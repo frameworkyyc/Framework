@@ -906,3 +906,18 @@ select.input {
   .feature__crest { grid-row: auto; padding: 40px 24px 20px; }
   .feature__detail { grid-template-columns: 1fr; }
 }
+
+/* Eagle's Nest panel — the client's own cream ground */
+.feature__crest--cream { background: #F3EEE1; color: #5F6A5C; }
+.feature__crest .feature__lockup { width: min(86%, 420px); }
+.feature__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+.feature__foot .work__link { margin-top: 16px; }
+.feature__foot { margin-top: 16px; border-top: 1px solid var(--hairline); }
+.feature__foot .work__status { margin-top: 0; padding-top: 12px; border-top: 0; }
+.feature__foot .work__link { margin-top: 10px; }
