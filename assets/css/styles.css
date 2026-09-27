@@ -921,3 +921,25 @@ select.input {
 .feature__foot { margin-top: 16px; border-top: 1px solid var(--hairline); }
 .feature__foot .work__status { margin-top: 0; padding-top: 12px; border-top: 0; }
 .feature__foot .work__link { margin-top: 10px; }
+
+/* Eagle's Nest — logo + wide photo, then a strip of on-site portraits */
+.feature__visuals--gallery { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+.feature__visuals--gallery .feature__crest { grid-row: auto; }
+.feature__photo--wide img { aspect-ratio: 3 / 2; }
+.feature__strip {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+.feature__strip .feature__photo img { aspect-ratio: 2 / 3; }
+.feature__credit {
+  grid-column: 1 / -1;
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: var(--slate);
+}
+@media (max-width: 640px) {
+  .feature__visuals--gallery { grid-template-columns: 1fr; }
+  .feature__strip { grid-template-columns: 1fr 1fr; gap: 12px; }
+}
