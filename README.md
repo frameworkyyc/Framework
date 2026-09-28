@@ -19,20 +19,9 @@ CNAME               Custom domain for GitHub Pages
 sitemap.xml, robots.txt
 ```
 
-## 1. Add your photos
+## 1. Photos
 
-These files are referenced by the pages but not included. Download them from the current site (or use new ones) and drop them into `assets/img/` with these exact names:
-
-| File | Used on |
-| --- | --- |
-| `site-structure.jpg` | Home — "On site" image |
-| `site-excavator.jpg` | About — field experience (left) |
-| `site-boots.jpg` | About — field experience (right) |
-| `site-wide.jpg` | The Method — build stage image |
-| `client-west-peak-logo.jpg` | Portfolio — West Peak Construction |
-| `client-red-e-logo.jpg` | Portfolio — Red E Corp. |
-
-Until a file is added, the page shows a hairline grid with the missing filename instead of a broken image. Photos are converted to greyscale by the stylesheet, so colour originals are fine. Keep each photo under ~400 KB (1600px wide JPG, quality ~75) for fast loading.
+All photos are included in `assets/img/`. The stylesheet shows Framework's own photos in black and white, so colour originals are fine. Client case studies on the portfolio page keep their original colour. To swap a photo, replace the file with one of the same name, ideally around 1000px wide and under ~300 KB.
 
 ## 2. Connect the contact form
 
