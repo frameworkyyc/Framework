@@ -55,10 +55,7 @@
   <section class="section">
     <div class="container contact">
       <div class="contact__form">
-        <!-- Replace YOUR_FORM_ID with your Formspree form ID (see README.md). -->
-        <form id="contact-form" action="https://formspree.io/f/YOUR_FORM_ID" method="POST" novalidate>
-          <input type="hidden" name="_subject" value="New project enquiry — frameworkco.ca">
-          <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
+        <form id="contact-form" data-mailto="hello@frameworkco.ca" novalidate>
           <div class="field">
             <label for="name">Full name</label>
             <input class="input" id="name" name="name" type="text" autocomplete="name" required aria-describedby="name-error">
@@ -90,11 +87,10 @@
             <p class="field__error" id="message-error">Tell us a bit about your business.</p>
           </div>
           <button class="btn btn--primary" type="submit">Send message</button>
-          <p class="form-status" id="form-status" role="alert" hidden></p>
         </form>
         <div class="success" id="form-success" tabindex="-1" hidden>
-          <h2 class="h3">Message sent.</h2>
-          <p class="muted">Thanks for reaching out — we'll be in touch within one to two business days to schedule a first conversation.</p>
+          <h2 class="h3">Almost there.</h2>
+          <p class="muted">Your email app should have opened with your message ready to send — just press send. If nothing opened, email us directly at <a href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a>. We'll be in touch within one to two business days.</p>
         </div>
       </div>
 

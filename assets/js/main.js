@@ -37,13 +37,11 @@
   });
 
   /* ---- Contact form ----
-     Sends to Formspree (see README). Validates required fields first. */
+     Validates required fields, then opens the visitor's email app with the message pre-filled. */
   var form = document.getElementById("contact-form");
   if (!form) return;
 
-  var status = document.getElementById("form-status");
   var success = document.getElementById("form-success");
-  var submit = form.querySelector('button[type="submit"]');
   var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   var validateField = function (input) {
@@ -63,14 +61,8 @@
     });
   });
 
-  var showStatus = function (msg) {
-    status.textContent = msg;
-    status.hidden = false;
-  };
-
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    status.hidden = true;
 
     var firstInvalid = null;
     form.querySelectorAll("[required]").forEach(function (input) {
@@ -78,29 +70,19 @@
     });
     if (firstInvalid) { firstInvalid.focus(); return; }
 
-    if (form.action.indexOf("YOUR_FORM_ID") !== -1) {
-      showStatus("This form isn't connected yet. Email hello@frameworkco.ca directly, or add your Formspree form ID in contact.html.");
-      return;
-    }
+    var val = function (id) { return form.elements[id].value.trim(); };
+    var lines = ["Name: " + val("name"), "Email: " + val("email")];
+    if (val("business")) lines.push("Business: " + val("business"));
+    if (val("project_type")) lines.push("Project type: " + val("project_type"));
+    lines.push("", val("message"));
 
-    submit.disabled = true;
-    submit.textContent = "Sending…";
+    var href = "mailto:" + form.dataset.mailto +
+      "?subject=" + encodeURIComponent("New project enquiry — frameworkco.ca") +
+      "&body=" + encodeURIComponent(lines.join("\n"));
 
-    fetch(form.action, {
-      method: "POST",
-      body: new FormData(form),
-      headers: { Accept: "application/json" }
-    })
-      .then(function (res) {
-        if (!res.ok) throw new Error("Request failed");
-        form.hidden = true;
-        success.hidden = false;
-        success.focus();
-      })
-      .catch(function () {
-        showStatus("Your message didn't send. Check your connection and try again, or email hello@frameworkco.ca directly.");
-        submit.disabled = false;
-        submit.textContent = "Send message";
-      });
+    form.hidden = true;
+    success.hidden = false;
+    success.focus();
+    window.location.href = href;
   });
 })();

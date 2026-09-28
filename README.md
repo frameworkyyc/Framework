@@ -23,15 +23,9 @@ sitemap.xml, robots.txt
 
 All photos are included in `assets/img/`. The stylesheet shows Framework's own photos in black and white, so colour originals are fine. Client case studies on the portfolio page keep their original colour. To swap a photo, replace the file with one of the same name, ideally around 1000px wide and under ~300 KB.
 
-## 2. Connect the contact form
+## 2. Contact form
 
-GitHub Pages can't process forms on its own, so the form sends through [Formspree](https://formspree.io) (free tier covers typical enquiry volume).
-
-1. Create a Formspree account and a new form pointed at hello@frameworkco.ca.
-2. Copy the form ID (the part after `/f/` in the endpoint).
-3. In `contact.html`, replace `YOUR_FORM_ID` in the form's `action` attribute.
-
-Until that's done, submitting the form shows a note directing people to email you directly.
+The form needs no setup. On submit it opens the visitor's email app with a pre-filled message to hello@frameworkco.ca (a `mailto:` link). To change the recipient, edit the `data-mailto` attribute on the form in `contact.html`.
 
 ## 3. Publish on GitHub Pages
 
