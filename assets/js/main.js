@@ -87,19 +87,16 @@
   });
 })();
 
-/* ---- Red E device mockup: scroll-driven screens ----
-   The phone capture travels up as the page scrolls; the laptop crossfades through real pages. */
+/* ---- Red E device mockup ----
+   Phone: the capture travels up as the page scrolls (--p, 0 to 1). */
 (function () {
   "use strict";
   var stage = document.getElementById("red-e-stage");
   if (!stage) return;
-  var pages = stage.querySelectorAll(".device__page");
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var fade = 0.3;
   var ticking = false;
 
   var clamp = function (v) { return Math.min(1, Math.max(0, v)); };
-  var smooth = function (t) { return t * t * (3 - 2 * t); };
 
   var render = function () {
     ticking = false;
@@ -110,10 +107,6 @@
       p = clamp((0.85 * vh - (r.top + r.height / 2)) / (0.6 * vh));
     }
     stage.style.setProperty("--p", p.toFixed(4));
-    var pos = p * (pages.length - 1);
-    for (var i = 1; i < pages.length; i++) {
-      pages[i].style.opacity = reduce.matches ? "" : smooth(clamp((pos - (i - 0.5) + fade / 2) / fade)).toFixed(3);
-    }
   };
   var request = function () {
     if (!ticking) { ticking = true; window.requestAnimationFrame(render); }
@@ -123,4 +116,65 @@
   window.addEventListener("resize", request);
   if (reduce.addEventListener) reduce.addEventListener("change", request);
   render();
+})();
+
+/* Laptop: auto-advancing carousel of real Red E pages. New page fades in over the old one (which
+   stays fully opaque underneath), so the screen is never blank. Click / Enter / Space advances now. */
+(function () {
+  "use strict";
+  var button = document.getElementById("red-e-carousel");
+  if (!button) return;
+  var pages = button.querySelectorAll(".device__page");
+  if (pages.length < 2) return;
+
+  var INTERVAL = 4000;
+  var FADE = 700;
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var index = 0;
+  var top = 1;
+  var timer = null;
+  var hovering = false;
+  var focused = false;
+
+  var label = function () {
+    button.setAttribute("aria-label", "Red E Corp. website preview: " + pages[index].getAttribute("data-title") +
+      ", " + (index + 1) + " of " + pages.length + ". Activate to show the next page.");
+  };
+
+  var show = function (next) {
+    var page = pages[next];
+    top += 1;
+    page.style.transition = "none";
+    page.style.opacity = "0";
+    page.style.zIndex = String(top);
+    void page.offsetWidth;
+    page.style.transition = reduce.matches ? "none" : "opacity " + FADE + "ms ease-in-out";
+    page.style.opacity = "1";
+    index = next;
+    label();
+  };
+
+  var stop = function () { window.clearTimeout(timer); timer = null; };
+  var schedule = function () {
+    stop();
+    if (reduce.matches || hovering || focused || document.hidden) return;
+    timer = window.setTimeout(function () { advance(); }, INTERVAL);
+  };
+  var advance = function () {
+    show((index + 1) % pages.length);
+    schedule();
+  };
+
+  button.addEventListener("click", advance);
+  button.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse") { hovering = true; stop(); } });
+  button.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") { hovering = false; schedule(); } });
+  /* keyboard focus pauses; a mouse click that leaves focus on the button does not */
+  button.addEventListener("focus", function () {
+    if (button.matches(":focus-visible")) { focused = true; stop(); }
+  });
+  button.addEventListener("blur", function () { focused = false; schedule(); });
+  document.addEventListener("visibilitychange", schedule);
+  if (reduce.addEventListener) reduce.addEventListener("change", schedule);
+
+  schedule();
 })();

@@ -998,7 +998,12 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 .device--laptop { aspect-ratio: 1555 / 1012; }
 .device--laptop .device__screen { left: 11.06%; top: 6.82%; width: 78.01%; height: 77.77%; border-radius: 1.24% / 1.9%; clip-path: inset(0 round 1.24% / 1.9%); }
 .device__page { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; opacity: 0; }
-.device__page:first-child { opacity: 1; }
+.device__page:first-child { opacity: 1; z-index: 1; }
+/* laptop screen is a button: click / tap / Enter / Space shows the next page */
+.device__carousel { appearance: none; -webkit-appearance: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; display: block; -webkit-tap-highlight-color: transparent; }
+.device__carousel:focus { outline: none; }
+/* focus ring sits on an overlay, above the stacked page images */
+.device__carousel:focus-visible::after { content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 1000; pointer-events: none; box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 6px #8A2E2A; }
 .device--phone { right: 0; bottom: 0; width: 22%; aspect-ratio: 388 / 800; z-index: 3; filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .28)); }
 /* screen opening is a rounded rect with a ~52px corner radius (of 354x772): clip the content to that exact shape.
    clip-path as well as border-radius, because Safari can ignore overflow rounding for transformed children. */
