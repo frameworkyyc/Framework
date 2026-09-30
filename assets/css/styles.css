@@ -996,7 +996,9 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 .device__screen { position: absolute; overflow: hidden; background: #17181A; z-index: 1; isolation: isolate; }
 .device--laptop { left: 0; top: 0; width: 88%; }
 .device--laptop { aspect-ratio: 1555 / 1012; }
-.device--laptop .device__screen { left: 11.06%; top: 6.82%; width: 78.01%; height: 77.77%; border-radius: 1.24% / 1.9%; clip-path: inset(0 round 1.24% / 1.9%); }
+/* opening is x172-1384, y69-855 of the 1555x1012 frame; its anti-aliased edge is ~3px wider, so the screen
+   extends 5px past the opening, tucked under the opaque bezel, or the page background shows through as a thin line */
+.device--laptop .device__screen { left: 10.74%; top: 6.32%; width: 78.65%; height: 78.75%; border-radius: 1.635% / 2.509%; clip-path: inset(0 round 1.635% / 2.509%); }
 .device__page { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; opacity: 0; }
 .device__page:first-child { opacity: 1; z-index: 1; }
 /* laptop screen is a button: click / tap / Enter / Space shows the next page */

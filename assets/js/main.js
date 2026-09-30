@@ -127,7 +127,7 @@
   var pages = button.querySelectorAll(".device__page");
   if (pages.length < 2) return;
 
-  var INTERVAL = 4000;
+  var INTERVAL = 2000;
   var FADE = 700;
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
   var index = 0;
