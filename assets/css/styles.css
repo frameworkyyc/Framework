@@ -982,10 +982,36 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
   .feature__strip--logos, .feature__strip--phones { grid-template-columns: repeat(3, 1fr); gap: 8px; }
 }
 
-/* Red E — desktop screenshots on wide screens, mobile screenshots on phones */
-.screens--mobile { display: none; }
+/* Red E — laptop + phone mockup; screens are driven by scroll (see main.js) */
+.device-stage {
+  --p: 0;
+  position: relative;
+  width: min(100%, 1040px);
+  margin: 0 auto;
+  aspect-ratio: 1555 / 1012;
+  margin-block: clamp(8px, 2vw, 24px);
+}
+.device { position: absolute; }
+.device__frame { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 2; }
+.device__screen { position: absolute; overflow: hidden; background: #17181A; z-index: 1; }
+.device--laptop { left: 0; top: 0; width: 88%; }
+.device--laptop { aspect-ratio: 1555 / 1012; }
+.device--laptop .device__screen { left: 11.06%; top: 6.82%; width: 78.01%; height: 77.77%; }
+.device__page { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; opacity: 0; }
+.device__page:first-child { opacity: 1; }
+.device--phone { right: 0; bottom: 0; width: 22%; aspect-ratio: 388 / 800; z-index: 3; filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .28)); }
+.device--phone .device__screen { left: 4.38%; top: 1.75%; width: 91.24%; height: 96.5%; }
+.device__scroll {
+  display: block; width: 100%; height: auto;
+  margin-top: 12.5%; /* starts below the Dynamic Island */
+  /* capture is 2576/782 of its width tall, the screen 772/354, plus the 12.5% top offset — total travel is 37.6% of its own height */
+  transform: translate3d(0, calc(var(--p) * -37.6%), 0);
+  will-change: transform;
+}
 @media (max-width: 640px) {
-  .screens--desktop { display: none; }
-  .screens--mobile { display: grid; }
-  .feature__credit.screens--mobile { display: block; }
+  .device--laptop { width: 86%; }
+  .device--phone { width: 30%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .device__scroll { will-change: auto; }
 }

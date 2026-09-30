@@ -86,3 +86,41 @@
     window.location.href = href;
   });
 })();
+
+/* ---- Red E device mockup: scroll-driven screens ----
+   The phone capture travels up as the page scrolls; the laptop crossfades through real pages. */
+(function () {
+  "use strict";
+  var stage = document.getElementById("red-e-stage");
+  if (!stage) return;
+  var pages = stage.querySelectorAll(".device__page");
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var fade = 0.3;
+  var ticking = false;
+
+  var clamp = function (v) { return Math.min(1, Math.max(0, v)); };
+  var smooth = function (t) { return t * t * (3 - 2 * t); };
+
+  var render = function () {
+    ticking = false;
+    var p = 0;
+    if (!reduce.matches) {
+      var r = stage.getBoundingClientRect();
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      p = clamp((0.85 * vh - (r.top + r.height / 2)) / (0.6 * vh));
+    }
+    stage.style.setProperty("--p", p.toFixed(4));
+    var pos = p * (pages.length - 1);
+    for (var i = 1; i < pages.length; i++) {
+      pages[i].style.opacity = reduce.matches ? "" : smooth(clamp((pos - (i - 0.5) + fade / 2) / fade)).toFixed(3);
+    }
+  };
+  var request = function () {
+    if (!ticking) { ticking = true; window.requestAnimationFrame(render); }
+  };
+
+  window.addEventListener("scroll", request, { passive: true });
+  window.addEventListener("resize", request);
+  if (reduce.addEventListener) reduce.addEventListener("change", request);
+  render();
+})();
