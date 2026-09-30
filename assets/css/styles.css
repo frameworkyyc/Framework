@@ -1009,12 +1009,15 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 .device--phone { right: 0; bottom: 0; width: 22%; aspect-ratio: 388 / 800; z-index: 3; filter: drop-shadow(0 12px 24px rgba(0, 0, 0, .28)); }
 /* screen opening is a rounded rect with a ~52px corner radius (of 354x772): clip the content to that exact shape.
    clip-path as well as border-radius, because Safari can ignore overflow rounding for transformed children. */
-.device--phone .device__screen { left: 4.38%; top: 1.75%; width: 91.24%; height: 96.5%; border-radius: 14.7% / 6.74%; clip-path: inset(0 round 14.7% / 6.74%); }
+/* opening is x17-370, y14-785 of the 388x800 frame, but the frame is only fully opaque up to 1px short of it, so
+   the screen extends 3px past the opening (x14-373, y11-788, 360x778), tucked under the bezel; otherwise the page
+   background shows through as a thin line. Corner radius 52 + 3 = 55px. */
+.device--phone .device__screen { left: 3.608%; top: 1.375%; width: 92.784%; height: 97.25%; border-radius: 15.28% / 7.07%; clip-path: inset(0 round 15.28% / 7.07%); }
 .device__scroll {
   display: block; width: 100%; height: auto;
-  margin-top: 12.5%; /* starts below the Dynamic Island */
-  /* capture is 2576/782 of its width tall, the screen 772/354, plus the 12.5% top offset — total travel is 37.6% of its own height */
-  transform: translate3d(0, calc(var(--p) * -37.6%), 0);
+  margin-top: 13.06%; /* starts below the Dynamic Island (47px of 360) */
+  /* capture is 2576/782 of the screen width tall (1186px of 360), the screen 778px, plus the 47px top offset: total travel is 38.36% of its own height */
+  transform: translate3d(0, calc(var(--p) * -38.36%), 0);
   will-change: transform;
 }
 @media (max-width: 640px) {

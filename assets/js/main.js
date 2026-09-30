@@ -119,7 +119,8 @@
 })();
 
 /* Laptop: auto-advancing carousel of real Red E pages. New page fades in over the old one (which
-   stays fully opaque underneath), so the screen is never blank. Click / Enter / Space advances now. */
+   stays fully opaque underneath), so the screen is never blank. Click / Enter / Space advances now.
+   Nothing runs until the laptop is on screen: the first page shows at once, moves on after ~1s, then every 4s. */
 (function () {
   "use strict";
   var button = document.getElementById("red-e-carousel");
@@ -127,12 +128,15 @@
   var pages = button.querySelectorAll(".device__page");
   if (pages.length < 2) return;
 
-  var INTERVAL = 2000;
+  var INTERVAL = 4000;
+  var FIRST_DELAY = 1000;
   var FADE = 700;
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
   var index = 0;
   var top = 1;
   var timer = null;
+  var visible = false;
+  var started = false;
   var hovering = false;
   var focused = false;
 
@@ -155,26 +159,37 @@
   };
 
   var stop = function () { window.clearTimeout(timer); timer = null; };
-  var schedule = function () {
+  var schedule = function (delay) {
     stop();
-    if (reduce.matches || hovering || focused || document.hidden) return;
-    timer = window.setTimeout(function () { advance(); }, INTERVAL);
+    if (!visible || reduce.matches || hovering || focused || document.hidden) return;
+    timer = window.setTimeout(function () { advance(); }, typeof delay === "number" ? delay : INTERVAL);
   };
   var advance = function () {
     show((index + 1) % pages.length);
-    schedule();
+    schedule(INTERVAL);
   };
+
+  var onVisible = function (isVisible) {
+    visible = isVisible;
+    if (!visible) { stop(); return; }
+    if (!started) { started = true; schedule(FIRST_DELAY); } else { schedule(INTERVAL); }
+  };
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function (entries) {
+      onVisible(entries[entries.length - 1].isIntersecting);
+    }, { threshold: 0.4 }).observe(button);
+  } else {
+    onVisible(true);
+  }
 
   button.addEventListener("click", advance);
   button.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse") { hovering = true; stop(); } });
-  button.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") { hovering = false; schedule(); } });
+  button.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") { hovering = false; schedule(INTERVAL); } });
   /* keyboard focus pauses; a mouse click that leaves focus on the button does not */
   button.addEventListener("focus", function () {
     if (button.matches(":focus-visible")) { focused = true; stop(); }
   });
-  button.addEventListener("blur", function () { focused = false; schedule(); });
-  document.addEventListener("visibilitychange", schedule);
-  if (reduce.addEventListener) reduce.addEventListener("change", schedule);
-
-  schedule();
+  button.addEventListener("blur", function () { focused = false; schedule(INTERVAL); });
+  document.addEventListener("visibilitychange", function () { schedule(started ? INTERVAL : FIRST_DELAY); });
+  if (reduce.addEventListener) reduce.addEventListener("change", function () { schedule(INTERVAL); });
 })();
