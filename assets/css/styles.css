@@ -948,6 +948,7 @@ select.input {
 .feature__visuals--screens { grid-template-columns: 1fr; }
 .feature__screen { background: #071A24; border: 1px solid var(--hairline); }
 .feature__screen img { aspect-ratio: 16 / 10; }
+.feature__screen--dark { background: #17181A; }
 .feature__strip--3 { grid-template-columns: repeat(3, 1fr); }
 .feature__strip--3 .feature__photo img { aspect-ratio: 16 / 10; }
 @media (max-width: 640px) {
