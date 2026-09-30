@@ -981,3 +981,11 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 @media (max-width: 640px) {
   .feature__strip--logos, .feature__strip--phones { grid-template-columns: repeat(3, 1fr); gap: 8px; }
 }
+
+/* Red E — desktop screenshots on wide screens, mobile screenshots on phones */
+.screens--mobile { display: none; }
+@media (max-width: 640px) {
+  .screens--desktop { display: none; }
+  .screens--mobile { display: grid; }
+  .feature__credit.screens--mobile { display: block; }
+}
