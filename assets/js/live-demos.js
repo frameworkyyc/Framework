@@ -11,7 +11,7 @@
      Production URL below; nothing else needs to change. */
   var DEMOS = {
     aurora: {
-      production: null,
+      production: "https://aurora.frameworkco.ca/?portfolioDemo=1",
       preview: "https://staging.aurora.frameworkco.ca/?portfolioDemo=1"
     }
   };
