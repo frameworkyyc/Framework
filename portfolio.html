@@ -71,7 +71,7 @@
 
         <div class="device-stage" id="red-e-stage">
           <div class="device device--laptop">
-            <button class="device__screen device__carousel" id="red-e-carousel" type="button" aria-label="Red E Corp. website preview: home page, 1 of 4. Activate to show the next page.">
+            <button class="device__screen device__carousel" id="red-e-carousel" data-site="Red E Corp." type="button" aria-label="Red E Corp. website preview: home page, 1 of 4. Activate to show the next page.">
               <img class="device__page" src="assets/img/red-e-site-home.jpg" alt="" data-title="home page" width="1600" height="1047">
               <img class="device__page" src="assets/img/red-e-site-consulting.jpg" alt="" data-title="Consulting page" width="1600" height="940">
               <img class="device__page" src="assets/img/red-e-site-credentials.jpg" alt="" data-title="credentials and trades" width="1600" height="1047">
@@ -217,32 +217,36 @@
             <span class="eyebrow">Case study</span>
             <span class="work__cat">Geomatics engineering — British Columbia &amp; the Canadian North</span>
             <h2 class="h2" id="au-title">Aurora Surveys</h2>
-            <p class="lead">A logo and website that show the survey work instead of describing it.</p>
+            <p class="lead">A website that shows the survey work instead of describing it.</p>
           </div>
           <div class="feature__summary">
             <p class="muted">Aurora Surveys provides geomatics engineering and reality capture for transportation, hydroelectric, mining, and energy projects — from downtown Vancouver to Baffin Island.</p>
-            <p>A 3D total station walks through a field setup. A traverse map plots each project by latitude. An animated point cloud shows how ten million raw returns become a usable deliverable.</p>
+            <p>Aurora supplied their own logo and identity. We designed and built the website around it: a 3D total station walks through a field setup, a traverse map plots each project by latitude, and an animated point cloud shows how ten million raw returns become a usable deliverable.</p>
           </div>
         </div>
 
-        <div class="feature__visuals feature__visuals--screens">
-          <div class="feature__strip feature__strip--3 feature__strip--logos">
-            <div class="feature__photo feature__screen"><img src="assets/img/aurora-logo-framed.jpg" alt="Aurora Surveys framed logo: green aurora bands over a mountain ridge, breaking out of an open frame, above the wordmark" loading="lazy" width="900" height="900"></div>
-            <div class="feature__photo feature__screen"><img src="assets/img/aurora-logo-lockup.jpg" alt="Aurora Surveys open lockup: aurora bands and wordmark without the frame, on a night-blue gradient" loading="lazy" width="900" height="900"></div>
-            <div class="feature__photo feature__screen"><img src="assets/img/aurora-logo-light.jpg" alt="Aurora Surveys logo in green and black on white" loading="lazy" width="900" height="900"></div>
+        <div class="device-stage device-stage--aurora" id="aurora-stage">
+          <div class="device device--laptop">
+            <button class="device__screen device__carousel" id="aurora-carousel" data-site="Aurora Surveys" type="button" aria-label="Aurora Surveys website preview: home page, 1 of 4. Activate to show the next page.">
+              <img class="device__page" src="assets/img/aurora-hero.jpg" alt="" data-title="home page, animated aurora hero" width="1600" height="1000">
+              <img class="device__page" src="assets/img/aurora-station.jpg" alt="" data-title="3D total station walkthrough" width="1200" height="750">
+              <img class="device__page" src="assets/img/aurora-traverse.jpg" alt="" data-title="project traverse map" width="1200" height="750">
+              <img class="device__page" src="assets/img/aurora-point-cloud.jpg" alt="" data-title="point-cloud explainer" width="1200" height="750">
+            </button>
+            <img class="device__frame" src="assets/img/device-macbook.png" alt="" width="1555" height="1012" aria-hidden="true">
           </div>
-          <p class="feature__credit">Logo system — framed mark, open lockup, and light version</p>
-          <div class="feature__strip feature__strip--3 feature__strip--phones">
-            <div class="feature__photo feature__screen"><img src="assets/img/aurora-mobile-station.jpg" alt="Aurora Surveys website on a phone: a 3D total station on its tripod beside the Orient and Observe steps" loading="lazy" width="720" height="1280"></div>
-            <div class="feature__photo feature__screen"><img src="assets/img/aurora-mobile-map.jpg" alt="Aurora Surveys website on a phone: the Where we work map, 49.28°N to 66.00°N, starting at Vancouver" loading="lazy" width="720" height="1280"></div>
-            <div class="feature__photo feature__screen"><img src="assets/img/aurora-mobile-traverse.jpg" alt="Aurora Surveys website on a phone: the traverse line running from Vancouver to Port Alice with station details" loading="lazy" width="720" height="1280"></div>
+          <div class="device device--phone">
+            <div class="device__screen">
+              <img class="device__scroll" src="assets/img/aurora-mobile-map.jpg" alt="Aurora Surveys website on a phone: the Where we work map, 49.28°N to 66.00°N, starting at Vancouver" width="720" height="1280" loading="lazy">
+            </div>
+            <img class="device__frame" src="assets/img/device-iphone.png" alt="" width="388" height="800" aria-hidden="true">
           </div>
-          <p class="feature__credit">The Aurora Surveys website on mobile</p>
         </div>
+        <p class="feature__credit">The Aurora Surveys website on desktop and mobile — designed and built by Framework</p>
 
         <div class="feature__detail">
           <div>
-            <h3 class="feature__label">Colour system</h3>
+            <h3 class="feature__label">Website palette</h3>
             <ul class="swatches">
               <li><span class="swatch" style="background:#071A24"></span><strong>Night</strong><span>#071A24</span></li>
               <li><span class="swatch" style="background:#0F2D3D"></span><strong>Navy</strong><span>#0F2D3D</span></li>
@@ -254,9 +258,9 @@
           <div>
             <h3 class="feature__label">Delivered</h3>
             <ul class="checklist">
-              <li>Logo &amp; identity system</li>
+              <li>Website design &amp; build</li>
               <li>Five-page website</li>
-              <li>Animated aurora logo hero</li>
+              <li>Animated aurora hero</li>
               <li>Interactive 3D total station</li>
               <li>Project traverse map, 49°N to 66°N</li>
               <li>Point-cloud process explainer</li>
@@ -276,7 +280,7 @@
           </div>
         </div>
         <div class="feature__foot">
-          <p class="work__status">Framework client — Logo, website design &amp; build</p>
+          <p class="work__status">Framework client — Website design &amp; build</p>
         </div>
       </article>
     </div>

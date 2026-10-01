@@ -982,7 +982,7 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
   .feature__strip--logos, .feature__strip--phones { grid-template-columns: repeat(3, 1fr); gap: 8px; }
 }
 
-/* Red E — laptop + phone mockup; screens are driven by scroll (see main.js) */
+/* Laptop + phone mockups (Red E, Aurora Surveys); behaviour in main.js */
 .device-stage {
   --p: 0;
   position: relative;
@@ -993,7 +993,7 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 }
 .device { position: absolute; }
 .device__frame { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 2; }
-.device__screen { position: absolute; overflow: hidden; background: #17181A; z-index: 1; isolation: isolate; }
+.device__screen { position: absolute; overflow: hidden; background: var(--screen-bg, #17181A); z-index: 1; isolation: isolate; }
 .device--laptop { left: 0; top: 0; width: 88%; }
 .device--laptop { aspect-ratio: 1555 / 1012; }
 /* opening is x172-1384, y69-855 of the 1555x1012 frame; its anti-aliased edge is ~3px wider, so the screen
@@ -1016,10 +1016,12 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 .device__scroll {
   display: block; width: 100%; height: auto;
   margin-top: 13.06%; /* starts below the Dynamic Island (47px of 360) */
-  /* capture is 2576/782 of the screen width tall (1186px of 360), the screen 778px, plus the 47px top offset: total travel is 38.36% of its own height */
-  transform: translate3d(0, calc(var(--p) * -38.36%), 0);
+  /* --travel (px) is how far the capture overflows the screen; main.js measures it. No overflow, no movement. */
+  transform: translate3d(0, calc(var(--p, 0) * var(--travel, 0px) * -1), 0);
   will-change: transform;
 }
+/* Aurora Surveys: the site is a near-black navy, so any screen not filled by a capture matches it */
+.device-stage--aurora { --screen-bg: #071923; }
 @media (max-width: 640px) {
   .device--laptop { width: 86%; }
   .device--phone { width: 30%; }

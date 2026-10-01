@@ -87,109 +87,132 @@
   });
 })();
 
-/* ---- Red E device mockup ----
-   Phone: the capture travels up as the page scrolls (--p, 0 to 1). */
+/* ---- Device mockups (laptop + phone) on the portfolio ----
+   Every .device-stage on the page gets two behaviours:
+   - Phone: the .device__scroll capture travels up as the page scrolls (--p, 0 to 1), by exactly as far as it
+     overflows the phone screen (--travel). A capture that fits the screen simply doesn't move.
+   - Laptop: the .device__carousel button cycles through its .device__page screenshots on its own. */
 (function () {
   "use strict";
-  var stage = document.getElementById("red-e-stage");
-  if (!stage) return;
+  var stages = Array.prototype.slice.call(document.querySelectorAll(".device-stage"));
+  if (!stages.length) return;
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var ticking = false;
-
   var clamp = function (v) { return Math.min(1, Math.max(0, v)); };
 
+  /* ---------- Phone: scroll-driven ---------- */
+
+  var measure = function (stage) {
+    var img = stage.querySelector(".device__scroll");
+    if (!img) return;
+    var screen = img.parentElement;
+    var top = parseFloat(window.getComputedStyle(img).marginTop) || 0;
+    var travel = Math.max(0, img.getBoundingClientRect().height + top - screen.getBoundingClientRect().height);
+    stage.style.setProperty("--travel", travel.toFixed(1) + "px");
+  };
+
+  var ticking = false;
   var render = function () {
     ticking = false;
-    var p = 0;
-    if (!reduce.matches) {
-      var r = stage.getBoundingClientRect();
-      var vh = window.innerHeight || document.documentElement.clientHeight;
-      p = clamp((0.85 * vh - (r.top + r.height / 2)) / (0.6 * vh));
-    }
-    stage.style.setProperty("--p", p.toFixed(4));
+    var vh = window.innerHeight || document.documentElement.clientHeight;
+    stages.forEach(function (stage) {
+      var p = 0;
+      if (!reduce.matches) {
+        var r = stage.getBoundingClientRect();
+        p = clamp((0.85 * vh - (r.top + r.height / 2)) / (0.6 * vh));
+      }
+      stage.style.setProperty("--p", p.toFixed(4));
+    });
   };
   var request = function () {
     if (!ticking) { ticking = true; window.requestAnimationFrame(render); }
   };
+  var remeasure = function () { stages.forEach(measure); request(); };
 
+  stages.forEach(function (stage) {
+    var img = stage.querySelector(".device__scroll");
+    if (img && !img.complete) img.addEventListener("load", remeasure);
+  });
   window.addEventListener("scroll", request, { passive: true });
-  window.addEventListener("resize", request);
+  window.addEventListener("resize", remeasure);
+  window.addEventListener("load", remeasure);
   if (reduce.addEventListener) reduce.addEventListener("change", request);
-  render();
+  remeasure();
 })();
 
-/* Laptop: auto-advancing carousel of real Red E pages. New page fades in over the old one (which
-   stays fully opaque underneath), so the screen is never blank. Click / Enter / Space advances now.
+/* Laptop: auto-advancing carousel of real pages. A new page fades in over the old one (which stays fully
+   opaque underneath), so the screen is never blank. Click / Enter / Space advances now.
    Nothing runs until the laptop is on screen: the first page shows at once, moves on after ~1s, then every 4s. */
 (function () {
   "use strict";
-  var button = document.getElementById("red-e-carousel");
-  if (!button) return;
-  var pages = button.querySelectorAll(".device__page");
-  if (pages.length < 2) return;
-
   var INTERVAL = 4000;
   var FIRST_DELAY = 1000;
   var FADE = 700;
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var index = 0;
-  var top = 1;
-  var timer = null;
-  var visible = false;
-  var started = false;
-  var hovering = false;
-  var focused = false;
 
-  var label = function () {
-    button.setAttribute("aria-label", "Red E Corp. website preview: " + pages[index].getAttribute("data-title") +
-      ", " + (index + 1) + " of " + pages.length + ". Activate to show the next page.");
-  };
+  Array.prototype.forEach.call(document.querySelectorAll(".device__carousel"), function (button) {
+    var pages = button.querySelectorAll(".device__page");
+    if (pages.length < 2) return;
 
-  var show = function (next) {
-    var page = pages[next];
-    top += 1;
-    page.style.transition = "none";
-    page.style.opacity = "0";
-    page.style.zIndex = String(top);
-    void page.offsetWidth;
-    page.style.transition = reduce.matches ? "none" : "opacity " + FADE + "ms ease-in-out";
-    page.style.opacity = "1";
-    index = next;
-    label();
-  };
+    var site = button.getAttribute("data-site") || "Website";
+    var index = 0;
+    var top = 1;
+    var timer = null;
+    var visible = false;
+    var started = false;
+    var hovering = false;
+    var focused = false;
 
-  var stop = function () { window.clearTimeout(timer); timer = null; };
-  var schedule = function (delay) {
-    stop();
-    if (!visible || reduce.matches || hovering || focused || document.hidden) return;
-    timer = window.setTimeout(function () { advance(); }, typeof delay === "number" ? delay : INTERVAL);
-  };
-  var advance = function () {
-    show((index + 1) % pages.length);
-    schedule(INTERVAL);
-  };
+    var label = function () {
+      button.setAttribute("aria-label", site + " website preview: " + pages[index].getAttribute("data-title") +
+        ", " + (index + 1) + " of " + pages.length + ". Activate to show the next page.");
+    };
 
-  var onVisible = function (isVisible) {
-    visible = isVisible;
-    if (!visible) { stop(); return; }
-    if (!started) { started = true; schedule(FIRST_DELAY); } else { schedule(INTERVAL); }
-  };
-  if ("IntersectionObserver" in window) {
-    new IntersectionObserver(function (entries) {
-      onVisible(entries[entries.length - 1].isIntersecting);
-    }, { threshold: 0.4 }).observe(button);
-  } else {
-    onVisible(true);
-  }
+    var show = function (next) {
+      var page = pages[next];
+      top += 1;
+      page.style.transition = "none";
+      page.style.opacity = "0";
+      page.style.zIndex = String(top);
+      void page.offsetWidth;
+      page.style.transition = reduce.matches ? "none" : "opacity " + FADE + "ms ease-in-out";
+      page.style.opacity = "1";
+      index = next;
+      label();
+    };
 
-  button.addEventListener("click", advance);
-  button.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse") { hovering = true; stop(); } });
-  button.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") { hovering = false; schedule(INTERVAL); } });
-  /* keyboard focus pauses; a mouse click that leaves focus on the button does not */
-  button.addEventListener("focus", function () {
-    if (button.matches(":focus-visible")) { focused = true; stop(); }
+    var stop = function () { window.clearTimeout(timer); timer = null; };
+    var schedule = function (delay) {
+      stop();
+      if (!visible || reduce.matches || hovering || focused || document.hidden) return;
+      timer = window.setTimeout(function () { advance(); }, typeof delay === "number" ? delay : INTERVAL);
+    };
+    var advance = function () {
+      show((index + 1) % pages.length);
+      schedule(INTERVAL);
+    };
+
+    var onVisible = function (isVisible) {
+      visible = isVisible;
+      if (!visible) { stop(); return; }
+      if (!started) { started = true; schedule(FIRST_DELAY); } else { schedule(INTERVAL); }
+    };
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(function (entries) {
+        onVisible(entries[entries.length - 1].isIntersecting);
+      }, { threshold: 0.4 }).observe(button);
+    } else {
+      onVisible(true);
+    }
+
+    button.addEventListener("click", advance);
+    button.addEventListener("pointerenter", function (e) { if (e.pointerType === "mouse") { hovering = true; stop(); } });
+    button.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse") { hovering = false; schedule(INTERVAL); } });
+    /* keyboard focus pauses; a mouse click that leaves focus on the button does not */
+    button.addEventListener("focus", function () {
+      if (button.matches(":focus-visible")) { focused = true; stop(); }
+    });
+    button.addEventListener("blur", function () { focused = false; schedule(INTERVAL); });
+    document.addEventListener("visibilitychange", function () { schedule(started ? INTERVAL : FIRST_DELAY); });
+    if (reduce.addEventListener) reduce.addEventListener("change", function () { schedule(INTERVAL); });
   });
-  button.addEventListener("blur", function () { focused = false; schedule(INTERVAL); });
-  document.addEventListener("visibilitychange", function () { schedule(started ? INTERVAL : FIRST_DELAY); });
-  if (reduce.addEventListener) reduce.addEventListener("change", function () { schedule(INTERVAL); });
 })();
