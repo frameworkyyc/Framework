@@ -1026,6 +1026,17 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 .device__live { display: none; pointer-events: none; }
 .device-stage.is-live .device__live { display: block; }
 .device-stage.is-live .device__static { display: none; }
+/* The phone's drop shadow on a live-demo stage is a plain box-shadow on a layer behind the screen, not a CSS filter:
+   Safari clips a filter to the element's box when a live iframe is inside it, which left a hard-edged pale rectangle
+   around the phone (iPhone Safari). Same shadow, shaped to the phone's outline (corner radius 78px of 388 x 800). */
+.device-stage.is-live .device--phone { filter: none; }
+.device-stage.is-live .device--phone::before {
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  border-radius: 20.1% / 9.75%;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, .28); /* = the old filter's drop-shadow(0 12px 24px): its blur is a std-dev, this one a diameter */
+  pointer-events: none;
+}
+
 .device__live-frame {
   position: absolute; left: 0; top: 0;
   margin: 0; padding: 0; border: 0; max-width: none;
