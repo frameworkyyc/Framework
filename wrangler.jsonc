@@ -11,8 +11,12 @@
   },
   // Private client feedback responses. Leaving out "database_id" lets Wrangler create this
   // D1 database on first deploy (see README → "Client feedback form").
-  "d1_databases": [
-    { "binding": "DB", "database_name": "framework-feedback" }
+  "d1_databases": [ 
+    {
+  "binding": "DB",
+  "database_name": "framework-feedback",
+  "database_id": "47d90f94-3846-4711-9495-ab3479431a6f"
+}
   ],
-  "previews": {}
+  "previews": {}git branch --show-current
 }
