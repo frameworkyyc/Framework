@@ -16,7 +16,11 @@ client-feedback.html  Private client feedback form (unlisted, noindex) → /clie
 assets/css/styles.css   All styling (brand tokens at the top)
 assets/js/main.js       Mobile menu, image placeholders, contact form, Red E mockup
 assets/js/feedback.js   Client feedback form (steps, validation, submit)
-worker/index.js         Cloudflare Worker: /api/feedback (store) and /api/feedback/export
+worker/index.js         Cloudflare Worker entry: /api/feedback (store), /api/feedback/export, routes /admin
+worker/shared.js        Columns, schema, JSON/CSV helpers shared by the form and the admin
+worker/admin/           Framework Admin back end: Access token check (access.js), API (feedback-api.js), router
+worker/test/            Unit tests for the admin authentication (node --test worker/test/*.test.mjs)
+admin/                  Framework Admin front end (static app served only after authentication)
 migrations/             Reference SQL for the feedback table (the Worker also creates it)
 wrangler.jsonc          Cloudflare config (static assets, Worker, D1 database)
 _headers                Security headers for the feedback page
@@ -58,6 +62,45 @@ The form needs no setup. On submit it opens the visitor's email app with a pre-f
 Revenue is optional and is stored per response (it needs to be to produce combined statistics); only ever publish combined figures. To delete a response: `DELETE FROM feedback_responses WHERE id = '...'` in the D1 console.
 
 **Local testing:** `npx wrangler dev --var FEEDBACK_EXPORT_TOKEN:test` serves the site and the API with a local D1 database (kept in `.wrangler/`, which is git-ignored).
+
+## 2c. Framework Admin (private)
+
+`/admin` is an internal admin area. Today it has two working modules, **Overview** and **Feedback** (`/admin/feedback`, and one response at `/admin/feedback/<id>`); the other modules are listed as "Later" in the sidebar and do nothing yet. It reads the same D1 table the feedback form writes to (`feedback_responses`); there is no second database.
+
+**Security model (read this before changing anything).** Two independent locks:
+
+1. **Cloudflare Access** is the front door for `/admin*` and `/api/admin*`: nobody reaches the app without logging in.
+2. **The Worker verifies the Access token itself** on every `/admin` and `/api/admin` request (`worker/admin/access.js`): RS256 signature against your team's published keys, issuer, audience, expiry, and that the email is in `ADMIN_EMAILS`. If any setting is missing it denies everything. So a wrong Access policy, a `workers.dev` URL or a Preview URL still cannot reveal any feedback. Static admin files are only served after this check (they are listed under `assets.run_worker_first`).
+
+Writes (mark reviewed, delete) additionally require a same-origin request with the `X-Framework-Admin` header, which blocks cross-site request forgery. Admin authorisation is separate from any future client login: a valid Access login alone does not make someone an admin.
+
+**One-time Cloudflare setup**
+
+1. *Create the Access application.* Zero Trust dashboard → **Access → Applications → Add an application → Self-hosted**. Add these destinations (repeat for `staging.frameworkco.ca` if you want Staging protected too):
+   `frameworkco.ca` path `/admin*`, and `frameworkco.ca` path `/api/admin*`.
+   Add a policy: **Allow**, Include → **Emails** → your email address. Login method: One-time PIN is fine. Save.
+2. *Copy two values.* From the application's overview, the **Application Audience (AUD) Tag**. And your **team domain** (Zero Trust → Settings → General → Team domain), which looks like `yourteam.cloudflareaccess.com`.
+3. *Set three secrets on the Worker* (secrets survive deploys, unlike plain variables):
+   ```
+   npx wrangler secret put ACCESS_TEAM_DOMAIN     # yourteam.cloudflareaccess.com
+   npx wrangler secret put ACCESS_AUD             # the AUD tag (several, comma-separated, are allowed)
+   npx wrangler secret put ADMIN_EMAILS           # you@yourdomain.com  (comma-separated for more than one admin)
+   ```
+   **Staging** is a Preview and does not share these. Put the three values in a file (`.env` format, e.g. `staging-secrets.env`, never committed) and run
+   `npx wrangler preview secret bulk staging-secrets.env --name Staging`, or set them once for every Preview with `npx wrangler preview base-config secret put <KEY>`.
+4. *Enable "Reviewed" (optional).* The Feedback pages work without it. To turn it on, run **once** in the D1 console (or `npx wrangler d1 execute framework-feedback --remote --file migrations/0002_add_reviewed_at.sql`):
+   `ALTER TABLE feedback_responses ADD COLUMN reviewed_at TEXT;`
+   It adds one empty column and changes no existing data; the admin notices within about 30 seconds. A second run fails harmlessly ("duplicate column").
+
+**Admin API** (all require the Access token; JSON, never cached): `GET /api/admin/me`, `/api/admin/overview`, `/api/admin/feedback`, `/api/admin/feedback/<id>`, `/api/admin/feedback/export` (CSV of everything), `/api/admin/feedback/<id>/export` (CSV, or `?format=json`), `PATCH /api/admin/feedback/<id>` (`{"reviewed": true|false}`), `DELETE /api/admin/feedback/<id>`.
+
+The older `GET /api/feedback/export` (bearer token) still works unchanged; the admin's **Export CSV** button replaces its day-to-day use.
+
+**Adding a module later** (Clients, Projects, Files…): add `admin/assets/<name>.js` exporting `render(ctx)`, switch the entry in `admin/assets/modules.js` to `enabled: true`, and add an API handler to the list in `worker/admin/router.js`. The shell, navigation and router need no changes.
+
+**Local testing.** `node --test worker/test/*.test.mjs` runs the authentication tests. To try the admin under `npx wrangler dev`, you need a signed test token; the tests show how to mint one, and `ACCESS_JWKS_JSON` can pin test keys locally (leave it unset in real deployments).
+
+**"Needs attention"** in the Feedback filters means: satisfaction or recommendation of 6 or below, any 1–5 rating of 2 or below, or the new site rated "Worse" than before.
 
 ## 3. Publish on GitHub Pages
 

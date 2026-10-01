@@ -6,8 +6,9 @@
   "assets": {
     "directory": "./",
     "binding": "ASSETS",
-    // The Worker only runs for the API; every page is still served straight from static assets.
-    "run_worker_first": ["/api/*"]
+    // The Worker runs for the API and for the private admin area (it checks the Cloudflare Access token before
+    // serving anything under /admin). Every public page is still served straight from static assets.
+    "run_worker_first": ["/api/*", "/admin", "/admin/*"]
   },
   // Private client feedback responses (D1). This binding is used by normal `wrangler deploy` deployments.
   "d1_databases": [
