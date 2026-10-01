@@ -1,7 +1,12 @@
 wrangler.jsonc
 .assetsignore
+.gitignore
 README.md
 CNAME
 .git/
 .github/
 node_modules/
+.wrangler/
+.dev.vars
+worker/
+migrations/

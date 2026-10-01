@@ -1,0 +1,9 @@
+# Private client feedback page: keep out of search engines and caches, don't leak the URL via Referer.
+/client-feedback
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+/client-feedback.html
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store

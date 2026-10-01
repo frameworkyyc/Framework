@@ -1,6 +1,6 @@
 # Framework — frameworkco.ca
 
-Static website for Framework. Plain HTML, CSS, and JavaScript — no build step, no framework, no dependencies. Built to be hosted on GitHub Pages.
+Static website for Framework. Plain HTML, CSS, and JavaScript — no build step, no framework, no dependencies. Hosted on Cloudflare (static assets plus one small Worker for the private client feedback form); the pages themselves also work on any static host.
 
 ## Structure
 
@@ -11,9 +11,15 @@ services.html       Services (anchors: #strategy #branding #website #digital-pre
 method.html         The Framework Method
 portfolio.html      Portfolio
 contact.html        Contact form
+client-feedback.html  Private client feedback form (unlisted, noindex) → /client-feedback
 404.html            Not-found page
 assets/css/styles.css   All styling (brand tokens at the top)
-assets/js/main.js       Mobile menu, image placeholders, contact form
+assets/js/main.js       Mobile menu, image placeholders, contact form, Red E mockup
+assets/js/feedback.js   Client feedback form (steps, validation, submit)
+worker/index.js         Cloudflare Worker: /api/feedback (store) and /api/feedback/export
+migrations/             Reference SQL for the feedback table (the Worker also creates it)
+wrangler.jsonc          Cloudflare config (static assets, Worker, D1 database)
+_headers                Security headers for the feedback page
 assets/img/             Logo, favicons, social share image, photos
 CNAME               Custom domain for GitHub Pages
 sitemap.xml, robots.txt
@@ -26,6 +32,32 @@ All photos are included in `assets/img/`. The stylesheet shows Framework's own p
 ## 2. Contact form
 
 The form needs no setup. On submit it opens the visitor's email app with a pre-filled message to hello@frameworkco.ca (a `mailto:` link). To change the recipient, edit the `data-mailto` attribute on the form in `contact.html`.
+
+## 2b. Client feedback form (private)
+
+`/client-feedback` is a permanent feedback form to send to clients after a project. It is **not** linked from the navigation, footer, or `sitemap.xml`, is not listed in `robots.txt`, and carries `noindex, nofollow` (meta tag plus an `X-Robots-Tag` header from `_headers`).
+
+**How responses are stored.** The form posts JSON to `/api/feedback`, handled by `worker/index.js`, which validates every field on the server and saves one row per submission in a Cloudflare **D1** database (`framework-feedback`, binding `DB`). Nothing is stored in the page source or in the browser. Repeat submissions of the same form are ignored (each page load has a unique id), a hidden honeypot field silently drops bots, and the Worker accepts at most 40 submissions per 10 minutes site-wide.
+
+**One-time setup (Cloudflare):**
+
+1. **Deploy.** `wrangler.jsonc` declares the D1 binding without a `database_id`, so the first deploy creates the `framework-feedback` database for you. (If your build says it can't, run `npx wrangler d1 create framework-feedback` and paste the `database_id` it prints into the `d1_databases` entry.) The table creates itself on the first submission; `migrations/0001_create_feedback_responses.sql` is only a reference.
+2. **Set an export token** (a long random string only you know):
+   `npx wrangler secret put FEEDBACK_EXPORT_TOKEN`
+   (Or in the dashboard: Workers & Pages → framework → Settings → Variables and Secrets → add a *Secret* named `FEEDBACK_EXPORT_TOKEN`.) Until it is set, the export endpoint answers 404.
+3. The form needs the Cloudflare Worker to be running. On a plain static host such as GitHub Pages `/api/feedback` does not exist, so submitting shows an error asking people to email hello@frameworkco.ca.
+
+**Reviewing and exporting responses.**
+
+- Spreadsheet export (opens in Excel / Sheets):
+  `curl -H "Authorization: Bearer YOUR_TOKEN" https://frameworkco.ca/api/feedback/export -o feedback.csv`
+  Add `?format=json` for JSON. The token goes in the header only, never in the URL.
+- Browse or query: Cloudflare dashboard → Storage & Databases → D1 → `framework-feedback` → Explore data / Console, or
+  `npx wrangler d1 execute framework-feedback --remote --command "SELECT * FROM feedback_responses ORDER BY created_at DESC"`.
+
+Revenue is optional and is stored per response (it needs to be to produce combined statistics); only ever publish combined figures. To delete a response: `DELETE FROM feedback_responses WHERE id = '...'` in the D1 console.
+
+**Local testing:** `npx wrangler dev --var FEEDBACK_EXPORT_TOKEN:test` serves the site and the API with a local D1 database (kept in `.wrangler/`, which is git-ignored).
 
 ## 3. Publish on GitHub Pages
 

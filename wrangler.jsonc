@@ -1,9 +1,18 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "framework",
+  "main": "worker/index.js",
   "compatibility_date": "2026-09-01",
   "assets": {
-    "directory": "./"
+    "directory": "./",
+    "binding": "ASSETS",
+    // The Worker only runs for the API; every page is still served straight from static assets.
+    "run_worker_first": ["/api/*"]
   },
+  // Private client feedback responses. Leaving out "database_id" lets Wrangler create this
+  // D1 database on first deploy (see README → "Client feedback form").
+  "d1_databases": [
+    { "binding": "DB", "database_name": "framework-feedback" }
+  ],
   "previews": {}
 }

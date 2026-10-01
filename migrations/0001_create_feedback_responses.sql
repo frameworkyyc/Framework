@@ -1,0 +1,32 @@
+-- Optional: the Worker creates this table itself on first use (CREATE TABLE IF NOT EXISTS).
+-- Keep in sync with SCHEMA in worker/index.js.
+CREATE TABLE IF NOT EXISTS feedback_responses (
+  id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  form_version TEXT NOT NULL,
+  satisfaction INTEGER NOT NULL,
+  rating_visual_design INTEGER NOT NULL,
+  rating_ease_of_use INTEGER NOT NULL,
+  rating_mobile_experience INTEGER NOT NULL,
+  rating_accuracy INTEGER NOT NULL,
+  rating_professionalism INTEGER NOT NULL,
+  rating_communication INTEGER NOT NULL,
+  rating_overall_product INTEGER NOT NULL,
+  improvement TEXT NOT NULL,
+  impact TEXT NOT NULL,
+  impact_other TEXT,
+  fair_price TEXT NOT NULL,
+  recommend INTEGER NOT NULL,
+  revenue TEXT,
+  liked TEXT NOT NULL,
+  could_improve TEXT,
+  testimonial TEXT,
+  testimonial_permission TEXT NOT NULL,
+  attribution_name TEXT,
+  attribution_title TEXT,
+  attribution_business TEXT,
+  logo_permission TEXT NOT NULL,
+  services TEXT NOT NULL,
+  services_other TEXT,
+  comments TEXT
+);
