@@ -41,8 +41,8 @@ The form needs no setup. On submit it opens the visitor's email app with a pre-f
 
 **One-time setup (Cloudflare):**
 
-1. **Deploy.** `wrangler.jsonc` declares the D1 binding without a `database_id`, so the first deploy creates the `framework-feedback` database for you. (If your build says it can't, run `npx wrangler d1 create framework-feedback` and paste the `database_id` it prints into the `d1_databases` entry.) The table creates itself on the first submission; `migrations/0001_create_feedback_responses.sql` is only a reference.
-2. **Set an export token** (a long random string only you know):
+1. **Database.** Create the D1 database `framework-feedback` (`npx wrangler d1 create framework-feedback`) and put its `database_id` in `wrangler.jsonc` in **both** places: the top-level `d1_databases` (normal deploys) and `previews.d1_databases` (branch builds such as Staging run `wrangler preview`, and a Preview does **not** inherit top-level bindings; without the `previews` entry the form fails with `503 storage_not_configured`). The table creates itself on the first submission; `migrations/0001_create_feedback_responses.sql` is only a reference.
+2. **Set an export token** (a long random string only you know). Secrets are not shared with Previews: for Staging use `npx wrangler preview secret put FEEDBACK_EXPORT_TOKEN --name Staging`, or skip it, the export then answers 404 on Staging:
    `npx wrangler secret put FEEDBACK_EXPORT_TOKEN`
    (Or in the dashboard: Workers & Pages → framework → Settings → Variables and Secrets → add a *Secret* named `FEEDBACK_EXPORT_TOKEN`.) Until it is set, the export endpoint answers 404.
 3. The form needs the Cloudflare Worker to be running. On a plain static host such as GitHub Pages `/api/feedback` does not exist, so submitting shows an error asking people to email hello@frameworkco.ca.

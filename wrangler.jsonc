@@ -9,14 +9,24 @@
     // The Worker only runs for the API; every page is still served straight from static assets.
     "run_worker_first": ["/api/*"]
   },
-  // Private client feedback responses. Leaving out "database_id" lets Wrangler create this
-  // D1 database on first deploy (see README → "Client feedback form").
-  "d1_databases": [ 
+  // Private client feedback responses (D1). This binding is used by normal `wrangler deploy` deployments.
+  "d1_databases": [
     {
-  "binding": "DB",
-  "database_name": "framework-feedback",
-  "database_id": "47d90f94-3846-4711-9495-ab3479431a6f"
-}
+      "binding": "DB",
+      "database_name": "framework-feedback",
+      "database_id": "47d90f94-3846-4711-9495-ab3479431a6f"
+    }
   ],
-  "previews": {}
+  // Branch builds (Staging) run `wrangler preview`. A Preview does NOT inherit the top-level bindings above:
+  // it only gets what is listed here, so without this block env.DB is undefined and /api/feedback answers
+  // 503 "storage_not_configured". Same database as above, on purpose: Staging submissions are stored there.
+  "previews": {
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "framework-feedback",
+        "database_id": "47d90f94-3846-4711-9495-ab3479431a6f"
+      }
+    ]
+  }
 }
