@@ -225,18 +225,20 @@
           </div>
         </div>
 
-        <div class="device-stage device-stage--aurora" id="aurora-stage">
+        <div class="device-stage device-stage--aurora" id="aurora-stage" data-live-demo="aurora">
           <div class="device device--laptop">
-            <button class="device__screen device__carousel" id="aurora-carousel" data-site="Aurora Surveys" type="button" aria-label="Aurora Surveys website preview: home page, 1 of 4. Activate to show the next page.">
+            <button class="device__screen device__carousel device__static" id="aurora-carousel" data-site="Aurora Surveys" type="button" aria-label="Aurora Surveys website preview: home page, 1 of 4. Activate to show the next page.">
               <img class="device__page" src="assets/img/aurora-hero.jpg" alt="" data-title="home page, animated aurora hero" width="1600" height="1000">
               <img class="device__page" src="assets/img/aurora-station.jpg" alt="" data-title="3D total station walkthrough" width="1200" height="750">
               <img class="device__page" src="assets/img/aurora-traverse.jpg" alt="" data-title="project traverse map" width="1200" height="750">
               <img class="device__page" src="assets/img/aurora-point-cloud.jpg" alt="" data-title="point-cloud explainer" width="1200" height="750">
             </button>
+            <div class="device__screen device__live" data-live-width="1440" data-title="Aurora Surveying website desktop demonstration"></div>
             <img class="device__frame" src="assets/img/device-macbook.png" alt="" width="1555" height="1012" aria-hidden="true">
           </div>
           <div class="device device--phone">
-            <div class="device__screen">
+            <div class="device__live device__screen" data-live-width="390" data-title="Aurora Surveying website mobile demonstration"></div>
+            <div class="device__screen device__static">
               <img class="device__scroll" src="assets/img/aurora-mobile-map.jpg" alt="Aurora Surveys website on a phone: the Where we work map, 49.28°N to 66.00°N, starting at Vancouver" width="720" height="1280" loading="lazy">
             </div>
             <img class="device__frame" src="assets/img/device-iphone.png" alt="" width="388" height="800" aria-hidden="true">
@@ -338,5 +340,6 @@
   </div>
 </footer>
 <script src="assets/js/main.js" defer></script>
+<script src="assets/js/live-demos.js" defer></script>
 </body>
 </html>

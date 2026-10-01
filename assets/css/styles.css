@@ -1020,6 +1020,24 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
   transform: translate3d(0, calc(var(--p, 0) * var(--travel, 0px) * -1), 0);
   will-change: transform;
 }
+/* Live website demos (see assets/js/live-demos.js). Hidden until a demo URL is configured for the environment;
+   the screenshots (.device__static) are the fallback. The iframe is a fixed logical viewport scaled into the
+   existing screen box, so it never affects layout, and it is a display only: it can't be clicked, focused or scrolled. */
+.device__live { display: none; pointer-events: none; }
+.device-stage.is-live .device__live { display: block; }
+.device-stage.is-live .device__static { display: none; }
+.device__live-frame {
+  position: absolute; left: 0; top: 0;
+  margin: 0; padding: 0; border: 0; max-width: none;
+  background: var(--screen-bg, #17181A);
+  transform: scale(var(--live-scale, 1)); transform-origin: 0 0;
+  opacity: 0; transition: opacity .45s ease;
+  pointer-events: none;
+}
+.device__live-frame.is-loaded { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .device__live-frame { transition: none; }
+}
 /* Aurora Surveys: the site is a near-black navy, so any screen not filled by a capture matches it */
 .device-stage--aurora { --screen-bg: #071923; }
 @media (max-width: 640px) {

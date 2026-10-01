@@ -16,6 +16,8 @@ client-feedback.html  Private client feedback form (unlisted, noindex) → /clie
 assets/css/styles.css   All styling (brand tokens at the top)
 assets/js/main.js       Mobile menu, image placeholders, contact form, Red E mockup
 assets/js/feedback.js   Client feedback form (steps, validation, submit)
+assets/js/live-demos.js Live website demos inside the portfolio mockups. The Aurora demo URL is set at the top of this file:
+                        `production` (frameworkco.ca) is null = screenshots; `preview` (everything else) = the staging demo
 worker/index.js         Cloudflare Worker entry: /api/feedback (store), /api/feedback/export, routes /admin
 worker/shared.js        Columns, schema, JSON/CSV helpers shared by the form and the admin
 worker/admin/           Framework Admin back end: Access token check (access.js), API (feedback-api.js), router
