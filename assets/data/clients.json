@@ -1,0 +1,8 @@
+{
+  "_readme": "Client results data. This file is the ONE place revenue figures live: the homepage total and each portfolio case study's results strip are both built from it by assets/js/results.js. To show a client's revenue, set `revenue` to a number (their annual revenue in CAD; if the client gave a range, use its lower bound, because it is displayed as '$X+'). Leave it null to show nothing. Only add a figure the client has agreed to have displayed. `id` must match data-client-results in portfolio.html; `project` is the line shown under 'Project'.",
+  "clients": [
+    { "id": "aurora", "name": "Aurora Surveys", "project": "Website design & build", "revenue": null },
+    { "id": "red-e", "name": "Red E Corp.", "project": "Brand system & website", "revenue": null },
+    { "id": "eagles-nest", "name": "Eagle's Nest Resort", "project": "Website & photography", "revenue": null }
+  ]
+}

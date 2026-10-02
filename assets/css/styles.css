@@ -1340,3 +1340,71 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 @media (max-width: 960px) {
   .testimonial__quote, .testimonial__source { grid-column: 1 / -1; }
 }
+
+/* ---------- Client results: homepage total + case study strips ----------
+   Revenue is the CLIENT's own figure, always labelled as such. Both blocks stay hidden until data exists. */
+
+.results-total {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  column-gap: 24px;
+  row-gap: 32px;
+  align-items: end;
+}
+.results-total__figure { grid-column: 1 / span 7; margin: 0; display: flex; flex-direction: column; gap: 20px; }
+.results-total__value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(64px, 9vw, 128px);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.results-total__label { font-weight: 600; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone); }
+.results-total__note { grid-column: 9 / -1; margin: 0; font-size: 15px; color: var(--slate); max-width: 22em; }
+@media (max-width: 860px) {
+  .results-total__figure, .results-total__note { grid-column: 1 / -1; }
+}
+
+.case-results { margin-top: clamp(40px, 5vw, 64px); }
+.case-results[hidden] { display: none; }
+.case-results__list { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 24px; margin: 0; border-top: 1px solid var(--ink); }
+.case-results__list > div { padding: 20px 0 0; }
+.case-results__list dt { margin: 0 0 8px; font-weight: 600; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone); }
+.case-results__list dd { margin: 0; font-weight: 500; font-size: 17px; }
+.case-results__list .case-results__value { font-family: var(--font-display); font-weight: 700; font-size: clamp(32px, 3.6vw, 46px); line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.case-results__note { margin: 16px 0 0; font-size: 13px; color: var(--stone); max-width: 42em; }
+@media (max-width: 640px) {
+  .case-results__list { grid-template-columns: 1fr; gap: 0; }
+  .case-results__list > div { padding: 16px 0; border-bottom: 1px solid var(--hairline); }
+}
+
+.case-quote {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  column-gap: 24px;
+  row-gap: 8px;
+  margin-top: clamp(40px, 5vw, 64px);
+  padding-top: 24px;
+  border-top: 1px solid var(--ink);
+}
+.case-quote .feature__label { grid-column: 1 / span 3; margin: 6px 0 0; }
+.case-quote__figure { grid-column: 4 / -1; margin: 0; }
+.case-quote__text { margin: 0; }
+.case-quote__text p { margin: 0; max-width: 42em; font-size: clamp(16px, 1.3vw, 18px); line-height: 1.6; color: var(--slate); }
+.case-quote__lead {
+  display: block;
+  margin-bottom: 0.9em;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(22px, 2.3vw, 30px);
+  line-height: 1.22;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+}
+.case-quote__source { display: flex; flex-direction: column; gap: 2px; margin-top: 24px; }
+.case-quote__source strong { font-family: var(--font-display); font-weight: 600; font-size: 17px; letter-spacing: -0.01em; }
+.case-quote__source span { font-size: 14px; color: var(--slate); }
+@media (max-width: 860px) {
+  .case-quote .feature__label, .case-quote__figure { grid-column: 1 / -1; }
+}
