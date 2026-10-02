@@ -104,6 +104,10 @@ The older `GET /api/feedback/export` (bearer token) still works unchanged; the a
 
 **"Needs attention"** in the Feedback filters means: satisfaction or recommendation of 6 or below, any 1–5 rating of 2 or below, or the new site rated "Worse" than before.
 
+## 2d. Combined client revenue (homepage)
+
+The homepage shows one number, "Combined annual client revenue", and nothing else about revenue. Individual client figures are private: they live in `worker/clients.json` (never served as a file) and are only read by the Worker, which adds them up, rounds the total down and serves just that total at `/api/client-revenue`. To add a figure, set that client's `revenue` to a number in `worker/clients.json` (use the lower bound of a range; only with the client's permission) and deploy. The block stays hidden until at least one figure exists.
+
 ## 3. Publish on GitHub Pages
 
 1. Create a new repository on GitHub (e.g. `frameworkco.ca`).

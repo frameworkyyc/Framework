@@ -6,6 +6,7 @@
  *
  * Public:
  *   POST /api/feedback          store one submission in D1 (the /client-feedback form)
+ *   GET  /api/client-revenue    the combined client revenue total for the homepage (no per-client data)
  *   GET  /api/feedback/export   CSV / JSON export, requires  Authorization: Bearer <FEEDBACK_EXPORT_TOKEN>
  *
  * Private (Framework Admin; every request must carry a valid Cloudflare Access token, see worker/admin/):
@@ -17,6 +18,8 @@
 
 import { RATING_KEYS, COLUMNS, ensureSchema, SECURITY_HEADERS, json, csvCell, timingSafeEqual } from "./shared.js";
 import { handleAdmin } from "./admin/router.js";
+import { combinedRevenue } from "./revenue.js";
+import clients from "./clients.json";
 
 const MAX_BODY_BYTES = 24 * 1024;
 const MAX_RECENT_SUBMISSIONS = 40; // flood guard: max stored submissions per 10 minutes, site-wide
@@ -274,6 +277,12 @@ export default {
     // Admin area: authenticated inside handleAdmin; nothing under these paths is served without it.
     if (path === "/admin" || path.startsWith("/admin/") || path === "/api/admin" || path.startsWith("/api/admin/")) {
       return handleAdmin(request, env);
+    }
+
+    // Public: the ONE combined, rounded-down client revenue figure. Individual figures never leave the Worker.
+    if (path === "/api/client-revenue") {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { Allow: "GET" });
+      return json({ total: combinedRevenue(clients) }, 200, { "Cache-Control": "public, max-age=300" });
     }
 
     try {

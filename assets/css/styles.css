@@ -1366,18 +1366,6 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
   .results-total__figure, .results-total__note { grid-column: 1 / -1; }
 }
 
-.case-results { margin-top: clamp(40px, 5vw, 64px); }
-.case-results[hidden] { display: none; }
-.case-results__list { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 24px; margin: 0; border-top: 1px solid var(--ink); }
-.case-results__list > div { padding: 20px 0 0; }
-.case-results__list dt { margin: 0 0 8px; font-weight: 600; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone); }
-.case-results__list dd { margin: 0; font-weight: 500; font-size: 17px; }
-.case-results__list .case-results__value { font-family: var(--font-display); font-weight: 700; font-size: clamp(32px, 3.6vw, 46px); line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.case-results__note { margin: 16px 0 0; font-size: 13px; color: var(--stone); max-width: 42em; }
-@media (max-width: 640px) {
-  .case-results__list { grid-template-columns: 1fr; gap: 0; }
-  .case-results__list > div { padding: 16px 0; border-bottom: 1px solid var(--hairline); }
-}
 
 .case-quote {
   display: grid;

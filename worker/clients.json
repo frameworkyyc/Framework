@@ -1,0 +1,8 @@
+{
+  "_readme": "PRIVATE client data. This file lives in worker/, which is never served as a static file, and it is only read by the Worker to compute one combined total for the homepage (GET /api/client-revenue). Individual figures are never sent to the browser or shown anywhere. To add a figure, set `revenue` to a number (annual revenue in CAD; if the client gave a range, use its lower bound). Only add a figure the client has agreed to share. Leave it null to leave the client out of the total.",
+  "clients": [
+    { "id": "aurora", "name": "Aurora Surveys", "revenue": null },
+    { "id": "red-e", "name": "Red E Corp.", "revenue": null },
+    { "id": "eagles-nest", "name": "Eagle's Nest Resort", "revenue": null }
+  ]
+}
