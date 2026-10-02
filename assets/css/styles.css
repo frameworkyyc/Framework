@@ -1308,3 +1308,35 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
   .fb-step:not([hidden]) { animation: none; }
   .fb-rate span, .fb-opt__mark { transition: none; }
 }
+
+/* ---------- Testimonial (home) ----------
+   An editorial pull quote on the existing grid: hairline rule, Switzer for the lead sentence, no card or ornament. */
+
+.testimonial {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  column-gap: 24px;
+  row-gap: 40px;
+  margin: 0;
+  padding-top: clamp(32px, 4vw, 48px);
+  border-top: 1px solid var(--ink);
+}
+.testimonial__quote { grid-column: 1 / span 8; margin: 0; }
+.testimonial__quote p { margin: 0; max-width: 40em; font-size: clamp(17px, 1.4vw, 19px); line-height: 1.6; color: var(--slate); }
+.testimonial__lead {
+  display: block;
+  margin-bottom: 1em;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(25px, 3vw, 38px);
+  line-height: 1.2;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+}
+.testimonial__source { grid-column: 10 / -1; align-self: end; display: flex; flex-direction: column; gap: 4px; }
+.testimonial__source strong { font-family: var(--font-display); font-weight: 600; font-size: 19px; letter-spacing: -0.01em; }
+.testimonial__source span { font-size: 15px; color: var(--slate); }
+.testimonial__source .text-link { align-self: flex-start; margin-top: 20px; }
+@media (max-width: 960px) {
+  .testimonial__quote, .testimonial__source { grid-column: 1 / -1; }
+}
