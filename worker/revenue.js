@@ -1,9 +1,7 @@
 /**
- * Combined client revenue for the homepage. The individual figures (worker/clients.json) stay inside the Worker;
- * the only thing that ever leaves is the rounded-down total below.
+ * Combined client revenue for the homepage. Individual figures live in the private D1 table `client_revenue`
+ * (migrations/0003); the only thing that ever leaves the Worker is the rounded-down total below.
  */
-
-const usable = (client) => client && typeof client.revenue === "number" && Number.isFinite(client.revenue) && client.revenue > 0;
 
 /** "$2.4M+" / "$750K+": rounded DOWN, so the total never claims more than the figures add up to. */
 export function formatTotal(n) {
@@ -15,10 +13,19 @@ export function formatTotal(n) {
   return "$" + Math.floor(n) + "+";
 }
 
-/** The display string for the sum of all usable figures, or null when there are none. */
-export function combinedRevenue(data) {
-  const clients = data && Array.isArray(data.clients) ? data.clients : [];
-  const figures = clients.filter(usable);
-  if (!figures.length) return null;
-  return formatTotal(figures.reduce((sum, c) => sum + c.revenue, 0));
+/**
+ * The display string for the sum of all stored figures, or null when there are none (or the table isn't there yet).
+ * Throws on a database error so the caller can avoid caching a failure.
+ */
+export async function combinedRevenue(db) {
+  if (!db) return null;
+  let row;
+  try {
+    row = await db.prepare("SELECT SUM(revenue) AS total FROM client_revenue WHERE revenue > 0").first();
+  } catch (err) {
+    if (/no such table/i.test(String(err && err.message))) return null; // migration not run yet
+    throw err;
+  }
+  const total = row && Number(row.total);
+  return Number.isFinite(total) && total > 0 ? formatTotal(total) : null;
 }

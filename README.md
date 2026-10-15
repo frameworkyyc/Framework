@@ -106,7 +106,18 @@ The older `GET /api/feedback/export` (bearer token) still works unchanged; the a
 
 ## 2d. Combined client revenue (homepage)
 
-The homepage shows one number, "Combined annual client revenue", and nothing else about revenue. Individual client figures are private: they live in `worker/clients.json` (never served as a file) and are only read by the Worker, which adds them up, rounds the total down and serves just that total at `/api/client-revenue`. To add a figure, set that client's `revenue` to a number in `worker/clients.json` (use the lower bound of a range; only with the client's permission) and deploy. The block stays hidden until at least one figure exists.
+The homepage shows one number, "Combined annual client revenue", and nothing else about revenue. The individual figures are private: they live in the D1 table `client_revenue` (one row per client), never in this repository. The Worker adds them up, rounds the total down and serves only that total at `/api/client-revenue`. No client, figure or count is ever returned. The block stays hidden while the table is empty or missing.
+
+Set up once (D1 console in the Cloudflare dashboard, database `framework-feedback`, or `wrangler d1 execute framework-feedback --remote`): run `migrations/0003_create_client_revenue.sql`.
+
+Add or change a client's figure (use the lower bound of what they reported; only with their permission). The homepage total updates within 5 minutes:
+
+```sql
+INSERT INTO client_revenue (client_id, revenue) VALUES ('aurora', 2500000)
+  ON CONFLICT(client_id) DO UPDATE SET revenue = excluded.revenue, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+```
+
+Remove one with `DELETE FROM client_revenue WHERE client_id = 'aurora';`
 
 ## 3. Publish on GitHub Pages
 
