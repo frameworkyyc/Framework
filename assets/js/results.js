@@ -2,8 +2,10 @@
    Asks the Worker for the one combined total (/api/client-revenue) and, when it returns one, reveals the band and
    counts the figure up from $0 the first time the band scrolls into view (once per page load).
    The API gives { total: "$2.5M+", value: 2500000 }. `value` is what we count to; if it is missing we fall back to
-   showing `total` as plain text. No total at all: the band stays hidden. Individual client figures never reach
-   the browser. Reduced motion: the finished figure is shown straight away. */
+   showing `total` as plain text. The band is in the page from the start, laid out at its final size but empty and
+   inert (.is-loading), so nothing below it moves while the request is in flight. No total, an error or a timeout:
+   the band is hidden outright (no gap). Individual client figures never reach the browser.
+   Reduced motion: the finished figure is shown straight away. */
 (function () {
   "use strict";
 
@@ -11,6 +13,7 @@
   if (!block) return;
 
   var DURATION = 2500;
+  var TIMEOUT = 10000; // give up (and remove the band) if the API takes longer than this
   var live = block.querySelector('[data-fill="total"]');
   var ghost = block.querySelector('[data-fill="ghost"]');
   var spoken = block.querySelector('[data-fill="final"]');
@@ -42,10 +45,21 @@
     window.requestAnimationFrame(frame);
   };
 
-  fetch("/api/client-revenue", { credentials: "same-origin" })
+  var remove = function () { block.hidden = true; };
+  var reveal = function () {
+    block.classList.remove("is-loading");
+    block.removeAttribute("aria-hidden");
+    block.removeAttribute("inert");
+  };
+
+  var controller = "AbortController" in window ? new AbortController() : null;
+  var timer = window.setTimeout(function () { if (controller) controller.abort(); }, TIMEOUT);
+
+  fetch("/api/client-revenue", { credentials: "same-origin", signal: controller ? controller.signal : undefined })
     .then(function (res) { if (!res.ok) throw new Error("client-revenue " + res.status); return res.json(); })
     .then(function (data) {
-      if (!data || typeof data.total !== "string" || !data.total) return; // nothing to show: stay hidden
+      window.clearTimeout(timer);
+      if (!data || typeof data.total !== "string" || !data.total) { remove(); return; } // nothing to show
 
       var value = data.value;
       var counting = typeof value === "number" && isFinite(value) && value > 0 && value < 1e12;
@@ -56,7 +70,7 @@
       spoken.textContent = finalText;
       live.textContent = counting && !reduced ? format(0) : finalText;
       figure.style.setProperty("--len", String(finalText.length));
-      block.hidden = false;
+      reveal();
 
       if ("IntersectionObserver" in window) {
         var io = new IntersectionObserver(function (entries) {
@@ -69,5 +83,5 @@
         run(target, finalText);
       }
     })
-    .catch(function () { /* unavailable: leave the block hidden */ });
+    .catch(function () { window.clearTimeout(timer); remove(); /* unavailable: no band, no gap */ });
 })();

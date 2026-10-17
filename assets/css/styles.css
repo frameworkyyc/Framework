@@ -1354,6 +1354,9 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
   padding: clamp(80px, 11vw, 160px) 0;
 }
 .results[hidden] { display: none; }
+/* While the total loads the band is already laid out at its final size (same markup, a placeholder figure) but
+   shows nothing and is inert, so the page below never moves. If there is no total it is removed ([hidden]). */
+.results.is-loading { pointer-events: none; user-select: none; }
 .results__inner { position: relative; }
 
 /* faint column grid behind the content */
@@ -1445,7 +1448,6 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
   padding-top: 24px;
 }
 .results__note { margin: 0; max-width: 32em; font-size: 16px; color: var(--paper); }
-.results__aside { margin: 0; font-size: 13px; letter-spacing: 0.04em; color: var(--stone); }
 
 /* labels and headline fade/rise into place, staggered */
 .results__rise { opacity: 0; transform: translateY(14px); transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.22, 0.8, 0.2, 1); }
@@ -1455,7 +1457,6 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 .results__headline { transition-duration: 1.1s; transition-delay: 0.3s; }
 .results__label { transition-delay: 0.6s; }
 .results__note { transition-delay: 1.8s; }
-.results__aside { transition-delay: 2.0s; }
 
 @media (max-width: 640px) {
   .results__cols { background-size: calc(100% / 3) 100%; }
