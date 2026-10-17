@@ -282,10 +282,11 @@ export default {
     if (path === "/api/client-revenue") {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { Allow: "GET" });
       try {
-        return json({ total: await combinedRevenue(env.DB) }, 200, { "Cache-Control": "public, max-age=300" });
+        const summary = await combinedRevenue(env.DB);
+        return json({ total: summary ? summary.total : null, value: summary ? summary.value : null }, 200, { "Cache-Control": "public, max-age=300" });
       } catch (err) {
         console.error("client revenue error:", err && err.message);
-        return json({ total: null }, 200); // fail closed: show nothing rather than a wrong number
+        return json({ total: null, value: null }, 200); // fail closed: show nothing rather than a wrong number
       }
     }
 

@@ -24,12 +24,12 @@ test("other database errors propagate", async () => {
   await assert.rejects(combinedRevenue(fakeDb([], "boom")));
 });
 test("one figure shows $2.5M+ and later figures add to it", async () => {
-  assert.equal(await combinedRevenue(fakeDb([2500000])), "$2.5M+");
-  assert.equal(await combinedRevenue(fakeDb([2500000, 1250000])), "$3.7M+");
-  assert.equal(await combinedRevenue(fakeDb([2500000, 1250000, 750000])), "$4.5M+");
+  assert.deepEqual(await combinedRevenue(fakeDb([2500000])), { total: "$2.5M+", value: 2500000 });
+  assert.deepEqual(await combinedRevenue(fakeDb([2500000, 1250000])), { total: "$3.7M+", value: 3750000 });
+  assert.deepEqual(await combinedRevenue(fakeDb([2500000, 1250000, 750000])), { total: "$4.5M+", value: 4500000 });
 });
 test("rounds down, never up", async () => {
-  assert.equal(await combinedRevenue(fakeDb([2499999])), "$2.4M+");
+  assert.deepEqual(await combinedRevenue(fakeDb([2499999])), { total: "$2.4M+", value: 2499999 });
   assert.equal(formatTotal(999999), "$999K+");
   assert.equal(formatTotal(1999999), "$1.9M+");
   assert.equal(formatTotal(3000000), "$3M+");
@@ -38,13 +38,14 @@ test("public API returns only the total: no client, no figure, no count", async 
   const res = await worker.fetch(new Request("https://x/api/client-revenue"), { DB: fakeDb([2500000]) });
   assert.equal(res.status, 200);
   const text = await res.text();
-  assert.deepEqual(JSON.parse(text), { total: "$2.5M+" });
-  assert.ok(!/2500000|aurora|client_id|count/i.test(text));
+  assert.deepEqual(JSON.parse(text), { total: "$2.5M+", value: 2500000 });
+  assert.deepEqual(Object.keys(JSON.parse(text)), ["total", "value"]);
+  assert.ok(!/aurora|client|count/i.test(text));
 });
 test("public API fails closed on a database error and is not cached", async () => {
   const res = await worker.fetch(new Request("https://x/api/client-revenue"), { DB: fakeDb([], "boom") });
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { total: null });
+  assert.deepEqual(await res.json(), { total: null, value: null });
   assert.notEqual(res.headers.get("cache-control"), "public, max-age=300");
 });
 test("only GET is allowed", async () => {

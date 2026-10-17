@@ -14,7 +14,8 @@ export function formatTotal(n) {
 }
 
 /**
- * The display string for the sum of all stored figures, or null when there are none (or the table isn't there yet).
+ * The combined total as { total: "$2.5M+", value: 2500000 } (display string plus the exact sum, which the homepage
+ * counts up to), or null when there are no figures (or the table isn't there yet). Never includes anything per client.
  * Throws on a database error so the caller can avoid caching a failure.
  */
 export async function combinedRevenue(db) {
@@ -26,6 +27,7 @@ export async function combinedRevenue(db) {
     if (/no such table/i.test(String(err && err.message))) return null; // migration not run yet
     throw err;
   }
-  const total = row && Number(row.total);
-  return Number.isFinite(total) && total > 0 ? formatTotal(total) : null;
+  const sum = row && Number(row.total);
+  if (!Number.isFinite(sum) || sum <= 0) return null;
+  return { total: formatTotal(sum), value: Math.floor(sum) };
 }
