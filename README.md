@@ -157,6 +157,19 @@ Settings (Cloudflare dashboard, Workers & Pages, framework, Settings, Variables 
 
 `privacy.html` is a draft notice that describes exactly what this form does; have it reviewed before going live.
 
+## 2f. Databases: Production and Staging are separate
+
+| Environment | D1 database | Where it is configured |
+|---|---|---|
+| Production (`frameworkco.ca`, deployed from `main`) | `framework-feedback` | top-level `d1_databases` in `wrangler.jsonc` (binding `DB`) |
+| Staging (the named Preview `Staging`) | `framework-staging` | `previews.d1_databases` in `wrangler.jsonc` (binding `DB`) |
+
+The Worker only ever talks to the binding called `DB`, so the code is identical in both. Never put the Production ID in `previews`, or the Staging ID at the top level. A Preview does not inherit top-level bindings.
+
+**New or empty staging database:** run `migrations/staging-init.sql` once in the D1 console of `framework-staging` (never of `framework-feedback`). It creates every table (feedback, assessments with email-delivery tracking, client revenue) with no data, and writes an environment marker row. The Worker would create most tables itself on first use, but `client_revenue` and the marker only come from this file.
+
+**Prove which database a deployment is using, before writing anything:** Admin → Assessments shows "Database environment", backed by the read-only `GET /api/admin/database` (table names, row counts and the marker; no contents, no writes). Staging must show `staging (marker found)`; Production shows "not marked". Cloudflare dashboard → Workers & Pages → framework → the Preview's Bindings must also show `framework-staging`, and D1 → framework-staging → Metrics shows the reads and writes.
+
 ## 3. Publish on GitHub Pages
 
 1. Create a new repository on GitHub (e.g. `frameworkco.ca`).

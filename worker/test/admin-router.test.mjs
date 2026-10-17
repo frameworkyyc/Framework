@@ -52,7 +52,7 @@ const call = (path, { method = "GET", token, cookie, headers = {}, body, e = env
 };
 const rows = () => db.raw.prepare("SELECT COUNT(*) AS n FROM assessment_requests").get().n;
 const ENDPOINTS = [
-  ["GET", "/api/admin/assessments"], ["GET", "/api/admin/assessments/summary"],
+  ["GET", "/api/admin/assessments"], ["GET", "/api/admin/assessments/summary"], ["GET", "/api/admin/database"],
   ["POST", "/api/admin/assessments/resend"], ["POST", "/api/admin/assessments/test-email"], ["DELETE", `/api/admin/assessments/${ID}`],
 ];
 

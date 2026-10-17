@@ -46,6 +46,8 @@ function details(r) {
 
 export async function render() {
   const busy = new Set(); // ids with a delete request in flight: blocks double submission
+  // Read-only identity check first: shows which database this deployment is connected to (best effort).
+  const dbInfo = await api("/database").catch(() => null);
   let data = await api("/assessments");
   const node = h("div", { class: "adm-page" });
 
@@ -135,6 +137,7 @@ export async function render() {
           data.unsent ? h("button", { class: "btn btn--primary", type: "button", onclick: () => resend(null) }, `Resend ${data.unsent} unsent`) : null)),
       feedback,
       h("p", { class: "adm-banner" + (e.can_send ? "" : " adm-banner--alert") }, h("strong", null, e.can_send ? "Email delivery: ready. " : "Email delivery: NOT working. "), emailSummary(e),
+        dbInfo ? h("span", { class: "adm-banner__line" }, "Database environment: " + (dbInfo.environment ? dbInfo.environment + " (marker found)." : "not marked (expected for Production).")) : null,
         h("span", { class: "adm-banner__line" }, "Spam check (Turnstile): " + ({ on: "on.", off: "off. The form relies on the hidden field, timing check and rate limit only.", misconfigured: "NOT enforced: set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET." })[data.spam_check])),
       h("section", { class: "adm-section", "aria-label": "Summary" }, h("div", { class: "adm-metrics" },
         metric("Requests", String(data.total)),

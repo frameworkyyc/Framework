@@ -11,6 +11,7 @@
 import { authenticateAdmin } from "./access.js";
 import { handleFeedbackApi } from "./feedback-api.js";
 import { handleAssessmentsApi } from "./assessments-api.js";
+import { handleDatabaseApi } from "./database-api.js";
 import { json } from "../shared.js";
 
 const ADMIN_CSP = [
@@ -59,7 +60,7 @@ function deniedPage(status, code) {
 
 async function handleApi(request, env, principal, path) {
   // Modules register here. Each handler returns a Response, or null when the path isn't one of its routes.
-  const handlers = [handleFeedbackApi, handleAssessmentsApi];
+  const handlers = [handleFeedbackApi, handleAssessmentsApi, handleDatabaseApi];
   for (const handler of handlers) {
     const res = await handler(request, env, principal, path);
     if (res) return res;
