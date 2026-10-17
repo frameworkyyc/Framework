@@ -22,12 +22,14 @@
 
 import { json } from "./shared.js";
 
-const MAX_BODY_BYTES = 16 * 1024;
+const MAX_BODY_BYTES = 32 * 1024; // enforced while reading, so an oversized (or chunked) body is never fully buffered
+const CONFIRM_COOLDOWN_MS = 24 * 60 * 60 * 1000; // at most one confirmation email per address per day (stops the form being used to mail a third party)
 const MIN_FILL_MS = 1200; // faster than a human can fill the form: ask them to try again
 const IP_LIMIT_PER_HOUR = 5;
 const SITE_LIMIT_PER_10_MIN = 40;
 const DEFAULT_NOTIFY_TO = "hello@frameworkco.ca";
 const EMAIL_TIMEOUT_MS = 8000;
+const RESEND_BATCH = 10; // per click: keeps one admin request well inside the Worker subrequest limits
 
 export const CONCERNS = [
   "Customers have trouble finding us online.",
@@ -341,6 +343,17 @@ export function emailConfig(env) {
 }
 
 export const emailConfigured = (env) => emailConfig(env).ok;
+
+/**
+ * Cloudflare Turnstile is enforced only when BOTH its secret and its site key are set. A secret without a site key
+ * would mean the widget never appears, no visitor could ever pass the check, and every lead would be lost.
+ * @returns "on" | "off" | "misconfigured" (one of the two is set: spam check not enforced)
+ */
+export const turnstileState = (env) => {
+  const secret = Boolean(String(env.TURNSTILE_SECRET || "").trim());
+  const site = Boolean(String(env.TURNSTILE_SITE_KEY || "").trim());
+  return secret && site ? "on" : secret || site ? "misconfigured" : "off";
+};
 export const notifyRecipient = (env) => String(env.ASSESSMENT_NOTIFY_TO || "").trim() || DEFAULT_NOTIFY_TO;
 
 const oneLine = (v, max = 200) => String(v == null ? "" : v).replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
@@ -482,7 +495,7 @@ const statusFor = (result) => (result.ok ? "sent" : String(result.error || "").s
  * Email Framework (and, as a courtesy, the applicant). Records the outcome on the stored request, if there is one.
  * @returns { notify, confirm } each { ok, error }; confirm is null when the notification was not attempted for it.
  */
-export async function deliverNotifications(env, data, { fetchImpl = fetch, now = new Date(), stored = false, resentAt = null, sendConfirmation = true } = {}) {
+export async function deliverNotifications(env, data, { fetchImpl = fetch, now = new Date(), stored = false, resentAt = null, sendConfirmation = true, countAttempt = true } = {}) {
   const note = buildNotification(data, { now: data.created_at ? new Date(data.created_at) : now, resentAt });
   const notify = await sendEmail(
     env,
@@ -498,12 +511,12 @@ export async function deliverNotifications(env, data, { fetchImpl = fetch, now =
     try {
       await env.DB.prepare(
         `UPDATE assessment_requests SET notify_status = ?, notify_error = ?, notified_at = CASE WHEN ? = 'sent' THEN ? ELSE notified_at END,
-           notify_attempts = notify_attempts + 1,
+           notify_attempts = notify_attempts + ?,
            confirm_status = CASE WHEN ? IS NULL THEN confirm_status ELSE ? END, confirm_error = CASE WHEN ? IS NULL THEN confirm_error ELSE ? END
          WHERE id = ?`,
       )
         .bind(
-          statusFor(notify), notify.ok ? null : notify.error, statusFor(notify), now.toISOString(),
+          statusFor(notify), notify.ok ? null : notify.error, statusFor(notify), now.toISOString(), countAttempt ? 1 : 0,
           confirm ? "x" : null, confirm ? statusFor(confirm) : null, confirm ? "x" : null, confirm && !confirm.ok ? confirm.error : null,
           data.submission_id || data.id,
         )
@@ -532,22 +545,28 @@ const rowToData = (row) => {
  * `id` limits it to one request. Safe to run repeatedly: requests that were delivered are never touched.
  * @returns { attempted, sent, failed, results: [{ id, business_name, ok, error }] }
  */
-export async function resendUnsent(env, { id = null, limit = 25 } = {}, deps = {}) {
+export async function resendUnsent(env, { id = null, limit = RESEND_BATCH } = {}, deps = {}) {
   await ensureAssessmentSchema(env.DB);
   const now = deps.now || new Date();
   const { results: rows } = id
     ? await env.DB.prepare("SELECT * FROM assessment_requests WHERE id = ? AND notify_status != 'sent'").bind(id).all()
-    : await env.DB.prepare("SELECT * FROM assessment_requests WHERE notify_status != 'sent' ORDER BY created_at ASC LIMIT ?").bind(limit).all();
+    : await env.DB.prepare("SELECT * FROM assessment_requests WHERE notify_status != 'sent' ORDER BY created_at ASC LIMIT ?").bind(Math.min(limit, RESEND_BATCH)).all();
   const out = [];
   for (const row of rows) {
+    // Claim the request first: if two resends run at once (double click, two tabs) only one wins, so nobody is emailed twice.
+    const claim = await env.DB.prepare("UPDATE assessment_requests SET notify_attempts = notify_attempts + 1 WHERE id = ? AND notify_attempts = ? AND notify_status != 'sent'")
+      .bind(row.id, row.notify_attempts).run();
+    if (!claim.meta || claim.meta.changes !== 1) continue;
     const data = rowToData(row);
     const { notify } = await deliverNotifications(env, data, {
-      fetchImpl: deps.fetch || fetch, now, stored: true, resentAt: now, sendConfirmation: row.confirm_status !== "sent",
+      fetchImpl: deps.fetch || fetch, now, stored: true, resentAt: now, countAttempt: false,
+      sendConfirmation: row.confirm_status !== "sent" && row.confirm_status !== "suppressed",
     });
     out.push({ id: row.id, business_name: row.business_name, ok: notify.ok, error: notify.ok ? null : notify.error });
   }
   const sent = out.filter((r) => r.ok).length;
-  return { attempted: out.length, sent, failed: out.length - sent, results: out };
+  const left = await env.DB.prepare("SELECT COUNT(*) AS n FROM assessment_requests WHERE notify_status != 'sent'").first();
+  return { attempted: out.length, sent, failed: out.length - sent, remaining: left ? left.n : 0, results: out };
 }
 
 async function hashIp(ip, env) {
@@ -555,6 +574,28 @@ async function hashIp(ip, env) {
   const bytes = new TextEncoder().encode(`${env.IP_HASH_SALT || "framework-assessment"}:${ip}`);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)].slice(0, 12).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Read a request body as text, giving up as soon as it exceeds `max` bytes. Returns null when too large. */
+async function readTextLimited(request, max) {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      try { await reader.cancel(); } catch { /* already closed */ }
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let offset = 0;
+  for (const c of chunks) { all.set(c, offset); offset += c.byteLength; }
+  return new TextDecoder().decode(all);
 }
 
 /* ------------------------------------------------------------------ handlers */
@@ -583,8 +624,8 @@ export async function handleAssessmentSubmit(request, env, deps = {}) {
   }
   const declared = Number(request.headers.get("Content-Length") || 0);
   if (declared > MAX_BODY_BYTES) return json({ error: "too_large" }, 413);
-  const raw = await request.text();
-  if (raw.length > MAX_BODY_BYTES) return json({ error: "too_large" }, 413);
+  const raw = await readTextLimited(request, MAX_BODY_BYTES);
+  if (raw === null) return json({ error: "too_large" }, 413);
 
   let body;
   try { body = JSON.parse(raw); } catch { return json({ error: "invalid_json" }, 400); }
@@ -600,7 +641,9 @@ export async function handleAssessmentSubmit(request, env, deps = {}) {
 
   const ip = request.headers.get("CF-Connecting-IP") || "";
 
-  if (env.TURNSTILE_SECRET) {
+  const turnstile = turnstileState(env);
+  if (turnstile === "misconfigured") console.warn("assessment: set BOTH TURNSTILE_SITE_KEY and TURNSTILE_SECRET; the spam check is not being enforced");
+  if (turnstile === "on") {
     const token = typeof body.turnstile_token === "string" ? body.turnstile_token : "";
     if (!token) return json({ error: "verification_failed" }, 403);
     const outcome = await verifyTurnstile(token, ip, env, fetchImpl);
@@ -631,7 +674,7 @@ export async function handleAssessmentSubmit(request, env, deps = {}) {
       const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM assessment_requests WHERE created_at > ?").bind(tenAgo).first();
       if (recent && recent.n >= SITE_LIMIT_PER_10_MIN) return json({ error: "try_again_later" }, 429, { "Retry-After": "600" });
 
-      await env.DB.prepare(
+      const inserted = await env.DB.prepare(
         `INSERT OR IGNORE INTO assessment_requests
           (id, created_at, business_name, website, contact_name, email, location, industry, phone, services, service_area,
            profiles, concern, additional_info, privacy_ack, marketing_opt_in, tracking, landing, referrer, ip_hash)
@@ -644,15 +687,32 @@ export async function handleAssessmentSubmit(request, env, deps = {}) {
           JSON.stringify(data.tracking), data.landing || null, data.referrer || null, ipHash || null,
         )
         .run();
+      // Two identical submissions racing past the check above: only the one that really inserted goes on to send email.
+      if (inserted.meta && inserted.meta.changes === 0) return json({ ok: true });
       stored = true;
     } catch (err) {
       console.error("assessment store failed:", err && err.message);
     }
   }
 
+  // One confirmation per address per day: a repeat within the cooldown is still saved and still notifies Framework,
+  // but the applicant address is not mailed again (so the form cannot be used to flood someone else's inbox).
+  let suppressConfirm = false;
+  if (stored) {
+    try {
+      const since = new Date(now.getTime() - CONFIRM_COOLDOWN_MS).toISOString();
+      const recent = await env.DB.prepare("SELECT 1 AS x FROM assessment_requests WHERE lower(email) = ? AND confirm_status = 'sent' AND created_at > ? AND id != ? LIMIT 1")
+        .bind(data.email.toLowerCase(), since, data.submission_id).first();
+      suppressConfirm = Boolean(recent);
+    } catch { /* if the check fails, send as normal */ }
+  }
+
   // Notify Framework. The confirmation to the applicant is a courtesy: its failure never fails the request.
   // Whatever happens is recorded on the stored request (notify_status / notify_error) so nothing is lost silently.
-  const { notify } = await deliverNotifications(env, { ...data, id: data.submission_id }, { fetchImpl, now, stored });
+  const { notify } = await deliverNotifications(env, { ...data, id: data.submission_id }, { fetchImpl, now, stored, sendConfirmation: !suppressConfirm });
+  if (stored && suppressConfirm) {
+    try { await env.DB.prepare("UPDATE assessment_requests SET confirm_status = 'suppressed' WHERE id = ?").bind(data.submission_id).run(); } catch { /* bookkeeping only */ }
+  }
   if (!notify.ok) console.error("assessment notification not delivered:", notify.error, "stored:", stored);
 
   // Accepted only if we truly hold the request: it is in D1, or Framework's inbox was notified.

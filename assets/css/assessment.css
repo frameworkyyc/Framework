@@ -32,11 +32,11 @@
 .as-hero .lead { max-width: 33em; color: var(--slate); }
 
 .as-scope { grid-column: 9 / -1; align-self: end; border-top: 1px solid var(--ink); }
-.as-scope__title { margin: 0; padding: 14px 0; font-weight: 600; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone); }
+.as-scope__title { margin: 0; padding: 14px 0; font-weight: 600; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--slate); }
 .as-scope__list { list-style: none; margin: 0; padding: 0; }
 .as-scope__list li { display: flex; gap: 16px; align-items: baseline; padding: 14px 0; border-top: 1px solid var(--hairline); font-weight: 500; font-size: 16px; }
 .as-scope__list .index { flex: none; width: 24px; }
-.as-scope__foot { margin: 0; padding: 14px 0 0; border-top: 1px solid var(--hairline); font-size: 13px; color: var(--stone); }
+.as-scope__foot { margin: 0; padding: 14px 0 0; border-top: 1px solid var(--hairline); font-size: 13px; color: var(--slate); }
 @media (max-width: 960px) {
   .as-scope { grid-column: 1 / -1; max-width: 520px; }
 }
@@ -92,10 +92,10 @@
 .as-report__bar { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--ink); font-weight: 700; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; }
 .as-report__bar span:last-child { font-weight: 500; color: var(--slate); text-align: right; }
 .as-report__sample { margin-top: 12px; display: inline-block; padding: 5px 9px; border: 1px solid var(--ink); font-weight: 600; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
-.as-report__label { display: block; font-weight: 600; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--stone); }
+.as-report__label { display: block; font-weight: 600; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--slate); }
 .as-report__hero { padding: 26px 0 22px; border-bottom: 1px solid var(--hairline); }
 .as-report__score { display: block; margin-top: 8px; font-family: var(--font-display); font-weight: 700; font-size: clamp(64px, 9vw, 104px); line-height: .95; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-.as-report__score small { font-size: .3em; letter-spacing: 0; font-weight: 600; color: var(--stone); margin-left: 6px; }
+.as-report__score small { font-size: .3em; letter-spacing: 0; font-weight: 600; color: var(--slate); margin-left: 6px; }
 .as-report__cats { padding: 8px 0 20px; border-bottom: 1px solid var(--hairline); }
 .as-report__cats > div { display: grid; grid-template-columns: minmax(110px, 1.2fr) 2fr 28px; gap: 14px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--hairline); font-size: 13px; }
 .as-report__cats > div:last-child { border-bottom: 0; }
@@ -107,8 +107,8 @@
 .as-report__split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; padding-top: 22px; }
 .as-report__recs, .as-report__road { list-style: none; margin: 12px 0 0; padding: 0; }
 .as-report__recs li, .as-report__road li { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
-.as-report__recs b { flex: none; width: 14px; font-family: var(--font-display); font-weight: 600; font-size: 12px; color: var(--stone); }
-.as-report__road b { flex: none; width: 70px; font-weight: 600; font-size: 11px; color: var(--stone); }
+.as-report__recs b { flex: none; width: 14px; font-family: var(--font-display); font-weight: 600; font-size: 12px; color: var(--slate); }
+.as-report__road b { flex: none; width: 70px; font-weight: 600; font-size: 11px; color: var(--slate); }
 .as-report__recs i, .as-report__road i { flex: 1; height: 7px; background: var(--mist); }
 .as-report__recs li:nth-child(2) i { max-width: 82%; } .as-report__recs li:nth-child(3) i { max-width: 91%; }
 .as-report__recs li:nth-child(4) i { max-width: 70%; } .as-report__recs li:nth-child(5) i { max-width: 78%; }
@@ -154,7 +154,7 @@
 }
 
 .as-form__legend-note { margin: 0 0 28px; font-size: 14px; color: var(--slate); }
-.as .optional { font-weight: 500; color: var(--stone); font-size: .92em; }
+.as .optional { font-weight: 500; color: var(--slate); font-size: .92em; } /* slate, not stone: stone is under 3:1 on white */
 .as-group { margin: 0 0 12px; padding: 0; border: 0; min-width: 0; }
 .as-group legend { display: block; width: 100%; margin: 0 0 22px; padding: 0 0 12px; border-bottom: 1px solid var(--ink); font-weight: 600; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
 .as-group + .as-group { margin-top: 40px; }

@@ -6,10 +6,11 @@
  *   GET  /assessments/summary    { total, unsent } for the Overview banner
  *   POST /assessments/resend     re-send notifications for requests that never got one ({ id } for just one)
  *   POST /assessments/test-email send a test message to the notification address and report the provider's answer
+ *   DELETE /assessments/<id>     permanently delete ONE request (no bulk delete exists)
  */
 
 import { json } from "../shared.js";
-import { ensureAssessmentSchema, emailHealth, resendUnsent, sendTestEmail } from "../assessment.js";
+import { ensureAssessmentSchema, emailHealth, resendUnsent, sendTestEmail, turnstileState } from "../assessment.js";
 
 const LIST_LIMIT = 200;
 const ID_PATTERN = /^[A-Za-z0-9-]{16,64}$/;
@@ -45,7 +46,7 @@ export async function handleAssessmentsApi(request, env, principal, path, deps =
       const c = await counts(env.DB);
       // ip_hash is internal bookkeeping for the rate limiter; it is not shown.
       const requests = results.map(({ ip_hash, ...rest }) => rest);
-      return json({ email: emailHealth(env), ...c, truncated: c.total > requests.length, requests });
+      return json({ email: emailHealth(env), spam_check: turnstileState(env), ...c, truncated: c.total > requests.length, requests });
     }
 
     if (path === "/assessments/summary") {
@@ -68,6 +69,21 @@ export async function handleAssessmentsApi(request, env, principal, path, deps =
       if (method !== "POST") return notAllowed("POST");
       if (!sameOriginWrite(request)) return json({ error: "forbidden" }, 403);
       return json(await sendTestEmail(env, deps));
+    }
+
+    // DELETE /assessments/<id>: one record, by exact id. The statement is parameterized and keyed on the primary key,
+    // so it cannot touch any other row. assessment_requests has no related tables, so there is nothing else to clean up.
+    const m = path.match(/^\/assessments\/([^/]+)$/);
+    if (m) {
+      if (method !== "DELETE") return notAllowed("DELETE");
+      if (!sameOriginWrite(request)) return json({ error: "forbidden" }, 403);
+      let id = "";
+      try { id = decodeURIComponent(m[1]); } catch { /* malformed escape: falls through to the pattern check */ }
+      if (!ID_PATTERN.test(id)) return json({ error: "invalid_id" }, 400);
+      const result = await env.DB.prepare("DELETE FROM assessment_requests WHERE id = ?").bind(id).run();
+      if (!result.meta || result.meta.changes === 0) return json({ error: "not_found" }, 404);
+      const c = await counts(env.DB);
+      return json({ ok: true, total: c.total, sent: c.sent, unsent: c.unsent });
     }
   } catch (err) {
     console.error("admin assessments api error:", err && err.message);

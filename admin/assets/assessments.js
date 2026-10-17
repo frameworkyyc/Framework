@@ -2,7 +2,7 @@
    Free Online Presence Assessment requests, whether each one reached Framework's inbox, whether this deployment
    can send email at all, a test-email button, and one-click recovery of anything that was saved but not emailed. */
 
-import { h, api, fmtDateTime, shortRef, stateBlock } from "./ui.js";
+import { h, api, ApiError, fmtDateTime, shortRef, stateBlock, confirmDialog } from "./ui.js";
 
 const metric = (label, value, note) =>
   h("div", { class: "adm-metric" },
@@ -20,6 +20,9 @@ const emailSummary = (e) => {
   if (!e.can_send) return PROBLEMS[e.problem] || "Email is not configured.";
   return `Ready to send from ${e.from_used} to ${e.notify_to}.` + (e.from === "corrected" ? " The sender setting was missing its angle brackets and is being corrected automatically; it is worth fixing in Cloudflare." : "");
 };
+
+// Constant markup (no data involved), same approach as the brand mark in admin.js.
+const TRASH = `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>`;
 
 const statusLabel = (r) =>
   r.notify_status === "sent" ? "Emailed" : r.notify_status === "not_configured" ? "Not emailed — email not configured" : r.notify_status === "failed" ? "Not emailed — delivery failed" : "Not emailed — pending";
@@ -42,6 +45,7 @@ function details(r) {
 }
 
 export async function render() {
+  const busy = new Set(); // ids with a delete request in flight: blocks double submission
   let data = await api("/assessments");
   const node = h("div", { class: "adm-page" });
 
@@ -54,6 +58,38 @@ export async function render() {
   };
 
   const reload = async () => { data = await api("/assessments"); paint(); };
+
+  const remove = async (r) => {
+    if (busy.has(r.id)) return;
+    const label = r.business_name || "this request";
+    const confirmed = await confirmDialog({
+      title: "Delete this assessment?",
+      body: "This permanently deletes the request from the database. It cannot be undone. Emails already sent are not affected.",
+      details: [["Business", label], ["Submitted", fmtDateTime(r.created_at)], ["Contact", r.email]],
+      confirmLabel: "Delete Assessment",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed || busy.has(r.id)) return;
+    busy.add(r.id);
+    paint();
+    const drop = (counts) => {
+      data.requests = data.requests.filter((x) => x.id !== r.id);
+      if (counts) Object.assign(data, { total: counts.total, sent: counts.sent, unsent: counts.unsent });
+      else { data.total -= 1; if (r.notify_status === "sent") data.sent -= 1; else data.unsent -= 1; }
+    };
+    try {
+      const res = await api("/assessments/" + encodeURIComponent(r.id), { method: "DELETE" });
+      drop(res);
+      say(`Deleted the assessment from ${label}.`);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) { drop(null); say(`${label} had already been deleted. The list has been updated.`); }
+      else say(`Couldn’t delete the assessment from ${label} (${err.code || "error"}). It has not been deleted.`);
+    } finally {
+      busy.delete(r.id);
+      paint();
+      feedback.scrollIntoView({ block: "nearest" });
+    }
+  };
 
   const testEmail = () => run("Sending a test email", async () => {
     const r = await api("/assessments/test-email", { method: "POST", body: {} });
@@ -80,7 +116,13 @@ export async function render() {
               h("span", { class: "adm-status-mark " + (r.notify_status === "sent" ? "is-reviewed" : "is-unreviewed") }, statusLabel(r)),
               r.notify_status !== "sent" && r.notify_error ? h("span", { class: "adm-client__sub" }, "Reason: " + r.notify_error) : null,
               r.notify_attempts ? h("span", { class: "adm-client__sub" }, `${r.notify_attempts} attempt${r.notify_attempts === 1 ? "" : "s"}`) : null),
-            h("td", { "data-label": "" }, r.notify_status !== "sent" ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => resend(r.id) }, "Resend") : null),
+            h("td", { "data-label": "", class: "adm-row-actions" },
+              r.notify_status !== "sent" ? h("button", { class: "btn btn--secondary adm-small", type: "button", disabled: busy.has(r.id), onclick: () => resend(r.id) }, "Resend") : null,
+              (() => {
+                const b = h("button", { class: "adm-icon-btn", type: "button", title: "Delete assessment", "aria-label": "Delete assessment from " + (r.business_name || "Ref " + shortRef(r.id)), disabled: busy.has(r.id), onclick: () => remove(r) });
+                b.insertAdjacentHTML("afterbegin", TRASH);
+                return b;
+              })()),
           ))))
       : stateBlock({ title: "No assessment requests yet", body: "Requests from the /assessment form appear here, whether or not the notification email went out." });
 
@@ -92,7 +134,8 @@ export async function render() {
           h("button", { class: "btn btn--secondary", type: "button", onclick: testEmail }, "Send test email"),
           data.unsent ? h("button", { class: "btn btn--primary", type: "button", onclick: () => resend(null) }, `Resend ${data.unsent} unsent`) : null)),
       feedback,
-      h("p", { class: "adm-banner", style: e.can_send ? null : "border-color:#0A0A0A;color:#0A0A0A" }, h("strong", null, e.can_send ? "Email delivery: ready. " : "Email delivery: NOT working. "), emailSummary(e)),
+      h("p", { class: "adm-banner" + (e.can_send ? "" : " adm-banner--alert") }, h("strong", null, e.can_send ? "Email delivery: ready. " : "Email delivery: NOT working. "), emailSummary(e),
+        h("span", { class: "adm-banner__line" }, "Spam check (Turnstile): " + ({ on: "on.", off: "off. The form relies on the hidden field, timing check and rate limit only.", misconfigured: "NOT enforced: set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET." })[data.spam_check])),
       h("section", { class: "adm-section", "aria-label": "Summary" }, h("div", { class: "adm-metrics" },
         metric("Requests", String(data.total)),
         metric("Emailed", String(data.sent)),

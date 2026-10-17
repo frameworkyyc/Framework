@@ -269,7 +269,7 @@ test("request hygiene: cross-origin, wrong content type, bad JSON and oversize a
   assert.equal((await handleAssessmentSubmit(post(good(), { Origin: "https://evil.example" }), env, { fetch: f })).status, 403);
   assert.equal((await handleAssessmentSubmit(post(good(), { "Content-Type": "text/plain" }), env, { fetch: f })).status, 415);
   assert.equal((await handleAssessmentSubmit(post("{not json"), env, { fetch: f })).status, 400);
-  assert.equal((await handleAssessmentSubmit(post(good({ additional_info: "x".repeat(20000) })), env, { fetch: f })).status, 413);
+  assert.equal((await handleAssessmentSubmit(post(good({ additional_info: "x".repeat(40000) })), env, { fetch: f })).status, 413);
   assert.equal(f.calls.length, 0);
 });
 
@@ -302,7 +302,7 @@ test("rate limit: the 6th request from one address in an hour is refused", async
 });
 
 test("Turnstile: enforced server-side when a secret is set", async () => {
-  const env = { DB: makeDb(), TURNSTILE_SECRET: "ts_secret", ...emailEnv() };
+  const env = { DB: makeDb(), TURNSTILE_SECRET: "ts_secret", TURNSTILE_SITE_KEY: "0xSITE", ...emailEnv() };
   assert.equal((await handleAssessmentSubmit(post(good()), env, { fetch: makeFetch() })).status, 403); // no token
   assert.equal((await handleAssessmentSubmit(post(good({ turnstile_token: "t" })), env, { fetch: makeFetch({ turnstile: { success: false } }) })).status, 403);
   assert.equal((await handleAssessmentSubmit(post(good({ turnstile_token: "t" })), env, { fetch: makeFetch({ turnstile: "down" }) })).status, 503);
@@ -515,4 +515,192 @@ test("admin API: wrong methods, unknown paths and a missing database", async () 
   assert.equal((await admin("/assessments/resend", { method: "GET", env })).status, 405);
   assert.equal(await admin("/feedback", { env }), null);
   assert.equal((await admin("/assessments", { env: {} })).status, 503);
+});
+
+/* ================================================================ deletion (admin) */
+
+const ID_A = "del-aaaaaaaaaaaaaaaaaaaa", ID_B = "del-bbbbbbbbbbbbbbbbbbbb", ID_C = "del-cccccccccccccccccccc";
+const seed = async (db, env = {}) => {
+  let n = 0;
+  for (const [id, name] of [[ID_A, "Alpha Ltd."], [ID_B, "Beta Ltd."], [ID_C, "Gamma Ltd."]]) {
+    await handleAssessmentSubmit(post(good({ submission_id: id, business_name: name }), { "CF-Connecting-IP": `198.51.100.${++n}` }), { DB: db, ...env }, { fetch: makeFetch() });
+  }
+};
+const count = (db) => db.raw.prepare("SELECT COUNT(*) AS n FROM assessment_requests").get().n;
+const names = (db) => db.raw.prepare("SELECT business_name FROM assessment_requests ORDER BY business_name").all().map((r) => r.business_name);
+const del = (id, over = {}) => admin("/assessments/" + id, { method: "DELETE", ...over });
+
+test("DELETE removes exactly one request, returns updated counts, and leaves the others untouched", async () => {
+  const db = makeDb(); await seed(db);
+  const res = await del(ID_B, { env: { DB: db } });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, total: 2, sent: 0, unsent: 2 });
+  assert.deepEqual(names(db), ["Alpha Ltd.", "Gamma Ltd."]);
+});
+
+test("DELETE counts reflect delivered vs unsent correctly", async () => {
+  const db = makeDb(); await seed(db, emailEnv()); // all three emailed
+  const res = await del(ID_A, { env: { DB: db } });
+  assert.deepEqual(await res.json(), { ok: true, total: 2, sent: 2, unsent: 0 });
+});
+
+test("DELETE without the same-origin admin header or with a foreign Origin is refused and deletes nothing", async () => {
+  const db = makeDb(); await seed(db);
+  assert.equal((await del(ID_A, { env: { DB: db }, headers: { "X-Framework-Admin": "" } })).status, 403);
+  assert.equal((await del(ID_A, { env: { DB: db }, headers: { Origin: "https://evil.example" } })).status, 403);
+  assert.equal((await del(ID_A, { env: { DB: db }, headers: { Origin: "" } })).status, 403);
+  assert.equal(count(db), 3);
+});
+
+test("DELETE with a malformed identifier is a 400 and never reaches the database", async () => {
+  const db = makeDb(); await seed(db);
+  let touched = false;
+  const spy = { prepare: (sql) => { if (/DELETE/i.test(sql)) touched = true; return db.prepare(sql); } };
+  for (const bad of ["short", "x".repeat(65), "has%20space-0000000000", "a'%3B--0000000000000", "%E0%A4%A", "..%2F..%2Fetc-0000000", "1%27%20OR%20%271%27%3D%271", "*"]) {
+    const res = await del(bad, { env: { DB: spy } });
+    assert.equal(res.status, 400, bad);
+    assert.deepEqual(await res.json(), { error: "invalid_id" });
+  }
+  assert.equal(touched, false);
+  assert.equal(count(db), 3);
+});
+
+test("DELETE of a nonexistent request is a 404 and changes nothing", async () => {
+  const db = makeDb(); await seed(db);
+  const res = await del("nope-nope-nope-nope-0000", { env: { DB: db } });
+  assert.equal(res.status, 404);
+  assert.deepEqual(await res.json(), { error: "not_found" });
+  assert.equal(count(db), 3);
+  // deleting the same one twice: second attempt is a clean 404, not an error
+  assert.equal((await del(ID_C, { env: { DB: db } })).status, 200);
+  assert.equal((await del(ID_C, { env: { DB: db } })).status, 404);
+  assert.equal(count(db), 2);
+});
+
+test("DELETE during a database failure is a 503 with no details, and the record survives", async () => {
+  const db = makeDb(); await seed(db);
+  const failing = { prepare: (sql) => {
+    if (/DELETE/i.test(sql)) return { bind() { return this; }, run: async () => { throw new Error("D1_ERROR: secret internal detail /var/db"); } };
+    return db.prepare(sql);
+  } };
+  const res = await del(ID_A, { env: { DB: failing } });
+  const text = await res.text();
+  assert.equal(res.status, 503);
+  assert.deepEqual(JSON.parse(text), { error: "database_unavailable" });
+  assert.ok(!/secret|var\/db|D1_ERROR/.test(text));
+  assert.equal(count(db), 3);
+});
+
+test("there is no bulk delete: the collection, summary, resend and test-email paths refuse DELETE", async () => {
+  const db = makeDb(); await seed(db);
+  for (const path of ["/assessments", "/assessments/summary", "/assessments/resend", "/assessments/test-email"]) {
+    assert.equal((await admin(path, { method: "DELETE", env: { DB: db } })).status, 405, path);
+  }
+  assert.equal((await admin("/assessments/" + ID_A, { method: "GET", env: { DB: db } })).status, 405); // GET/POST on an id: not allowed
+  assert.equal((await admin("/assessments/" + ID_A, { method: "POST", env: { DB: db }, body: {} })).status, 405);
+  assert.equal(count(db), 3);
+});
+
+test("a deleted request can no longer be resent or listed", async () => {
+  const db = makeDb(); await seed(db);
+  await del(ID_A, { env: { DB: db } });
+  const list = await (await admin("/assessments", { env: { DB: db } })).json();
+  assert.deepEqual(list.requests.map((r) => r.id).sort(), [ID_B, ID_C]);
+  const out = await resendUnsent({ DB: db, ...emailEnv() }, { id: ID_A }, { fetch: makeFetch() });
+  assert.equal(out.attempted, 0);
+});
+
+/* ================================================================ hardening found in the audit */
+
+test("AUDIT: a body is capped while it is being read, even with no Content-Length (chunked)", async () => {
+  let pulled = 0;
+  const stream = new ReadableStream({ pull(c) { pulled += 1; c.enqueue(new TextEncoder().encode("x".repeat(8192))); if (pulled > 200) c.close(); } });
+  const req = new Request("https://frameworkco.ca/api/assessment", { method: "POST", headers: { "Content-Type": "application/json", Origin: "https://frameworkco.ca" }, body: stream, duplex: "half" });
+  const res = await handleAssessmentSubmit(req, { DB: makeDb(), ...emailEnv() }, { fetch: makeFetch() });
+  assert.equal(res.status, 413);
+  assert.ok(pulled < 20, "stopped reading early: pulled " + pulled);
+});
+
+test("AUDIT: the confirmation email is sent once per address per day (no mail-bombing a third party)", async () => {
+  const db = makeDb(); const f = makeFetch(); const env = { DB: db, ...emailEnv() };
+  const t0 = new Date("2026-10-20T10:00:00Z");
+  const go = (id, ip, when, email = "victim@example.com") => handleAssessmentSubmit(post(good({ submission_id: id, email }), { "CF-Connecting-IP": ip }), env, { fetch: f, now: when });
+  await go("conf-aaaaaaaaaaaaaaaaaaaa", "1.1.1.1", t0);
+  await go("conf-bbbbbbbbbbbbbbbbbbbb", "1.1.1.2", new Date(t0.getTime() + 3600e3), "VICTIM@example.com");
+  const sentTo = (addr) => f.emails().filter((e) => e.subject.startsWith("Your Assessment") && e.to[0].toLowerCase() === addr).length;
+  assert.equal(sentTo("victim@example.com"), 1);
+  assert.equal(f.emails().filter((e) => e.subject.startsWith("New Assessment")).length, 2); // Framework still hears about both
+  const rows = db.raw.prepare("SELECT confirm_status FROM assessment_requests ORDER BY created_at").all().map((r) => r.confirm_status);
+  assert.deepEqual(rows, ["sent", "suppressed"]);
+  await go("conf-cccccccccccccccccccc", "1.1.1.3", new Date(t0.getTime() + 25 * 3600e3)); // next day: allowed again
+  assert.equal(sentTo("victim@example.com"), 2);
+  // a suppressed confirmation is never "recovered" later by a resend
+  db.raw.prepare("UPDATE assessment_requests SET notify_status = 'failed'").run();
+  const f2 = makeFetch();
+  await resendUnsent(env, {}, { fetch: f2 });
+  assert.equal(f2.emails().filter((e) => e.subject.startsWith("Your Assessment")).length, 0); // all three already sent/suppressed
+});
+
+test("AUDIT: concurrent resends never email the same request twice", async () => {
+  const db = makeDb(); await seed(db); // seeded with no email configured: all unsent
+  const f = makeFetch(); const env = { DB: db, ...emailEnv() };
+  const [a, b] = await Promise.all([resendUnsent(env, {}, { fetch: f }), resendUnsent(env, {}, { fetch: f })]);
+  assert.equal(a.sent + b.sent, 3);
+  assert.equal(f.emails().filter((e) => e.subject.startsWith("New Assessment")).length, 3);
+});
+
+test("AUDIT: a resend is capped per click and reports how many remain", async () => {
+  const db = makeDb(); const env = { DB: db, ...emailEnv() };
+  await ensureAssessmentSchema(db);
+  for (let i = 0; i < 13; i++) db.raw.prepare("INSERT INTO assessment_requests (id, created_at, business_name, email, notify_status) VALUES (?, ?, ?, 'a@b.co', 'failed')").run("cap-" + String(i).padStart(20, "0"), `2026-10-20T10:${String(i).padStart(2, "0")}:00Z`, "Co " + i);
+  const first = await resendUnsent(env, {}, { fetch: makeFetch() });
+  assert.deepEqual({ attempted: first.attempted, sent: first.sent, remaining: first.remaining }, { attempted: 10, sent: 10, remaining: 3 });
+  const second = await resendUnsent(env, {}, { fetch: makeFetch() });
+  assert.deepEqual({ attempted: second.attempted, remaining: second.remaining }, { attempted: 3, remaining: 0 });
+});
+
+test("AUDIT: two identical submissions racing past the duplicate check produce one record and one email pair", async () => {
+  const db = makeDb(); const f = makeFetch(); const env = { DB: db, ...emailEnv() };
+  const [a, b] = await Promise.all([submit(env, f), submit(env, f)]);
+  assert.equal(a.status, 200); assert.equal(b.status, 200);
+  assert.equal(count(db), 1);
+  assert.equal(f.emails().filter((e) => e.subject.startsWith("New Assessment")).length, 1);
+});
+
+test("AUDIT: applicant-supplied HTML/script never survives into the notification email or the admin JSON as markup", async () => {
+  const db = makeDb(); const f = makeFetch();
+  const evil = `<img src=x onerror=alert(1)><script>alert(2)</script>"'&`;
+  await submit({ DB: db, ...emailEnv() }, f, { business_name: evil, additional_info: evil, profiles: evil });
+  const note = f.emails().find((e) => e.subject.startsWith("New Assessment"));
+  assert.ok(!/<img|<script/i.test(note.html));
+  assert.ok(!/[\r\n]/.test(note.subject));
+  assert.ok(note.text.includes(evil)); // plain-text part carries the raw text, harmlessly
+});
+
+test("AUDIT: SQL metacharacters in every field are stored as data", async () => {
+  const db = makeDb();
+  const sqli = "x'); DROP TABLE assessment_requests;--";
+  const res = await submit({ DB: db }, null, { business_name: sqli, contact_name: sqli, industry: sqli, location: sqli, additional_info: sqli });
+  assert.equal(res.status, 200);
+  assert.equal(db.raw.prepare("SELECT business_name FROM assessment_requests").get().business_name, sqli);
+});
+
+test("AUDIT: Turnstile is enforced only when secret AND site key are both set (a half-set config must not lock out every lead)", async () => {
+  assert.equal((await import("../assessment.js")).turnstileState({}), "off");
+  const { turnstileState } = await import("../assessment.js");
+  assert.equal(turnstileState({ TURNSTILE_SECRET: "s", TURNSTILE_SITE_KEY: "k" }), "on");
+  assert.equal(turnstileState({ TURNSTILE_SECRET: "s" }), "misconfigured");
+  assert.equal(turnstileState({ TURNSTILE_SITE_KEY: "k" }), "misconfigured");
+  const warned = []; const w = console.warn; console.warn = (...a) => warned.push(a.join(" "));
+  try {
+    const res = await handleAssessmentSubmit(post(good()), { DB: makeDb(), TURNSTILE_SECRET: "s", ...emailEnv() }, { fetch: makeFetch() });
+    assert.equal(res.status, 200); // not blocked: no widget could have been shown
+    assert.ok(warned.some((m) => /BOTH TURNSTILE_SITE_KEY and TURNSTILE_SECRET/.test(m)));
+  } finally { console.warn = w; }
+});
+
+test("admin list reports the spam-check state", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db);
+  assert.equal((await (await admin("/assessments", { env: { DB: db } })).json()).spam_check, "off");
+  assert.equal((await (await admin("/assessments", { env: { DB: db, TURNSTILE_SECRET: "s", TURNSTILE_SITE_KEY: "k" } })).json()).spam_check, "on");
 });

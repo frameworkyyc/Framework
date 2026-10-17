@@ -251,3 +251,15 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-details dt { color: var(--stone); font-weight: 600; }
 .adm-details dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 @media (max-width: 520px) { .adm-details dl > div { grid-template-columns: 1fr; gap: 2px; } }
+.adm-banner--alert { border-color: var(--ink); color: var(--ink); }
+.adm-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.adm-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0;
+  border: 1px solid var(--hairline); border-radius: 0; background: var(--paper); color: var(--slate); cursor: pointer;
+  transition: border-color .15s ease, color .15s ease, background-color .15s ease;
+}
+.adm-icon-btn:hover { border-color: var(--ink); color: var(--ink); }
+.adm-icon-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.adm-icon-btn:disabled, .adm-small:disabled { opacity: .4; cursor: progress; }
+@media (max-width: 1279px) { .adm-row-actions { justify-content: flex-start; } }
+.adm-banner__line { display: block; margin-top: 6px; }

@@ -7,3 +7,16 @@
   X-Robots-Tag: noindex, nofollow
   Referrer-Policy: no-referrer
   Cache-Control: no-store
+
+# Assessment landing page and privacy notice: no framing, no MIME sniffing.
+/assessment
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+/assessment.html
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+/privacy.html
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY

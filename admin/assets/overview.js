@@ -20,7 +20,7 @@ export async function render() {
     : stateBlock({ title: "No feedback yet", body: "Responses appear here after a client completes the feedback form." });
 
   // Never let a saved-but-unemailed assessment request go unnoticed: surface it on the first screen.
-  const alert = h("p", { class: "adm-banner", hidden: true, role: "status", style: "border-color:#0A0A0A;color:#0A0A0A" });
+  const alert = h("p", { class: "adm-banner adm-banner--alert", hidden: true, role: "status" });
   api("/assessments/summary").then((a) => {
     if (!a.unsent) return;
     alert.replaceChildren(h("strong", null, `${a.unsent} assessment request${a.unsent === 1 ? "" : "s"} saved but not emailed. `), h("a", { class: "adm-link", href: "/admin/assessments", "data-link": "" }, "Review and resend →"));

@@ -143,6 +143,18 @@ Settings (Cloudflare dashboard, Workers & Pages, framework, Settings, Variables 
 
 `ASSESSMENT_FROM` should be `Framework <hello@frameworkco.ca>` (angle brackets included). The Worker repairs a missing-brackets value (`Framework hello@frameworkco.ca`) and trims pasted whitespace or quotes from the API key, but still fix the setting in Cloudflare. Settings reach a deployment only when it is built after they are saved: after changing Variables/Secrets (especially Preview base-config values), push a commit or redeploy Staging, then use **Send test email** to confirm.
 
+**Deleting a request** (Admin → Assessments, trash icon, then *Delete Assessment* in the confirmation): permanently removes that one row from D1 (`DELETE /api/admin/assessments/<id>`; admin-only, same-origin, parameterized, one id at a time, there is no bulk delete). The page updates in place and the counts follow. Cloudflare may keep point-in-time backups of D1 for a limited period; delete test submissions before launch.
+
+**Protections on the public form** (`worker/assessment.js`): server-side validation and length limits, a request-size cap enforced while reading, hidden honeypot, minimum fill time, 5 requests per hour per (hashed) address plus a site-wide flood limit, one confirmation email per address per day, idempotent retries, no HTML ever rendered from applicant text (emails escape it; the admin builds text nodes). Cloudflare Turnstile is optional and only enforced when **both** `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` are set (Admin → Assessments shows its state). Optionally set `IP_HASH_SALT` (a long random secret) so the stored address hash cannot be brute-forced.
+
+**Production launch checklist for the assessment.** Staging (a Preview) and Production do not share settings:
+1. Cloudflare → Workers & Pages → framework → Settings → Variables and Secrets, **Production** column: `RESEND_API_KEY` (secret), `ASSESSMENT_FROM` (`Framework <hello@frameworkco.ca>`), `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, `ADMIN_EMAILS` (secrets). Optional: `ASSESSMENT_NOTIFY_TO`, `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET` (together), `META_PIXEL_ID`, `IP_HASH_SALT`.
+2. Zero Trust → Access → Applications: the application must list `frameworkco.ca` paths `/admin*` and `/api/admin*` (and `www.frameworkco.ca` if it serves the site); `ACCESS_AUD` must be that application's AUD tag.
+3. Resend: the sending domain shows Verified (SPF and DKIM); add a DMARC record if you have none.
+4. D1: Production uses the top-level `d1_databases` binding (same database as Staging today). The assessment table creates and upgrades itself; `migrations/0003_create_client_revenue.sql` must already have been applied for the homepage revenue figure.
+5. Delete Staging test submissions in Admin → Assessments, then review and approve `privacy.html` (it is `noindex` until then).
+6. After the deploy: `/api/admin/me` must answer 401 (not `not_configured`), Admin → Assessments must say "Email delivery: ready", **Send test email**, then submit one real test request and delete it.
+
 `privacy.html` is a draft notice that describes exactly what this form does; have it reviewed before going live.
 
 ## 3. Publish on GitHub Pages
