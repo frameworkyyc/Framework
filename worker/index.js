@@ -6,6 +6,8 @@
  *
  * Public:
  *   POST /api/feedback          store one submission in D1 (the /client-feedback form)
+ *   POST /api/assessment        Free Online Presence Assessment request (stores in D1, emails Framework)
+ *   GET  /api/assessment/config public IDs the page needs (Turnstile site key, Meta Pixel ID)
  *   GET  /api/client-revenue    the combined client revenue total for the homepage (no per-client data)
  *   GET  /api/feedback/export   CSV / JSON export, requires  Authorization: Bearer <FEEDBACK_EXPORT_TOKEN>
  *
@@ -19,6 +21,7 @@
 import { RATING_KEYS, COLUMNS, ensureSchema, SECURITY_HEADERS, json, csvCell, timingSafeEqual } from "./shared.js";
 import { handleAdmin } from "./admin/router.js";
 import { combinedRevenue } from "./revenue.js";
+import { handleAssessmentSubmit, handleAssessmentConfig } from "./assessment.js";
 
 const MAX_BODY_BYTES = 24 * 1024;
 const MAX_RECENT_SUBMISSIONS = 40; // flood guard: max stored submissions per 10 minutes, site-wide
@@ -288,6 +291,21 @@ export default {
         console.error("client revenue error:", err && err.message);
         return json({ total: null, value: null }, 200); // fail closed: show nothing rather than a wrong number
       }
+    }
+
+    // Public: Free Online Presence Assessment request form (see worker/assessment.js).
+    try {
+      if (path === "/api/assessment") {
+        if (request.method === "POST") return await handleAssessmentSubmit(request, env);
+        return json({ error: "method_not_allowed" }, 405, { Allow: "POST" });
+      }
+      if (path === "/api/assessment/config") {
+        if (request.method === "GET") return handleAssessmentConfig(env);
+        return json({ error: "method_not_allowed" }, 405, { Allow: "GET" });
+      }
+    } catch (err) {
+      console.error("assessment error", err && err.message);
+      return json({ error: "server_error" }, 500);
     }
 
     try {

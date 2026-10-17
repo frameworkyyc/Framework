@@ -119,6 +119,25 @@ INSERT INTO client_revenue (client_id, revenue) VALUES ('aurora', 2500000)
 
 Remove one with `DELETE FROM client_revenue WHERE client_id = 'aurora';`
 
+## 2e. Free Online Presence Assessment page (`/assessment`)
+
+A landing page (for Meta ads, social and outreach) that collects assessment requests. The assessment itself is prepared by hand; the site only receives the request.
+
+How a request flows (`worker/assessment.js`): validated server-side, spam-checked (hidden honeypot, minimum fill time, Cloudflare Turnstile when configured, per-address rate limit), **saved to D1** (`assessment_requests`, created automatically on first use; `migrations/0004` documents it), then emailed to Framework and confirmed to the applicant. The visitor sees "Your request is in." only if the request was saved or the notification email was accepted; otherwise they see an honest error and their answers stay in the form. A repeat submission with the same id is ignored, so double-clicks never duplicate.
+
+Settings (Cloudflare dashboard, Workers & Pages, framework, Settings, Variables and Secrets; set them for the **Preview** environment too so Staging works). None of these belong in the repository:
+
+| Name | Type | Purpose |
+|---|---|---|
+| `RESEND_API_KEY` | Secret | Resend API key. Email stays off until this and `ASSESSMENT_FROM` are both set. |
+| `ASSESSMENT_FROM` | Variable | Verified sender, e.g. `Framework <assessments@frameworkco.ca>` (the domain must be verified in Resend). |
+| `ASSESSMENT_NOTIFY_TO` | Variable | Where requests are emailed. Defaults to `info@frameworkco.ca`. |
+| `TURNSTILE_SITE_KEY` | Variable | Turnstile site key (public). Shows the check on the form. |
+| `TURNSTILE_SECRET` | Secret | Turnstile secret. Turns on server-side verification. Set both Turnstile values together. |
+| `META_PIXEL_ID` | Variable | Meta Pixel ID (public). The page then asks for consent and loads the Pixel only if the visitor allows it; the `Lead` event fires only after a confirmed submission. |
+
+Until email is configured, requests are still saved to D1 (`notify_status = 'skipped'`). To see them: D1 console, `SELECT created_at, business_name, website, contact_name, email, notify_status FROM assessment_requests ORDER BY created_at DESC;`. Requests where the email failed show `notify_status = 'failed'`. `privacy.html` is a draft notice that describes exactly what this form does; have it reviewed before going live.
+
 ## 3. Publish on GitHub Pages
 
 1. Create a new repository on GitHub (e.g. `frameworkco.ca`).
