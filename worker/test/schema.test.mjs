@@ -62,28 +62,59 @@ test("a database created from staging-init.sql starts EMPTY: no customer data, o
   assert.deepEqual(db.prepare("SELECT key, value FROM framework_environment").all().map((r) => ({ ...r })), [{ key: "environment", value: "staging" }]);
 });
 
-test("staging-init.sql contains nothing destructive and inserts no data besides the marker", () => {
+test("staging-init.sql is non-destructive and idempotent by construction: only CREATE TABLE IF NOT EXISTS and one INSERT OR IGNORE", () => {
   const sql = read("staging-init.sql").replace(/--.*$/gm, "");
-  assert.ok(!/\b(DROP|DELETE|TRUNCATE|REPLACE\s+INTO)\b/i.test(sql));
-  const inserts = sql.match(/\bINSERT\b[^;]*;/gi) || [];
-  assert.equal(inserts.length, 1);
-  assert.match(inserts[0], /framework_environment/);
+  assert.ok(!/\b(DROP|DELETE|TRUNCATE|ALTER|UPDATE|REPLACE)\b/i.test(sql), "no ALTER/UPDATE/DROP/DELETE");
+  const statements = sql.split(";").map((x) => x.trim()).filter(Boolean);
+  const creates = statements.filter((x) => /^CREATE TABLE/i.test(x));
+  assert.equal(creates.length, 4);
+  assert.ok(creates.every((x) => /^CREATE TABLE IF NOT EXISTS\b/i.test(x)));
+  const others = statements.filter((x) => !/^CREATE TABLE/i.test(x));
+  assert.equal(others.length, 1);
+  assert.match(others[0], /^INSERT OR IGNORE INTO framework_environment/i);
 });
 
-test("SAFETY: running staging-init.sql against a populated database (e.g. Production) does NOT label it 'staging'", () => {
-  const prod = new DatabaseSync(":memory:");
-  prod.exec(SCHEMA);
-  prod.exec(read("0002_add_reviewed_at.sql")); // Production already has these, as it does in real life
-  prod.prepare("INSERT INTO feedback_responses (id, created_at, form_version, satisfaction, rating_visual_design, rating_ease_of_use, rating_mobile_experience, rating_accuracy, rating_professionalism, rating_communication, rating_overall_product, improvement, impact, fair_price, recommend, liked, testimonial_permission, logo_permission, services) VALUES ('keep-1','2026-01-01',1,9,5,5,5,5,5,5,5,'x','x','x',9,'x','No','No','x')").run();
-  assert.throws(() => prod.exec(read("staging-init.sql")), /duplicate column/i); // stops at the ALTER, as documented
-  assert.equal(prod.prepare("SELECT COUNT(*) AS n FROM framework_environment").get().n, 0, "no marker on a populated database");
-  assert.equal(prod.prepare("SELECT COUNT(*) AS n FROM feedback_responses").get().n, 1, "existing data untouched");
+test("LIVE STATE: framework-staging currently holds only the Worker-created (empty) assessment_requests; the script completes and adds the rest", async () => {
+  const raw = new DatabaseSync(":memory:");
+  await ensureAssessmentSchema(d1(raw)); // exactly what loading the admin page did on Staging
+  raw.exec(read("staging-init.sql"));
+  const tables = raw.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((r) => r.name);
+  assert.deepEqual(tables, ["assessment_requests", "client_revenue", "feedback_responses", "framework_environment"]);
+  assert.deepEqual(raw.prepare("SELECT key, value FROM framework_environment").all().map((r) => ({ ...r })), [{ key: "environment", value: "staging" }]);
+  for (const t of APP_TABLES) assert.equal(raw.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n, 0);
 });
 
-test("re-running staging-init.sql on the staging database is harmless to its data and keeps a single marker", () => {
+test("the previous (ALTER-based) approach would have failed on that live state, which is why the script no longer uses ALTER", async () => {
+  const raw = new DatabaseSync(":memory:");
+  await ensureAssessmentSchema(d1(raw));
+  assert.throws(() => raw.exec(read("0005_assessment_delivery_tracking.sql")), /duplicate column/i);
+});
+
+test("existing rows are preserved when the script runs on a database that already has data", async () => {
+  const raw = new DatabaseSync(":memory:");
+  await ensureAssessmentSchema(d1(raw));
+  raw.prepare("INSERT INTO assessment_requests (id, created_at, business_name, email) VALUES ('keep-111111111111111','2026-10-20','Keep Me Ltd.','k@example.com')").run();
+  raw.exec(read("staging-init.sql"));
+  assert.equal(raw.prepare("SELECT business_name FROM assessment_requests").get().business_name, "Keep Me Ltd.");
+  assert.equal(raw.prepare("SELECT COUNT(*) AS n FROM framework_environment").get().n, 0, "a database that holds data is never labelled");
+});
+
+test("SAFETY: running it against a populated Production-style database changes nothing and does not label it 'staging'", () => {
+  const prod = viaMigrations();
+  prod.prepare("INSERT INTO feedback_responses (id, created_at, form_version, satisfaction, rating_visual_design, rating_ease_of_use, rating_mobile_experience, rating_accuracy, rating_professionalism, rating_communication, rating_overall_product, improvement, impact, fair_price, recommend, liked, testimonial_permission, logo_permission, services) VALUES ('keep-1','2026-01-01','1',9,5,5,5,5,5,5,5,'x','x','x',9,'x','No','No','x')").run();
+  prod.prepare("INSERT INTO client_revenue (client_id, revenue) VALUES ('c', 2500000)").run();
+  const before = ["feedback_responses", "client_revenue", "assessment_requests"].map((t) => shape(prod, t).join(";"));
+  prod.exec(read("staging-init.sql")); // no error, no change
+  assert.equal(prod.prepare("SELECT COUNT(*) AS n FROM framework_environment").get().n, 0);
+  assert.equal(prod.prepare("SELECT COUNT(*) AS n FROM feedback_responses").get().n, 1);
+  assert.equal(prod.prepare("SELECT revenue FROM client_revenue").get().revenue, 2500000);
+  assert.deepEqual(["feedback_responses", "client_revenue", "assessment_requests"].map((t) => shape(prod, t).join(";")), before);
+});
+
+test("running it repeatedly is harmless: no errors, data kept, a single marker", () => {
   const db = viaInit();
   db.prepare("INSERT INTO client_revenue (client_id, revenue) VALUES ('demo', 1000)").run();
-  assert.throws(() => db.exec(read("staging-init.sql")), /duplicate column/i);
+  db.exec(read("staging-init.sql")); db.exec(read("staging-init.sql"));
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM client_revenue").get().n, 1);
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM framework_environment").get().n, 1);
 });
