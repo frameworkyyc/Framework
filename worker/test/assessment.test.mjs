@@ -76,7 +76,7 @@ const makeFetch = ({ resend = 200, turnstile = { success: true } } = {}) => {
   return impl;
 };
 
-const emailEnv = (over = {}) => ({ RESEND_API_KEY: "re_test_key", ASSESSMENT_FROM: "Framework <assessments@frameworkco.ca>", ...over });
+const emailEnv = (over = {}) => ({ RESEND_API_KEY: "re_test_key", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", ...over });
 
 beforeEach(() => resetAssessmentSchemaForTests());
 
@@ -176,9 +176,11 @@ test("success: stored in D1, Framework notified at info@, applicant confirmed", 
   assert.equal(row.confirm_status, "sent");
   assert.ok(row.ip_hash && !row.ip_hash.includes("203.0.113.7"));
   const [note, confirm] = f.emails();
-  assert.deepEqual(note.to, ["info@frameworkco.ca"]);
+  assert.deepEqual(note.to, ["hello@frameworkco.ca"]); // default recipient
+  assert.ok(!JSON.stringify(f.emails()).includes("info@frameworkco.ca"));
   assert.equal(note.reply_to, "alex@summitconcrete.ca");
-  assert.equal(note.from, "Framework <assessments@frameworkco.ca>");
+  assert.equal(note.from, "Framework <hello@frameworkco.ca>");
+  assert.equal(confirm.reply_to, "hello@frameworkco.ca");
   assert.match(note.subject, /^New Assessment Request \| Summit Concrete Ltd\.$/);
   assert.deepEqual(confirm.to, ["alex@summitconcrete.ca"]);
   assert.equal(confirm.subject, "Your Assessment Request | Framework");
@@ -189,6 +191,7 @@ test("notify address is configurable", async () => {
   const f = makeFetch();
   await handleAssessmentSubmit(post(good()), { DB: makeDb(), ...emailEnv({ ASSESSMENT_NOTIFY_TO: "team@frameworkco.ca" }) }, { fetch: f });
   assert.deepEqual(f.emails()[0].to, ["team@frameworkco.ca"]);
+  assert.equal(f.emails()[1].reply_to, "team@frameworkco.ca");
 });
 
 test("a repeated submission id is a harmless success: one record, one set of emails", async () => {

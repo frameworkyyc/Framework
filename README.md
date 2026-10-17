@@ -130,8 +130,8 @@ Settings (Cloudflare dashboard, Workers & Pages, framework, Settings, Variables 
 | Name | Type | Purpose |
 |---|---|---|
 | `RESEND_API_KEY` | Secret | Resend API key. Email stays off until this and `ASSESSMENT_FROM` are both set. |
-| `ASSESSMENT_FROM` | Variable | Verified sender, e.g. `Framework <assessments@frameworkco.ca>` (the domain must be verified in Resend). |
-| `ASSESSMENT_NOTIFY_TO` | Variable | Where requests are emailed. Defaults to `info@frameworkco.ca`. |
+| `ASSESSMENT_FROM` | Variable | Verified sender, e.g. `Framework <hello@frameworkco.ca>` (the domain must be verified in Resend). |
+| `ASSESSMENT_NOTIFY_TO` | Variable | Where requests are emailed. Defaults to `hello@frameworkco.ca`. |
 | `TURNSTILE_SITE_KEY` | Variable | Turnstile site key (public). Shows the check on the form. |
 | `TURNSTILE_SECRET` | Secret | Turnstile secret. Turns on server-side verification. Set both Turnstile values together. |
 | `META_PIXEL_ID` | Variable | Meta Pixel ID (public). The page then asks for consent and loads the Pixel only if the visitor allows it; the `Lead` event fires only after a confirmed submission. |

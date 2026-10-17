@@ -246,12 +246,12 @@
 
   var FRIENDLY = {
     try_again: "That went through a little too fast. Please try again.",
-    try_again_later: "We’ve had a lot of requests from this connection. Please try again a little later, or email info@frameworkco.ca.",
+    try_again_later: "We’ve had a lot of requests from this connection. Please try again a little later, or email hello@frameworkco.ca.",
     verification_failed: "We couldn’t confirm you’re human. Please complete the check and try again.",
     verification_unavailable: "We couldn’t run the spam check just now. Please try again in a moment.",
     forbidden: "Something went wrong with this request. Please reload the page and try again."
   };
-  var GENERIC_FAILURE = "We couldn’t send your request just now, and it has not been received. Your answers are still here — please try again, or email info@frameworkco.ca.";
+  var GENERIC_FAILURE = "We couldn’t send your request just now, and it has not been received. Your answers are still here — please try again, or email hello@frameworkco.ca.";
 
   form.addEventListener("submit", function (event) {
     event.preventDefault();

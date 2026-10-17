@@ -9,8 +9,8 @@
  *
  * Configuration (Worker variables / secrets; none of this is ever sent to the browser except the two public IDs):
  *   RESEND_API_KEY        secret   email provider key (Resend). Email is skipped until this AND ASSESSMENT_FROM are set.
- *   ASSESSMENT_FROM       var      verified sender, e.g.  Framework <assessments@frameworkco.ca>
- *   ASSESSMENT_NOTIFY_TO  var      where requests are sent (default info@frameworkco.ca)
+ *   ASSESSMENT_FROM       var      verified sender, e.g.  Framework <hello@frameworkco.ca>
+ *   ASSESSMENT_NOTIFY_TO  var      where requests are sent (default hello@frameworkco.ca)
  *   TURNSTILE_SECRET      secret   Cloudflare Turnstile secret key (enables server-side verification)
  *   TURNSTILE_SITE_KEY    var      Turnstile site key (public; shown to the browser via /api/assessment/config)
  *   META_PIXEL_ID         var      Meta Pixel ID (public; the page loads the pixel only with visitor consent)
@@ -23,7 +23,7 @@ const MAX_BODY_BYTES = 16 * 1024;
 const MIN_FILL_MS = 1200; // faster than a human can fill the form: ask them to try again
 const IP_LIMIT_PER_HOUR = 5;
 const SITE_LIMIT_PER_10_MIN = 40;
-const DEFAULT_NOTIFY_TO = "info@frameworkco.ca";
+const DEFAULT_NOTIFY_TO = "hello@frameworkco.ca";
 const EMAIL_TIMEOUT_MS = 8000;
 
 export const CONCERNS = [
