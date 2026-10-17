@@ -3,6 +3,8 @@
   "name": "framework",
   "main": "worker/index.js",
   "compatibility_date": "2026-09-01",
+  // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
+  "observability": { "enabled": true },
   "assets": {
     "directory": "./",
     "binding": "ASSETS",

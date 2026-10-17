@@ -136,7 +136,14 @@ Settings (Cloudflare dashboard, Workers & Pages, framework, Settings, Variables 
 | `TURNSTILE_SECRET` | Secret | Turnstile secret. Turns on server-side verification. Set both Turnstile values together. |
 | `META_PIXEL_ID` | Variable | Meta Pixel ID (public). The page then asks for consent and loads the Pixel only if the visitor allows it; the `Lead` event fires only after a confirmed submission. |
 
-Until email is configured, requests are still saved to D1 (`notify_status = 'skipped'`). To see them: D1 console, `SELECT created_at, business_name, website, contact_name, email, notify_status FROM assessment_requests ORDER BY created_at DESC;`. Requests where the email failed show `notify_status = 'failed'`. `privacy.html` is a draft notice that describes exactly what this form does; have it reviewed before going live.
+**Email is never skipped silently.** Every request is saved first, and its row records `notify_status` (`sent`, `failed`, `not_configured` or `pending`) and `notify_error` (the reason, e.g. `config:missing_api_key`, `config:invalid_from`, `provider 403: domain not verified`, `network:TimeoutError`). The form's JSON answer also says `"notification": "sent"` or `"not_sent"` (browser dev tools, Network tab, `assessment` request). Anything saved but not emailed can be found and recovered:
+
+- **Framework Admin → Assessments** (`/admin/assessments`): shows whether *this deployment* can send email (and the exact problem if not), a **Send test email** button that proves delivery to the notification address, every request with its notification status and reason, and **Resend** (one request or all unsent). The Admin Overview also shows a banner while anything is unsent. Resent emails say "Resent" and keep the original submission time; delivered requests are never resent.
+- **Without Admin** (D1 console): `SELECT created_at, business_name, contact_name, email, notify_status, notify_error FROM assessment_requests WHERE notify_status <> 'sent' ORDER BY created_at;`
+
+`ASSESSMENT_FROM` should be `Framework <hello@frameworkco.ca>` (angle brackets included). The Worker repairs a missing-brackets value (`Framework hello@frameworkco.ca`) and trims pasted whitespace or quotes from the API key, but still fix the setting in Cloudflare. Settings reach a deployment only when it is built after they are saved: after changing Variables/Secrets (especially Preview base-config values), push a commit or redeploy Staging, then use **Send test email** to confirm.
+
+`privacy.html` is a draft notice that describes exactly what this form does; have it reviewed before going live.
 
 ## 3. Publish on GitHub Pages
 

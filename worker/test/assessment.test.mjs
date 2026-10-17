@@ -5,7 +5,9 @@ import { DatabaseSync } from "node:sqlite";
 import {
   validateAssessment, normaliseWebsite, validEmail, buildNotification, buildConfirmation,
   handleAssessmentSubmit, handleAssessmentConfig, resetAssessmentSchemaForTests,
+  normaliseFrom, emailConfig, emailHealth, resendUnsent, ensureAssessmentSchema,
 } from "../assessment.js";
+import { handleAssessmentsApi } from "../admin/assessments-api.js";
 
 /** A D1-shaped wrapper over node:sqlite so the real SQL runs. */
 const makeDb = () => {
@@ -165,11 +167,11 @@ test("confirmation email matches the approved copy and promises no deadline", ()
 
 /* ---------------------------------------------------------------- endpoint */
 
-test("success: stored in D1, Framework notified at info@, applicant confirmed", async () => {
+test("success: stored in D1, Framework notified at hello@, applicant confirmed", async () => {
   const db = makeDb(); const f = makeFetch();
   const res = await handleAssessmentSubmit(post(good()), { DB: db, ...emailEnv() }, { fetch: f, now: new Date("2026-10-20T20:03:00Z") });
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { ok: true });
+  assert.deepEqual(await res.json(), { ok: true, notification: "sent" });
   const row = db.raw.prepare("SELECT * FROM assessment_requests").get();
   assert.equal(row.business_name, "Summit Concrete Ltd.");
   assert.equal(row.notify_status, "sent");
@@ -177,7 +179,7 @@ test("success: stored in D1, Framework notified at info@, applicant confirmed", 
   assert.ok(row.ip_hash && !row.ip_hash.includes("203.0.113.7"));
   const [note, confirm] = f.emails();
   assert.deepEqual(note.to, ["hello@frameworkco.ca"]); // default recipient
-  assert.ok(!JSON.stringify(f.emails()).includes("info@frameworkco.ca"));
+  assert.ok(!JSON.stringify(f.emails()).includes("info@frameworkco.ca")); // the old address is gone from every email
   assert.equal(note.reply_to, "alex@summitconcrete.ca");
   assert.equal(note.from, "Framework <hello@frameworkco.ca>");
   assert.equal(confirm.reply_to, "hello@frameworkco.ca");
@@ -208,7 +210,10 @@ test("email not configured: request is stored and reported as received", async (
   const res = await handleAssessmentSubmit(post(good()), { DB: db }, { fetch: f });
   assert.equal(res.status, 200);
   assert.equal(f.calls.length, 0);
-  assert.equal(db.raw.prepare("SELECT notify_status FROM assessment_requests").get().notify_status, "skipped");
+  const row = db.raw.prepare("SELECT notify_status, notify_error FROM assessment_requests").get();
+  assert.equal(row.notify_status, "not_configured");
+  assert.equal(row.notify_error, "config:missing_api_key");
+  assert.equal((await res.clone().json()).notification, "not_sent"); // the browser can tell the email did not go out
 });
 
 test("email provider fails but the request is safely stored: accepted, flagged for follow-up", async () => {
@@ -314,4 +319,200 @@ test("config endpoint exposes only the two public IDs, never secrets", async () 
   assert.deepEqual(JSON.parse(text), { turnstileSiteKey: "0xSITE", metaPixelId: "123" });
   assert.ok(!text.includes("s\"") && !text.includes("re_"));
   assert.deepEqual(await handleAssessmentConfig({}).json(), { turnstileSiteKey: null, metaPixelId: null });
+});
+
+
+/* ================================================================ email must never be skipped silently */
+
+const rowOf = (db) => db.raw.prepare("SELECT * FROM assessment_requests").get();
+const submit = (env, f, over = {}, now) => handleAssessmentSubmit(post(good(over)), env, { fetch: f || makeFetch(), now });
+
+test("ASSESSMENT_FROM: the bracket-less value from the dashboard is repaired, other shapes are handled", () => {
+  assert.deepEqual(normaliseFrom("Framework hello@frameworkco.ca"), { value: "Framework <hello@frameworkco.ca>", corrected: true });
+  assert.deepEqual(normaliseFrom("Framework <hello@frameworkco.ca>"), { value: "Framework <hello@frameworkco.ca>", corrected: false });
+  assert.deepEqual(normaliseFrom('"Framework <hello@frameworkco.ca>"'), { value: "Framework <hello@frameworkco.ca>", corrected: true });
+  assert.deepEqual(normaliseFrom("  hello@frameworkco.ca \n"), { value: "hello@frameworkco.ca", corrected: false }); // whitespace only: not a real correction
+  assert.deepEqual(normaliseFrom("Framework Studio hello@frameworkco.ca"), { value: "Framework Studio <hello@frameworkco.ca>", corrected: true });
+  for (const bad of ["", "Framework", "hello@", "Framework <hello>", "<<a@b.co>>", "a@b", null, undefined]) assert.equal(normaliseFrom(bad), null, String(bad));
+});
+
+test("emailConfig names the exact problem and tolerates pasted whitespace", () => {
+  assert.deepEqual(emailConfig({}), { ok: false, reason: "missing_api_key" });
+  assert.deepEqual(emailConfig({ RESEND_API_KEY: "   " }), { ok: false, reason: "missing_api_key" });
+  assert.deepEqual(emailConfig({ RESEND_API_KEY: "k" }), { ok: false, reason: "missing_from" });
+  assert.deepEqual(emailConfig({ RESEND_API_KEY: "k", ASSESSMENT_FROM: "nonsense" }), { ok: false, reason: "invalid_from" });
+  const c = emailConfig({ RESEND_API_KEY: "re_key\n", ASSESSMENT_FROM: "Framework hello@frameworkco.ca" });
+  assert.equal(c.ok, true);
+  assert.equal(c.apiKey, "re_key");
+  assert.equal(c.from, "Framework <hello@frameworkco.ca>");
+  assert.equal(c.fromCorrected, true);
+});
+
+test("REGRESSION: a bracket-less ASSESSMENT_FROM now sends (with a valid From header) instead of failing silently", async () => {
+  const db = makeDb(); const f = makeFetch();
+  const res = await submit({ DB: db, RESEND_API_KEY: "re_key", ASSESSMENT_FROM: "Framework hello@frameworkco.ca" }, f);
+  assert.deepEqual(await res.json(), { ok: true, notification: "sent" });
+  assert.deepEqual(f.emails().map((e) => e.from), ["Framework <hello@frameworkco.ca>", "Framework <hello@frameworkco.ca>"]);
+  assert.equal(rowOf(db).notify_status, "sent");
+});
+
+test("REGRESSION: an API key pasted with a trailing newline still authenticates", async () => {
+  const f = makeFetch();
+  await submit({ DB: makeDb(), RESEND_API_KEY: "re_key\n", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" }, f);
+  assert.equal(f.calls[0].init.headers.Authorization, "Bearer re_key");
+});
+
+test("skipped delivery is recorded with its reason, never hidden: missing key, missing sender, invalid sender", async () => {
+  for (const [env, reason] of [
+    [{}, "config:missing_api_key"],
+    [{ RESEND_API_KEY: "k" }, "config:missing_from"],
+    [{ RESEND_API_KEY: "k", ASSESSMENT_FROM: "nonsense" }, "config:invalid_from"],
+  ]) {
+    resetAssessmentSchemaForTests();
+    const db = makeDb(); const f = makeFetch();
+    const res = await submit({ DB: db, ...env }, f, { submission_id: "skip" + reason.length + "00000000000000" });
+    const r = rowOf(db);
+    assert.equal((await res.json()).notification, "not_sent");
+    assert.equal(r.notify_status, "not_configured");
+    assert.equal(r.notify_error, reason);
+    assert.equal(f.calls.length, 0);
+  }
+});
+
+test("a provider rejection is stored with the provider's own message", async () => {
+  const db = makeDb();
+  const f = async () => new Response(JSON.stringify({ name: "validation_error", message: "Invalid `from` field.\nUse email@example.com or Name <email@example.com>" }), { status: 422 });
+  const res = await submit({ DB: db, RESEND_API_KEY: "k", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" }, f);
+  const r = rowOf(db);
+  assert.equal((await res.json()).notification, "not_sent");
+  assert.equal(r.notify_status, "failed");
+  assert.match(r.notify_error, /^provider 422: Invalid `from` field\. Use email@example\.com/);
+  assert.ok(!r.notify_error.includes("\n"));
+  assert.equal(r.notify_attempts, 1);
+});
+
+test("a network error or timeout is stored as such", async () => {
+  const db = makeDb();
+  const f = async () => { throw Object.assign(new Error("boom"), { name: "TimeoutError" }); };
+  await submit({ DB: db, RESEND_API_KEY: "k", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" }, f);
+  assert.equal(rowOf(db).notify_error, "network:TimeoutError");
+});
+
+test("no secret ever reaches D1, logs or responses", async () => {
+  const logged = [];
+  const orig = { e: console.error, w: console.warn };
+  console.error = (...a) => logged.push(a.join(" ")); console.warn = (...a) => logged.push(a.join(" "));
+  try {
+    const db = makeDb();
+    const f = async () => new Response(JSON.stringify({ message: "nope" }), { status: 401 });
+    const res = await submit({ DB: db, RESEND_API_KEY: "re_SUPERSECRET123", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" }, f);
+    const everything = JSON.stringify(rowOf(db)) + (await res.text()) + logged.join("\n") + JSON.stringify(emailHealth({ RESEND_API_KEY: "re_SUPERSECRET123", ASSESSMENT_FROM: "x y@z.co" }));
+    assert.ok(!everything.includes("SUPERSECRET"));
+  } finally { console.error = orig.e; console.warn = orig.w; }
+});
+
+test("an existing Staging table from the first release is upgraded in place (columns added, 'skipped' migrated)", async () => {
+  const db = makeDb();
+  db.raw.exec(`CREATE TABLE assessment_requests (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, business_name TEXT, website TEXT, contact_name TEXT, email TEXT,
+    location TEXT, industry TEXT, phone TEXT, services TEXT, service_area TEXT, profiles TEXT, concern TEXT, additional_info TEXT,
+    privacy_ack INTEGER NOT NULL DEFAULT 0, marketing_opt_in INTEGER NOT NULL DEFAULT 0, tracking TEXT, landing TEXT, referrer TEXT, ip_hash TEXT,
+    notify_status TEXT NOT NULL DEFAULT 'pending', confirm_status TEXT NOT NULL DEFAULT 'pending')`);
+  db.raw.prepare("INSERT INTO assessment_requests (id, created_at, business_name, notify_status, confirm_status) VALUES ('old-1111111111111111', '2026-10-20T00:00:00Z', 'Old Co', 'skipped', 'skipped')").run();
+  await ensureAssessmentSchema(db);
+  const cols = db.raw.prepare("PRAGMA table_info(assessment_requests)").all().map((c) => c.name);
+  for (const c of ["notify_error", "notified_at", "notify_attempts", "confirm_error"]) assert.ok(cols.includes(c), c);
+  const r = rowOf(db);
+  assert.equal(r.notify_status, "not_configured");
+  assert.equal(r.notify_attempts, 0);
+  await ensureAssessmentSchema(db); // idempotent
+});
+
+test("RECOVERY: saved-but-unsent requests are found and resent once email works; sent ones are never resent", async () => {
+  const db = makeDb();
+  // two requests arrive while email is broken, one while it works
+  await submit({ DB: db }, null, { submission_id: "recover-aaaaaaaaaaaaaaaa", business_name: "Alpha Ltd." }, new Date("2026-10-20T10:00:00Z"));
+  await submit({ DB: db }, null, { submission_id: "recover-bbbbbbbbbbbbbbbb", business_name: "Beta Ltd.", elapsed_ms: 9000 }, new Date("2026-10-20T11:00:00Z"));
+  const working = { DB: db, ...emailEnv() };
+  await handleAssessmentSubmit(post(good({ submission_id: "recover-cccccccccccccccc", business_name: "Gamma Ltd." }), { "CF-Connecting-IP": "198.51.100.9" }), working, { fetch: makeFetch() });
+  const unsent = () => db.raw.prepare("SELECT business_name FROM assessment_requests WHERE notify_status != 'sent' ORDER BY created_at").all().map((r) => r.business_name);
+  assert.deepEqual(unsent(), ["Alpha Ltd.", "Beta Ltd."]);
+
+  const f = makeFetch();
+  const out = await resendUnsent(working, {}, { fetch: f, now: new Date("2026-10-21T09:00:00Z") });
+  assert.deepEqual({ attempted: out.attempted, sent: out.sent, failed: out.failed }, { attempted: 2, sent: 2, failed: 0 });
+  assert.deepEqual(unsent(), []);
+  const notes = f.emails().filter((e) => e.subject.startsWith("New Assessment Request"));
+  assert.deepEqual(notes.map((e) => e.subject), ["New Assessment Request | Alpha Ltd.", "New Assessment Request | Beta Ltd."]);
+  assert.ok(notes.every((e) => e.to[0] === "hello@frameworkco.ca" && e.text.includes("Resent: the original notification")));
+  assert.ok(notes[0].text.includes("2026-10-20T10:00:00.000Z")); // original submission time preserved
+  assert.equal(f.emails().filter((e) => e.subject === "Your Assessment Request | Framework").length, 2); // applicants finally get their confirmation
+  const alpha = db.raw.prepare("SELECT * FROM assessment_requests WHERE business_name = 'Alpha Ltd.'").get();
+  assert.equal(alpha.notify_status, "sent"); assert.equal(alpha.notify_error, null); assert.equal(alpha.notify_attempts, 2); assert.ok(alpha.notified_at); // one failed attempt at submission, one successful resend
+  assert.equal(alpha.confirm_status, "sent");
+
+  const again = await resendUnsent(working, {}, { fetch: makeFetch() });
+  assert.equal(again.attempted, 0); // nothing left; delivered requests are never touched
+});
+
+test("RECOVERY: a resend that still fails keeps the request flagged with the new reason; one request can be targeted", async () => {
+  const db = makeDb();
+  await submit({ DB: db }, null, { submission_id: "retry-aaaaaaaaaaaaaaaaa" });
+  const env = { DB: db, RESEND_API_KEY: "k", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" };
+  const bad = async () => new Response(JSON.stringify({ message: "domain not verified" }), { status: 403 });
+  const out = await resendUnsent(env, { id: "retry-aaaaaaaaaaaaaaaaa" }, { fetch: bad });
+  assert.deepEqual({ attempted: out.attempted, sent: out.sent, failed: out.failed }, { attempted: 1, sent: 0, failed: 1 });
+  assert.equal(out.results[0].error, "provider 403: domain not verified");
+  const r = rowOf(db);
+  assert.equal(r.notify_status, "failed"); assert.equal(r.notify_error, "provider 403: domain not verified"); assert.equal(r.notify_attempts, 2);
+  assert.equal((await resendUnsent(env, { id: "no-such-id-0000000000" }, { fetch: bad })).attempted, 0);
+});
+
+/* ---------------------------------------------------------------- admin API */
+
+const admin = (path, { method = "GET", env, body, headers = {}, fetch: f } = {}) => {
+  const req = new Request("https://frameworkco.ca/api/admin" + path, {
+    method,
+    headers: { Origin: "https://frameworkco.ca", "X-Framework-Admin": "1", "Content-Type": "application/json", ...headers },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return handleAssessmentsApi(req, env, { email: "owner@example.com" }, path, { fetch: f || makeFetch() });
+};
+
+test("admin list shows requests, counts and email health; hides internals and secrets", async () => {
+  const db = makeDb();
+  await submit({ DB: db }, null, { submission_id: "adm-aaaaaaaaaaaaaaaaaaa" });
+  const res = await admin("/assessments", { env: { DB: db, RESEND_API_KEY: "re_SECRETKEY", ASSESSMENT_FROM: "Framework hello@frameworkco.ca" } });
+  const text = await res.text(); const out = JSON.parse(text);
+  assert.deepEqual({ total: out.total, sent: out.sent, unsent: out.unsent }, { total: 1, sent: 0, unsent: 1 });
+  assert.equal(out.requests[0].notify_status, "not_configured");
+  assert.ok(!("ip_hash" in out.requests[0]));
+  assert.deepEqual(out.email, { can_send: true, api_key: "set", from: "corrected", from_used: "Framework <hello@frameworkco.ca>", notify_to: "hello@frameworkco.ca", problem: null });
+  assert.ok(!text.includes("SECRETKEY"));
+  const none = JSON.parse(await (await admin("/assessments", { env: { DB: db } })).text()).email;
+  assert.deepEqual({ can_send: none.can_send, problem: none.problem, api_key: none.api_key }, { can_send: false, problem: "missing_api_key", api_key: "missing" });
+});
+
+test("admin summary, resend and test-email work; writes need the same-origin header", async () => {
+  const db = makeDb(); const env = { DB: db, ...emailEnv() };
+  await submit({ DB: db }, null, { submission_id: "adm-bbbbbbbbbbbbbbbbbbb" });
+  assert.deepEqual(await (await admin("/assessments/summary", { env })).json(), { total: 1, unsent: 1 });
+  assert.equal((await admin("/assessments/resend", { method: "POST", env, headers: { "X-Framework-Admin": "" } })).status, 403);
+  assert.equal((await admin("/assessments/resend", { method: "POST", env, headers: { Origin: "https://evil.example" } })).status, 403);
+  assert.equal((await admin("/assessments/test-email", { method: "POST", env, headers: { "X-Framework-Admin": "" } })).status, 403);
+  const f = makeFetch();
+  const sent = await (await admin("/assessments/resend", { method: "POST", env, body: {}, fetch: f })).json();
+  assert.equal(sent.sent, 1);
+  assert.deepEqual(await (await admin("/assessments/summary", { env })).json(), { total: 1, unsent: 0 });
+  const t = await (await admin("/assessments/test-email", { method: "POST", env, body: {}, fetch: makeFetch() })).json();
+  assert.deepEqual({ ok: t.ok, to: t.to }, { ok: true, to: "hello@frameworkco.ca" });
+  const bad = await (await admin("/assessments/test-email", { method: "POST", env: { DB: db }, body: {} })).json();
+  assert.deepEqual({ ok: bad.ok, error: bad.error }, { ok: false, error: "config:missing_api_key" });
+});
+
+test("admin API: wrong methods, unknown paths and a missing database", async () => {
+  const env = { DB: makeDb(), ...emailEnv() };
+  assert.equal((await admin("/assessments", { method: "POST", env })).status, 405);
+  assert.equal((await admin("/assessments/resend", { method: "GET", env })).status, 405);
+  assert.equal(await admin("/feedback", { env }), null);
+  assert.equal((await admin("/assessments", { env: {} })).status, 503);
 });

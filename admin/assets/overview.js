@@ -19,9 +19,18 @@ export async function render() {
     ? responseTable(data.recent, ["client", "date", "satisfaction", "recommend", "testimonial", "view"])
     : stateBlock({ title: "No feedback yet", body: "Responses appear here after a client completes the feedback form." });
 
+  // Never let a saved-but-unemailed assessment request go unnoticed: surface it on the first screen.
+  const alert = h("p", { class: "adm-banner", hidden: true, role: "status", style: "border-color:#0A0A0A;color:#0A0A0A" });
+  api("/assessments/summary").then((a) => {
+    if (!a.unsent) return;
+    alert.replaceChildren(h("strong", null, `${a.unsent} assessment request${a.unsent === 1 ? "" : "s"} saved but not emailed. `), h("a", { class: "adm-link", href: "/admin/assessments", "data-link": "" }, "Review and resend →"));
+    alert.hidden = false;
+  }).catch(() => {});
+
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Overview"))),
 
+    alert,
     h("section", { class: "adm-section", "aria-label": "Feedback summary" }, h("div", { class: "adm-metrics" },
       metric("Total feedback", String(s.total), null, s.unreviewed ? `${s.unreviewed} unreviewed` : null),
       metric("Avg. satisfaction", none ? "—" : avg(s.avg_satisfaction), none ? null : "/ 10"),

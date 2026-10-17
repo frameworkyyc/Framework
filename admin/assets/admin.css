@@ -241,3 +241,13 @@ a.adm-nav__link:hover { color: var(--ink); }
 }
 
 .adm-sub .adm-status-mark { margin: 0 0 0 16px; }
+
+/* ---------- Assessments module ---------- */
+.adm-small { min-height: 36px; padding: 0 14px; font-size: 13px; }
+.adm-details { margin-top: 10px; font-size: 13px; }
+.adm-details summary { cursor: pointer; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+.adm-details dl { margin: 12px 0 0; display: grid; gap: 8px; }
+.adm-details dl > div { display: grid; grid-template-columns: 9em 1fr; gap: 12px; }
+.adm-details dt { color: var(--stone); font-weight: 600; }
+.adm-details dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+@media (max-width: 520px) { .adm-details dl > div { grid-template-columns: 1fr; gap: 2px; } }

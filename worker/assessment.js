@@ -6,6 +6,9 @@
  *   → email Framework → email the applicant a confirmation.
  * The applicant is told "received" only if the request was stored in D1 or the notification email was accepted
  * by the email provider; if neither worked they get an honest failure and their inputs stay in the form.
+ * Email is never silently skipped: every request records notify_status ('sent' | 'failed' | 'not_configured' |
+ * 'pending') and notify_error (why), and Framework Admin > Assessments lists unsent requests, shows whether this
+ * deployment can send mail at all, and resends them (resendUnsent / sendTestEmail below).
  *
  * Configuration (Worker variables / secrets; none of this is ever sent to the browser except the two public IDs):
  *   RESEND_API_KEY        secret   email provider key (Resend). Email is skipped until this AND ASSESSMENT_FROM are set.
@@ -186,6 +189,7 @@ function formatTimestamp(date) {
 /** The structured notification to Framework. `text` is laid out so it can be pasted straight into the assessment workflow. */
 export function buildNotification(data, meta = {}) {
   const when = formatTimestamp(meta.now || new Date());
+  const resentAt = meta.resentAt ? formatTimestamp(meta.resentAt) : null;
   const dash = (v) => (v ? v : "—");
   const t = data.tracking || {};
 
@@ -209,6 +213,7 @@ export function buildNotification(data, meta = {}) {
   ];
   const source = [
     ["Submitted", when.local ? `${when.local} · ${when.iso}` : when.iso],
+    ...(resentAt ? [["Notification resent", resentAt.iso]] : []),
     ["Landing page", dash(data.landing)],
     ["Referrer", dash(data.referrer)],
     ...TRACKING_KEYS.map((k) => [k, dash(t[k])]),
@@ -235,8 +240,10 @@ export function buildNotification(data, meta = {}) {
     `Notes: ${dash(data.additional_info).replace(/\n+/g, " ")}`,
   ].join("\n");
 
+  const RESENT_NOTE = "Resent: the original notification for this request could not be delivered.";
   const text = [
     "NEW ONLINE PRESENCE ASSESSMENT REQUEST",
+    ...(resentAt ? [RESENT_NOTE] : []),
     "",
     block("BUSINESS", business),
     "",
@@ -270,6 +277,7 @@ export function buildNotification(data, meta = {}) {
     `<div style="max-width:640px;margin:0 auto;padding:24px;font-family:Arial,sans-serif;color:#0A0A0A">` +
     `<p style="font:700 20px Arial,sans-serif;margin:0 0 4px">New assessment request</p>` +
     `<p style="font:14px Arial,sans-serif;color:#5C5C5C;margin:0">${escapeHtml(data.business_name)}</p>` +
+    (resentAt ? `<p style="font:13px Arial,sans-serif;color:#5C5C5C;margin:6px 0 0">${escapeHtml(RESENT_NOTE)}</p>` : "") +
     table("Business", business) +
     table("Contact", contact) +
     table("Concerns", concerns) +
@@ -300,26 +308,99 @@ export function buildConfirmation() {
   return { subject: "Your Assessment Request | Framework", text, html };
 }
 
-/* ------------------------------------------------------------------ providers */
+/* ------------------------------------------------------------------ email provider */
 
-export const emailConfigured = (env) => Boolean(env.RESEND_API_KEY && env.ASSESSMENT_FROM);
+const FROM_RE = /^(?:[^<>@\r\n]+<[^<>\s@]+@[^<>\s@]+\.[^<>\s@]+>|[^<>\s@]+@[^<>\s@]+\.[^<>\s@]+)$/;
+const stripQuotes = (v) => v.replace(/^(["'])([\s\S]*)\1$/, "$2").trim();
 
-/** Send one email through Resend. Resolves true only if the provider accepted it. Never throws. */
+/**
+ * Normalise the ASSESSMENT_FROM setting. Accepts `Name <a@b.c>` and `a@b.c`, and repairs the common slip of a
+ * display name with the angle brackets lost (`Name a@b.c`), which the email provider rejects. Null if unusable.
+ */
+export function normaliseFrom(raw) {
+  const s = stripQuotes(String(raw || "").replace(/[\u0000-\u001F\u007F]/g, " ").trim());
+  if (!s) return null;
+  if (FROM_RE.test(s)) return { value: s, corrected: s !== String(raw).trim() };
+  const m = s.match(/^(.+?)\s+([^<>\s@]+@[^<>\s@]+\.[^<>\s@]+)$/);
+  if (m && !/[<>]/.test(m[1])) return { value: `${m[1].trim()} <${m[2]}>`, corrected: true };
+  return null;
+}
+
+/**
+ * Can this deployment send email? Returns { ok: true, apiKey, from, fromCorrected } or { ok: false, reason } where
+ * reason is 'missing_api_key' | 'missing_from' | 'invalid_from'. Secrets pasted into a dashboard often carry a
+ * trailing newline or quotes; both are stripped (a newline in an Authorization header makes every request fail).
+ */
+export function emailConfig(env) {
+  const apiKey = stripQuotes(String(env.RESEND_API_KEY || "").trim());
+  if (!apiKey) return { ok: false, reason: "missing_api_key" };
+  if (!String(env.ASSESSMENT_FROM || "").trim()) return { ok: false, reason: "missing_from" };
+  const from = normaliseFrom(env.ASSESSMENT_FROM);
+  if (!from) return { ok: false, reason: "invalid_from" };
+  return { ok: true, apiKey, from: from.value, fromCorrected: from.corrected };
+}
+
+export const emailConfigured = (env) => emailConfig(env).ok;
+export const notifyRecipient = (env) => String(env.ASSESSMENT_NOTIFY_TO || "").trim() || DEFAULT_NOTIFY_TO;
+
+const oneLine = (v, max = 200) => String(v == null ? "" : v).replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+
+/**
+ * Send one email through Resend. Never throws. Resolves { ok: true } or { ok: false, error } where `error` is a short,
+ * secret-free reason that is stored with the request: 'config:<reason>', 'provider <status>: <message>', 'network:<name>'.
+ */
 export async function sendEmail(env, { to, replyTo, subject, text, html }, fetchImpl = fetch) {
-  if (!emailConfigured(env)) return false;
+  const config = emailConfig(env);
+  if (!config.ok) {
+    console.warn("assessment email not sent: not configured:", config.reason);
+    return { ok: false, error: "config:" + config.reason };
+  }
   try {
     const res = await fetchImpl("https://api.resend.com/emails", {
       method: "POST",
-      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: env.ASSESSMENT_FROM, to: [to], reply_to: replyTo, subject, text, html }),
+      headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: config.from, to: [to], reply_to: replyTo, subject, text, html }),
       signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
     });
-    if (!res.ok) console.error("assessment email rejected:", res.status);
-    return res.ok;
+    if (res.ok) return { ok: true };
+    let message = "";
+    try { message = oneLine((await res.json()).message); } catch { /* no JSON body */ }
+    const error = `provider ${res.status}${message ? ": " + message : ""}`;
+    console.error("assessment email rejected by provider:", error);
+    return { ok: false, error };
   } catch (err) {
-    console.error("assessment email failed:", err && err.name);
-    return false;
+    const error = "network:" + oneLine(err && err.name, 40);
+    console.error("assessment email failed:", error);
+    return { ok: false, error };
   }
+}
+
+/** What an admin needs to know about email on THIS deployment. Booleans and the sender address only; never the key. */
+export function emailHealth(env) {
+  const config = emailConfig(env);
+  const fromSet = Boolean(String(env.ASSESSMENT_FROM || "").trim());
+  return {
+    can_send: config.ok,
+    api_key: String(env.RESEND_API_KEY || "").trim() ? "set" : "missing",
+    from: !fromSet ? "missing" : config.ok ? (config.fromCorrected ? "corrected" : "valid") : config.reason === "invalid_from" ? "invalid" : "set",
+    from_used: config.ok ? config.from : null,
+    notify_to: notifyRecipient(env),
+    problem: config.ok ? null : config.reason,
+  };
+}
+
+/** Send a one-off message to the notification address to prove delivery works. */
+export async function sendTestEmail(env, deps = {}) {
+  const to = notifyRecipient(env);
+  const at = (deps.now || new Date()).toISOString();
+  const text = `This is a test from Framework Admin.\n\nIf you can read it, assessment notifications can be delivered to ${to}.\nSent: ${at}\n`;
+  const result = await sendEmail(env, {
+    to,
+    subject: "Framework assessment email test",
+    text,
+    html: `<p style="font:16px/1.6 Arial,sans-serif">This is a test from Framework Admin.</p><p style="font:16px/1.6 Arial,sans-serif">If you can read it, assessment notifications can be delivered to ${escapeHtml(to)}.</p><p style="font:13px Arial,sans-serif;color:#5C5C5C">Sent: ${escapeHtml(at)}</p>`,
+  }, deps.fetch || fetch);
+  return { ...result, to };
 }
 
 /** @returns "ok" | "failed" | "unavailable" */
@@ -346,6 +427,14 @@ async function verifyTurnstile(token, ip, env, fetchImpl) {
 
 let schemaReady = false;
 
+// Columns added after the first release. An existing table (Staging already has one) is upgraded in place.
+const ADDED_COLUMNS = [
+  ["notify_error", "TEXT"],
+  ["notified_at", "TEXT"],
+  ["notify_attempts", "INTEGER NOT NULL DEFAULT 0"],
+  ["confirm_error", "TEXT"],
+];
+
 export async function ensureAssessmentSchema(db) {
   if (schemaReady) return;
   await db
@@ -360,15 +449,105 @@ export async function ensureAssessmentSchema(db) {
         tracking TEXT, landing TEXT, referrer TEXT,
         ip_hash TEXT,
         notify_status TEXT NOT NULL DEFAULT 'pending',
-        confirm_status TEXT NOT NULL DEFAULT 'pending'
+        confirm_status TEXT NOT NULL DEFAULT 'pending',
+        notify_error TEXT,
+        notified_at TEXT,
+        notify_attempts INTEGER NOT NULL DEFAULT 0,
+        confirm_error TEXT
       )`,
     )
     .run();
+  const { results } = await db.prepare("PRAGMA table_info(assessment_requests)").all();
+  const have = new Set(results.map((c) => c.name));
+  for (const [name, type] of ADDED_COLUMNS) {
+    if (have.has(name)) continue;
+    try { await db.prepare(`ALTER TABLE assessment_requests ADD COLUMN ${name} ${type}`).run(); }
+    catch (err) { if (!/duplicate column/i.test(String(err && err.message))) throw err; }
+  }
+  // First release called "email not configured" 'skipped'; it is the same state as 'not_configured'.
+  await db.prepare("UPDATE assessment_requests SET notify_status = 'not_configured' WHERE notify_status = 'skipped'").run();
+  await db.prepare("UPDATE assessment_requests SET confirm_status = 'not_configured' WHERE confirm_status = 'skipped'").run();
   schemaReady = true;
 }
 
 export function resetAssessmentSchemaForTests() {
   schemaReady = false;
+}
+
+/* ------------------------------------------------------------------ delivery + recovery */
+
+const statusFor = (result) => (result.ok ? "sent" : String(result.error || "").startsWith("config:") ? "not_configured" : "failed");
+
+/**
+ * Email Framework (and, as a courtesy, the applicant). Records the outcome on the stored request, if there is one.
+ * @returns { notify, confirm } each { ok, error }; confirm is null when the notification was not attempted for it.
+ */
+export async function deliverNotifications(env, data, { fetchImpl = fetch, now = new Date(), stored = false, resentAt = null, sendConfirmation = true } = {}) {
+  const note = buildNotification(data, { now: data.created_at ? new Date(data.created_at) : now, resentAt });
+  const notify = await sendEmail(
+    env,
+    { to: notifyRecipient(env), replyTo: data.email, subject: note.subject, text: note.text, html: note.html },
+    fetchImpl,
+  );
+  let confirm = null;
+  if (sendConfirmation) {
+    const c = buildConfirmation();
+    confirm = await sendEmail(env, { to: data.email, replyTo: notifyRecipient(env), subject: c.subject, text: c.text, html: c.html }, fetchImpl);
+  }
+  if (stored) {
+    try {
+      await env.DB.prepare(
+        `UPDATE assessment_requests SET notify_status = ?, notify_error = ?, notified_at = CASE WHEN ? = 'sent' THEN ? ELSE notified_at END,
+           notify_attempts = notify_attempts + 1,
+           confirm_status = CASE WHEN ? IS NULL THEN confirm_status ELSE ? END, confirm_error = CASE WHEN ? IS NULL THEN confirm_error ELSE ? END
+         WHERE id = ?`,
+      )
+        .bind(
+          statusFor(notify), notify.ok ? null : notify.error, statusFor(notify), now.toISOString(),
+          confirm ? "x" : null, confirm ? statusFor(confirm) : null, confirm ? "x" : null, confirm && !confirm.ok ? confirm.error : null,
+          data.submission_id || data.id,
+        )
+        .run();
+    } catch (err) {
+      console.error("assessment status update failed:", err && err.message);
+    }
+  }
+  return { notify, confirm };
+}
+
+const rowToData = (row) => {
+  let tracking = {};
+  try { tracking = JSON.parse(row.tracking || "{}") || {}; } catch { tracking = {}; }
+  return {
+    submission_id: row.id, created_at: row.created_at,
+    business_name: row.business_name || "", website: row.website || "", contact_name: row.contact_name || "", email: row.email || "",
+    location: row.location || "", industry: row.industry || "", phone: row.phone || "", services: row.services || "",
+    service_area: row.service_area || "", profiles: row.profiles || "", concern: row.concern || "", additional_info: row.additional_info || "",
+    privacy_ack: row.privacy_ack === 1, marketing_opt_in: row.marketing_opt_in === 1, tracking, landing: row.landing || "", referrer: row.referrer || "",
+  };
+};
+
+/**
+ * Re-send notifications for stored requests that never got one (notify_status other than 'sent'), oldest first.
+ * `id` limits it to one request. Safe to run repeatedly: requests that were delivered are never touched.
+ * @returns { attempted, sent, failed, results: [{ id, business_name, ok, error }] }
+ */
+export async function resendUnsent(env, { id = null, limit = 25 } = {}, deps = {}) {
+  await ensureAssessmentSchema(env.DB);
+  const now = deps.now || new Date();
+  const { results: rows } = id
+    ? await env.DB.prepare("SELECT * FROM assessment_requests WHERE id = ? AND notify_status != 'sent'").bind(id).all()
+    : await env.DB.prepare("SELECT * FROM assessment_requests WHERE notify_status != 'sent' ORDER BY created_at ASC LIMIT ?").bind(limit).all();
+  const out = [];
+  for (const row of rows) {
+    const data = rowToData(row);
+    const { notify } = await deliverNotifications(env, data, {
+      fetchImpl: deps.fetch || fetch, now, stored: true, resentAt: now, sendConfirmation: row.confirm_status !== "sent",
+    });
+    out.push({ id: row.id, business_name: row.business_name, ok: notify.ok, error: notify.ok ? null : notify.error });
+  }
+  const sent = out.filter((r) => r.ok).length;
+  return { attempted: out.length, sent, failed: out.length - sent, results: out };
 }
 
 async function hashIp(ip, env) {
@@ -417,7 +596,7 @@ export async function handleAssessmentSubmit(request, env, deps = {}) {
   if (!result.ok) return json({ error: "validation_failed", fields: result.errors }, 422);
   const data = result.data;
 
-  if (!env.DB && !emailConfigured(env)) return json({ error: "not_configured" }, 503);
+  if (!env.DB && !emailConfigured(env)) return json({ error: "not_configured" }, 503); // nowhere to keep or send the request
 
   const ip = request.headers.get("CF-Connecting-IP") || "";
 
@@ -472,32 +651,12 @@ export async function handleAssessmentSubmit(request, env, deps = {}) {
   }
 
   // Notify Framework. The confirmation to the applicant is a courtesy: its failure never fails the request.
-  let notified = false;
-  let confirmed = false;
-  if (emailConfigured(env)) {
-    const note = buildNotification(data, { now });
-    notified = await sendEmail(
-      env,
-      { to: env.ASSESSMENT_NOTIFY_TO || DEFAULT_NOTIFY_TO, replyTo: data.email, subject: note.subject, text: note.text, html: note.html },
-      fetchImpl,
-    );
-    const confirmation = buildConfirmation();
-    confirmed = await sendEmail(
-      env,
-      { to: data.email, replyTo: env.ASSESSMENT_NOTIFY_TO || DEFAULT_NOTIFY_TO, subject: confirmation.subject, text: confirmation.text, html: confirmation.html },
-      fetchImpl,
-    );
-  }
-
-  if (stored) {
-    try {
-      await env.DB.prepare("UPDATE assessment_requests SET notify_status = ?, confirm_status = ? WHERE id = ?")
-        .bind(emailConfigured(env) ? (notified ? "sent" : "failed") : "skipped", emailConfigured(env) ? (confirmed ? "sent" : "failed") : "skipped", data.submission_id)
-        .run();
-    } catch { /* status bookkeeping only */ }
-  }
+  // Whatever happens is recorded on the stored request (notify_status / notify_error) so nothing is lost silently.
+  const { notify } = await deliverNotifications(env, { ...data, id: data.submission_id }, { fetchImpl, now, stored });
+  if (!notify.ok) console.error("assessment notification not delivered:", notify.error, "stored:", stored);
 
   // Accepted only if we truly hold the request: it is in D1, or Framework's inbox was notified.
-  if (stored || notified) return json({ ok: true });
+  // `notification` tells the browser (and anyone testing) whether the email actually went out.
+  if (stored || notify.ok) return json({ ok: true, notification: notify.ok ? "sent" : "not_sent" });
   return json({ error: "delivery_failed" }, 502);
 }
