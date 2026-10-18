@@ -7,7 +7,7 @@ import {
   handleAssessmentSubmit, handleAssessmentConfig, resetAssessmentSchemaForTests,
   normaliseFrom, emailConfig, emailHealth, resendUnsent, ensureAssessmentSchema,
 } from "../assessment.js";
-import { handleAssessmentsApi } from "../admin/assessments-api.js";
+import { handleAssessmentsApi, validateInteractionDate, cleanQuery } from "../admin/assessments-api.js";
 
 /** A D1-shaped wrapper over node:sqlite so the real SQL runs. */
 const makeDb = () => {
@@ -469,13 +469,13 @@ test("RECOVERY: a resend that still fails keeps the request flagged with the new
 
 /* ---------------------------------------------------------------- admin API */
 
-const admin = (path, { method = "GET", env, body, headers = {}, fetch: f } = {}) => {
+const admin = (path, { method = "GET", env, body, headers = {}, fetch: f, now } = {}) => {
   const req = new Request("https://frameworkco.ca/api/admin" + path, {
     method,
     headers: { Origin: "https://frameworkco.ca", "X-Framework-Admin": "1", "Content-Type": "application/json", ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  return handleAssessmentsApi(req, env, { email: "owner@example.com" }, path, { fetch: f || makeFetch() });
+  return handleAssessmentsApi(req, env, { email: "owner@example.com" }, path.split("?")[0], { fetch: f || makeFetch(), now: now || undefined });
 };
 
 test("admin list shows requests, counts and email health; hides internals and secrets", async () => {
@@ -703,4 +703,172 @@ test("admin list reports the spam-check state", async () => {
   const db = makeDb(); await ensureAssessmentSchema(db);
   assert.equal((await (await admin("/assessments", { env: { DB: db } })).json()).spam_check, "off");
   assert.equal((await (await admin("/assessments", { env: { DB: db, TURNSTILE_SECRET: "s", TURNSTILE_SITE_KEY: "k" } })).json()).spam_check, "on");
+});
+
+
+/* ================================================================ search (Admin > Assessments) */
+
+const addRow = (db, i, over = {}) => db.raw.prepare(
+  "INSERT INTO assessment_requests (id, created_at, business_name, contact_name, email, notify_status) VALUES (?, ?, ?, ?, ?, 'sent')",
+).run(over.id || "srch-" + String(i).padStart(20, "0"), over.created_at || new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString(), over.business_name ?? "Co " + i, over.contact_name ?? "Person " + i, over.email ?? `p${i}@example.com`);
+const search = async (db, q) => (await admin("/assessments?q=" + encodeURIComponent(q), { env: { DB: db } })).json();
+
+test("SEARCH: finds by business name, contact name or email, case-insensitively, newest first", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db);
+  addRow(db, 1, { business_name: "Summit Concrete Ltd.", contact_name: "Alex Rivera", email: "alex@summitconcrete.ca" });
+  addRow(db, 2, { business_name: "Ridge Roofing", contact_name: "Morgan SUMMIT", email: "m@ridge.ca" });
+  addRow(db, 3, { business_name: "Northline", contact_name: "Sam", email: "sam@SUMMIT-electric.ca" });
+  addRow(db, 4, { business_name: "Unrelated", contact_name: "Nobody", email: "n@other.ca" });
+  for (const q of ["summit", "SUMMIT", "SuMmIt"]) {
+    const out = await search(db, q);
+    assert.deepEqual(out.requests.map((r) => r.business_name), ["Northline", "Ridge Roofing", "Summit Concrete Ltd."], q);
+    assert.equal(out.matched, 3);
+  }
+  assert.deepEqual((await search(db, "alex rivera")).requests.map((r) => r.business_name), ["Summit Concrete Ltd."]);
+  assert.deepEqual((await search(db, "@ridge.ca")).requests.map((r) => r.business_name), ["Ridge Roofing"]);
+  assert.deepEqual((await search(db, "  riDGE   roof  ")).requests.map((r) => r.business_name), ["Ridge Roofing"], "trimmed and single-spaced");
+});
+
+test("SEARCH: no match returns an empty list; an empty query returns the normal list; counts stay global", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db); addRow(db, 1); addRow(db, 2);
+  const none = await search(db, "zzz-nothing");
+  assert.deepEqual({ n: none.requests.length, matched: none.matched, total: none.total, query: none.query, truncated: none.truncated }, { n: 0, matched: 0, total: 2, query: "zzz-nothing", truncated: false });
+  const all = await search(db, "   ");
+  assert.deepEqual({ n: all.requests.length, matched: all.matched, query: all.query }, { n: 2, matched: 2, query: "" });
+});
+
+test("SEARCH covers the WHOLE table, not just the newest 200", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db);
+  addRow(db, 0, { business_name: "Needle Fabrication", email: "needle@old.example", created_at: "2020-06-01T00:00:00.000Z" }); // the oldest record
+  for (let i = 1; i <= 250; i++) addRow(db, i);
+  const list = await (await admin("/assessments", { env: { DB: db } })).json();
+  assert.equal(list.requests.length, 200); assert.equal(list.truncated, true);
+  assert.ok(!list.requests.some((r) => r.business_name === "Needle Fabrication"), "not in the newest 200");
+  const hit = await search(db, "needle");
+  assert.deepEqual(hit.requests.map((r) => r.business_name), ["Needle Fabrication"]);
+  assert.equal(hit.matched, 1); assert.equal(hit.truncated, false);
+  const many = await search(db, "co "); // matches 250 rows: capped at 200, and says so
+  assert.equal(many.requests.length, 200); assert.equal(many.matched, 250); assert.equal(many.truncated, true);
+});
+
+test("SEARCH: LIKE wildcards and SQL metacharacters in the text are literal", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db);
+  addRow(db, 1, { business_name: "100% Pure Paving", email: "a@x.ca" });
+  addRow(db, 2, { business_name: "Plain Co", email: "b@x.ca" });
+  addRow(db, 3, { business_name: "Under_score Ltd", email: "c@x.ca" });
+  addRow(db, 4, { business_name: "Back\\slash Inc", email: "d@x.ca" });
+  assert.deepEqual((await search(db, "%")).requests.map((r) => r.business_name), ["100% Pure Paving"], "% is not 'match everything'");
+  assert.deepEqual((await search(db, "_")).requests.map((r) => r.business_name), ["Under_score Ltd"], "_ is not 'any character'");
+  assert.deepEqual((await search(db, "\\")).requests.map((r) => r.business_name), ["Back\\slash Inc"]);
+  assert.equal((await search(db, "' OR 1=1 --")).matched, 0);
+  assert.equal((await search(db, "x'); DROP TABLE assessment_requests;--")).matched, 0);
+  assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM assessment_requests").get().n, 4, "nothing was dropped or changed");
+});
+
+test("SEARCH: only the three intended fields are searched; query text is cleaned and capped; the search is read-only", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db);
+  db.raw.prepare("INSERT INTO assessment_requests (id, created_at, business_name, contact_name, email, website, additional_info, phone) VALUES ('f-1111111111111111','2026-01-01','A','B','c@d.ca','https://secretsite.example','confidential note','403-555-0100')").run();
+  for (const q of ["secretsite", "confidential", "555-0100"]) assert.equal((await search(db, q)).matched, 0, q + " is not a searchable field");
+  assert.equal(cleanQuery("  a\u0000b\n\tc  "), "a b c");
+  assert.equal(cleanQuery("x".repeat(500)).length, 100);
+  assert.equal(cleanQuery(null), "");
+  const log = []; const spy = { prepare: (sql) => { log.push(sql); return db.prepare(sql); } };
+  await (await admin("/assessments?q=a", { env: { DB: spy } })).json();
+  assert.ok(log.filter((l) => !/^\s*(SELECT|PRAGMA|CREATE TABLE IF NOT EXISTS|UPDATE assessment_requests SET (notify|confirm)_status)/i.test(l) && !/ALTER TABLE/i.test(l)).length === 0, "no data-changing statement: " + log.join(" | "));
+});
+
+test("SEARCH: needs the admin API (never reachable unauthenticated) and does not weaken the response", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db); addRow(db, 1);
+  const out = await search(db, "co");
+  assert.ok(out.requests.every((r) => !("ip_hash" in r)));
+  assert.equal((await admin("/assessments?q=x", { method: "POST", env: { DB: db } })).status, 405);
+});
+
+/* ================================================================ last interaction date (Admin > Assessments) */
+
+const NOW = new Date("2026-10-20T15:00:00Z");
+const created = (db, id = "li-aaaaaaaaaaaaaaaaaaaa", at = "2026-10-01T18:30:00.000Z") => db.raw.prepare("INSERT INTO assessment_requests (id, created_at, business_name, email) VALUES (?, ?, 'Li Co', 'li@example.com')").run(id, at);
+const patch = (id, body, { db, env, headers, now = NOW } = {}) => admin("/assessments/" + id, { method: "PATCH", body, env: env || { DB: db }, headers, now });
+const row = (db, id = "li-aaaaaaaaaaaaaaaaaaaa") => db.raw.prepare("SELECT * FROM assessment_requests WHERE id = ?").get(id);
+
+test("LAST INTERACTION: an admin can set a valid date; only that column changes; created_at is never touched", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db); created(db); created(db, "li-bbbbbbbbbbbbbbbbbbbb");
+  const before = { ...row(db) };
+  const res = await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: "2026-10-15" }, { db });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, last_interaction_at: "2026-10-15" });
+  const after = row(db);
+  assert.equal(after.last_interaction_at, "2026-10-15");
+  assert.deepEqual({ ...after, last_interaction_at: null }, { ...before, last_interaction_at: null }, "nothing else changed");
+  assert.equal(after.created_at, "2026-10-01T18:30:00.000Z");
+  assert.equal(row(db, "li-bbbbbbbbbbbbbbbbbbbb").last_interaction_at, null, "other records untouched");
+});
+
+test("LAST INTERACTION: today is accepted; null clears it (retention then falls back to the submission date)", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db); created(db);
+  assert.equal((await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: "2026-10-20" }, { db })).status, 200);
+  assert.equal((await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: null }, { db })).status, 200);
+  assert.equal(row(db).last_interaction_at, null);
+  assert.equal(row(db).created_at, "2026-10-01T18:30:00.000Z");
+});
+
+test("LAST INTERACTION: invalid dates are rejected with a clear message and nothing is written", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db); created(db);
+  const cases = [
+    ["2026-02-30", /real calendar date/], ["2026-13-01", /real calendar date/], ["2026-00-10", /real calendar date/], ["2025-02-29", /real calendar date/],
+    ["2026-10-21", /future/], ["2099-01-01", /future/],
+    ["2026-09-29", /before the request was submitted/], ["2019-12-31", /before/],
+    ["10/15/2026", /YYYY-MM-DD/], ["2026-10-5", /YYYY-MM-DD/], ["", /YYYY-MM-DD/], ["today", /YYYY-MM-DD/], ["2026-10-15T10:00:00Z", /YYYY-MM-DD/],
+    [20261015, /YYYY-MM-DD/], [true, /YYYY-MM-DD/], [{}, /YYYY-MM-DD/], [["2026-10-15"], /YYYY-MM-DD/], [undefined, /YYYY-MM-DD|Nothing/],
+  ];
+  for (const [value, re] of cases) {
+    const res = await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: value }, { db });
+    assert.equal(res.status, 422, JSON.stringify(value));
+    assert.match((await res.json()).message, re, JSON.stringify(value));
+    assert.equal(row(db).last_interaction_at, null, "not written: " + JSON.stringify(value));
+  }
+  // the day before submission is allowed (Calgary vs UTC), two days before is not
+  assert.equal((await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: "2026-09-30" }, { db })).status, 200);
+  assert.equal((await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: "2026-09-29" }, { db })).status, 422);
+  assert.equal(validateInteractionDate("2026-10-20", "not-a-date", NOW).ok, true, "an unreadable created_at falls back to the 2020 floor");
+});
+
+test("LAST INTERACTION: malformed bodies, unknown ids, bad ids and other fields", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db); created(db);
+  assert.equal((await admin("/assessments/li-aaaaaaaaaaaaaaaaaaaa", { method: "PATCH", env: { DB: db }, now: NOW })).status, 400, "no body");
+  for (const body of [[], "x", 5, null, {}, { notes: "x" }]) assert.equal((await patch("li-aaaaaaaaaaaaaaaaaaaa", body, { db })).status, 422, JSON.stringify(body));
+  assert.equal((await patch("li-zzzzzzzzzzzzzzzzzzzz", { last_interaction_at: "2026-10-15" }, { db })).status, 404);
+  for (const bad of ["short", "x".repeat(65), "has%20space-0000000000", "%E0%A4%A", "a'--0000000000000000"]) assert.equal((await patch(bad, { last_interaction_at: "2026-10-15" }, { db })).status, 400, bad);
+  // extra fields can never be used to change anything else
+  const res = await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: "2026-10-15", created_at: "1999-01-01", notify_status: "sent", business_name: "Hacked", email: "x@evil.example" }, { db });
+  assert.equal(res.status, 200);
+  const r = row(db);
+  assert.deepEqual({ c: r.created_at, n: r.notify_status, b: r.business_name, e: r.email }, { c: "2026-10-01T18:30:00.000Z", n: "pending", b: "Li Co", e: "li@example.com" });
+});
+
+test("LAST INTERACTION: needs the same-origin admin header; failures are 503 without details and write nothing", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db); created(db);
+  assert.equal((await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: "2026-10-15" }, { db, headers: { "X-Framework-Admin": "" } })).status, 403);
+  assert.equal((await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: "2026-10-15" }, { db, headers: { Origin: "https://evil.example" } })).status, 403);
+  assert.equal(row(db).last_interaction_at, null);
+  const failing = { prepare: (sql) => (/UPDATE assessment_requests SET last_interaction_at/.test(sql) ? { bind() { return this; }, run: async () => { throw new Error("D1_ERROR secret detail"); } } : db.prepare(sql)) };
+  const res = await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: "2026-10-15" }, { env: { DB: failing } });
+  const t = await res.text();
+  assert.equal(res.status, 503); assert.ok(!/secret detail|D1_ERROR/.test(t)); assert.equal(row(db).last_interaction_at, null);
+});
+
+test("LAST INTERACTION: appears in the admin list and a deleted record can no longer be patched; delete/resend unaffected", async () => {
+  const db = makeDb(); await ensureAssessmentSchema(db); created(db);
+  await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: "2026-10-15" }, { db });
+  const list = await (await admin("/assessments", { env: { DB: db } })).json();
+  assert.equal(list.requests[0].last_interaction_at, "2026-10-15");
+  assert.equal((await admin("/assessments/li-aaaaaaaaaaaaaaaaaaaa", { method: "DELETE", env: { DB: db } })).status, 200);
+  assert.equal((await patch("li-aaaaaaaaaaaaaaaaaaaa", { last_interaction_at: "2026-10-16" }, { db })).status, 404);
+  assert.equal((await admin("/assessments/li-aaaaaaaaaaaaaaaaaaaa", { method: "GET", env: { DB: db } })).status, 405);
+});
+
+test("LAST INTERACTION: new submissions start with none recorded (NULL)", async () => {
+  const db = makeDb();
+  await submit({ DB: db }, null, { submission_id: "fresh-aaaaaaaaaaaaaaaaaa" });
+  assert.equal(row(db, "fresh-aaaaaaaaaaaaaaaaaa").last_interaction_at, null);
 });

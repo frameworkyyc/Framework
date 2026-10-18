@@ -10,7 +10,7 @@ import { ensureAssessmentSchema, resetAssessmentSchemaForTests } from "../assess
 import { handleDatabaseApi } from "../admin/database-api.js";
 
 const read = (f) => readFileSync(new URL("../../migrations/" + f, import.meta.url), "utf8");
-const MIGRATIONS = ["0001_create_feedback_responses.sql", "0002_add_reviewed_at.sql", "0003_create_client_revenue.sql", "0004_create_assessment_requests.sql", "0005_assessment_delivery_tracking.sql"];
+const MIGRATIONS = ["0001_create_feedback_responses.sql", "0002_add_reviewed_at.sql", "0003_create_client_revenue.sql", "0004_create_assessment_requests.sql", "0005_assessment_delivery_tracking.sql", "0006_assessment_last_interaction.sql"];
 const APP_TABLES = ["feedback_responses", "assessment_requests", "client_revenue"];
 
 const d1 = (db, log = []) => ({
@@ -52,7 +52,7 @@ test("staging-init.sql covers every table the code uses, and the delivery-tracki
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all().map((r) => r.name).sort();
   assert.deepEqual(tables, [...APP_TABLES, "framework_environment"].sort());
   const cols = shape(db, "assessment_requests").map((c) => c.split("|")[0]);
-  for (const c of ["notify_status", "notify_error", "notified_at", "notify_attempts", "confirm_status", "confirm_error"]) assert.ok(cols.includes(c), c);
+  for (const c of ["notify_status", "notify_error", "notified_at", "notify_attempts", "confirm_status", "confirm_error", "last_interaction_at"]) assert.ok(cols.includes(c), c);
   assert.ok(shape(db, "feedback_responses").map((c) => c.split("|")[0]).includes("reviewed_at"));
 });
 
@@ -187,4 +187,38 @@ test("production-assessment-tables.sql is a single, additive CREATE TABLE IF NOT
   const statements = sql.split(";").map((x) => x.trim()).filter(Boolean);
   assert.equal(statements.length, 1);
   assert.match(statements[0], /^CREATE TABLE IF NOT EXISTS assessment_requests/);
+});
+
+/* ---------------------------------------------------------------- last_interaction_at: additive on every starting point */
+
+test("last_interaction_at is NULLable, additive, and brought to existing tables without touching rows (Staging and Production shapes)", async () => {
+  // A table exactly as it exists today in Staging/Production (before this column), with real-looking rows.
+  const old = new DatabaseSync(":memory:");
+  old.exec(read("0004_create_assessment_requests.sql"));
+  old.exec(read("0005_assessment_delivery_tracking.sql"));
+  old.prepare("INSERT INTO assessment_requests (id, created_at, business_name, email, notify_status) VALUES ('old-1111111111111111','2026-10-01T10:00:00.000Z','Old Co','o@example.com','sent')").run();
+  const before = old.prepare("SELECT * FROM assessment_requests").all().map((r) => ({ ...r }));
+
+  resetAssessmentSchemaForTests();
+  await ensureAssessmentSchema(d1(old)); // what the Worker does on first use after the deploy
+  const cols = shape(old, "assessment_requests");
+  assert.ok(cols.includes("last_interaction_at|TEXT|0|null|0"), "nullable TEXT, no default");
+  const after = old.prepare("SELECT * FROM assessment_requests").all().map((r) => ({ ...r }));
+  assert.equal(after.length, 1);
+  assert.equal(after[0].last_interaction_at, null, "existing rows stay NULL");
+  const { last_interaction_at, ...rest } = after[0];
+  assert.deepEqual(rest, before[0], "every other value, including created_at, is unchanged");
+
+  // the manual migration file is also safe on such a table, and fails harmlessly if the Worker already added the column
+  const manual = new DatabaseSync(":memory:"); manual.exec(read("0004_create_assessment_requests.sql")); manual.exec(read("0005_assessment_delivery_tracking.sql"));
+  manual.exec(read("0006_assessment_last_interaction.sql"));
+  assert.throws(() => manual.exec(read("0006_assessment_last_interaction.sql")), /duplicate column/i);
+  assert.deepEqual(shape(manual, "assessment_requests"), shape(old, "assessment_requests"));
+});
+
+test("0006 migration is a single additive ALTER", () => {
+  const sql = read("0006_assessment_last_interaction.sql").replace(/--.*$/gm, "");
+  assert.ok(!/\b(DROP|DELETE|UPDATE|INSERT|REPLACE|NOT NULL)\b/i.test(sql));
+  assert.equal(sql.split(";").map((x) => x.trim()).filter(Boolean).length, 1);
+  assert.match(sql, /ALTER TABLE assessment_requests ADD COLUMN last_interaction_at TEXT/);
 });

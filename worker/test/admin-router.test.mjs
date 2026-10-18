@@ -54,7 +54,24 @@ const rows = () => db.raw.prepare("SELECT COUNT(*) AS n FROM assessment_requests
 const ENDPOINTS = [
   ["GET", "/api/admin/assessments"], ["GET", "/api/admin/assessments/summary"], ["GET", "/api/admin/database"],
   ["POST", "/api/admin/assessments/resend"], ["POST", "/api/admin/assessments/test-email"], ["DELETE", `/api/admin/assessments/${ID}`],
+  ["PATCH", `/api/admin/assessments/${ID}`], ["GET", "/api/admin/assessments?q=co"],
 ];
+
+test("authorised admin: can search and record a last-interaction date; unauthenticated and non-admin callers cannot", async () => {
+  const good = sign(claims());
+  const found = await (await call("/api/admin/assessments?q=" + encodeURIComponent("co rt-a"), { token: good })).json();
+  assert.equal(found.matched, 1);
+  const ok = await call(`/api/admin/assessments/${ID}`, { method: "PATCH", token: good, body: { last_interaction_at: "2026-01-01" } });
+  assert.equal(ok.status, 422, "before the submission date is refused even for an admin");
+  const today = new Date().toISOString().slice(0, 10);
+  assert.equal((await call(`/api/admin/assessments/${ID}`, { method: "PATCH", token: good, body: { last_interaction_at: today } })).status, 200);
+  assert.equal(db.raw.prepare("SELECT last_interaction_at AS d FROM assessment_requests WHERE id = ?").get(ID).d, today);
+  for (const [token, status] of [[undefined, 401], [sign(claims({ email: "intruder@example.com" })), 403], [sign(claims(), other), 401]]) {
+    const res = await call(`/api/admin/assessments/${ID2}`, { method: "PATCH", token, body: { last_interaction_at: today } });
+    assert.equal(res.status, status);
+  }
+  assert.equal(db.raw.prepare("SELECT last_interaction_at AS d FROM assessment_requests WHERE id = ?").get(ID2).d, null, "the other record was never modified");
+});
 
 test("authorised admin: can list, delete one record (token via header or the CF_Authorization cookie)", async () => {
   const good = sign(claims());

@@ -48,6 +48,7 @@ export async function api(path, { method = "GET", body } = {}) {
   if (res.status === 401 || res.status === 403) throw new ApiError(res.status, "denied");
   if (res.status === 404) throw new ApiError(404, "not_found");
   if (res.status === 409) throw new ApiError(409, data.error || "conflict");
+  if (res.status === 422) { const e = new ApiError(422, data.error || "invalid"); e.detail = typeof data.message === "string" ? data.message : ""; throw e; }
   if (res.status === 503) throw new ApiError(503, "unavailable");
   throw new ApiError(res.status, "error");
 }

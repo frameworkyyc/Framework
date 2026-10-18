@@ -9,8 +9,8 @@
 -- assessment_requests itself the first time the admin page loads), and any number of times. It never changes or
 -- removes existing tables or rows.
 --
--- The tables below are the FINAL structure, i.e. migrations 0001 to 0005 combined (feedback_responses already
--- includes reviewed_at; assessment_requests already includes the email-delivery tracking columns).
+-- The tables below are the FINAL structure, i.e. migrations 0001 to 0006 combined (feedback_responses already
+-- includes reviewed_at; assessment_requests already includes the email-delivery tracking columns and last_interaction_at).
 -- If a table already exists with an older structure, this file leaves it alone and the Worker upgrades it in
 -- place the next time it is used.
 --
@@ -71,7 +71,8 @@ CREATE TABLE IF NOT EXISTS assessment_requests (
   notify_error TEXT,
   notified_at TEXT,
   notify_attempts INTEGER NOT NULL DEFAULT 0,
-  confirm_error TEXT
+  confirm_error TEXT,
+  last_interaction_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS framework_environment (

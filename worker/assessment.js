@@ -446,6 +446,9 @@ const ADDED_COLUMNS = [
   ["notified_at", "TEXT"],
   ["notify_attempts", "INTEGER NOT NULL DEFAULT 0"],
   ["confirm_error", "TEXT"],
+  // Date (YYYY-MM-DD) of the last meaningful interaction, set by an admin. NULL means "none recorded": retention
+  // reviews then use created_at (the original submission time, which is never changed).
+  ["last_interaction_at", "TEXT"],
 ];
 
 export async function ensureAssessmentSchema(db) {
@@ -466,7 +469,8 @@ export async function ensureAssessmentSchema(db) {
         notify_error TEXT,
         notified_at TEXT,
         notify_attempts INTEGER NOT NULL DEFAULT 0,
-        confirm_error TEXT
+        confirm_error TEXT,
+        last_interaction_at TEXT
       )`,
     )
     .run();

@@ -24,5 +24,6 @@ CREATE TABLE IF NOT EXISTS assessment_requests (
   notify_error TEXT,
   notified_at TEXT,
   notify_attempts INTEGER NOT NULL DEFAULT 0,
-  confirm_error TEXT
+  confirm_error TEXT,
+  last_interaction_at TEXT
 );

@@ -36,7 +36,10 @@ test("policy: required sections, effective date, contact and decided facts are p
   for (const id of ["summary", "who", "collect", "purposes", "assessments", "feedback", "marketing", "cookies", "advertising", "providers", "international", "security", "retention", "rights", "links", "changes", "contact"]) {
     assert.ok(policy.includes(`id="${id}"`), "section " + id);
   }
-  assert.match(policy, /<time datetime="\d{4}-\d{2}-\d{2}" id="effective-date">[A-Z][a-z]+ \d{1,2}, \d{4}<\/time>/);
+  const pending = /<time id="effective-date" data-status="pending">Effective on the date this policy is published on the live website<\/time>/.test(policy);
+  const dated = /<time datetime="\d{4}-\d{2}-\d{2}" id="effective-date">[A-Z][a-z]+ \d{1,2}, \d{4}<\/time>/.test(policy);
+  assert.ok(pending || dated, "effective date must be either the explicit pending notice or a real date, never another placeholder");
+  if (process.env.PRIVACY_PUBLISH) assert.ok(dated && !pending, "set the real Production publication date before publishing");
   assert.ok(policyText.includes("hello@frameworkco.ca"));
   assert.ok(!policyText.includes("info@frameworkco.ca"));
   assert.match(policyText, /up to 24 months after our last meaningful interaction/);
@@ -148,4 +151,23 @@ test("internal privacy operations file exists and is never served publicly", () 
   assert.match(ops, /24 months/);
   assert.match(ops, /no automatic deletion/i);
   assert.match(ops, /CASL/);
+});
+
+test("policy: client feedback retention, record types and deletion disclosure", () => {
+  assert.match(policyText, /Client feedback: up to 24 months after our last meaningful interaction with the client/);
+  for (const phrase of ["authorized us to publish", "ongoing client relationship", "contractual or legal requirement", "Published testimonials", "Other business records", "Assessment inquiries and related prospect information"]) {
+    assert.ok(policyText.includes(phrase), phrase);
+  }
+  assert.match(policyText, /remove that record from our main database/);
+  for (const place of ["inbox", "Resend", "Cloudflare database backups", "Worker logs", "files we have exported", "any other third party"]) {
+    assert.ok(policyText.includes(place), "deletion disclosure names " + place);
+  }
+  assert.ok(!/(removes?|deletes?) (it|the record|your (data|information)) (from|in) (all|every)/i.test(policyText), "no claim that deletion reaches every system");
+});
+
+test("operations guide: retention rules, last interaction, search and off-system review", () => {
+  const ops = readFileSync(new URL("../../PRIVACY-OPERATIONS.md", import.meta.url), "utf8");
+  for (const phrase of ["24 months after the last meaningful interaction", "COALESCE(last_interaction_at, created_at)", "last_interaction_at", "no automatic deletion", "ongoing client relationship", "Resend", "Time Travel", "Workers Logs", "Downloaded exports", "Other third parties", "search box"]) {
+    assert.ok(ops.toLowerCase().includes(phrase.toLowerCase()), phrase);
+  }
 });

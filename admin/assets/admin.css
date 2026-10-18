@@ -263,3 +263,14 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-icon-btn:disabled, .adm-small:disabled { opacity: .4; cursor: progress; }
 @media (max-width: 1279px) { .adm-row-actions { justify-content: flex-start; } }
 .adm-banner__line { display: block; margin-top: 6px; }
+
+/* ---------- Assessments: search and last-interaction editor ---------- */
+.adm-search { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 12px; max-width: 560px; }
+.adm-search__input { flex: 1 1 280px; min-height: 48px; }
+.adm-results-line { margin: 0 0 16px; }
+.adm-interaction { margin: 18px 0 4px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.adm-interaction label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px; }
+.adm-interaction__row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.adm-interaction__date { width: auto; min-height: 40px; padding: 6px 10px; font-size: 14px; }
+.adm-interaction__hint { margin: 10px 0 0; font-size: 12px; color: var(--slate); max-width: 38em; }
+.adm-search .btn[hidden] { display: none; }

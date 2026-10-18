@@ -59,31 +59,48 @@ Status key: **ACTIVE** = running today · **BUILT, OFF** = implemented but disab
 
 ## 3. Retention and deletion (manual)
 
-Policy: **assessment inquiries and related prospect information are kept up to 24 months after the last meaningful interaction.** There is no automatic deletion. A person must run the review.
+Record types are handled differently. There is **no automatic deletion** of any of them; a person runs the review.
+
+| Record type | Where | Rule |
+|---|---|---|
+| Assessment inquiries / prospect information | `assessment_requests`, hello@ mailbox | Up to **24 months after the last meaningful interaction**. Reference date = `COALESCE(last_interaction_at, created_at)` (the submission date if no interaction is recorded) |
+| Client feedback | `feedback_responses` | Up to **24 months after the last meaningful interaction with the client**, **except**: (a) it contains a testimonial the client authorized us to publish (keep the testimonial and the consent record while it is in use); (b) an ongoing client relationship; (c) a contractual or legal requirement to keep it |
+| Published testimonials / logos | website + the feedback record that holds the permission | Used only while permitted. On withdrawal remove from the site and keep the permission/withdrawal record |
+| Other business records (agreements, invoices, project correspondence) | accounting / mailbox / drive | As business, tax and legal rules require. Not covered by the 24-month rule |
+
+The feedback table has no interaction-date column. Use the client relationship (mailbox, projects) as the "last interaction" test, and `created_at` as the earliest possible date.
+
+### Recording the last meaningful interaction (assessments)
+
+* **Admin → Assessments → Show all details → Last interaction.** Pick a date and *Save date* (or *Today*; *Clear* removes it). The date cannot be in the future or before the request was submitted. The submission time `created_at` is never changed.
+* Record it when something meaningful happens: a reply from the applicant, a call or meeting, a quote, a project starting. Automated emails and our own outbound messages that get no response do not count.
+* Column: `assessment_requests.last_interaction_at` (nullable `YYYY-MM-DD`). NULL means none recorded and the submission date is used. It was added as an additive, nullable column: the Worker adds it automatically on first use, and `migrations/0006_assessment_last_interaction.sql` is the optional manual equivalent (safe on Staging and Production, existing rows stay NULL).
+* The list can be searched by business name, contact name or email (Admin → Assessments → search box). It searches the whole table, not only the 200 newest rows.
 
 ### Simple review routine (every 3 months, 15 minutes)
 
-1. In the D1 console (`framework-feedback` for Production) run the read-only query below.
-2. For each row: search the hello@ mailbox for that email address. If there has been a meaningful interaction (a reply, a meeting, a project) in the last 24 months, keep it. The database only records the submission date, not later contact, so this email check is the "last interaction" test.
-3. Delete what is due (Admin → Assessments → trash icon, or SQL below). Do not delete in bulk without checking.
-4. Note the review date and counts in the request log (below).
+1. In the D1 console (`framework-feedback` for Production) run the read-only queries below.
+2. For each assessment row: search the hello@ mailbox for that email address. If there has been a meaningful interaction since the reference date, record it (Last interaction) and keep the row.
+3. For each feedback row: apply the exceptions above before deleting (published testimonial + consent, ongoing client, contractual/legal).
+4. Delete what is due (Admin → trash icon, or SQL below), one at a time. Then clean up the other locations in "What the admin delete does not remove" for those people.
+5. Note the review date and counts in the request log (below).
 
 ```sql
--- Assessment requests submitted more than 24 months ago (candidates only)
-SELECT id, created_at, business_name, contact_name, email
+-- Assessment requests whose reference date is more than 24 months ago (candidates only)
+SELECT id, created_at, last_interaction_at, business_name, contact_name, email
 FROM assessment_requests
-WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 months')
-ORDER BY created_at;
+WHERE COALESCE(last_interaction_at || 'T00:00:00.000Z', created_at) < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 months')
+ORDER BY COALESCE(last_interaction_at, created_at);
 
--- Client feedback older than 24 months (decide per your feedback retention choice)
-SELECT id, created_at, attribution_business FROM feedback_responses
+-- Client feedback older than 24 months (candidates; apply the exceptions before deleting)
+SELECT id, created_at, attribution_business, testimonial_permission FROM feedback_responses
 WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 months') ORDER BY created_at;
 ```
 
 ### Handling an individual request (access, correction, deletion, withdrawal)
 
 1. Log it (date received, who, what asked, how you checked identity: reply from the address they used is normally enough).
-2. **Find everything** (the admin list shows only the newest 200 and has no search):
+2. **Find everything:** use the Admin → Assessments search box (name, business or email), or SQL:
    ```sql
    SELECT id, created_at, business_name, email FROM assessment_requests WHERE lower(email) = lower('person@example.com');
    SELECT id, created_at, attribution_name, attribution_business FROM feedback_responses WHERE lower(attribution_name) LIKE '%name%';
@@ -91,12 +108,14 @@ WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 months') ORDER BY 
    Also search the hello@ mailbox (notifications are titled "New Assessment Request | <business>").
 3. **Access:** copy the record (Admin → Assessments → "Show all details", or the SELECT above) and send it to them. Feedback has a per-record CSV/JSON export.
 4. **Correction:** edit in the D1 console (`UPDATE assessment_requests SET email = '...' WHERE id = '...'`), after checking with them.
-5. **Deletion:** Admin → Assessments → trash icon (permanent, confirmation dialog), or `DELETE FROM assessment_requests WHERE id = '...'`; Admin → Feedback → Delete for feedback.
+5. **Deletion:** Admin → Assessments → trash icon (permanent, confirmation dialog), or `DELETE FROM assessment_requests WHERE id = '...'`; Admin → Feedback → Delete for feedback. Do not delete if a contractual or legal requirement applies; tell the person why.
 6. **Withdrawing marketing consent:** `UPDATE assessment_requests SET marketing_opt_in = 0 WHERE lower(email) = lower('...')`, and remove them from any promotional list you have.
 7. **Withdrawing testimonial/logo permission:** stop using it, remove it from the site (homepage/portfolio) and update the feedback record.
-8. Clean up the places the admin delete does **not** reach (next section), then reply to the person and close the log entry.
+8. **Review every location in the next section**, delete or note each one (subject to retention requirements), then reply to the person and close the log entry.
 
-### What the admin delete does not remove (handle separately)
+### What the admin delete does not remove (review each, subject to retention requirements)
+
+The admin delete removes **only the record in the main D1 database**. The public policy says exactly this and must not claim more. For each deletion request, review these places, remove what you can and may, and note what remains and when it expires:
 
 | Place | What to do |
 |---|---|
@@ -105,13 +124,15 @@ WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 months') ORDER BY 
 | D1 point-in-time backups (Time Travel) | not deletable on demand; they age out (limited window, set by Cloudflare). Say so if asked |
 | Cloudflare Workers Logs / hosting logs | expire on Cloudflare's schedule; code logs avoid personal data |
 | Downloaded exports (feedback CSV/JSON) | delete local copies, including downloads and cloud drives |
-| Meta (only if the Pixel was allowed) | data held by Meta is governed by Meta; the person can use Meta's own tools, and you can delete Events data in Events Manager |
+| Other third parties that received the data | Meta (only if the Pixel was allowed): governed by Meta; the person can use Meta's tools and you can delete Events data in Events Manager. Any other recipient you shared it with |
 | Published testimonial / logo | remove from the website and redeploy |
 | `client_revenue` | business data, not the person's; remove the client's row only if they withdraw permission |
 
+A contractual or legal requirement (for example a signed client agreement or tax records) can justify keeping some of this. Record the reason in the request log and tell the person.
+
 ### Is the current admin deletion enough for individual requests?
 
-It deletes one record permanently and safely, so **yes for the database record**. Gaps, in order of importance: no search by name/email (use the SQL above), no deletion log (keep the request log), no per-record export for assessments (use "Show all details"/SQL), and it does not reach the mailbox, Resend or backups. Suggested small future improvements (not built, need approval): a search box on Admin → Assessments, a "last interaction" date field, and a per-record export.
+It deletes one record permanently and safely, so **yes for the database record**, provided the locations above are also reviewed. Remaining gaps: no deletion log (keep the request log), no per-record export for assessments (use "Show all details"/SQL), and no reach into the mailbox, Resend or backups. Suggested future improvements (not built, need approval): a per-record export, and a last-interaction date for feedback records.
 
 ### Request log (keep outside the website, e.g. a private spreadsheet)
 
@@ -133,4 +154,5 @@ The website records only a yes/no `marketing_opt_in` and the request time. Befor
 * "We do not currently use website analytics": true only while no analytics code or Cloudflare Web Analytics is enabled. Check the Cloudflare dashboard (Analytics → Web Analytics) is off.
 * "The Pixel is off unless you allow it": true while `consent.js` + `assessment.js` are unchanged and `META_PIXEL_ID` gating stays.
 * "We do not set cookies ourselves": true while no code sets cookies.
-* The effective date at the top of `privacy.html` must be the actual publication date.
+* The effective date at the top of `privacy.html` is a deliberate "effective on the date this policy is published" notice (`data-status="pending"`) until Production launch. At launch, replace it with the real publication date (see the Production checklist in README.md). `privacy.test.mjs` fails in publish mode (`PRIVACY_PUBLISH=1`) while it is still pending.
+* The homepage "$2.5M+" figure is a combined, client-reported total; it never names or attributes an individual client's figure.
