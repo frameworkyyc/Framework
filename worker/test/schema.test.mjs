@@ -155,3 +155,36 @@ test("identity check: only GET, needs a database, hides internals on error", asy
   assert.equal(res.status, 503); assert.ok(!/internal detail|D1_ERROR/.test(t));
   assert.equal(await handleDatabaseApi(new Request("https://x/api/admin/feedback"), { DB: d1(viaInit()) }, {}, "/feedback"), null);
 });
+
+/* ---------------------------------------------------------------- Production readiness */
+
+test("PRODUCTION: a database in Production's current shape gains assessment_requests without any existing table or row being touched", async () => {
+  const prod = new DatabaseSync(":memory:");
+  prod.exec(SCHEMA);                                   // feedback_responses (as created by the Worker)
+  prod.exec(read("0002_add_reviewed_at.sql"));
+  prod.exec(read("0003_create_client_revenue.sql"));
+  prod.prepare("INSERT INTO feedback_responses (id, created_at, form_version, satisfaction, rating_visual_design, rating_ease_of_use, rating_mobile_experience, rating_accuracy, rating_professionalism, rating_communication, rating_overall_product, improvement, impact, fair_price, recommend, liked, testimonial_permission, logo_permission, services) VALUES ('real-1','2026-09-01','1',10,5,5,5,5,5,5,5,'x','x','x',10,'x','Yes','Yes','x')").run();
+  prod.prepare("INSERT INTO client_revenue (client_id, revenue) VALUES ('aurora', 2500000)").run();
+  const before = ["feedback_responses", "client_revenue"].map((t) => shape(prod, t).join(";"));
+
+  // (a) what the Worker does by itself on first use
+  resetAssessmentSchemaForTests();
+  await ensureAssessmentSchema(d1(prod));
+  // (b) the optional pre-creation script, run before or after: harmless
+  prod.exec(read("production-assessment-tables.sql"));
+  prod.exec(read("production-assessment-tables.sql"));
+
+  assert.deepEqual(shape(prod, "assessment_requests"), shape(viaInit(), "assessment_requests"), "same final structure as Staging");
+  assert.deepEqual(["feedback_responses", "client_revenue"].map((t) => shape(prod, t).join(";")), before, "existing tables unchanged");
+  assert.equal(prod.prepare("SELECT COUNT(*) AS n FROM feedback_responses").get().n, 1);
+  assert.equal(prod.prepare("SELECT revenue FROM client_revenue WHERE client_id='aurora'").get().revenue, 2500000);
+  assert.equal(prod.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'framework_environment'").get().n, 0, "Production is never marked staging");
+});
+
+test("production-assessment-tables.sql is a single, additive CREATE TABLE IF NOT EXISTS", () => {
+  const sql = read("production-assessment-tables.sql").replace(/--.*$/gm, "");
+  assert.ok(!/\b(DROP|DELETE|TRUNCATE|ALTER|UPDATE|INSERT|REPLACE)\b/i.test(sql));
+  const statements = sql.split(";").map((x) => x.trim()).filter(Boolean);
+  assert.equal(statements.length, 1);
+  assert.match(statements[0], /^CREATE TABLE IF NOT EXISTS assessment_requests/);
+});

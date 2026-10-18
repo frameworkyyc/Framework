@@ -149,13 +149,14 @@ Settings (Cloudflare dashboard, Workers & Pages, framework, Settings, Variables 
 
 **Protections on the public form** (`worker/assessment.js`): server-side validation and length limits, a request-size cap enforced while reading, hidden honeypot, minimum fill time, 5 requests per hour per (hashed) address plus a site-wide flood limit, one confirmation email per address per day, idempotent retries, no HTML ever rendered from applicant text (emails escape it; the admin builds text nodes). Cloudflare Turnstile is optional and only enforced when **both** `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` are set (Admin → Assessments shows its state). Optionally set `IP_HASH_SALT` (a long random secret) so the stored address hash cannot be brute-forced.
 
-**Production launch checklist for the assessment.** Staging (a Preview) and Production do not share settings:
-1. Cloudflare → Workers & Pages → framework → Settings → Variables and Secrets, **Production** column: `RESEND_API_KEY` (secret), `ASSESSMENT_FROM` (`Framework <hello@frameworkco.ca>`), `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, `ADMIN_EMAILS` (secrets). Optional: `ASSESSMENT_NOTIFY_TO`, `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET` (together), `META_PIXEL_ID`, `IP_HASH_SALT`.
-2. Zero Trust → Access → Applications: the application must list `frameworkco.ca` paths `/admin*` and `/api/admin*` (and `www.frameworkco.ca` if it serves the site); `ACCESS_AUD` must be that application's AUD tag.
-3. Resend: the sending domain shows Verified (SPF and DKIM); add a DMARC record if you have none.
-4. D1: Production uses the top-level `d1_databases` binding (same database as Staging today). The assessment table creates and upgrades itself; `migrations/0003_create_client_revenue.sql` must already have been applied for the homepage revenue figure.
-5. Delete Staging test submissions in Admin → Assessments, then review and approve `privacy.html` (it is `noindex` until then).
-6. After the deploy: `/api/admin/me` must answer 401 (not `not_configured`), Admin → Assessments must say "Email delivery: ready", **Send test email**, then submit one real test request and delete it.
+**Production launch checklist for the assessment.** Staging (a Preview) and Production do not share settings, databases or secrets:
+1. **Secrets** (Cloudflare → Workers & Pages → framework → Settings → Variables and Secrets, **Production**; type *Secret*): `RESEND_API_KEY`, `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, `ADMIN_EMAILS`. Optional secrets: `TURNSTILE_SECRET`, `IP_HASH_SALT`. Never set `ACCESS_JWKS_JSON` in Production (test-only).
+2. **Non-secret settings live in `wrangler.jsonc`, not the dashboard** (top-level `vars` for Production, `previews.vars` for Staging): `ASSESSMENT_FROM` is already there. If you later enable them, `TURNSTILE_SITE_KEY`, `META_PIXEL_ID` and `ASSESSMENT_NOTIFY_TO` go there too. Before the first Production deploy from this config, note any *plain variables* currently set only in the Production dashboard: Wrangler deletes dashboard-only plain variables on deploy.
+3. **Access** (Zero Trust → Access → Applications): destinations `frameworkco.ca/admin*`, `frameworkco.ca/api/admin*`, and the same two for `www.frameworkco.ca` if it serves the site (or redirect www to the apex). `ACCESS_AUD` must be that application's AUD tag.
+4. **Resend**: sending domain `frameworkco.ca` shows Verified (SPF and DKIM); add a DMARC record if you have none.
+5. **D1**: Production keeps the top-level binding `DB` → `framework-feedback` (`47d90f94-…`). The Worker creates `assessment_requests` on first use; `migrations/production-assessment-tables.sql` is an optional, additive pre-creation. Check first with read-only queries: `SELECT name FROM sqlite_master WHERE type='table';` and `SELECT COUNT(*) FROM feedback_responses;`.
+6. **Privacy**: approve `privacy.html` (see the list of open points), then remove its `noindex`.
+7. **After the deploy**: `/api/admin/me` must answer 401 (not `not_configured`), Admin → Assessments must say "Email delivery: ready" and show Database environment "not marked" (never "staging"), **Send test email**, then submit one real test request and delete it.
 
 `privacy.html` is a draft notice that describes exactly what this form does; have it reviewed before going live.
 

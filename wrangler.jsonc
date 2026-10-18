@@ -3,6 +3,13 @@
   "name": "framework",
   "main": "worker/index.js",
   "compatibility_date": "2026-09-01",
+  // Non-secret runtime settings for PRODUCTION (and any normal `wrangler deploy`). Wrangler treats this file as the source
+  // of truth: a plain variable that exists only in the Cloudflare dashboard is deleted on the next deploy, so settings like
+  // this one must live here (or be stored as secrets). The sender address is not a secret. Previews do not inherit this
+  // block; Staging has its own copy in previews.vars below. Never put secrets (API keys, tokens, admin emails) in this file.
+  "vars": {
+    "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>"
+  },
   // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
   "observability": { "enabled": true },
   "assets": {

@@ -32,16 +32,23 @@ test("the Production ID appears exactly once in the file (never inside the previ
   assert.ok(!JSON.stringify(config.previews).includes("framework-feedback"));
 });
 
-test("Production has no vars in the config (untouched by this change); Staging's only config variable is the non-secret sender", () => {
-  assert.equal(config.vars, undefined);
-  assert.deepEqual(Object.keys(config.previews.vars), ["ASSESSMENT_FROM"]);
+test("Production (top-level vars) and Staging (previews.vars) each carry the non-secret sender, and nothing else", () => {
+  assert.deepEqual(config.vars, { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" });
+  assert.deepEqual(config.previews.vars, { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" });
 });
 
-test("the Staging sender is a valid From value that the Worker accepts as-is (no correction needed)", () => {
-  const cfg = emailConfig({ RESEND_API_KEY: "placeholder", ASSESSMENT_FROM: config.previews.vars.ASSESSMENT_FROM });
-  assert.equal(cfg.ok, true);
-  assert.equal(cfg.fromCorrected, false);
-  assert.equal(cfg.from, "Framework <hello@frameworkco.ca>");
+test("the sender is a valid From value that the Worker accepts as-is (no correction needed)", () => {
+  for (const vars of [config.vars, config.previews.vars]) {
+    const cfg = emailConfig({ RESEND_API_KEY: "placeholder", ASSESSMENT_FROM: vars.ASSESSMENT_FROM });
+    assert.equal(cfg.ok, true);
+    assert.equal(cfg.fromCorrected, false);
+    assert.equal(cfg.from, "Framework <hello@frameworkco.ca>");
+  }
+});
+
+test("only whitelisted NON-secret names may ever appear under vars", () => {
+  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID"]);
+  for (const vars of [config.vars, config.previews.vars]) for (const name of Object.keys(vars)) assert.ok(allowed.has(name), name + " is not an approved non-secret variable");
 });
 
 test("no secrets are committed in wrangler.jsonc", () => {
