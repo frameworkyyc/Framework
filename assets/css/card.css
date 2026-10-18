@@ -11,7 +11,11 @@
 }
 
 .card__brand { display: flex; align-items: center; gap: 14px; }
-.card__mark { width: 44px; height: 44px; flex: none; display: block; }
+/* The landing-page logo animation (same markup and the .dw-* keyframes in styles.css, cropped to the mark). The callout labels are
+   too small to read at this size, so they are not shown here. Reduced motion shows the finished logo (rule in styles.css). */
+.card__mark { width: 88px; height: 88px; flex: none; display: block; }
+.card__mark svg { display: block; width: 100%; height: 100%; }
+.card__mark .dw-callout { display: none; }
 .card__word { font-family: var(--font-body); font-weight: 600; font-size: 14px; letter-spacing: 0.26em; text-transform: uppercase; }
 
 .card__id { border-top: 1px solid var(--ink); padding-top: 22px; }

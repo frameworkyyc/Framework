@@ -75,10 +75,10 @@ test("page: branded metadata, canonical /card, preview image and no site navigat
 });
 
 test("page: every control the card promises is present and labelled", () => {
-  for (const id of ["save-contact", "act-call", "act-text", "act-email", "act-web", "share-card", "toggle-qr", "qr-panel", "social"]) assert.ok(html.includes(`id="${id}"`), id);
+  for (const id of ["save-contact", "act-call", "act-text", "act-email", "act-web", "act-portfolio", "act-assessment", "share-card", "toggle-qr", "qr-panel", "social"]) assert.ok(html.includes(`id="${id}"`), id);
   assert.match(html, /aria-controls="qr-panel"/);
   assert.match(html, /role="status" aria-live="polite"/);
-  assert.match(html, /aria-label="Framework logo"/);
+  assert.match(html, /<title id="card-dw-title">Framework logo/);
   for (const id of ["act-call", "act-text", "act-email"]) assert.match(html, new RegExp(`id="${id}" href="#" hidden`), id + " is hidden until configured");
 });
 
@@ -87,4 +87,19 @@ test("page: not listed for search engines, no analytics or trackers, no data col
   assert.ok(!read("sitemap.xml").includes("/card"));
   const js = read("assets/js/card.js");
   assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|localStorage|sessionStorage|document\.cookie/.test(js));
+});
+
+test("page: the logo is the landing-page animation (same paths and classes) and the new links use real destinations", () => {
+  const home = read("index.html");
+  const pick = (src, cls) => src.match(new RegExp(`<path class="dw-shape ${cls}"[^>]*>`))[0];
+  for (const cls of ["dw-shape--1", "dw-shape--2"]) assert.equal(pick(html, cls), pick(home, cls));
+  assert.ok(html.includes('<rect class="dw-square"') && html.includes('<g class="dw-grid">') && html.includes('<g class="dw-reg">'));
+  assert.match(read("assets/css/styles.css"), /prefers-reduced-motion: reduce\) \{\s*\.dw-build/);
+  // order: Visit Website, View Portfolio, Get a Free Assessment
+  const order = ["act-web", "act-portfolio", "act-assessment"].map((id) => html.indexOf(`id="${id}"`));
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+  assert.match(html, /id="act-portfolio" href="portfolio\.html"/);
+  assert.match(html, /id="act-assessment" href="assessment"/);
+  assert.ok(read("portfolio.html").length && read("assessment.html").length, "destinations exist");
+  assert.ok(read("sitemap.xml").includes("https://frameworkco.ca/assessment</loc>"), "assessment URL matches the site's canonical route");
 });
