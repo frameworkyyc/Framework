@@ -328,7 +328,7 @@
           <div class="as-consent-fields">
             <div class="field as-check" data-field="privacy_ack">
               <input type="checkbox" id="f-privacy" name="privacy_ack" required aria-describedby="f-privacy-error">
-              <label for="f-privacy">I understand that Framework will use the information provided to prepare and contact me about my requested assessment. <a href="/privacy.html" target="_blank" rel="noopener">Read our privacy notice</a>.</label>
+              <label for="f-privacy">I understand that Framework will use the information provided to prepare and contact me about my requested assessment. <a href="/privacy.html" target="_blank" rel="noopener">Read our Privacy Policy</a>.</label>
               <p class="field__error" id="f-privacy-error"></p>
             </div>
             <div class="field as-check">
@@ -374,10 +374,14 @@
   <a class="btn btn--primary" href="#request">Get My Free Assessment</a>
 </div>
 
-<div class="as-consent" id="as-consent" role="region" aria-label="Advertising measurement" hidden>
-  <p>With your permission, we use Meta’s advertising measurement to understand which of our ads lead to an assessment request. This does not affect your request. <a href="/privacy.html" target="_blank" rel="noopener">Privacy notice</a></p>
+<div class="as-consent" id="as-consent" role="region" aria-labelledby="as-consent-title" hidden>
+  <div class="as-consent__text">
+    <p id="as-consent-title"><strong>Advertising measurement</strong></p>
+    <p>May we use Meta’s advertising measurement on this page, to understand which of our ads lead to an assessment request? It is off unless you allow it, and it does not affect your request. <a href="/privacy.html#advertising" target="_blank" rel="noopener">Privacy Policy</a></p>
+    <p class="as-consent__status" id="as-consent-status" role="status"></p>
+  </div>
   <div class="as-consent__actions">
-    <button class="btn btn--primary" type="button" data-consent="granted">Allow</button>
+    <button class="btn btn--secondary" type="button" data-consent="granted">Allow</button>
     <button class="btn btn--secondary" type="button" data-consent="denied">No thanks</button>
   </div>
 </div>
@@ -399,7 +403,8 @@
           <li><a href="/method.html">The Method</a></li>
           <li><a href="/portfolio.html">Portfolio</a></li>
           <li><a href="/contact.html">Contact</a></li>
-          <li><a href="/privacy.html">Privacy</a></li>
+          <li><a href="/privacy.html">Privacy Policy</a></li>
+          <li hidden><button class="as-linkbtn" type="button" id="as-prefs" hidden>Privacy preferences</button></li>
         </ul>
       </div>
       <div>
@@ -426,6 +431,7 @@
   </div>
 </footer>
 <script src="/assets/js/main.js" defer></script>
+<script src="/assets/js/consent.js" defer></script>
 <script src="/assets/js/assessment.js" defer></script>
 </body>
 </html>

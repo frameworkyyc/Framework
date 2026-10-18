@@ -222,12 +222,18 @@
 }
 .as-consent[hidden] { display: none; }
 .as-consent p { margin: 0; max-width: 46em; font-size: 14px; line-height: 1.5; }
+.as-consent p + p { margin-top: 6px; }
 .as-consent a { text-decoration: underline; text-underline-offset: 3px; }
+.as-consent__status { color: var(--stone); font-size: 13px; }
+.as-consent__status:empty { display: none; }
 .as-consent__actions { display: flex; gap: 10px; }
-.as-consent .btn { min-height: 44px; padding: 0 20px; border-color: var(--paper); color: var(--paper); }
-.as-consent .btn--primary { background: var(--paper); color: var(--ink); }
-.as-consent .btn--primary:hover { background: transparent; color: var(--paper); }
-.as-consent .btn--secondary:hover { background: var(--paper); color: var(--ink); }
+/* Allow and No thanks carry the same visual weight on purpose: declining must be as easy as accepting. */
+.as-consent .btn { min-height: 44px; padding: 0 22px; border-color: var(--paper); color: var(--paper); background: transparent; }
+.as-consent .btn:hover { background: var(--paper); color: var(--ink); }
+.as-consent .btn:focus-visible { outline: 2px solid var(--paper); outline-offset: 3px; }
+.as-linkbtn { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-decoration: none; }
+.as-linkbtn:hover { text-decoration: underline; text-underline-offset: 4px; }
+.as-linkbtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 @media (max-width: 560px) { .as-consent__actions { width: 100%; } .as-consent .btn { flex: 1; } }
 
 /* ---------- Privacy notice page ---------- */
@@ -237,3 +243,19 @@
 .as-prose ul { padding-left: 20px; }
 .as-prose li { margin-bottom: 8px; }
 .as-prose a { text-decoration: underline; text-underline-offset: 3px; color: var(--ink); }
+
+/* ---------- Privacy policy page ---------- */
+.as-policy h3 { margin: 28px 0 10px; font-size: 17px; letter-spacing: -.005em; }
+.as-policy-meta { margin: 24px 0 0; font-size: 14px; color: var(--slate); }
+.as-policy li strong { color: var(--ink); }
+.as-prefs { margin: 32px 0 8px; padding: 24px 0 8px; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--hairline); }
+.as-prefs h3 { margin-top: 0; }
+.as-prefs__status { margin: 0 0 16px; font-weight: 600; color: var(--ink) !important; }
+.as-prefs__actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.as-prefs .btn { min-height: 48px; }
+.as-prefs .btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.as-prefs .btn:disabled { opacity: .45; cursor: not-allowed; }
+.as-prefs__note { margin: 0 0 12px; font-size: 14px; }
+.as-prefs [hidden] { display: none; }
+.as-policy ul { list-style: disc; padding-left: 1.25em; }
+.as-policy li::marker { color: var(--ink); }

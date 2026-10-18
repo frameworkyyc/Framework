@@ -17,9 +17,9 @@
   var successBox = $("as-success");
   var turnstileBox = $("as-turnstile");
 
+  // Only sessionStorage is used here (campaign details for this visit). The advertising-measurement choice is handled
+  // entirely by consent.js.
   var store = {
-    get: function (k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } },
-    set: function (k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
     sget: function (k) { try { return window.sessionStorage.getItem(k); } catch (e) { return null; } },
     sset: function (k, v) { try { window.sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } }
   };
@@ -146,18 +146,18 @@
   var submissionId = uuid();
 
   /* ---------------------------------------------------------------- Meta Pixel (consent-gated) */
+  /* The Pixel script is never requested until the visitor clicks Allow (consent.js remembers the choice).
+     Changing the choice later is possible from "Privacy preferences" in the footer or on the privacy policy page. */
 
   var pixelId = null;
   var pixelLoaded = false;
   var consentBar = $("as-consent");
-
-  var consentState = function () {
-    if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1") return "denied";
-    return store.get("fw_meta_consent"); // "granted" | "denied" | null
-  };
+  var prefsBtn = $("as-prefs");
+  var consent = window.FrameworkConsent;
 
   var loadPixel = function () {
-    if (pixelLoaded || !pixelId || consentState() !== "granted") return;
+    if (!pixelId || consent.get() !== "granted") return;
+    if (pixelLoaded) { if (window.fbq) window.fbq("consent", "grant"); return; }
     pixelLoaded = true;
     /* eslint-disable */
     !function (f, b, e, v, n, t, s) {
@@ -170,26 +170,52 @@
     window.fbq("track", "PageView");
   };
 
-  var setupConsent = function () {
-    if (!pixelId) return; // no Pixel configured: nothing to ask, nothing loads
-    var state = consentState();
-    if (state === "granted") { loadPixel(); return; }
-    if (state === "denied" || !consentBar) return;
-    consentBar.hidden = false;
-    Array.prototype.forEach.call(consentBar.querySelectorAll("[data-consent]"), function (btn) {
-      btn.addEventListener("click", function () {
-        store.set("fw_meta_consent", btn.getAttribute("data-consent"));
-        consentBar.hidden = true;
-        loadPixel();
-        syncSticky();
-      });
-    });
-    syncSticky();
+  var consentStatus = $("as-consent-status");
+  var paintConsent = function () {
+    if (!consentStatus) return;
+    var state = consent.get();
+    consentStatus.textContent = consent.browserSignal()
+      ? "Your browser’s privacy signal is on, so advertising measurement stays off."
+      : state === "granted" ? "Advertising measurement is currently allowed." : state === "denied" ? "Advertising measurement is currently off." : "";
   };
 
-  // The conversion: only ever called after the server has confirmed the request.
+  var showConsent = function (focus) {
+    if (!pixelId || !consentBar) return;
+    consentBar.hidden = false;
+    paintConsent();
+    syncSticky();
+    if (focus) { var first = consentBar.querySelector("[data-consent]"); if (first) first.focus(); }
+  };
+
+  var choose = function (value) {
+    consent.set(value);
+    consentBar.hidden = true;
+    if (value === "granted") loadPixel();
+    // Withdrawing after the Pixel loaded: tell it to stop (no reload, so a half-filled form is not lost).
+    else if (pixelLoaded && window.fbq) window.fbq("consent", "revoke");
+    syncSticky();
+    if (prefsBtn) prefsBtn.focus();
+  };
+
+  var setupConsent = function () {
+    if (!pixelId || !consentBar) return; // no Pixel configured: nothing to ask, nothing loads, no control shown
+    if (prefsBtn) {
+      prefsBtn.hidden = false;
+      prefsBtn.parentNode.hidden = false;
+      prefsBtn.addEventListener("click", function () { showConsent(true); });
+    }
+    Array.prototype.forEach.call(consentBar.querySelectorAll("[data-consent]"), function (btn) {
+      btn.addEventListener("click", function () { choose(btn.getAttribute("data-consent")); });
+    });
+    consentBar.addEventListener("keydown", function (e) { if (e.key === "Escape" && consent.get()) { consentBar.hidden = true; syncSticky(); if (prefsBtn) prefsBtn.focus(); } });
+    var state = consent.get();
+    if (state === "granted") loadPixel();
+    else if (state === null) showConsent(false); // first visit: ask. A stored "denied" (or a browser signal) is not asked again.
+  };
+
+  // The conversion: only ever called after the server has confirmed the request, and only while consent is in place.
   var trackLead = function (id) {
-    if (!pixelLoaded || !window.fbq) return;
+    if (!pixelLoaded || !window.fbq || consent.get() !== "granted") return;
     window.fbq("track", "Lead", { content_name: "Online Presence Assessment" }, { eventID: id });
   };
 
