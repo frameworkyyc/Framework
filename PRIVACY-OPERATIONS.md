@@ -26,7 +26,7 @@ Status key: **ACTIVE** = running today · **BUILT, OFF** = implemented but disab
 | Worker logs | Cloudflare Workers Logs (`observability` is on in `wrangler.jsonc`) | code logs error reasons only, no names/emails. Provider error text (e.g. a Resend message) can occasionally mention an address; it is also stored in `notify_error` | ACTIVE |
 | Admin sign-in | Cloudflare Access (cookie `CF_Authorization`, staff only) | not visible to ordinary visitors | ACTIVE |
 | Spam checks | hidden honeypot field, minimum fill time, rate limits | the fill time is not stored | ACTIVE |
-| Cloudflare Turnstile | script from `challenges.cloudflare.com` on the assessment page | only when both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` are set | BUILT, OFF |
+| Cloudflare Turnstile | script from `challenges.cloudflare.com` on the assessment page | only when both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` are set | ACTIVE on Staging (site key in `previews.vars`, secret in Cloudflare); BUILT, OFF on Production |
 
 ### Browser storage (nothing else is used; there are no first-party cookies on public pages)
 

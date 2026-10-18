@@ -37,7 +37,10 @@
     // (Secrets such as RESEND_API_KEY are different: they live in Cloudflare and survive deploys.) The sender address
     // is not a secret, so it belongs here. Keep secrets out of this file.
     "vars": {
-      "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>"
+      "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>",
+      // Public Turnstile site key (safe to expose; it is rendered in the page). The matching TURNSTILE_SECRET is an
+      // encrypted secret stored in Cloudflare, never in this file. Production does not get this key from here.
+      "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss"
     },
     "d1_databases": [
       {

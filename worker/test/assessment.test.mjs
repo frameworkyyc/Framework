@@ -313,6 +313,22 @@ test("Turnstile: enforced server-side when a secret is set", async () => {
   assert.equal(verify.init.body.get("response"), "good");
 });
 
+test("Turnstile: a missing or invalid token stores nothing and sends no email; a valid one stores and sends both", async () => {
+  const db = makeDb();
+  const env = { DB: db, TURNSTILE_SECRET: "ts_secret", TURNSTILE_SITE_KEY: "0xSITE", ...emailEnv() };
+  const count = () => (db.raw.prepare("SELECT name FROM sqlite_master WHERE name = 'assessment_requests'").get() ? db.raw.prepare("SELECT COUNT(*) AS n FROM assessment_requests").get().n : 0);
+  const noToken = makeFetch(), bad = makeFetch({ turnstile: { success: false } });
+  assert.equal((await handleAssessmentSubmit(post(good()), env, { fetch: noToken })).status, 403);
+  assert.equal((await handleAssessmentSubmit(post(good({ turnstile_token: 42 })), env, { fetch: noToken })).status, 403);
+  assert.equal((await handleAssessmentSubmit(post(good({ turnstile_token: "forged" })), env, { fetch: bad })).status, 403);
+  assert.equal(count(), 0);
+  assert.equal(noToken.calls.length + bad.calls.filter((c) => !c.url.includes("turnstile")).length, 0, "no email attempted");
+  const ok = makeFetch();
+  assert.equal((await handleAssessmentSubmit(post(good({ turnstile_token: "good" })), env, { fetch: ok })).status, 200);
+  assert.equal(count(), 1);
+  assert.equal(ok.calls.filter((c) => c.url.includes("resend")).length, 2, "notification + confirmation");
+});
+
 test("config endpoint exposes only the two public IDs, never secrets", async () => {
   const res = handleAssessmentConfig({ TURNSTILE_SITE_KEY: "0xSITE", META_PIXEL_ID: "123", TURNSTILE_SECRET: "s", RESEND_API_KEY: "k" });
   const text = await res.text();

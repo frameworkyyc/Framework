@@ -32,9 +32,10 @@ test("the Production ID appears exactly once in the file (never inside the previ
   assert.ok(!JSON.stringify(config.previews).includes("framework-feedback"));
 });
 
-test("Production (top-level vars) and Staging (previews.vars) each carry the non-secret sender, and nothing else", () => {
+test("Production (top-level vars) carries only the sender; Staging (previews.vars) adds the public Turnstile site key", () => {
   assert.deepEqual(config.vars, { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" });
-  assert.deepEqual(config.previews.vars, { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" });
+  assert.deepEqual(config.previews.vars, { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" });
+  assert.ok(!("TURNSTILE_SITE_KEY" in config.vars), "Production must not get Turnstile from this change");
 });
 
 test("the sender is a valid From value that the Worker accepts as-is (no correction needed)", () => {
