@@ -206,7 +206,8 @@
 /* ---------- Mobile sticky CTA + consent notice ---------- */
 .as-sticky {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
-  padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom));
+  /* Raised and inset so the button clears the rounded screen corners of modern phones (Safari reports no bottom inset). */
+  padding: 12px max(var(--gutter), 28px) calc(26px + env(safe-area-inset-bottom));
   background: var(--paper); border-top: 1px solid var(--ink);
   transform: translateY(0); transition: transform .25s ease;
 }
