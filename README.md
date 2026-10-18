@@ -197,3 +197,7 @@ DNS changes can take up to 24 hours. Once GitHub shows the certificate is ready,
 - **Fonts:** Switzer and General Sans load from Fontshare. If they fail to load, the site falls back to Space Grotesk / Inter / Helvetica.
 - **Hero drawing:** the animated mark on the home page is inline SVG in `index.html`; its timing is controlled by the `.dw-*` rules in the stylesheet. It shows its finished state immediately for visitors who have reduced motion turned on.
 - **Portfolio:** to turn a "coming soon" tile into a real client, copy the West Peak `<article>` block in `portfolio.html` and swap in the new logo, name, and scope.
+
+## Digital business card (`/card`)
+
+A phone-first card to share when meeting people (text, AirDrop, QR code, or an NFC card/sticker that simply stores the URL `https://frameworkco.ca/card`; the page itself does not perform phone-to-phone NFC sharing). Files: `card.html`, `assets/css/card.css`, `assets/js/card.js`, `assets/js/vcard.js` (contact-file builder), `assets/js/vendor/qrcode.js` (MIT-licensed QR generator, no network calls) and **`assets/js/card-config.js`, the only file to edit**: name, role, phone, email, social profile URLs, and the card URL used for the QR code and Share button. Any value left empty is hidden, so no placeholder is ever published. The page is `noindex` and is not in the sitemap. It uses no analytics, cookies or storage. Tests: `worker/test/card.test.mjs`.

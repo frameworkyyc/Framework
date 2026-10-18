@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Framework | Digital Business Card</title>
+<meta name="description" content="Framework helps entrepreneurs, contractors, and small businesses launch professional companies through strategy, brand, website design, and business systems built to last.">
+<meta name="robots" content="noindex, follow">
+<link rel="canonical" href="https://frameworkco.ca/card">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Framework">
+<meta property="og:title" content="Framework | Digital Business Card">
+<meta property="og:description" content="Framework helps entrepreneurs, contractors, and small businesses launch professional companies through strategy, brand, website design, and business systems built to last.">
+<meta property="og:url" content="https://frameworkco.ca/card">
+<meta property="og:image" content="https://frameworkco.ca/assets/img/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Framework | Digital Business Card">
+<meta name="twitter:description" content="Save the contact details for Framework, call, text or email, and visit the website.">
+<meta name="twitter:image" content="https://frameworkco.ca/assets/img/og-image.png">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@600,700&f[]=general-sans@400,500,600&display=swap">
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/card.css">
+</head>
+<body class="card-page">
+<main class="card" id="main">
+  <header class="card__brand">
+    <svg class="card__mark" viewBox="0 0 1092 1092" role="img" aria-label="Framework logo"><rect width="1092" height="1092" fill="#0A0A0A"/><path fill="#FFFFFF" d="M302 245H815V347H411V741L302 851Z"/><path fill="#FFFFFF" d="M435 517L512 440H815V545H534V842H435Z"/></svg>
+    <span class="card__word">Framework</span>
+  </header>
+
+  <section class="card__id" aria-labelledby="card-name">
+    <p class="card__role" id="card-role" hidden></p>
+    <h1 class="card__name" id="card-name">Framework</h1>
+    <p class="card__about">Framework helps entrepreneurs, contractors, and small businesses launch professional companies through strategy, brand, website design, and business systems built to last.</p>
+  </section>
+
+  <div class="card__actions">
+    <button class="card-btn card-btn--primary" type="button" id="save-contact">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
+      Save Contact
+    </button>
+
+    <div class="card__trio" id="trio">
+      <a class="card-btn" id="act-call" href="#" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 0 0 5.5 5.5L16 13l4 1.5v3a2 2 0 0 1-2 2A14 14 0 0 1 4.5 6a2 2 0 0 1 2-2Z"/></svg>
+        Call
+      </a>
+      <a class="card-btn" id="act-text" href="#" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H9l-5 4V5Z"/></svg>
+        Text
+      </a>
+      <a class="card-btn" id="act-email" href="#" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16v12H4V6Zm0 1 8 6 8-6"/></svg>
+        Email
+      </a>
+    </div>
+
+    <a class="card-btn" id="act-web" href="https://frameworkco.ca/">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c2.6 2.4 3.9 5.4 3.9 9s-1.3 6.6-3.9 9c-2.6-2.4-3.9-5.4-3.9-9S9.4 5.4 12 3Z"/></svg>
+      Visit Website
+    </a>
+  </div>
+
+  <ul class="card__social" id="social" aria-label="Framework on social media" hidden></ul>
+
+  <div class="card__more">
+    <button class="card-btn card-btn--quiet" type="button" id="share-card">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 12v8h14v-8"/></svg>
+      Share Card
+    </button>
+    <button class="card-btn card-btn--quiet" type="button" id="toggle-qr" aria-expanded="false" aria-controls="qr-panel">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h2v2h-2v-2Zm4 0h2v6h-4m0-2v2m0-6v-2"/></svg>
+      Show QR Code
+    </button>
+  </div>
+  <p class="card__status" id="card-status" role="status" aria-live="polite"></p>
+
+  <section class="card__qr" id="qr-panel" aria-label="QR code for this card" hidden>
+    <div class="card__qr-box" id="qr-box"></div>
+    <p class="card__qr-note">Point a phone camera at this code to open the card.</p>
+    <p class="card__qr-url" id="qr-url"></p>
+  </section>
+
+  <footer class="card__foot">
+    <a href="privacy.html">Privacy Policy</a>
+  </footer>
+</main>
+<noscript><p class="card__noscript">This card needs JavaScript for the Save Contact and QR features. You can still reach Framework at <a href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a> or <a href="https://frameworkco.ca/">frameworkco.ca</a>.</p></noscript>
+<script src="assets/js/card-config.js"></script>
+<script src="assets/js/vendor/qrcode.js"></script>
+<script src="assets/js/vcard.js"></script>
+<script src="assets/js/card.js"></script>
+</body>
+</html>

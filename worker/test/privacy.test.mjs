@@ -16,15 +16,16 @@ const policy = read("privacy.html");
 const policyText = text(policy);
 
 test("every public page has a Privacy Policy link in its footer", () => {
-  assert.deepEqual(PAGES.sort(), ["404.html", "about.html", "assessment.html", "client-feedback.html", "contact.html", "index.html", "method.html", "portfolio.html", "privacy.html", "services.html"]);
+  assert.deepEqual(PAGES.sort(), ["404.html", "about.html", "assessment.html", "card.html", "client-feedback.html", "contact.html", "index.html", "method.html", "portfolio.html", "privacy.html", "services.html"]);
   for (const page of PAGES) {
-    const footer = read(page).split('<footer class="site-footer">')[1] || "";
+    // the business card has no site footer: it carries a single compact privacy link instead
+    const footer = read(page).split(page === "card.html" ? '<footer class="card__foot">' : '<footer class="site-footer">')[1] || "";
     assert.match(footer, /<a href="\/?privacy\.html">Privacy Policy<\/a>/, page + " footer link");
   }
 });
 
 test("the privacy link is a plain footer list item (no layout or navigation changes)", () => {
-  for (const page of PAGES.filter((p) => !["assessment.html", "privacy.html"].includes(p))) {
+  for (const page of PAGES.filter((p) => !["assessment.html", "privacy.html", "card.html"].includes(p))) {
     const html = read(page);
     assert.equal((html.match(/privacy\.html/g) || []).length, 1, page + ": exactly one privacy link");
     assert.ok(html.includes('<li><a href="contact.html">Contact</a></li>\n          <li><a href="privacy.html">Privacy Policy</a></li>'), page);
@@ -78,7 +79,7 @@ test("the Meta Pixel and every third-party script are absent from all pages exce
     assert.ok(!/connect\.facebook\.net|facebook\.com\/tr|fbevents|googletagmanager|google-analytics|gtag\(/i.test(html), page + " has no tracker markup");
     assert.ok(!/<script[^>]+src="https?:\/\/(?!api\.fontshare\.com)/.test(html), page + " loads no external script tag");
   }
-  const loaders = readdirSync(new URL("assets/js/", root)).filter((f) => /connect\.facebook\.net/.test(read("assets/js/" + f)));
+  const loaders = readdirSync(new URL("assets/js/", root)).filter((f) => f.endsWith(".js") && /connect\.facebook\.net/.test(read("assets/js/" + f)));
   assert.deepEqual(loaders, ["assessment.js"], "the Pixel URL exists in exactly one script");
   const js = read("assets/js/assessment.js");
   const afterLoader = js.slice(js.indexOf("var loadPixel"));
@@ -87,7 +88,7 @@ test("the Meta Pixel and every third-party script are absent from all pages exce
 });
 
 test("no cookies are set by site code, and localStorage is touched only by the consent module", () => {
-  for (const f of readdirSync(new URL("assets/js/", root))) {
+  for (const f of readdirSync(new URL("assets/js/", root)).filter((n) => n.endsWith(".js"))) {
     const js = read("assets/js/" + f);
     assert.ok(!/document\.cookie/.test(js), f + " must not set cookies");
     if (f !== "consent.js") assert.ok(!/localStorage/.test(js), f + " must not use localStorage");
