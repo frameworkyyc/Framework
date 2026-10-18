@@ -23,6 +23,7 @@ import { handleAdmin } from "./admin/router.js";
 import { combinedRevenue } from "./revenue.js";
 import { handleAssessmentSubmit, handleAssessmentConfig } from "./assessment.js";
 import { handleCardPage } from "./card.js";
+import { handlePortalProbe, PROBE_PATHS } from "./portal/probe.js";
 
 const MAX_BODY_BYTES = 24 * 1024;
 const MAX_RECENT_SUBMISSIONS = 40; // flood guard: max stored submissions per 10 minutes, site-wide
@@ -284,6 +285,12 @@ export default {
 
     // Digital business card: static page, link-preview URLs follow the host (worker/card.js).
     if (path === "/card") return handleCardPage(request, env);
+
+    // Client portal Phase 0 sign-in probe (Staging only; inert and falling through to the static site everywhere else). Temporary.
+    if (PROBE_PATHS.includes(path)) {
+      const probe = await handlePortalProbe(request, env);
+      return probe || env.ASSETS.fetch(request);
+    }
 
     // Public: the ONE combined, rounded-down client revenue figure. Individual figures stay in D1.
     if (path === "/api/client-revenue") {

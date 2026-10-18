@@ -20,8 +20,9 @@
     "binding": "ASSETS",
     // The Worker runs for the API and for the private admin area (it checks the Cloudflare Access token before
     // serving anything under /admin), and for /card so its link-preview URLs match the environment. Every other public page is
-    // still served straight from static assets.
-    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/card"]
+    // still served straight from static assets. The three /portal paths belong to the temporary Staging sign-in probe: on Production
+    // the probe is off, so the Worker hands those requests straight back to the static site (a 404 page, as before).
+    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/card", "/portal/login", "/portal/auth/callback", "/portal/logout"]
   },
   // Private client feedback responses (D1). This binding is used by normal `wrangler deploy` deployments.
   "d1_databases": [
@@ -44,13 +45,32 @@
       "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>",
       // Public Turnstile site key (safe to expose; it is rendered in the page). The matching TURNSTILE_SECRET is an
       // encrypted secret stored in Cloudflare, never in this file. Production does not get this key from here.
-      "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss"
+      "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss",
+      // Client portal (Staging only). Non-secret settings must live here or the next deploy deletes them from the dashboard.
+      // Still to add before deploying: PORTAL_AUTH_CLIENT_ID (the public WorkOS Staging client id).
+      // Secrets stay in Cloudflare and are never written here: PORTAL_AUTH_CLIENT_SECRET (the WorkOS API key), PORTAL_SESSION_PEPPER.
+      "PORTAL_BASE_URL": "https://staging.frameworkco.ca",
+      "PORTAL_AUTH_ISSUER": "https://api.workos.com",
+      // Switches the Phase 0 sign-in probe on. Delete this line (and worker/portal/probe.js) when the probe is retired.
+      "PORTAL_PROBE": "1"
     },
     "d1_databases": [
       {
         "binding": "DB",
         "database_name": "framework-staging",
         "database_id": "c4815cdc-8948-4561-92a3-65e4860cdb94"
+      },
+      {
+        "binding": "PORTAL_DB",
+        "database_name": "framework-portal-staging",
+        "database_id": "1edda8a2-5249-4f40-9dbc-d29aa44e21f8"
+      }
+    ],
+    // Private bucket for client files. Not served publicly (no public access, no custom domain).
+    "r2_buckets": [
+      {
+        "binding": "PORTAL_FILES",
+        "bucket_name": "framework-portal-files-staging"
       }
     ]
   }

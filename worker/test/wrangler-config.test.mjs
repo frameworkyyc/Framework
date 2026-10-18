@@ -16,14 +16,25 @@ test("Production: exactly one D1 binding, DB -> framework-feedback, original ID 
   assert.deepEqual(config.d1_databases, [PRODUCTION]);
 });
 
-test("Staging (Preview): exactly one D1 binding, DB -> framework-staging", () => {
-  assert.deepEqual(config.previews.d1_databases, [STAGING]);
+const PORTAL_STAGING = { binding: "PORTAL_DB", database_name: "framework-portal-staging", database_id: "1edda8a2-5249-4f40-9dbc-d29aa44e21f8" };
+
+test("Staging (Preview): DB -> framework-staging is preserved, plus PORTAL_DB -> framework-portal-staging", () => {
+  assert.deepEqual(config.previews.d1_databases, [STAGING, PORTAL_STAGING]);
+});
+
+test("the client portal resources exist ONLY in the Preview block, never in Production's top-level config", () => {
+  assert.deepEqual(config.previews.r2_buckets, [{ binding: "PORTAL_FILES", bucket_name: "framework-portal-files-staging" }]);
+  assert.equal(config.r2_buckets, undefined);
+  assert.ok(!JSON.stringify(config.d1_databases).includes("portal"));
+  assert.ok(!Object.keys(config.vars).some((k) => k.startsWith("PORTAL_")));
+  assert.ok(!raw.slice(0, raw.indexOf('"previews"')).replace(/^\s*\/\/.*$/gm, "").includes("PORTAL_"), "nothing portal-related before the previews block except the shared route list");
 });
 
 test("the two environments use the same binding name but different databases", () => {
-  assert.equal(config.d1_databases[0].binding, config.previews.d1_databases[0].binding);
-  assert.notEqual(config.d1_databases[0].database_id, config.previews.d1_databases[0].database_id);
-  assert.notEqual(config.d1_databases[0].database_name, config.previews.d1_databases[0].database_name);
+  const stagingDb = config.previews.d1_databases.find((d) => d.binding === "DB");
+  assert.equal(config.d1_databases[0].binding, stagingDb.binding);
+  assert.notEqual(config.d1_databases[0].database_id, stagingDb.database_id);
+  assert.notEqual(config.d1_databases[0].database_name, stagingDb.database_name);
 });
 
 test("the Production ID appears exactly once in the file (never inside the previews block)", () => {
@@ -32,10 +43,20 @@ test("the Production ID appears exactly once in the file (never inside the previ
   assert.ok(!JSON.stringify(config.previews).includes("framework-feedback"));
 });
 
-test("Production (top-level vars) and Staging (previews.vars) each carry the sender and the same public Turnstile site key", () => {
-  const expected = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
-  assert.deepEqual(config.vars, expected);
-  assert.deepEqual(config.previews.vars, expected);
+test("Production (top-level vars) and Staging (previews.vars) each carry the sender and the same public Turnstile site key; Staging adds the portal settings", () => {
+  const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
+  assert.deepEqual(config.vars, shared);
+  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com", PORTAL_PROBE: "1" });
+});
+
+test("the Staging portal base URL is the Staging host, not the live site", () => {
+  assert.equal(new URL(config.previews.vars.PORTAL_BASE_URL).hostname, "staging.frameworkco.ca");
+  assert.ok(!JSON.stringify(config.vars).includes("frameworkco.ca/portal"));
+});
+
+test("shared routes: the existing worker routes are unchanged and only the three exact probe paths were added", () => {
+  assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/admin", "/admin/*", "/card", "/portal/login", "/portal/auth/callback", "/portal/logout"]);
+  assert.ok(!config.assets.run_worker_first.some((p) => p === "/portal/*" || p === "/*"), "no portal wildcard");
 });
 
 test("the sender is a valid From value that the Worker accepts as-is (no correction needed)", () => {
@@ -48,11 +69,11 @@ test("the sender is a valid From value that the Worker accepts as-is (no correct
 });
 
 test("only whitelisted NON-secret names may ever appear under vars", () => {
-  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID"]);
+  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_PROBE"]);
   for (const vars of [config.vars, config.previews.vars]) for (const name of Object.keys(vars)) assert.ok(allowed.has(name), name + " is not an approved non-secret variable");
 });
 
 test("no secrets are committed in wrangler.jsonc", () => {
   const code = raw.replace(/^\s*\/\/.*$/gm, "");
-  assert.ok(!/RESEND_API_KEY|TURNSTILE_SECRET|ACCESS_AUD|ACCESS_TEAM_DOMAIN|ADMIN_EMAILS|IP_HASH_SALT|re_[A-Za-z0-9]{10,}/.test(code));
+  assert.ok(!/RESEND_API_KEY|TURNSTILE_SECRET|ACCESS_AUD|ACCESS_TEAM_DOMAIN|ADMIN_EMAILS|IP_HASH_SALT|PORTAL_AUTH_CLIENT_SECRET|PORTAL_SESSION_PEPPER|sk_(test|live)_|re_[A-Za-z0-9]{10,}/.test(code));
 });

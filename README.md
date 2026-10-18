@@ -206,3 +206,7 @@ A phone-first card to share when meeting people (text, AirDrop, QR code, or an N
 * The logo is the landing-page animation (same SVG and `.dw-*` keyframes) set to play once and hold on this page only.
 * The social preview image uses a system sans-serif for its text (the brand fonts are web fonts); regenerate it from the same layout if the name or description changes.
 * Tests: `worker/test/card.test.mjs`. No analytics, cookies or storage.
+
+## Client portal: Phase 0 sign-in probe (temporary, Staging only)
+
+`worker/portal/probe.js` (+ `jwt.js`) is a throwaway test of the WorkOS AuthKit sign-in used to validate the flow before the client portal is built: `/portal/login`, `/portal/auth/callback`, `/portal/logout`. It creates no portal session and touches no database or bucket, and it prints only a masked report. It is **off unless** `PORTAL_PROBE=1` and the portal settings are present (they exist only in the `previews` block of `wrangler.jsonc`), so on Production those three paths simply fall through to the static site. Secrets (`PORTAL_AUTH_CLIENT_SECRET` = the WorkOS API key, `PORTAL_SESSION_PEPPER`) live only in Cloudflare. **Retire it** by deleting `worker/portal/probe.js`, its test, the three `/portal/*` entries in `run_worker_first`, the `PORTAL_PROBE` variable and the route block in `worker/index.js`, before building the real portal.
