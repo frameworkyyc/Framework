@@ -118,13 +118,15 @@ export async function render() {
               h("span", { class: "adm-status-mark " + (r.notify_status === "sent" ? "is-reviewed" : "is-unreviewed") }, statusLabel(r)),
               r.notify_status !== "sent" && r.notify_error ? h("span", { class: "adm-client__sub" }, "Reason: " + r.notify_error) : null,
               r.notify_attempts ? h("span", { class: "adm-client__sub" }, `${r.notify_attempts} attempt${r.notify_attempts === 1 ? "" : "s"}`) : null),
-            h("td", { "data-label": "", class: "adm-row-actions" },
+            // The flex layout lives on an inner wrapper: a <td> that is itself display:flex stops being a table cell,
+            // so its bottom border no longer lines up with the rest of the row.
+            h("td", { "data-label": "" }, h("div", { class: "adm-row-actions" },
               r.notify_status !== "sent" ? h("button", { class: "btn btn--secondary adm-small", type: "button", disabled: busy.has(r.id), onclick: () => resend(r.id) }, "Resend") : null,
               (() => {
                 const b = h("button", { class: "adm-icon-btn", type: "button", title: "Delete assessment", "aria-label": "Delete assessment from " + (r.business_name || "Ref " + shortRef(r.id)), disabled: busy.has(r.id), onclick: () => remove(r) });
                 b.insertAdjacentHTML("afterbegin", TRASH);
                 return b;
-              })()),
+              })())),
           ))))
       : stateBlock({ title: "No assessment requests yet", body: "Requests from the /assessment form appear here, whether or not the notification email went out." });
 
