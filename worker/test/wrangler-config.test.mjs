@@ -96,3 +96,16 @@ test("no secrets are committed in wrangler.jsonc", () => {
   const code = raw.replace(/^\s*\/\/.*$/gm, "");
   assert.ok(!/RESEND_API_KEY|TURNSTILE_SECRET|ACCESS_AUD|ACCESS_TEAM_DOMAIN|ADMIN_EMAILS|IP_HASH_SALT|PORTAL_AUTH_CLIENT_SECRET|PORTAL_SESSION_PEPPER|sk_(test|live)_|re_[A-Za-z0-9]{10,}/.test(code));
 });
+
+test("Staging redacts query strings in Workers Logs while keeping logging on; Production observability is unchanged", () => {
+  assert.deepEqual(config.previews.observability, { enabled: true, redact_query_string: true });
+  assert.deepEqual(config.observability, { enabled: true }, "Production observability must stay exactly as it was");
+  assert.equal(config.observability.redact_query_string, undefined);
+});
+
+test("Staging keeps invocation logging and full sampling (monitoring is not reduced)", () => {
+  const o = config.previews.observability;
+  assert.equal(o.enabled, true);
+  assert.equal(o.logs, undefined, "no invocation_logs / persist override that could switch logging off");
+  assert.equal(o.head_sampling_rate, undefined, "default 100% sampling");
+});
