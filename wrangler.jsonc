@@ -47,8 +47,9 @@
       // encrypted secret stored in Cloudflare, never in this file. Production does not get this key from here.
       "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss",
       // Client portal (Staging only). Non-secret settings must live here or the next deploy deletes them from the dashboard.
-      // Still to add before deploying: PORTAL_AUTH_CLIENT_ID (the public WorkOS Staging client id).
+      // PORTAL_AUTH_CLIENT_ID is the public WorkOS Staging client id (not a secret; it appears in the sign-in URL).
       // Secrets stay in Cloudflare and are never written here: PORTAL_AUTH_CLIENT_SECRET (the WorkOS API key), PORTAL_SESSION_PEPPER.
+      "PORTAL_AUTH_CLIENT_ID": "client_01M58C412YHC548S5JXP1TJ2ED",
       "PORTAL_BASE_URL": "https://staging.frameworkco.ca",
       "PORTAL_AUTH_ISSUER": "https://api.workos.com",
       // Switches the Phase 0 sign-in probe on. Delete this line (and worker/portal/probe.js) when the probe is retired.

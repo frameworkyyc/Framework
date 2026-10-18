@@ -46,7 +46,20 @@ test("the Production ID appears exactly once in the file (never inside the previ
 test("Production (top-level vars) and Staging (previews.vars) each carry the sender and the same public Turnstile site key; Staging adds the portal settings", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
   assert.deepEqual(config.vars, shared);
-  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com", PORTAL_PROBE: "1" });
+  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com", PORTAL_PROBE: "1" });
+});
+
+test("the WorkOS client id is a public id (client_…), is Staging-only, and no secret-shaped value sits beside it", () => {
+  assert.match(config.previews.vars.PORTAL_AUTH_CLIENT_ID, /^client_[0-9A-Z]{20,40}$/);
+  assert.equal(config.vars.PORTAL_AUTH_CLIENT_ID, undefined);
+  assert.ok(!/sk_(test|live)_/.test(raw));
+});
+
+test("every portal setting the probe needs is either declared in previews or listed as a Cloudflare secret", () => {
+  const needed = ["PORTAL_PROBE", "PORTAL_BASE_URL", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER"];
+  for (const name of needed) assert.ok(name in config.previews.vars, name + " must be in previews.vars or the next deploy deletes it");
+  const secrets = ["PORTAL_AUTH_CLIENT_SECRET", "PORTAL_SESSION_PEPPER"];
+  for (const name of secrets) assert.ok(!(name in config.previews.vars) && !raw.replace(/^\s*\/\/.*$/gm, "").includes(name), name + " is a secret and must not be in the file");
 });
 
 test("the Staging portal base URL is the Staging host, not the live site", () => {
