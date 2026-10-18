@@ -266,7 +266,8 @@ a.adm-nav__link:hover { color: var(--ink); }
 
 /* ---------- Assessments: search and last-interaction editor ---------- */
 .adm-search { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 12px; max-width: 560px; }
-.adm-search__input { flex: 1 1 280px; min-height: 48px; }
+.adm-search__input { flex: 1 1 280px; min-height: 48px; padding-left: 0; padding-right: 0; border-width: 0 0 1px; background: transparent; }
+.adm-search__input:focus { outline: none; border-bottom-color: var(--ink); box-shadow: 0 1px 0 var(--ink); }
 .adm-results-line { margin: 0 0 16px; }
 .adm-interaction { margin: 18px 0 4px; padding-top: 14px; border-top: 1px solid var(--hairline); }
 .adm-interaction label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px; }

@@ -26,7 +26,7 @@ Status key: **ACTIVE** = running today · **BUILT, OFF** = implemented but disab
 | Worker logs | Cloudflare Workers Logs (`observability` is on in `wrangler.jsonc`) | code logs error reasons only, no names/emails. Provider error text (e.g. a Resend message) can occasionally mention an address; it is also stored in `notify_error` | ACTIVE |
 | Admin sign-in | Cloudflare Access (cookie `CF_Authorization`, staff only) | not visible to ordinary visitors | ACTIVE |
 | Spam checks | hidden honeypot field, minimum fill time, rate limits | the fill time is not stored | ACTIVE |
-| Cloudflare Turnstile | script from `challenges.cloudflare.com` on the assessment page | only when both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` are set | ACTIVE on Staging (site key in `previews.vars`, secret in Cloudflare); BUILT, OFF on Production |
+| Cloudflare Turnstile | script from `challenges.cloudflare.com` on the assessment page | only when both `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET` are set | ACTIVE on Staging; configured for Production (site key in `vars`, secret in Cloudflare) from the next deploy |
 
 ### Browser storage (nothing else is used; there are no first-party cookies on public pages)
 
@@ -154,5 +154,5 @@ The website records only a yes/no `marketing_opt_in` and the request time. Befor
 * "We do not currently use website analytics": true only while no analytics code or Cloudflare Web Analytics is enabled. Check the Cloudflare dashboard (Analytics → Web Analytics) is off.
 * "The Pixel is off unless you allow it": true while `consent.js` + `assessment.js` are unchanged and `META_PIXEL_ID` gating stays.
 * "We do not set cookies ourselves": true while no code sets cookies.
-* The effective date at the top of `privacy.html` is a deliberate "effective on the date this policy is published" notice (`data-status="pending"`) until Production launch. At launch, replace it with the real publication date (see the Production checklist in README.md). `privacy.test.mjs` fails in publish mode (`PRIVACY_PUBLISH=1`) while it is still pending.
+* The effective date at the top of `privacy.html` must be the actual Production publication date. It is set to October 17, 2026; if deployment slips, change it and run `PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`.
 * The homepage "$2.5M+" figure is a combined, client-reported total; it never names or attributes an individual client's figure.

@@ -8,7 +8,10 @@
   // this one must live here (or be stored as secrets). The sender address is not a secret. Previews do not inherit this
   // block; Staging has its own copy in previews.vars below. Never put secrets (API keys, tokens, admin emails) in this file.
   "vars": {
-    "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>"
+    "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>",
+    // Public Turnstile site key (safe to expose; it is rendered in the page). The matching TURNSTILE_SECRET is an
+    // encrypted runtime secret stored in Cloudflare, never in this file. Both must be set for the check to be enforced.
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss"
   },
   // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
   "observability": { "enabled": true },
