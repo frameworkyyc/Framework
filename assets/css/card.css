@@ -1,36 +1,46 @@
 /* Digital business card (/card). Builds on styles.css tokens: ink/paper/slate/hairline, square corners, Switzer + General Sans. */
 
 .card-page { background: var(--paper); min-height: 100vh; min-height: 100dvh; }
+html.card-lock { overflow: hidden; }
 
 .card {
   max-width: 460px;
   margin: 0 auto;
   min-height: 100vh; min-height: 100dvh;
-  display: flex; flex-direction: column; gap: 22px;
-  padding: calc(28px + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
+  display: flex; flex-direction: column; gap: 20px;
+  padding: calc(18px + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
 }
 
-.card__brand { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-/* The landing-page logo animation (same markup and the .dw-* keyframes in styles.css), cropped to the registration marks so the
-   logo fills the frame instead of floating in empty space. The callout labels are
-   too small to read at this size, so they are not shown here. Reduced motion shows the finished logo (rule in styles.css). */
-.card__mark { width: clamp(150px, 46vw, 210px); aspect-ratio: 1; flex: none; display: block; }
+/* ---- utility row (share + QR), kept compact and apart from the contact actions */
+.card__utility { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.card__utility[hidden] { display: none; }
+.card__status { margin: -8px 0 -4px; min-height: 0; font-size: 14px; line-height: 1.4; color: var(--slate); }
+.card__status:empty { display: none; }
+
+/* ---- logo: the landing-page animation (same markup and .dw-* keyframes from styles.css), cropped to its registration marks so the
+   black logo fills the frame. Callout labels are unreadable at this size, so they are not shown. On this page the drawing plays
+   ONCE and holds the finished logo (the landing page loops it, unchanged). Reduced motion shows the finished logo straight away
+   (rule in styles.css). */
+.card__brand { display: flex; justify-content: center; }
+.card__mark { width: clamp(124px, min(44vw, 24dvh), 168px); aspect-ratio: 1; flex: none; display: block; }
 .card__mark svg { display: block; width: 100%; height: 100%; }
 .card__mark .dw-callout { display: none; }
-.card__word { font-family: var(--font-body); font-weight: 600; font-size: 14px; letter-spacing: 0.26em; text-transform: uppercase; }
+.card__mark .dw-build { animation: none; }
+.card__mark .dw-shape, .card__mark .dw-square { animation-iteration-count: 1; animation-fill-mode: forwards; }
 
-.card__id { border-top: 1px solid var(--ink); padding-top: 22px; }
-.card__role { margin: 0 0 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--slate); }
-.card__role[hidden] { display: none; }
+/* ---- identity */
+.card__id { border-top: 1px solid var(--ink); padding-top: 18px; }
 .card__name { font-weight: 700; font-size: clamp(34px, 10vw, 46px); line-height: 1.02; letter-spacing: -0.02em; }
+.card__role { margin: 8px 0 0; font-size: 13px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--slate); }
 .card__about { margin: 14px 0 0; color: var(--slate); font-size: 16px; line-height: 1.55; }
 
+/* ---- actions */
 .card__actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .card__trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .card__trio[data-count="0"] { display: none; }
 .card__trio[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
 .card__trio[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.card__trio > [hidden] { display: none; }
+.card__trio > [hidden], .card__actions > [hidden] { display: none; }
 
 .card-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 10px;
@@ -45,11 +55,17 @@
 }
 .card-btn svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: square; stroke-linejoin: miter; }
 @media (hover: hover) { .card-btn:hover { background: var(--ink); color: var(--paper); } }
-.card-btn:focus-visible, .card__social a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.card-btn:focus-visible, .card__social a:focus-visible, .card__qr-close:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .card-btn--primary { background: var(--ink); color: var(--paper); min-height: 60px; font-size: 17px; }
 @media (hover: hover) { .card-btn--primary:hover { background: var(--paper); color: var(--ink); } }
-.card-btn--quiet { border-color: var(--hairline); }
-@media (hover: hover) { .card-btn--quiet:hover { border-color: var(--ink); } }
+.card-btn--util { min-height: 48px; font-size: 15px; padding: 0 10px; border-color: var(--hairline); }
+@media (hover: hover) { .card-btn--util:hover { border-color: var(--ink); } }
+
+/* Assessment: the one secondary call to action. Heavier border and a light fill, never a second solid-black button. */
+.card__assess { display: grid; gap: 8px; margin: 6px 0; }
+.card-btn--assess { border-width: 2px; background: var(--mist); }
+@media (hover: hover) { .card-btn--assess:hover { background: var(--ink); color: var(--paper); } }
+.card__assess-note { margin: 0; font-size: 14px; line-height: 1.45; color: var(--slate); }
 
 .card__social { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
 .card__social[hidden] { display: none; }
@@ -58,27 +74,31 @@
 .card__social svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .card__social svg .fill { fill: currentColor; stroke: none; }
 
-.card__more { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.card__more .card-btn { font-size: 15px; padding: 0 10px; }
-.card__status { margin: -8px 0 0; min-height: 20px; font-size: 14px; color: var(--slate); }
-
-.card__qr { border: 1px solid var(--ink); padding: 20px; text-align: center; }
-.card__qr[hidden] { display: none; }
-.card__qr-box { width: min(100%, 320px); margin: 0 auto; background: #fff; }
+/* ---- QR overlay */
+.card__qr {
+  width: min(92vw, 420px); max-height: 92vh; max-height: 92dvh; overflow: auto;
+  margin: auto; padding: 22px 22px 20px;
+  border: 1px solid var(--ink); border-radius: 0; background: var(--paper); color: var(--ink);
+  text-align: center;
+}
+.card__qr::backdrop { background: rgba(10, 10, 10, 0.72); }
+.card__qr-close { position: absolute; top: 6px; right: 6px; width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--ink); cursor: pointer; }
+.card__qr-close svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; }
+.card__qr-title { margin: 6px 40px 14px; font-size: 18px; line-height: 1.25; }
+.card__qr-box { width: min(100%, 320px, 56vh, 56dvh); margin: 0 auto; background: #fff; }
 .card__qr-box svg { display: block; width: 100%; height: auto; }
-.card__qr-note { margin: 14px 0 0; font-size: 15px; }
-.card__qr-url { margin: 6px 0 0; font-size: 13px; color: var(--slate); word-break: break-all; }
+.card__qr-url { margin: 14px 0 0; font-size: 15px; font-weight: 600; word-break: break-all; }
 
-.card__foot { margin-top: auto; padding-top: 8px; font-size: 13px; }
+.card__foot { margin-top: auto; padding-top: 4px; font-size: 13px; }
 .card__foot a { color: var(--slate); text-underline-offset: 3px; }
 .card__noscript { max-width: 460px; margin: 0 auto; padding: 0 var(--gutter) 24px; font-size: 14px; color: var(--slate); }
 
 @media (min-width: 700px) {
-  .card { padding-top: 56px; padding-bottom: 40px; }
+  .card { padding-top: 48px; padding-bottom: 40px; }
 }
 @media (max-width: 359px) {
   .card__trio { gap: 8px; }
   .card__trio .card-btn { padding: 0 6px; gap: 6px; font-size: 15px; }
-  .card__more .card-btn { font-size: 14px; gap: 6px; }
+  .card-btn--util { font-size: 14px; gap: 6px; }
 }
 @media (prefers-reduced-motion: reduce) { .card-btn, .card__social a { transition: none; } }

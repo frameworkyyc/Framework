@@ -28,7 +28,7 @@
     return { family: parts[parts.length - 1], given: parts.slice(0, -1).join(" ") };
   };
 
-  /** @param c {name, company, role, phone, email, websiteUrl, cardUrl?} @returns {string} the .vcf text */
+  /** @param c {name, company, role (the job title), phone, email, websiteUrl, cardUrl} @returns {string} the .vcf text */
   var build = function (c) {
     var name = String(c.name || "").trim();
     var company = String(c.company || "").trim();
@@ -46,12 +46,18 @@
     if (c.phone) lines.push("TEL;TYPE=CELL,VOICE:" + String(c.phone).replace(/[^\d+]/g, ""));
     if (c.email) lines.push("EMAIL;TYPE=INTERNET,WORK:" + escapeText(c.email));
     if (c.websiteUrl) lines.push("URL:" + String(c.websiteUrl).replace(/[\r\n]/g, ""));
+    if (c.cardUrl) { // a labelled second link (Apple "item" group syntax, ignored harmlessly elsewhere)
+      lines.push("item1.URL:" + String(c.cardUrl).replace(/[\r\n]/g, ""));
+      lines.push("item1.X-ABLabel:Digital Business Card");
+    }
     lines.push("END:VCARD");
     return lines.map(fold).join("\r\n") + "\r\n";
   };
 
   var fileName = function (c) {
-    var base = String(c.name || c.company || "contact").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    var slug = function (v) { return String(v || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); };
+    var person = slug(c.name), company = slug(c.company);
+    var base = person && company && person !== company ? person + "-" + company : person || company || "contact";
     return (base || "contact") + ".vcf";
   };
 

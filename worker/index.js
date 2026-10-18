@@ -1,8 +1,8 @@
 /**
  * Framework — Cloudflare Worker
  *
- * Static pages are served by Workers static assets. This Worker only runs for /api/*, /admin and /admin/*
- * (see "run_worker_first" in wrangler.jsonc).
+ * Static pages are served by Workers static assets. This Worker only runs for /api/*, /admin, /admin/* and /card
+ * (see "run_worker_first" in wrangler.jsonc). /card is the static business card with environment-aware preview metadata.
  *
  * Public:
  *   POST /api/feedback          store one submission in D1 (the /client-feedback form)
@@ -22,6 +22,7 @@ import { RATING_KEYS, COLUMNS, ensureSchema, SECURITY_HEADERS, json, csvCell, ti
 import { handleAdmin } from "./admin/router.js";
 import { combinedRevenue } from "./revenue.js";
 import { handleAssessmentSubmit, handleAssessmentConfig } from "./assessment.js";
+import { handleCardPage } from "./card.js";
 
 const MAX_BODY_BYTES = 24 * 1024;
 const MAX_RECENT_SUBMISSIONS = 40; // flood guard: max stored submissions per 10 minutes, site-wide
@@ -280,6 +281,9 @@ export default {
     if (path === "/admin" || path.startsWith("/admin/") || path === "/api/admin" || path.startsWith("/api/admin/")) {
       return handleAdmin(request, env);
     }
+
+    // Digital business card: static page, link-preview URLs follow the host (worker/card.js).
+    if (path === "/card") return handleCardPage(request, env);
 
     // Public: the ONE combined, rounded-down client revenue figure. Individual figures stay in D1.
     if (path === "/api/client-revenue") {

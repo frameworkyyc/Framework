@@ -3,20 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Framework | Digital Business Card</title>
-<meta name="description" content="Framework helps entrepreneurs, contractors, and small businesses launch professional companies through strategy, brand, website design, and business systems built to last.">
+<title>JJ Brick | Framework</title>
+<meta name="description" content="Business strategy, branding, websites, and systems—for businesses starting out or ready to grow.">
 <meta name="robots" content="noindex, follow">
 <link rel="canonical" href="https://frameworkco.ca/card">
-<meta property="og:type" content="website">
+<meta property="og:type" content="profile">
 <meta property="og:site_name" content="Framework">
-<meta property="og:title" content="Framework | Digital Business Card">
-<meta property="og:description" content="Framework helps entrepreneurs, contractors, and small businesses launch professional companies through strategy, brand, website design, and business systems built to last.">
+<meta property="og:title" content="JJ Brick | Framework">
+<meta property="og:description" content="Business strategy, branding, websites, and systems—for businesses starting out or ready to grow.">
 <meta property="og:url" content="https://frameworkco.ca/card">
-<meta property="og:image" content="https://frameworkco.ca/assets/img/og-image.png">
+<meta property="og:image" content="https://frameworkco.ca/assets/img/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="JJ Brick, Founder of Framework, beside the Framework logo.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Framework | Digital Business Card">
-<meta name="twitter:description" content="Save the contact details for Framework, call, text or email, and visit the website.">
-<meta name="twitter:image" content="https://frameworkco.ca/assets/img/og-image.png">
+<meta name="twitter:title" content="JJ Brick | Framework">
+<meta name="twitter:description" content="Business strategy, branding, websites, and systems—for businesses starting out or ready to grow.">
+<meta name="twitter:image" content="https://frameworkco.ca/assets/img/og-card.png">
 <meta name="theme-color" content="#FFFFFF">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
@@ -29,8 +32,19 @@
 </head>
 <body class="card-page">
 <main class="card" id="main">
-  <header class="card__brand">
-    <span class="card__mark drawing"><svg viewBox="24 154 665.4 665.4" role="img" aria-labelledby="card-dw-title">
+  <div class="card__utility" id="utility" hidden>
+    <button class="card-btn card-btn--util" type="button" id="share-card">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 12v8h14v-8"/></svg>
+      Share Card
+    </button>
+    <button class="card-btn card-btn--util" type="button" id="toggle-qr" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h2v2h-2v-2Zm4 0h2v6h-4m0-2v2m0-6v-2"/></svg>
+      Show QR Code
+    </button>
+  </div>
+  <p class="card__status" id="card-status" role="status" aria-live="polite"></p>
+
+  <header class="card__brand"><span class="card__mark drawing"><svg viewBox="24 154 665.4 665.4" role="img" aria-labelledby="card-dw-title">
           <title id="card-dw-title">Framework logo, drawn in build order: strategy, design, then execution.</title>
           <g class="dw-grid"><line x1="50" y1="0" x2="50" y2="1000"/><line x1="0" y1="50" x2="1000" y2="50"/><line x1="100" y1="0" x2="100" y2="1000"/><line x1="0" y1="100" x2="1000" y2="100"/><line x1="150" y1="0" x2="150" y2="1000"/><line x1="0" y1="150" x2="1000" y2="150"/><line x1="200" y1="0" x2="200" y2="1000"/><line x1="0" y1="200" x2="1000" y2="200"/><line x1="250" y1="0" x2="250" y2="1000"/><line x1="0" y1="250" x2="1000" y2="250"/><line x1="300" y1="0" x2="300" y2="1000"/><line x1="0" y1="300" x2="1000" y2="300"/><line x1="350" y1="0" x2="350" y2="1000"/><line x1="0" y1="350" x2="1000" y2="350"/><line x1="400" y1="0" x2="400" y2="1000"/><line x1="0" y1="400" x2="1000" y2="400"/><line x1="450" y1="0" x2="450" y2="1000"/><line x1="0" y1="450" x2="1000" y2="450"/><line x1="500" y1="0" x2="500" y2="1000"/><line x1="0" y1="500" x2="1000" y2="500"/><line x1="550" y1="0" x2="550" y2="1000"/><line x1="0" y1="550" x2="1000" y2="550"/><line x1="600" y1="0" x2="600" y2="1000"/><line x1="0" y1="600" x2="1000" y2="600"/><line x1="650" y1="0" x2="650" y2="1000"/><line x1="0" y1="650" x2="1000" y2="650"/><line x1="700" y1="0" x2="700" y2="1000"/><line x1="0" y1="700" x2="1000" y2="700"/><line x1="750" y1="0" x2="750" y2="1000"/><line x1="0" y1="750" x2="1000" y2="750"/><line x1="800" y1="0" x2="800" y2="1000"/><line x1="0" y1="800" x2="1000" y2="800"/><line x1="850" y1="0" x2="850" y2="1000"/><line x1="0" y1="850" x2="1000" y2="850"/><line x1="900" y1="0" x2="900" y2="1000"/><line x1="0" y1="900" x2="1000" y2="900"/><line x1="950" y1="0" x2="950" y2="1000"/><line x1="0" y1="950" x2="1000" y2="950"/></g>
           <g class="dw-reg"><line x1="26.0" y1="170.0" x2="54.0" y2="170.0"/><line x1="40.0" y1="156.0" x2="40.0" y2="184.0"/><line x1="659.4" y1="170.0" x2="687.4" y2="170.0"/><line x1="673.4" y1="156.0" x2="673.4" y2="184.0"/><line x1="26.0" y1="803.4" x2="54.0" y2="803.4"/><line x1="40.0" y1="789.4" x2="40.0" y2="817.4"/><line x1="659.4" y1="803.4" x2="687.4" y2="803.4"/><line x1="673.4" y1="789.4" x2="673.4" y2="817.4"/></g>
@@ -42,76 +56,71 @@
             <path class="dw-shape dw-shape--1" pathLength="1" d="M215.2 312.1 L512.7 312.1 L512.7 371.3 L278.4 371.3 L278.4 599.8 L215.2 663.6 Z"/>
             <path class="dw-shape dw-shape--2" pathLength="1" d="M292.3 469.9 L337.0 425.2 L512.7 425.2 L512.7 486.1 L349.7 486.1 L349.7 658.4 L292.3 658.4 Z"/>
           </g>
-        </svg></span>
-    <span class="card__word">Framework</span>
-  </header>
+        </svg></span></header>
 
   <section class="card__id" aria-labelledby="card-name">
-    <p class="card__role" id="card-role" hidden></p>
-    <h1 class="card__name" id="card-name">Framework</h1>
-    <p class="card__about">Framework helps entrepreneurs, contractors, and small businesses launch professional companies through strategy, brand, website design, and business systems built to last.</p>
+    <h1 class="card__name" id="card-name">JJ Brick</h1>
+    <p class="card__role" id="card-role">Founder, Framework</p>
+    <p class="card__about">Business strategy, branding, websites, and systems—for businesses starting out or ready to grow.</p>
   </section>
 
   <div class="card__actions">
-    <button class="card-btn card-btn--primary" type="button" id="save-contact">
+    <button class="card-btn card-btn--primary" type="button" id="save-contact" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
       Save Contact
     </button>
 
-    <div class="card__trio" id="trio">
-      <a class="card-btn" id="act-call" href="#" hidden>
+    <div class="card__trio" id="trio" data-count="3">
+      <a class="card-btn" id="act-call" href="tel:+16472153773">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 4h3l1.5 4-2 1.5a11 11 0 0 0 5.5 5.5L16 13l4 1.5v3a2 2 0 0 1-2 2A14 14 0 0 1 4.5 6a2 2 0 0 1 2-2Z"/></svg>
         Call
       </a>
-      <a class="card-btn" id="act-text" href="#" hidden>
+      <a class="card-btn" id="act-text" href="sms:+16472153773">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H9l-5 4V5Z"/></svg>
         Text
       </a>
-      <a class="card-btn" id="act-email" href="#" hidden>
+      <a class="card-btn" id="act-email" href="mailto:hello@frameworkco.ca">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16v12H4V6Zm0 1 8 6 8-6"/></svg>
         Email
       </a>
     </div>
 
+    <div class="card__assess">
+      <a class="card-btn card-btn--assess" id="act-assessment" href="assessment" aria-describedby="assess-note">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3h9l4 4v14H6V3Zm8 0v5h5M9 13l2 2 4-4"/></svg>
+        Get a Free Assessment
+      </a>
+      <p class="card__assess-note" id="assess-note">Find out how easily potential customers can find your business online.</p>
+    </div>
+
+    <a class="card-btn" id="act-portfolio" href="portfolio.html">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v14H4V5Zm0 9 4.5-4.5L13 14l3-3 4 4M15.5 8.5h.01"/></svg>
+      View Portfolio
+    </a>
     <a class="card-btn" id="act-web" href="https://frameworkco.ca/">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm-9 9h18M12 3c2.6 2.4 3.9 5.4 3.9 9s-1.3 6.6-3.9 9c-2.6-2.4-3.9-5.4-3.9-9S9.4 5.4 12 3Z"/></svg>
       Visit Website
     </a>
-    <a class="card-btn" id="act-portfolio" href="portfolio.html">
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v14H4V5Zm0 9 4.5-4.5L13 14l3-3 4 4M15.500 8.500h.01"/></svg>
-      View Portfolio
-    </a>
-    <a class="card-btn" id="act-assessment" href="assessment">
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3h9l4 4v14H6V3Zm8 0v5h5M9 13l2 2 4-4"/></svg>
-      Get a Free Assessment
-    </a>
   </div>
 
-  <ul class="card__social" id="social" aria-label="Framework on social media" hidden></ul>
-
-  <div class="card__more">
-    <button class="card-btn card-btn--quiet" type="button" id="share-card">
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 12v8h14v-8"/></svg>
-      Share Card
-    </button>
-    <button class="card-btn card-btn--quiet" type="button" id="toggle-qr" aria-expanded="false" aria-controls="qr-panel">
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h2v2h-2v-2Zm4 0h2v6h-4m0-2v2m0-6v-2"/></svg>
-      Show QR Code
-    </button>
-  </div>
-  <p class="card__status" id="card-status" role="status" aria-live="polite"></p>
-
-  <section class="card__qr" id="qr-panel" aria-label="QR code for this card" hidden>
-    <div class="card__qr-box" id="qr-box"></div>
-    <p class="card__qr-note">Point a phone camera at this code to open the card.</p>
-    <p class="card__qr-url" id="qr-url"></p>
-  </section>
+  <ul class="card__social" id="social" aria-label="Framework on social media">
+    <li><a href="https://www.instagram.com/frameworkmethod" target="_blank" rel="noopener noreferrer" aria-label="Framework on Instagram (opens in a new tab)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="4.5"/><circle cx="12" cy="12" r="3.8"/><circle class="fill" cx="16.9" cy="7.1" r="1.1"/></svg></a></li>
+  </ul>
 
   <footer class="card__foot">
     <a href="privacy.html">Privacy Policy</a>
   </footer>
 </main>
-<noscript><p class="card__noscript">This card needs JavaScript for the Save Contact and QR features. You can still reach Framework at <a href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a> or <a href="https://frameworkco.ca/">frameworkco.ca</a>.</p></noscript>
+
+<dialog class="card__qr" id="qr-dialog" aria-labelledby="qr-title">
+  <button class="card__qr-close" type="button" id="qr-close" aria-label="Close QR code">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>
+  </button>
+  <h2 class="card__qr-title" id="qr-title">Scan to open this card</h2>
+  <div class="card__qr-box" id="qr-box"></div>
+  <p class="card__qr-url" id="qr-url"></p>
+</dialog>
+<noscript><p class="card__noscript">The Save Contact, Share and QR code features need JavaScript. The call, text, email and website links above still work.</p></noscript>
 <script src="assets/js/card-config.js"></script>
 <script src="assets/js/vendor/qrcode.js"></script>
 <script src="assets/js/vcard.js"></script>
