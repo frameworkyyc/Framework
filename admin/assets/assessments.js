@@ -12,7 +12,7 @@ const metric = (label, value, note) =>
 
 const PROBLEMS = {
   missing_api_key: "RESEND_API_KEY is not set for this deployment.",
-  missing_from: "ASSESSMENT_FROM is not set for this deployment.",
+  missing_from: "ASSESSMENT_FROM is not set for this deployment. A plain variable that exists only in the Cloudflare dashboard is removed by the next deploy: set it in wrangler.jsonc (previews.vars) or as a secret.",
   invalid_from: "ASSESSMENT_FROM is not a valid sender. Use  Framework <hello@frameworkco.ca>  (with the angle brackets).",
 };
 

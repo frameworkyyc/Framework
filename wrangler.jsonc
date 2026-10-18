@@ -25,6 +25,13 @@
   // 503 "storage_not_configured". Staging has its OWN database (framework-staging) so test submissions never mix with
   // Production's framework-feedback. Same binding name (DB), so the code is identical in both. Never swap these IDs.
   "previews": {
+    // Non-secret runtime settings for Previews. In Wrangler the config file is the source of truth: a plain variable
+    // that exists only in the dashboard is deleted on the next deploy, and previews do not inherit top-level `vars`.
+    // (Secrets such as RESEND_API_KEY are different: they live in Cloudflare and survive deploys.) The sender address
+    // is not a secret, so it belongs here. Keep secrets out of this file.
+    "vars": {
+      "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>"
+    },
     "d1_databases": [
       {
         "binding": "DB",

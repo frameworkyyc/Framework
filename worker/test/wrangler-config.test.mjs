@@ -4,6 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { emailConfig } from "../assessment.js";
 
 const raw = readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8");
 const config = JSON.parse(raw.replace(/^\s*\/\/.*$/gm, "")); // the file only uses whole-line comments
@@ -31,8 +32,19 @@ test("the Production ID appears exactly once in the file (never inside the previ
   assert.ok(!JSON.stringify(config.previews).includes("framework-feedback"));
 });
 
-test("no secrets or variables are committed in wrangler.jsonc", () => {
+test("Production has no vars in the config (untouched by this change); Staging's only config variable is the non-secret sender", () => {
   assert.equal(config.vars, undefined);
-  assert.equal(config.previews.vars, undefined);
-  assert.ok(!/RESEND|TURNSTILE|ACCESS_AUD|ADMIN_EMAILS/.test(raw.replace(/^\s*\/\/.*$/gm, "")));
+  assert.deepEqual(Object.keys(config.previews.vars), ["ASSESSMENT_FROM"]);
+});
+
+test("the Staging sender is a valid From value that the Worker accepts as-is (no correction needed)", () => {
+  const cfg = emailConfig({ RESEND_API_KEY: "placeholder", ASSESSMENT_FROM: config.previews.vars.ASSESSMENT_FROM });
+  assert.equal(cfg.ok, true);
+  assert.equal(cfg.fromCorrected, false);
+  assert.equal(cfg.from, "Framework <hello@frameworkco.ca>");
+});
+
+test("no secrets are committed in wrangler.jsonc", () => {
+  const code = raw.replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/RESEND_API_KEY|TURNSTILE_SECRET|ACCESS_AUD|ACCESS_TEAM_DOMAIN|ADMIN_EMAILS|IP_HASH_SALT|re_[A-Za-z0-9]{10,}/.test(code));
 });

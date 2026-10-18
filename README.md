@@ -130,11 +130,13 @@ Settings (Cloudflare dashboard, Workers & Pages, framework, Settings, Variables 
 | Name | Type | Purpose |
 |---|---|---|
 | `RESEND_API_KEY` | Secret | Resend API key. Email stays off until this and `ASSESSMENT_FROM` are both set. |
-| `ASSESSMENT_FROM` | Variable | Verified sender, e.g. `Framework <hello@frameworkco.ca>` (the domain must be verified in Resend). |
+| `ASSESSMENT_FROM` | Variable (in `wrangler.jsonc`) | Verified sender, e.g. `Framework <hello@frameworkco.ca>` (the domain must be verified in Resend). For Staging it lives in `previews.vars` in `wrangler.jsonc`; see the note below. |
 | `ASSESSMENT_NOTIFY_TO` | Variable | Where requests are emailed. Defaults to `hello@frameworkco.ca`. |
 | `TURNSTILE_SITE_KEY` | Variable | Turnstile site key (public). Shows the check on the form. |
 | `TURNSTILE_SECRET` | Secret | Turnstile secret. Turns on server-side verification. Set both Turnstile values together. |
 | `META_PIXEL_ID` | Variable | Meta Pixel ID (public). The page then asks for consent and loads the Pixel only if the visitor allows it; the `Lead` event fires only after a confirmed submission. |
+
+**Variables vs secrets, and why a dashboard variable can vanish.** Wrangler treats `wrangler.jsonc` as the source of truth: a plain (non-secret) variable that exists only in the Cloudflare dashboard is deleted on the next deploy, and Previews do not inherit top-level `vars`. Secrets (`RESEND_API_KEY`, `ACCESS_*`, `ADMIN_EMAILS`, `TURNSTILE_SECRET`, `IP_HASH_SALT`) live in Cloudflare and survive deploys. So non-secret settings must go in the config (`previews.vars` for Staging, top-level `vars` for Production) or be stored as secrets. Admin → Assessments reads the live Worker environment, so what it shows is what that deployment really has.
 
 **Email is never skipped silently.** Every request is saved first, and its row records `notify_status` (`sent`, `failed`, `not_configured` or `pending`) and `notify_error` (the reason, e.g. `config:missing_api_key`, `config:invalid_from`, `provider 403: domain not verified`, `network:TimeoutError`). The form's JSON answer also says `"notification": "sent"` or `"not_sent"` (browser dev tools, Network tab, `assessment` request). Anything saved but not emailed can be found and recovered:
 
