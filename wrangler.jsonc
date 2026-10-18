@@ -51,7 +51,8 @@
       // Secrets stay in Cloudflare and are never written here: PORTAL_AUTH_CLIENT_SECRET (the WorkOS API key), PORTAL_SESSION_PEPPER.
       "PORTAL_AUTH_CLIENT_ID": "client_01M58C412YHC548S5JXP1TJ2ED",
       "PORTAL_BASE_URL": "https://staging.frameworkco.ca",
-      "PORTAL_AUTH_ISSUER": "https://api.workos.com",
+      // The exact token issuer, verified in the live Staging test (it embeds the client id).
+      "PORTAL_AUTH_ISSUER": "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED",
       // Switches the Phase 0 sign-in probe on. Delete this line (and worker/portal/probe.js) when the probe is retired.
       "PORTAL_PROBE": "1"
     },

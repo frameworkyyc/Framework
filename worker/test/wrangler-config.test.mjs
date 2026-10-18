@@ -46,7 +46,13 @@ test("the Production ID appears exactly once in the file (never inside the previ
 test("Production (top-level vars) and Staging (previews.vars) each carry the sender and the same public Turnstile site key; Staging adds the portal settings", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
   assert.deepEqual(config.vars, shared);
-  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com", PORTAL_PROBE: "1" });
+  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_PROBE: "1" });
+});
+
+test("the verified WorkOS issuer is pinned and belongs to the configured client id (not the bare api.workos.com base)", () => {
+  const { PORTAL_AUTH_ISSUER, PORTAL_AUTH_CLIENT_ID } = config.previews.vars;
+  assert.equal(PORTAL_AUTH_ISSUER, "https://api.workos.com/user_management/" + PORTAL_AUTH_CLIENT_ID);
+  assert.notEqual(PORTAL_AUTH_ISSUER, "https://api.workos.com");
 });
 
 test("the WorkOS client id is a public id (client_…), is Staging-only, and no secret-shaped value sits beside it", () => {

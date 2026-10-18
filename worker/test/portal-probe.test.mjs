@@ -9,9 +9,10 @@ import worker from "../index.js";
 
 const BASE = "https://staging.frameworkco.ca";
 const CLIENT_ID = "client_TESTCLIENT123";
+const VERIFIED_ISSUER = "https://api.workos.com/user_management/" + CLIENT_ID; // the shape confirmed by the live Staging test
 const API_KEY = "sk_test_THIS_IS_A_FAKE_KEY_FOR_TESTS";
 const PEPPER = "pepper-for-tests-only-0123456789";
-const env = (over = {}) => ({ PORTAL_PROBE: "1", PORTAL_BASE_URL: BASE, PORTAL_AUTH_CLIENT_ID: CLIENT_ID, PORTAL_AUTH_CLIENT_SECRET: API_KEY, PORTAL_SESSION_PEPPER: PEPPER, PORTAL_AUTH_ISSUER: "https://api.workos.com", ...over });
+const env = (over = {}) => ({ PORTAL_PROBE: "1", PORTAL_BASE_URL: BASE, PORTAL_AUTH_CLIENT_ID: CLIENT_ID, PORTAL_AUTH_CLIENT_SECRET: API_KEY, PORTAL_SESSION_PEPPER: PEPPER, PORTAL_AUTH_ISSUER: VERIFIED_ISSUER, ...over });
 const NOW = new Date("2026-10-20T12:00:00Z");
 const nowSec = Math.floor(NOW.getTime() / 1000);
 
@@ -258,14 +259,14 @@ test("success: exchanges the code with the PKCE verifier, verifies the token, an
   const verifier = JSON.parse(Buffer.from(started.cookie.split("=")[1].split(".")[0], "base64url").toString()).v;
   assert.equal(sent.code_verifier, verifier);
 
-  assert.match(html, /token signature verified/);
   assert.match(html, /"signature_valid": true/);
   assert.match(html, /t\*\*\*@example\.com/);
   assert.ok(!html.includes("tester@example.com"));
   assert.match(html, /user_01H…/);
   assert.ok(!html.includes("user_01HXYZABCDEF"));
   assert.match(html, /"iss_equals_discovery_issuer": true/);
-  assert.match(html, /"iss_equals_PORTAL_AUTH_ISSUER": false/, "the configured issuer is only compared, never trusted");
+  assert.match(html, /"iss_equals_PORTAL_AUTH_ISSUER": true/);
+  assert.match(html, /token signature and issuer verified/);
   assert.match(html, /"client_id_claim_matches": true/);
   assert.match(html, /"lifetime_seconds": 300/);
   assert.match(html, /"sid_present": true/);
@@ -353,36 +354,114 @@ test("WorkOS refusing the exchange, or being unreachable, gives a generic page t
 
 /* ------------------------------------------------------------------ logout */
 
-test("logout is POST only, same-origin only, and goes to WorkOS logout for the signed-in session with the exact return URL", async () => {
+/** Sign in and return what a real browser would hold: the sign-out cookie and the form's CSRF token. */
+async function signedIn(e = env()) {
   const key = await makeKey();
-  const started = await startLogin();
-  const signedIn = await callback(env(), fakeWorkOS({ key, accessToken: await signJwt(key, goodClaims()) }), started);
-  const sid = cookieHeader(signedIn, "__Host-fw_probe_sid");
-  assert.ok(sid);
+  const started = await startLogin(e);
+  const res = await callback(e, fakeWorkOS({ key, accessToken: await signJwt(key, goodClaims()) }), started);
+  const html = await res.text();
+  const csrf = (/name="csrf" value="([^"]+)"/.exec(html) || [])[1];
+  return { cookie: cookieHeader(res, "__Host-fw_probe_sid"), csrf, html };
+}
+const logoutReq = ({ cookie, csrf, headers = {}, body, type = "application/x-www-form-urlencoded" }) =>
+  new Request(BASE + "/portal/logout", { method: "POST", headers: { ...(type ? { "Content-Type": type } : {}), ...(cookie ? { Cookie: cookie } : {}), ...headers }, body: body === undefined ? "csrf=" + encodeURIComponent(csrf || "") : body });
+const doLogout = (e, opts) => handlePortalProbe(logoutReq(opts), e, { now: NOW });
 
-  const get = await handlePortalProbe(req("/portal/logout", { headers: { Cookie: sid } }), env(), { now: NOW });
-  assert.equal(get.status, 405);
-  assert.equal(get.headers.get("Location"), null);
-  for (const origin of [null, "https://evil.test", "https://frameworkco.ca"]) {
-    const headers = { Cookie: sid, ...(origin ? { Origin: origin } : {}) };
-    const bad = await handlePortalProbe(req("/portal/logout", { method: "POST", headers }), env(), { now: NOW });
-    assert.equal(bad.status, 403, String(origin));
-    assert.equal(bad.headers.get("Location"), null);
-  }
-  const ok = await handlePortalProbe(req("/portal/logout", { method: "POST", headers: { Cookie: sid, Origin: BASE } }), env(), { now: NOW });
-  assert.equal(ok.status, 303);
-  const loc = new URL(ok.headers.get("Location"));
+test("logout works with the Origin a real browser sends from this no-referrer page (\"Origin: null\"): the reported failure", async () => {
+  const { cookie, csrf, html } = await signedIn();
+  assert.ok(csrf && cookie);
+  assert.match(html, /<input type="hidden" name="csrf"/);
+  // Same-origin form posts from a Referrer-Policy: no-referrer page carry "Origin: null" plus Sec-Fetch-Site: same-origin (observed in Chromium).
+  const res = await doLogout(env(), { cookie, csrf, headers: { Origin: "null", "Sec-Fetch-Site": "same-origin" } });
+  assert.equal(res.status, 303);
+  const loc = new URL(res.headers.get("Location"));
   assert.equal(loc.origin + loc.pathname, "https://api.workos.com/user_management/sessions/logout");
   assert.equal(loc.searchParams.get("session_id"), "session_01ABC");
   assert.equal(loc.searchParams.get("return_to"), BASE + "/portal/login");
-  assert.ok(cookiesOf(ok).some((c) => c.startsWith("__Host-fw_probe_sid=;") && /Max-Age=0/.test(c)));
+  assert.ok(cookiesOf(res).some((c) => c.startsWith("__Host-fw_probe_sid=;") && /Max-Age=0/.test(c)));
 });
 
-test("logout without a valid sign-out cookie never sends an attacker-chosen session id to WorkOS", async () => {
+test("logout also works with the real Origin, with no Origin at all (older browsers), and with no Sec-Fetch-Site", async () => {
+  for (const headers of [{ Origin: BASE }, {}, { Origin: BASE, "Sec-Fetch-Site": "same-origin" }]) {
+    const { cookie, csrf } = await signedIn();
+    assert.equal((await doLogout(env(), { cookie, csrf, headers })).status, 303, JSON.stringify(headers));
+  }
+});
+
+test("logout CSRF protection is NOT weakened: it needs a valid token, and a null Origin alone is never enough", async () => {
+  const { cookie, csrf } = await signedIn();
+  const nullOrigin = { Origin: "null", "Sec-Fetch-Site": "same-origin" };
+  const cases = {
+    "no token field": { cookie, body: "" },
+    "empty token": { cookie, csrf: "" },
+    "wrong token": { cookie, csrf: "A".repeat(43) },
+    "token in the query string instead of the body": { cookie, body: "", headers: { ...nullOrigin } },
+    "wrong content type": { cookie, csrf, type: "application/json", body: JSON.stringify({ csrf }) },
+    "oversize body": { cookie, csrf, body: "csrf=" + csrf + "&pad=" + "x".repeat(2000) },
+  };
+  for (const [name, c] of Object.entries(cases)) {
+    const res = await doLogout(env(), { headers: nullOrigin, ...c });
+    assert.equal(res.status, 403, name);
+    assert.equal(res.headers.get("Location"), null, name);
+  }
+});
+
+test("logout refuses cross-site requests even when they carry a valid cookie and token", async () => {
+  const { cookie, csrf } = await signedIn();
+  for (const headers of [{ Origin: "https://evil.test" }, { Origin: "https://frameworkco.ca" }, { "Sec-Fetch-Site": "cross-site" }, { "Sec-Fetch-Site": "same-site" }, { "Sec-Fetch-Site": "none" }, { Origin: BASE, "Sec-Fetch-Site": "cross-site" }]) {
+    const res = await doLogout(env(), { cookie, csrf, headers });
+    assert.equal(res.status, 403, JSON.stringify(headers));
+    assert.equal(res.headers.get("Location"), null);
+  }
+});
+
+test("a token from one session cannot sign out another, and tokens do not work after the pepper changes", async () => {
+  const one = await signedIn();
+  const key = await makeKey();
+  const started = await startLogin();
+  const two = await callback(env(), fakeWorkOS({ key, accessToken: await signJwt(key, goodClaims({ sid: "session_OTHER" })) }), started);
+  const twoToken = (/name="csrf" value="([^"]+)"/.exec(await two.text()) || [])[1];
+  assert.notEqual(one.csrf, twoToken);
+  assert.equal((await doLogout(env(), { cookie: one.cookie, csrf: twoToken })).status, 403, "session two's token on session one's cookie");
+  assert.equal((await doLogout(env({ PORTAL_SESSION_PEPPER: "another-pepper-value-entirely-0000" }), { cookie: one.cookie, csrf: one.csrf })).status, 303, "an invalid cookie degrades to a plain redirect to the login page");
+});
+
+test("logout: GET is refused, and a missing or forged cookie never sends an attacker-chosen session id to WorkOS", async () => {
+  const get = await handlePortalProbe(req("/portal/logout"), env(), { now: NOW });
+  assert.equal(get.status, 405);
   for (const cookie of ["", "__Host-fw_probe_sid=forged.value", "__Host-fw_probe_sid=" + Buffer.from(JSON.stringify({ sid: "victim", exp: nowSec + 100 })).toString("base64url") + ".AAAA"]) {
-    const res = await handlePortalProbe(req("/portal/logout", { method: "POST", headers: { Origin: BASE, ...(cookie ? { Cookie: cookie } : {}) } }), env(), { now: NOW });
+    const res = await doLogout(env(), { cookie, csrf: "A".repeat(43), headers: { Origin: "null", "Sec-Fetch-Site": "same-origin" } });
     assert.equal(res.status, 303);
     assert.equal(res.headers.get("Location"), BASE + "/portal/login");
+  }
+});
+
+test("the report page's sign-out form is a same-origin POST with a hidden token, and the page still sends Referrer-Policy: no-referrer", async () => {
+  const { html } = await signedIn();
+  assert.match(html, /<form method="post" action="\/portal\/logout"><input type="hidden" name="csrf" value="[A-Za-z0-9_-]{40,}">/);
+  const key = await makeKey();
+  const started = await startLogin();
+  const res = await callback(env(), fakeWorkOS({ key, accessToken: await signJwt(key, goodClaims()) }), started);
+  assert.equal(res.headers.get("Referrer-Policy"), "no-referrer");
+  assert.ok(!(await res.clone().text()).includes(PEPPER));
+});
+
+/* ------------------------------------------------------------------ issuer validation */
+
+test("issuer: the configured value must equal the token's iss exactly; the old api.workos.com base is reported as a mismatch", async () => {
+  const key = await makeKey();
+  const token = await signJwt(key, goodClaims());
+  const run = async (issuer) => {
+    const started = await startLogin(env({ PORTAL_AUTH_ISSUER: issuer }));
+    return reportOf(await callback(env({ PORTAL_AUTH_ISSUER: issuer }), fakeWorkOS({ key, accessToken: token }), started));
+  };
+  const right = await run(VERIFIED_ISSUER);
+  assert.match(right, /"iss_equals_PORTAL_AUTH_ISSUER": true/);
+  assert.match(right, /token signature and issuer verified/);
+  for (const wrong of ["https://api.workos.com", VERIFIED_ISSUER + "/", VERIFIED_ISSUER.toUpperCase(), "https://api.workos.com/user_management/client_OTHER", ""]) {
+    const html = await run(wrong);
+    assert.match(html, /"iss_equals_PORTAL_AUTH_ISSUER": false/, JSON.stringify(wrong));
+    assert.match(html, /issuer does NOT match PORTAL_AUTH_ISSUER/, JSON.stringify(wrong));
   }
 });
 

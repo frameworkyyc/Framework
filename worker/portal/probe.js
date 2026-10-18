@@ -102,6 +102,22 @@ async function openCookie(cfg, value, now) {
   }
 }
 
+/**
+ * Logout CSRF token: HMAC(pepper, "logout-csrf:" + sid), shown only on the report page of the person who is signed in.
+ * It is bound to that WorkOS session, so a forged request cannot know it. This is the primary check; Origin and Sec-Fetch-Site
+ * are extra. (An Origin check alone is not enough: a page sent with Referrer-Policy: no-referrer makes browsers send
+ * "Origin: null" on its own same-origin form posts, which is why a legitimate logout was refused.)
+ */
+const logoutToken = async (cfg, sid) => bytesToB64url(new Uint8Array(await crypto.subtle.sign("HMAC", await hmacKey(cfg.pepper), encoder.encode("logout-csrf:" + sid))));
+async function logoutTokenValid(cfg, sid, supplied) {
+  if (typeof supplied !== "string" || !/^[A-Za-z0-9_-]{20,100}$/.test(supplied)) return false;
+  try {
+    return await crypto.subtle.verify("HMAC", await hmacKey(cfg.pepper), b64urlToBytes(supplied), encoder.encode("logout-csrf:" + sid));
+  } catch {
+    return false;
+  }
+}
+
 const readCookie = (request, name) => {
   for (const part of String(request.headers.get("Cookie") || "").split(";")) {
     const i = part.indexOf("=");
@@ -285,8 +301,9 @@ async function handleCallback(request, cfg, url, deps, now) {
   const keys = await loadKeys(cfg, fetchImpl);
   const verified = keys.jwks ? await verifyRs256(accessToken, keys.jwks, now) : { ok: false, reason: "no_keys" };
   const payload = verified.payload || {};
+  const issuerOk = Boolean(cfg.expectedIssuer) && payload.iss === cfg.expectedIssuer;
   const report = {
-    result: verified.ok ? "token signature verified" : `token NOT verified (${verified.reason})`,
+    result: !verified.ok ? `token NOT verified (${verified.reason})` : issuerOk ? "token signature and issuer verified" : "token signature verified, but the issuer does NOT match PORTAL_AUTH_ISSUER",
     code_exchange: { status: exchange.status, authentication_method: exchange.body.authentication_method ?? null },
     user: { id: maskId(user.id), email: maskEmail(user.email), email_verified: user.email_verified === true, organization_id_present: typeof exchange.body.organization_id === "string" },
     token: {
@@ -294,7 +311,7 @@ async function handleCallback(request, cfg, url, deps, now) {
       kid_present: Boolean(verified.header && verified.header.kid),
       signature_valid: verified.ok,
       ...claimsReport(payload),
-      iss_equals_PORTAL_AUTH_ISSUER: Boolean(cfg.expectedIssuer) && payload.iss === cfg.expectedIssuer,
+      iss_equals_PORTAL_AUTH_ISSUER: issuerOk,
       iss_equals_discovery_issuer: keys.discovery.ok && payload.iss === keys.discovery.issuer,
       client_id_claim_matches: payload.client_id === cfg.clientId,
     },
@@ -306,21 +323,40 @@ async function handleCallback(request, cfg, url, deps, now) {
   const extra = { "Set-Cookie": [setCookie(STATE_COOKIE, "", 0)] };
   const sid = verified.ok && typeof payload.sid === "string" && /^[A-Za-z0-9_.-]{1,128}$/.test(payload.sid) ? payload.sid : "";
   if (sid) extra["Set-Cookie"].push(setCookie(SID_COOKIE, await sealCookie(cfg, { sid, exp: Math.floor(now.getTime() / 1000) + SID_TTL_SECONDS }), SID_TTL_SECONDS));
+  const csrf = sid ? await logoutToken(cfg, sid) : "";
   const body = `<p class="lead">${escapeHtml(report.result)}.</p>
 <pre>${escapeHtml(JSON.stringify(report, null, 2))}</pre>
-<form method="post" action="${LOGOUT_PATH}"><button class="btn btn--primary" type="submit">Sign out (tests WorkOS logout)</button></form>
+<form method="post" action="${LOGOUT_PATH}"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"><button class="btn btn--primary" type="submit">Sign out (tests WorkOS logout)</button></form>
 <p><a class="text-link" href="${LOGIN_PATH}">Start over</a></p>`;
   return page(200, "Sign-in test result", body, extra);
 }
 
+const refused = () => page(403, "Request refused", "<p class=\"lead\">This request did not come from the sign-in test page. Go back and use the Sign out button.</p>");
+
 async function handleLogout(request, cfg, now) {
   if (request.method !== "POST") return page(405, "Method not allowed", "", { Allow: "POST" });
+  // Layered same-site checks (defence in depth; the CSRF token below is what must pass):
+  //  - a browser that says the request is not same-origin is refused outright;
+  //  - an Origin that is present must be ours or the literal "null" browsers send for same-origin form posts from a
+  //    no-referrer page. "null" is also what a hostile sandboxed page sends, so it is never enough on its own.
+  const site = request.headers.get("Sec-Fetch-Site");
+  if (site && site !== "same-origin") return refused();
   const origin = request.headers.get("Origin");
-  if (origin !== cfg.origin) return page(403, "Request refused", "<p class=\"lead\">This request must come from the sign-in test page.</p>");
+  if (origin && origin !== cfg.origin && origin !== "null") return refused();
+
   const sealed = await openCookie(cfg, readCookie(request, SID_COOKIE), now);
   const clear = setCookie(SID_COOKIE, "", 0);
   const back = cfg.origin + LOGIN_PATH;
   if (!sealed || typeof sealed.sid !== "string") return new Response(null, { status: 303, headers: headersFor({ Location: back, "Set-Cookie": clear }) });
+
+  // The token must be present in the form body and match this session.
+  let supplied = "";
+  if ((request.headers.get("Content-Type") || "").toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+    const text = await request.text();
+    if (text.length <= 1024) supplied = new URLSearchParams(text).get("csrf") || "";
+  }
+  if (!(await logoutTokenValid(cfg, sealed.sid, supplied))) return refused();
+
   const logout = new URL(`${API}/user_management/sessions/logout`);
   logout.searchParams.set("session_id", sealed.sid);
   logout.searchParams.set("return_to", back);
