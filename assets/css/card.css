@@ -10,10 +10,11 @@
   padding: calc(28px + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
 }
 
-.card__brand { display: flex; align-items: center; gap: 14px; }
-/* The landing-page logo animation (same markup and the .dw-* keyframes in styles.css, cropped to the mark). The callout labels are
+.card__brand { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+/* The landing-page logo animation (same markup and the .dw-* keyframes in styles.css), cropped to the registration marks so the
+   logo fills the frame instead of floating in empty space. The callout labels are
    too small to read at this size, so they are not shown here. Reduced motion shows the finished logo (rule in styles.css). */
-.card__mark { width: 88px; height: 88px; flex: none; display: block; }
+.card__mark { width: clamp(150px, 46vw, 210px); aspect-ratio: 1; flex: none; display: block; }
 .card__mark svg { display: block; width: 100%; height: 100%; }
 .card__mark .dw-callout { display: none; }
 .card__word { font-family: var(--font-body); font-weight: 600; font-size: 14px; letter-spacing: 0.26em; text-transform: uppercase; }
