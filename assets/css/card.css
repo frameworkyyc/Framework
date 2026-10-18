@@ -39,17 +39,17 @@
   transition: background-color .15s ease, color .15s ease;
 }
 .card-btn svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: square; stroke-linejoin: miter; }
-.card-btn:hover { background: var(--ink); color: var(--paper); }
+@media (hover: hover) { .card-btn:hover { background: var(--ink); color: var(--paper); } }
 .card-btn:focus-visible, .card__social a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .card-btn--primary { background: var(--ink); color: var(--paper); min-height: 60px; font-size: 17px; }
-.card-btn--primary:hover { background: var(--paper); color: var(--ink); }
+@media (hover: hover) { .card-btn--primary:hover { background: var(--paper); color: var(--ink); } }
 .card-btn--quiet { border-color: var(--hairline); }
-.card-btn--quiet:hover { border-color: var(--ink); }
+@media (hover: hover) { .card-btn--quiet:hover { border-color: var(--ink); } }
 
 .card__social { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
 .card__social[hidden] { display: none; }
 .card__social a { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid var(--hairline); color: var(--ink); transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
-.card__social a:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+@media (hover: hover) { .card__social a:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); } }
 .card__social svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .card__social svg .fill { fill: currentColor; stroke: none; }
 

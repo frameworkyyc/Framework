@@ -7,14 +7,14 @@ window.FRAMEWORK_CARD = {
   websiteUrl: "https://frameworkco.ca/",
   company: "Framework",
 
-  name: "",            // e.g. "First Last"
-  role: "",            // e.g. "Founder"
-  phone: "",           // international format, e.g. "+14035550123"
+  name: "JJ",
+  role: "Founder",
+  phone: "+16472153773", // international format
   email: "hello@frameworkco.ca",
 
   // Full profile URLs (https://…). Leave "" to hide an icon.
   social: {
-    instagram: "",
+    instagram: "https://www.instagram.com/frameworkmethod",
     linkedin: "",
     facebook: "",
     x: "",
