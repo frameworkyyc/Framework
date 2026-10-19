@@ -8,7 +8,11 @@
  */
 
 export const PRODUCTION_HOSTS = ["frameworkco.ca", "www.frameworkco.ca"];
-export const MIN_PEPPER_LENGTH = 32;
+// 32 random bytes = 43 base64/base64url characters (or 64 hex). Length and variety are checked; true randomness cannot be, so the setup
+// instructions generate it with a CSPRNG (openssl rand -base64 48) and the value is never shown or logged.
+export const MIN_PEPPER_LENGTH = 43;
+const PEPPER_ALPHABET = /^[A-Za-z0-9+/_=-]+$/;
+const MIN_DISTINCT_PEPPER_CHARS = 12;
 
 const CLIENT_ID = /^client_[A-Za-z0-9]{10,64}$/;
 const text = (v) => (typeof v === "string" ? v.trim() : "");
@@ -51,6 +55,7 @@ export function portalConfigProblems(env) {
   const pepper = text(env.PORTAL_SESSION_PEPPER);
   if (!pepper) problems.push("PORTAL_SESSION_PEPPER");
   else if (pepper.length < MIN_PEPPER_LENGTH) problems.push("PORTAL_SESSION_PEPPER_too_short");
+  else if (!PEPPER_ALPHABET.test(pepper) || new Set(pepper).size < MIN_DISTINCT_PEPPER_CHARS) problems.push("PORTAL_SESSION_PEPPER_weak");
 
   if (!env.PORTAL_DB || typeof env.PORTAL_DB.prepare !== "function" || typeof env.PORTAL_DB.batch !== "function") problems.push("PORTAL_DB");
   return problems;

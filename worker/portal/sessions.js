@@ -32,6 +32,24 @@ export async function startSession(cfg, db, { userId, workosSessionId, authMetho
 }
 
 /**
+ * Sign-in rotation: ALWAYS a brand-new token. If this browser already presented a session cookie, that one session (and only that
+ * one) is revoked with reason "rotated" once the new one exists; the person's other browsers are untouched.
+ */
+export async function rotateSession(request, cfg, db, params, opts = {}) {
+  const started = await startSession(cfg, db, params, opts);
+  if (!started.ok) return started;
+  const old = getCookie(request, SESSION_COOKIE);
+  if (isSessionToken(old)) {
+    try {
+      await store.revokeSession(db, await hashSessionToken(cfg.pepper, old), "rotated", { now: opts.now || new Date() });
+    } catch {
+      /* the new session is valid; a stale old one still expires on its own */
+    }
+  }
+  return started;
+}
+
+/**
  * Who is signed in on this request?
  * @returns {{ok:true, session}|{ok:false, reason:"no_session"|"invalid"|"store_error"}}
  */

@@ -8,7 +8,7 @@ import * as H from "../portal/http.js";
 import { buildLogEntry, logEvent, routeName } from "../portal/log.js";
 import { validateAccessTokenClaims, identityFromWorkosUser } from "../portal/claims.js";
 
-const PEPPER = "p".repeat(40);
+const PEPPER = "Zk3xQ9vB7mLr2TnW8yHcA5dJfG1sPuE4oXiK6bNtMe0";
 const db = { prepare() {}, batch() {} };
 const goodEnv = () => ({
   PORTAL_ENABLED: "1",
@@ -58,6 +58,16 @@ test("config: problems never contain secret values", () => {
   const out = JSON.stringify(portalConfigProblems(env));
   assert.ok(!out.includes("SUPERSECRET") && !out.includes("tooShortPepperValue"));
   assert.ok(portalConfigProblems(env).includes("PORTAL_SESSION_PEPPER_too_short"));
+});
+test("config: the pepper must be at least 32 bytes of encoded randomness (43+ characters) with real variety", () => {
+  const mode = (p) => portalMode({ ...goodEnv(), PORTAL_SESSION_PEPPER: p });
+  assert.equal(mode(PEPPER), "on");
+  assert.deepEqual(portalConfigProblems({ ...goodEnv(), PORTAL_SESSION_PEPPER: PEPPER.slice(0, 42) }), ["PORTAL_SESSION_PEPPER_too_short"]);
+  assert.deepEqual(portalConfigProblems({ ...goodEnv(), PORTAL_SESSION_PEPPER: "A1b2".repeat(11) }), ["PORTAL_SESSION_PEPPER_weak"], "repetitive");
+  assert.deepEqual(portalConfigProblems({ ...goodEnv(), PORTAL_SESSION_PEPPER: "p".repeat(64) }), ["PORTAL_SESSION_PEPPER_weak"]);
+  assert.deepEqual(portalConfigProblems({ ...goodEnv(), PORTAL_SESSION_PEPPER: PEPPER.slice(0, 40) + " ab" }), ["PORTAL_SESSION_PEPPER_weak"], "characters outside base64/hex");
+  assert.equal(mode("0123456789abcdef".repeat(4)), "on", "64 hex characters are fine");
+  assert.equal(mode(Buffer.from(crypto.getRandomValues(new Uint8Array(48))).toString("base64")), "on", "openssl rand -base64 48 style");
 });
 test("config: the production hosts need a second explicit approval flag", () => {
   for (const host of ["https://frameworkco.ca", "https://www.frameworkco.ca"]) {

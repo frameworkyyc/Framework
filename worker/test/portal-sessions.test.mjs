@@ -8,7 +8,7 @@ import * as store from "../portal/repo/sessions.js";
 import * as S from "../portal/sessions.js";
 import { SESSION_COOKIE } from "../portal/http.js";
 
-const PEPPER = "p".repeat(40);
+const PEPPER = "Zk3xQ9vB7mLr2TnW8yHcA5dJfG1sPuE4oXiK6bNtMe0";
 const CFG = Object.freeze({ pepper: PEPPER, origin: "https://staging.frameworkco.ca" });
 const T0 = new Date("2026-10-20T12:00:00.000Z");
 const at = (seconds) => new Date(T0.getTime() + seconds * 1000);
