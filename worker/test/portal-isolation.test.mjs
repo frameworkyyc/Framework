@@ -181,6 +181,7 @@ test("SQL scan: values are always bound; the only interpolations into SQL are th
     'status ? "AND status = ?" : ""',
     "clientVisibleOnly ? \"AND visibility = 'client'\" : \"\"",
     "guard",
+    "ACTIVE", // portal_sessions: the fixed "not revoked, not idle-expired, not past the absolute limit" predicate (user-scoped, see portal-sessions.test.mjs)
   ]);
   const used = new Set();
   for (const { file, sql } of sqlStrings()) for (const m of sql.matchAll(/\$\{([^}]*)\}/g)) {
@@ -195,10 +196,10 @@ test("SQL scan: values are always bound; the only interpolations into SQL are th
   }
 });
 
-test("data layer boundary: Stage 1 contains no routes, sessions, authentication or Cloudflare bindings", () => {
+test("data layer boundary: the repository modules contain no routes, authentication, cookies or Cloudflare bindings", () => {
   for (const f of files) {
     const src = readFileSync(new URL(f, REPO_DIR), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
     assert.ok(!/\b(Request|Response|Headers|fetch|cookie|Set-Cookie|env\.[A-Z_]+|PORTAL_[A-Z_]+|process\.env)\b/.test(src), `${f} reaches outside the data layer`);
   }
-  assert.ok(!files.includes("sessions.js"), "sessions are Stage 2");
+  assert.ok(files.includes("sessions.js"), "the session repository (Stage 2B) lives here, and passes the same boundary check");
 });
