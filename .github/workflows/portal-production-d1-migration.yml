@@ -1,0 +1,105 @@
+# Manually triggered Production portal D1 migration (framework-portal). NOT part of CI: it never runs automatically.
+#   * workflow_dispatch only. Default mode is verify-only (read-only: checks the target, lists pending migrations, lists tables).
+#   * "apply" additionally needs the database name typed exactly. It applies ONLY 0001_portal_foundation.sql, and only into an EMPTY database:
+#     the pre-checks fail closed on any name/id mismatch, any other pending migration, unrecognised output, or any existing portal table.
+#   * Runs in the GitHub environment "production-portal-d1". Required reviewers on that environment are what make a human approve each run;
+#     this file cannot create or verify that protection (see migrations/portal/README.md). The Cloudflare secrets live in that environment only.
+#   * One run at a time (concurrency, never cancelled mid-run). Read-only repository token. Actions pinned to full commit SHAs.
+# Required environment secrets (names only; never put values in the repository): CLOUDFLARE_API_TOKEN (D1 edit only), CLOUDFLARE_ACCOUNT_ID.
+name: Portal Production D1 migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_database:
+        description: "Type the Production database name exactly: framework-portal"
+        required: true
+        type: string
+      mode:
+        description: "verify-only checks and reports; apply also applies 0001_portal_foundation.sql"
+        required: true
+        type: choice
+        default: verify-only
+        options:
+          - verify-only
+          - apply
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-production-d1-migration
+  cancel-in-progress: false
+
+env:
+  WRANGLER_VERSION: "4.151.2"
+  WRANGLER_SEND_METRICS: "false"
+  CONFIG: migrations/portal/wrangler.migrate.production.jsonc
+
+jobs:
+  migrate:
+    name: Verify / apply Production portal D1 migration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production-portal-d1
+    steps:
+      - name: Check the inputs and the branch
+        env:
+          CONFIRM_DATABASE: ${{ inputs.confirm_database }}
+          MODE: ${{ inputs.mode }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$CONFIRM_DATABASE" != "framework-portal" ]; then echo "FAIL: the typed database name does not match."; exit 1; fi
+          if [ "$MODE" != "verify-only" ] && [ "$MODE" != "apply" ]; then echo "FAIL: unknown mode."; exit 1; fi
+          if [ "$REF" != "refs/heads/Staging" ] && [ "$REF" != "refs/heads/main" ]; then echo "FAIL: run this only from Staging or main."; exit 1; fi
+          echo "mode: $MODE"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Check the migration config targets only the Production portal database
+        run: node .github/scripts/portal-d1-check.mjs config "$CONFIG"
+      - name: Verify the remote database name and id
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 info PORTAL_DB --json -c "$CONFIG" > "$RUNNER_TEMP/info.json"
+          node .github/scripts/portal-d1-check.mjs info < "$RUNNER_TEMP/info.json"
+      - name: List pending migrations (before)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations list PORTAL_DB --remote -c "$CONFIG" > "$RUNNER_TEMP/pending-before.txt"
+          node .github/scripts/portal-d1-check.mjs pending-before "$MODE" < "$RUNNER_TEMP/pending-before.txt"
+      - name: List tables (before, read-only)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute PORTAL_DB --remote -c "$CONFIG" --json --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" > "$RUNNER_TEMP/tables-before.json"
+          node .github/scripts/portal-d1-check.mjs tables-before "$MODE" < "$RUNNER_TEMP/tables-before.json"
+      - name: Apply 0001_portal_foundation.sql
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply PORTAL_DB --remote -c "$CONFIG"
+      - name: Verify completion (apply only)
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations list PORTAL_DB --remote -c "$CONFIG" > "$RUNNER_TEMP/pending-after.txt"
+          node .github/scripts/portal-d1-check.mjs pending-after < "$RUNNER_TEMP/pending-after.txt"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute PORTAL_DB --remote -c "$CONFIG" --json --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" > "$RUNNER_TEMP/tables-after.json"
+          node .github/scripts/portal-d1-check.mjs tables-after < "$RUNNER_TEMP/tables-after.json"
+          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute PORTAL_DB --remote -c "$CONFIG" --json --command "SELECT name FROM sqlite_master WHERE type='index' ORDER BY name" > "$RUNNER_TEMP/indexes-after.json"
+          node .github/scripts/portal-d1-check.mjs indexes-after < "$RUNNER_TEMP/indexes-after.json"
