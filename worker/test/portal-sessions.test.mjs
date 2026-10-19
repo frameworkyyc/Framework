@@ -232,13 +232,15 @@ test("createSession refuses bad input and unknown or disabled users", async () =
   assert.equal((await login(db, user)).error, "user_not_active");
   assert.equal(count(db, "portal_sessions"), 0);
 });
-test("a disabled user's existing sessions stop working immediately, even without revocation", async () => {
+test("a disabled user's sessions stop working immediately, are revoked, and never come back when the account is re-enabled", async () => {
   const { db, user } = await setup();
   const r = await login(db, user);
   await repo.setUserStatus(db, user.id, "disabled", { now: at(5) });
   assert.equal((await S.authenticate(reqWith(r.cookie), CFG, db, { now: at(6) })).ok, false);
+  assert.equal(rows(db, "SELECT revoked_reason FROM portal_sessions")[0].revoked_reason, "user_disabled", "revoked at disable time, not merely hidden by the status check");
   await repo.setUserStatus(db, user.id, "active", { now: at(7) });
-  assert.equal((await S.authenticate(reqWith(r.cookie), CFG, db, { now: at(8) })).ok, true, "re-enabling does not need a new login only because nothing was revoked");
+  assert.equal((await S.authenticate(reqWith(r.cookie), CFG, db, { now: at(8) })).ok, false, "re-enabling must not revive the old cookie");
+  assert.equal((await login(db, user, at(9))).ok, true, "a fresh sign-in works");
 });
 test("disableUser: disables and revokes all sessions atomically, leaves other users alone", async () => {
   const { db, user, other } = await setup();

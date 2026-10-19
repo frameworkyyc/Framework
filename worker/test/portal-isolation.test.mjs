@@ -170,6 +170,8 @@ test("SQL scan: every statement on a tenant table names organization_id, or carr
     "housekeeping that closes expired invitations for every organization",
     "lists the signed-in user's OWN memberships for the organization picker",
     "resolves one organization for the signed-in user through THEIR OWN membership",
+    "revokes every active membership of one offboarded user",
+    "revokes the pending invitations addressed to one offboarded user's email",
   ]);
 });
 

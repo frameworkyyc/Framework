@@ -52,10 +52,31 @@ export async function getUserByEmail(db, email) {
   return (await db.prepare(`SELECT ${COLUMNS} FROM portal_users WHERE email = ?`).bind(normalized).first()) || null;
 }
 
-/** active / disabled. (Revoking the user's sessions is the sessions module's job, added in Stage 2.) */
+/**
+ * active / disabled, in ONE atomic batch.
+ *  - disabling also revokes every session of the user (reason "user_disabled"), so the cookies of a disabled account are dead for good;
+ *  - re-enabling first revokes any session that is still unrevoked (reason "user_reenabled"), and only while the user is still disabled, so a
+ *    session that survived a disable done by other means (for example raw SQL) can never come back to life, while re-enabling an
+ *    already-active user signs nobody out.
+ * Memberships are never touched here: re-enabling never restores access to an organization.
+ */
 export async function setUserStatus(db, id, status, { now = new Date() } = {}) {
   requireUserId(id);
   if (!validateEnum(status, USER_STATUSES)) return fail("invalid_status");
-  const res = await db.prepare("UPDATE portal_users SET status = ?, disabled_at = CASE WHEN ? = 'disabled' THEN ? ELSE NULL END WHERE id = ?").bind(status, status, isoTime(now), id).run();
-  return res.meta.changes === 1 ? ok({ user: await getUserById(db, id) }) : fail("not_found");
+  const t = isoTime(now);
+  const disabling = status === "disabled";
+  const results = await db.batch(
+    disabling
+      ? [
+          db.prepare("UPDATE portal_users SET status = 'disabled', disabled_at = COALESCE(disabled_at, ?) WHERE id = ?").bind(t, id),
+          db.prepare("UPDATE portal_sessions SET revoked_at = ?, revoked_reason = 'user_disabled' WHERE user_id = ? AND revoked_at IS NULL").bind(t, id),
+        ]
+      : [
+          db
+            .prepare("UPDATE portal_sessions SET revoked_at = ?, revoked_reason = 'user_reenabled' WHERE user_id = ? AND revoked_at IS NULL AND EXISTS (SELECT 1 FROM portal_users WHERE id = ? AND status = 'disabled')")
+            .bind(t, id, id),
+          db.prepare("UPDATE portal_users SET status = 'active', disabled_at = NULL WHERE id = ?").bind(id),
+        ],
+  );
+  return results[disabling ? 0 : 1].meta.changes === 1 ? ok({ user: await getUserById(db, id) }) : fail("not_found");
 }

@@ -99,6 +99,12 @@ Two independent layers, both Staging only today:
   before the session lookup and without reading the body; a chunked body is cancelled as soon as it crosses the limit.
 * No database counters are used (that would need a migration).
 
+## Emergency offboarding and re-enabling
+Disabling a user (`setUserStatus(…, "disabled")`, `disableUser`) revokes all of that user's sessions in the same atomic step, and re-enabling revokes any
+session that survived, so an old cookie never comes back. `offboardUser` additionally revokes memberships and pending invitations and writes audit entries;
+`reenableUser` never restores memberships. The hand-run version for an emergency is in `migrations/portal-ops/` (SQL plus `README.md` with the
+step-by-step procedure, partial-failure recovery and verification queries). It is not wired to any web route.
+
 ## Settings required (names only)
 
 Staging vars (already in `wrangler.jsonc` `previews.vars`): `PORTAL_BASE_URL`, `PORTAL_AUTH_CLIENT_ID`, `PORTAL_AUTH_ISSUER`.
