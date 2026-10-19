@@ -334,7 +334,7 @@ test("the SQL files are reviewed, narrow and non-destructive", () => {
   }
   assert.ok(!/memberships|invitations/.test(REENABLE_SQL.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n")), "re-enabling never touches memberships or invitations");
   assert.ok(!readdirSync(new URL("../../migrations/portal/", import.meta.url)).some((f) => /offboard|reenable/i.test(f)), "not in the migrations folder wrangler applies");
-  assert.deepEqual(readdirSync(OPS).sort(), ["README.md", "emergency-offboard.sql", "emergency-reenable.sql"]);
+  assert.deepEqual(readdirSync(OPS).filter((f) => f.startsWith("emergency-") || f === "README.md").sort(), ["README.md", "emergency-offboard.sql", "emergency-reenable.sql"], "the emergency files are exactly these two; onboarding runbooks are pinned in portal-onboarding.test.mjs");
 });
 test("the runbook README documents the procedure, partial-failure recovery and verification, and does not claim the console is atomic", () => {
   for (const needle of ["Do not assume the D1 Console is atomic", "partial-failure recovery", "Run the **entire** file", "Verify (read-only)", "unrevoked_sessions", "active_memberships", "pending_invitations", "emergency-reenable.sql", "restores **no** access", "PORTAL_SESSION_PEPPER", "WorkOS", "NOT", "outside the repository"]) assert.ok(README.includes(needle) || README.toLowerCase().includes(needle.toLowerCase()), needle);
