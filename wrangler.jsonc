@@ -38,11 +38,13 @@
   // 503 "storage_not_configured". Staging has its OWN database (framework-staging) so test submissions never mix with
   // Production's framework-feedback. Same binding name (DB), so the code is identical in both. Never swap these IDs.
   "previews": {
-    // Staging logging. Same as Production's observability (invocation logs stay on, so status, timing and errors remain visible),
-    // plus redact_query_string, which removes query strings from request URLs in Workers Logs and traces. Staging sign-in
-    // requests carry ?code= (authorization code) and possibly ?invitation_token=, which must not be retained in platform logs.
-    // Production is deliberately unchanged here; it is decided separately.
-    "observability": { "enabled": true, "redact_query_string": true },
+    // Staging logging. Application logs (console.log/error, including the portal's own request events) and errors stay on.
+    // redact_query_string removes query strings from request URLs in Workers Logs and traces: Staging sign-in requests carry
+    // ?code= (authorization code) and possibly ?invitation_token=, which must not be retained in platform logs.
+    // invocation_logs is OFF because Cloudflare's automatic per-request record keeps request headers (cookies are redacted, but not
+    // Referer), and the WorkOS sign-in callback arrives with a Referer holding a WorkOS AuthKit /success?client_redirect_key=... URL.
+    // Production is deliberately unchanged here; it is decided separately and must be before the portal is ever enabled there.
+    "observability": { "enabled": true, "redact_query_string": true, "logs": { "enabled": true, "invocation_logs": false } },
     // Non-secret runtime settings for Previews. In Wrangler the config file is the source of truth: a plain variable
     // that exists only in the dashboard is deleted on the next deploy, and previews do not inherit top-level `vars`.
     // (Secrets such as RESEND_API_KEY are different: they live in Cloudflare and survive deploys.) The sender address
