@@ -5,13 +5,15 @@
  * Returns null (= "not mine"; worker/index.js then answers portalNotFound(), never the static site) when the portal is off, or the request is not for the portal or not on the
  * portal host. When it IS enabled but misconfigured it fails closed with a generic 503 for portal paths.
  */
-import { portalMode, portalConfigProblems, readPortalConfig } from "./config.js";
+import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled } from "./config.js";
 import { errorPage, newRef, redirect } from "./http.js";
 import { handleLogin, handleCallback, handleLogout } from "./auth.js";
 import { requireSession, requireOrgAccess, dbCall, Unavailable, unavailablePage, notFoundPage } from "./guard.js";
 import { checkRateLimit } from "./ratelimit.js";
 import { logEvent, routeName } from "./log.js";
 import * as pages from "./pages.js";
+import { handleDemo, isDemoPath } from "./demo.js";
+import { viewFilters } from "./filters.js";
 import { listActiveMembershipsForUser, listMembers } from "./repo/memberships.js";
 import { listProjects, getProject } from "./repo/projects.js";
 import { listActivity } from "./repo/activity.js";
@@ -78,7 +80,9 @@ const ORG_ROUTES = [
       return p ? pages.projectPage(ctx, a, p) : notFoundPage(ctx);
     },
   },
-  { re: /^\/portal\/o\/([^/]+)\/activity$/, action: "activity.view", run: async (ctx, a) => pages.activityPage(ctx, a, await listActivity(ctx.db, a.membership.organizationId, { limit: 50 })) },
+  { re: /^\/portal\/o\/([^/]+)\/activity$/, action: "activity.view", run: async (ctx, a) => pages.activityPage(ctx, a, await listActivity(ctx.db, a.membership.organizationId, { limit: 50 }), viewFilters(ctx.url)) },
+  { re: /^\/portal\/o\/([^/]+)\/documents$/, action: "documents.view", run: async (ctx, a) => pages.documentsPage(ctx, a, viewFilters(ctx.url)) },
+  { re: /^\/portal\/o\/([^/]+)\/account$/, action: "account.view", run: async (ctx, a) => pages.accountPage(ctx, a) },
   {
     re: /^\/portal\/o\/([^/]+)\/members$/,
     action: "members.view",
@@ -129,12 +133,18 @@ export async function handlePortal(request, env, deps = {}) {
   const cfg = readPortalConfig(env);
   if (url.origin !== cfg.origin) return null;
 
-  const ctx = { request, env, cfg, db: env.PORTAL_DB, url, now: deps.now || new Date(), fetch: deps.fetch || fetch, ref };
+  const ctx = { request, env, cfg, db: env.PORTAL_DB, url, now: deps.now || new Date(), fetch: deps.fetch || fetch, ref, demo: demoEnabled(env, cfg) };
   const started = Date.now();
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   let response;
   let rl; // the limiter outcome (a fixed word), set only for the limited endpoints; logged on the final `request` event
   try {
+    if (isDemoPath(path)) {
+      // The static demonstration: no session, no database, no cookies, sample data only. Off everywhere except where demoEnabled says so (never a production host).
+      response = ctx.demo ? handleDemo(ctx, path) : errorPage(404, { ref });
+      logEvent({ evt: "request", method: request.method === "GET" || request.method === "HEAD" ? request.method : undefined, route: routeName(path), status: response.status, ms: Date.now() - started, ref });
+      return response;
+    }
     const bucket = LIMITED[path];
     const limited = bucket && !(path === "/portal/login" && request.method === "GET" && url.searchParams.get("start") !== "1"); // the plain login page is free; starting a sign-in is not
     if (limited) {

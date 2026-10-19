@@ -10,6 +10,8 @@ const GRANTS = Object.freeze({
   "org.view": Object.freeze(["owner", "member"]),
   "projects.view": Object.freeze(["owner", "member"]),
   "activity.view": Object.freeze(["owner", "member"]),
+  "documents.view": Object.freeze(["owner", "member"]),
+  "account.view": Object.freeze(["owner", "member"]),
   "members.view": Object.freeze(["owner"]),
 });
 

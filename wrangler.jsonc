@@ -85,7 +85,9 @@
       // The exact token issuer, verified in the live Staging test (it embeds the client id).
       "PORTAL_AUTH_ISSUER": "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED",
       // Switches the client portal on for Staging ONLY. It must never appear in the top-level vars (Production): without it every /portal path answers 404.
-      "PORTAL_ENABLED": "1"
+      "PORTAL_ENABLED": "1",
+      // Serves the static, clearly labelled demo portal at /portal/demo (fictional data, no sign-in, no database). Staging ONLY: never at the top level, and the code also refuses it on the live hosts (worker/portal/config.js demoEnabled).
+      "PORTAL_DEMO": "1"
     },
     "d1_databases": [
       {
