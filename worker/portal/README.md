@@ -20,7 +20,7 @@ never set at the top level, so every `/portal` path is a 404 on Production. The 
 | `auth.js` | `/portal/login`, `/portal/auth/callback`, `/portal/logout` |
 | `guard.js` | `requireSession`, `requireOrgAccess` (membership + org status + role, every request) |
 | `pages.js` | server-rendered HTML, no client script |
-| `ratelimit.js` | optional Workers Rate Limiting binding hook (no binding exists today) |
+| `ratelimit.js` | abuse limiter on sign-in start, callback and sign-out (Workers Rate Limiting binding, Staging only) |
 | `router.js` | route table; the single entry point |
 
 ## Request flow
@@ -60,14 +60,30 @@ Recommended, needs your decision: ask WorkOS support what `client_redirect_key` 
 Worker invocation request logging for the portal (the `observability` `logs.invocation_logs` option; validate with `wrangler` before use)
 or shortening log retention. Neither is changed here.
 
-## Rate limiting (design only)
+## Rate limiting
 
-* Cloudflare WAF on the Free plan: one rate-limiting rule (verified earlier). Suggested single rule: path in
-  (`/portal/login`, `/portal/auth/callback`, `/portal/logout`), per IP, low threshold, block/challenge. No rule has been created.
-* In-Worker option, already coded: if an `env.PORTAL_RATE_LIMITER` Workers Rate Limiting binding exists, `start=1`, callback and
-  logout call `.limit({ key: "<bucket>:<hashed ip>" })`; `429` + `Retry-After` when refused; limiter errors fail OPEN (limiting is abuse
-  mitigation, not authorization). The binding is NOT configured (that edit to `wrangler.jsonc` is for the activation step).
-* No database counters (that would need a migration).
+Two independent layers, both Staging only today:
+
+1. **Cloudflare WAF rate-limiting rule** (dashboard; the Free plan allows one). It runs before the Worker, so blocked requests cost no Worker
+   invocation, database or WorkOS call. It is not part of this repository.
+2. **Workers Rate Limiting binding `PORTAL_RATE_LIMITER`** (`wrangler.jsonc` `previews.ratelimits`, namespace `4101`, **20 requests per 60 seconds**).
+   `worker/portal/ratelimit.js` calls it for `/portal/login?start=1`, `/portal/auth/callback` and `POST /portal/logout` (the plain login page and
+   authenticated browsing are not limited). Each (bucket, client network) has its own counter, so one noisy client or bucket cannot use up another's.
+   * **Runs first:** the check happens before any session, database or WorkOS work; a limited request gets a `429` page with `Retry-After: 60`
+     and a `rate.limited` log line.
+   * **Who is counted:** IPv4 per address, IPv6 per **/64** (IPv4-mapped IPv6 as the IPv4 address). Keys are a keyed hash of that network
+     (`<bucket>:<32 hex>`); the raw address is never stored or logged.
+   * **Missing or invalid `CF-Connecting-IP`** (never happens behind Cloudflare, which sets it): the request is **not limited**. A shared
+     "unknown" bucket would let one unattributable client throttle everyone.
+   * **Fails open:** no binding, a limiter error or an unexpected result means "not limited". The WAF rule stays in front.
+   * **Limits of the binding:** counters are per Cloudflare location and approximate; the period can only be 10 or 60 seconds; `namespace_id`
+     values are shared by every binding with the same id in the account (use a different id for Production when that is ever approved).
+   * **Not verified from the repo:** that Cloudflare applies `previews.ratelimits` in the Preview runtime and that the Free plan includes the binding.
+     Verify after deployment with a small, paced, supervised test (about 25 requests to `/portal/login?start=1` over ~50 seconds, kept under the WAF
+     rule's rate): the first 20 should redirect, the rest return `429`.
+* **Sign-out body bound:** `POST /portal/logout` accepts at most 2048 bytes. A declared oversized or malformed `Content-Length` is refused (`413`/`400`)
+  before the session lookup and without reading the body; a chunked body is cancelled as soon as it crosses the limit.
+* No database counters are used (that would need a migration).
 
 ## Settings required (names only)
 

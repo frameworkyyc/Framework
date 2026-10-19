@@ -151,14 +151,52 @@ export async function handleCallback(ctx) {
 
 /* ------------------------------------------------------------------ POST /portal/logout */
 
+const MAX_FORM_BYTES = 2048; // the sign-out form is one fixed-length token
+
+/** Cheap pre-check from the headers alone: a declared length over the limit (or not a number) is refused before anything is read. */
+function declaredBodyProblem(request) {
+  const declared = request.headers.get("Content-Length");
+  if (declared === null) return null;
+  if (!/^\d{1,12}$/.test(declared.trim())) return 400;
+  return Number(declared) > MAX_FORM_BYTES ? 413 : null;
+}
+
+/**
+ * Read the form body, never more than MAX_FORM_BYTES: the stream is cancelled the moment the limit is crossed, so an oversized or
+ * chunked (no Content-Length) body is never buffered whole. Returns { tooLarge: true } or { value }.
+ */
 async function formValue(request, name) {
-  if (!(request.headers.get("Content-Type") || "").toLowerCase().startsWith("application/x-www-form-urlencoded")) return "";
-  const text = await request.text();
-  return text.length <= 2048 ? new URLSearchParams(text).get(name) || "" : "";
+  if (!(request.headers.get("Content-Type") || "").toLowerCase().startsWith("application/x-www-form-urlencoded")) return { value: "" };
+  if (!request.body) return { value: "" };
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_FORM_BYTES) {
+      await reader.cancel().catch(() => {});
+      return { tooLarge: true };
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    bytes.set(c, at);
+    at += c.byteLength;
+  }
+  return { value: new URLSearchParams(new TextDecoder().decode(bytes)).get(name) || "" };
 }
 
 export async function handleLogout(ctx) {
   if (ctx.request.method !== "POST") return methodNotAllowed(ctx, "POST");
+  const declared = declaredBodyProblem(ctx.request); // before the session lookup: an oversized request costs no database work and its body is never read
+  if (declared) {
+    note(ctx, "auth.logout", "rejected", { reason: "body_too_large", status: declared });
+    return errorPage(declared, { ref: ctx.ref });
+  }
   const same = checkSameSiteMutation(ctx.request, ctx.cfg.origin);
   if (!same.ok) {
     note(ctx, "auth.logout", "rejected", { reason: same.reason, status: 403 });
@@ -169,7 +207,12 @@ export async function handleLogout(ctx) {
     // No usable session: nothing to end. An outage is still reported as one; anything else just goes to sign-in.
     return got.status === 503 ? got : redirect("/portal/login", { cookies: [clearCookie(SESSION_COOKIE)] });
   }
-  if (!(await checkCsrf(ctx.cfg, got.session, await formValue(ctx.request, "csrf")))) {
+  const form = await formValue(ctx.request, "csrf");
+  if (form.tooLarge) {
+    note(ctx, "auth.logout", "rejected", { reason: "body_too_large", status: 413 });
+    return errorPage(413, { ref: ctx.ref });
+  }
+  if (!(await checkCsrf(ctx.cfg, got.session, form.value))) {
     note(ctx, "auth.logout", "rejected", { reason: "csrf", status: 403 });
     return errorPage(403, { ref: ctx.ref });
   }

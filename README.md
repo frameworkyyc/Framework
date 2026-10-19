@@ -213,6 +213,7 @@ A phone-first card to share when meeting people (text, AirDrop, QR code, or an N
 
 * **Reporting vs blocking.** On `Staging` the check reports a result next to each commit, but Cloudflare builds and deploys the push independently, so a red check does not stop a Staging deploy. Always look at the check. Once a GitHub ruleset on `main` requires **Node tests** (a separate, manual setting), nothing can be merged into `main` until it passes, and the Production deploy from `main` only ever receives tested code.
 * **Release process.** Work and test on `Staging`; when it is ready, open a pull request from `Staging` into `main`, wait for **Node tests** to pass, then merge. The portal stays disabled on Production: `PORTAL_ENABLED` exists only in the Preview vars of `wrangler.jsonc`, and the suite fails if it appears anywhere that Production reads.
+* The portal's abuse limiter (`PORTAL_RATE_LIMITER`, 20 requests per 60 seconds) is declared under `previews.ratelimits` only (Staging); see `worker/portal/README.md`.
 * Do not set `PRIVACY_PUBLISH` in CI; it is only for the manual Production publication check described in the Privacy item above.
 
 ## Client portal: routing and activation state

@@ -177,3 +177,30 @@ test("without the secrets the Staging configuration fails closed (503), never ha
   const { env } = makeEnv({ ...wrangler.previews.vars, PORTAL_DB: NO_DB });
   assert.equal((await call(env, STAGING + "/portal/login")).status, 503);
 });
+
+test("STAGING rate limiter via the real wrangler config: the binding the config declares is the one the code uses, and a limited request does no database or WorkOS work", async () => {
+  const name = wrangler.previews.ratelimits[0].name;
+  assert.equal(name, "PORTAL_RATE_LIMITER");
+  const seen = [];
+  const db = { prepare() { seen.push("db"); throw new Error("db touched"); }, batch() { seen.push("db"); throw new Error("db touched"); } };
+  const { env } = makeEnv({ ...wrangler.previews.vars, ...FAKE_SECRETS, PORTAL_DB: db, [name]: { limit: async ({ key }) => { seen.push(key); return { success: false }; } } });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => { seen.push("workos"); throw new Error("network touched"); };
+  try {
+    for (const [path, init] of [["/portal/login?start=1", {}], ["/portal/auth/callback?code=abc&state=def", {}], ["/portal/logout", { method: "POST", body: "csrf=x", headers: { "Content-Type": "application/x-www-form-urlencoded" } }]]) {
+      const res = await call(env, STAGING + path, { ...init, headers: { "CF-Connecting-IP": "2001:db8:1:2::1", ...(init.headers || {}) } });
+      assert.equal(res.status, 429, path);
+      assert.equal(res.headers.get("Retry-After"), "60");
+      assert.equal(res.headers.get("Cache-Control"), "no-store");
+    }
+  } finally { globalThis.fetch = realFetch; }
+  assert.equal(seen.length, 3, "only the three limiter calls happened");
+  assert.ok(seen.every((k) => /^(login|callback|logout):[0-9a-f]{32}$/.test(k)));
+});
+test("PRODUCTION (top-level config) has no limiter binding and never reaches the limiter: every /portal path stays the safe 404", async () => {
+  assert.equal(wrangler.ratelimits, undefined);
+  let called = false;
+  const { env } = makeEnv({ ...wrangler.vars, ...FAKE_SECRETS, PORTAL_DB: NO_DB, PORTAL_RATE_LIMITER: { limit: async () => { called = true; return { success: false }; } } });
+  for (const p of ["/portal/login?start=1", "/portal/auth/callback?code=a&state=b"]) assertSafe404(await call(env, PROD + p, { headers: { "CF-Connecting-IP": "203.0.113.7" } }), p);
+  assert.equal(called, false);
+});

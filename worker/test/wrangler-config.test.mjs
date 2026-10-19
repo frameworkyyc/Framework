@@ -86,7 +86,17 @@ test("the portal is enabled for Staging ONLY: PORTAL_ENABLED is \"1\" in preview
   assert.ok(!("PORTAL_ENABLED" in config.vars), "Production vars do not enable the portal");
   assert.ok(!Object.keys(config.vars).some((k) => k.startsWith("PORTAL_")), "Production vars carry no portal setting at all");
   assert.ok(!code.includes("PORTAL_PROBE") && !code.includes("PORTAL_ALLOW_PRODUCTION"), "no probe flag, and no override that would let the portal run on the live hosts");
-  assert.ok(!/PORTAL_RATE_LIMITER|ratelimits/.test(code));
+});
+
+test("the portal rate limiter binding is Staging-only: previews.ratelimits holds exactly PORTAL_RATE_LIMITER (20 requests per 60 seconds), and Production has none", () => {
+  const code = raw.replace(/^\s*\/\/.*$/gm, "");
+  assert.deepEqual(config.previews.ratelimits, [{ name: "PORTAL_RATE_LIMITER", namespace_id: "4101", simple: { limit: 20, period: 60 } }]);
+  assert.equal(config.ratelimits, undefined, "no top-level (Production) rate-limit binding");
+  assert.equal([...code.matchAll(/ratelimits/g)].length, 1, "declared once");
+  assert.equal([...code.matchAll(/PORTAL_RATE_LIMITER/g)].length, 1);
+  assert.ok(code.indexOf("ratelimits") > code.indexOf('"previews"'), "inside the previews block");
+  assert.ok(!/\bunsafe\b/.test(code), "the supported binding type is used, not the legacy unsafe block");
+  assert.ok([10, 60].includes(config.previews.ratelimits[0].simple.period), "Cloudflare only allows 10 or 60 second periods");
 });
 
 test("the Preview environment has everything the portal needs: PORTAL_DB (Staging portal database) and the non-secret WorkOS settings; secrets are not in the file", () => {

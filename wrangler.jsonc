@@ -82,6 +82,13 @@
         "binding": "PORTAL_FILES",
         "bucket_name": "framework-portal-files-staging"
       }
+    ],
+    // Application-level abuse limiter for the portal's unauthenticated endpoints (worker/portal/ratelimit.js): sign-in start, callback and
+    // sign-out, counted per client network (IPv4 address or IPv6 /64) and bucket, 20 requests per 60 seconds. Staging only: it must never appear
+    // at the top level (Production). It complements, and does not replace, the Cloudflare WAF rate-limiting rule. If the binding is missing the
+    // portal simply does not limit (fails open). namespace_id must be unique in the account (equal ids share counters): use a different one for Production later.
+    "ratelimits": [
+      { "name": "PORTAL_RATE_LIMITER", "namespace_id": "4101", "simple": { "limit": 20, "period": 60 } }
     ]
   }
 }

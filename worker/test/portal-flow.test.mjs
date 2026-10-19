@@ -646,25 +646,132 @@ test("an unexpected internal error becomes a generic 500 with a reference and no
   assert.match(html, /Reference: <strong>/);
 });
 
-/* ------------------------------------------------------------------ rate limiting (design only; binding optional) */
-test("rate limiting: with no binding configured nothing is limited; with one, starting sign-in and the callback are limited, the plain login page is not", async () => {
+/* ------------------------------------------------------------------ rate limiting (Workers binding, Staging only) */
+const IP = { "CF-Connecting-IP": "203.0.113.7" };
+test("rate limiting: with no binding nothing is limited; with one, starting sign-in, the callback and sign-out are limited, the plain login page and browsing are not", async () => {
   const { w } = await acme();
-  for (let i = 0; i < 20; i++) assert.equal((await w.browser().get("/portal/login?start=1")).status, 302);
+  for (let i = 0; i < 20; i++) assert.equal((await w.browser().get("/portal/login?start=1", { headers: IP })).status, 302);
   const keys = [];
   w.env.PORTAL_RATE_LIMITER = { limit: async ({ key }) => { keys.push(key); return { success: false }; } };
   const b = w.browser();
-  assert.equal((await b.get("/portal/login")).status, 200, "interstitial is free");
-  const limited = await b.get("/portal/login?start=1", { headers: { "CF-Connecting-IP": "203.0.113.7" } });
+  assert.equal((await b.get("/portal/login", { headers: IP })).status, 200, "interstitial is free");
+  const limited = await b.get("/portal/login?start=1", { headers: IP });
   assert.equal(limited.status, 429);
   assert.equal(limited.headers.get("Retry-After"), "60");
-  assert.equal((await b.get("/portal/auth/callback?code=a&state=b")).status, 429);
-  assert.equal((await b.post("/portal/logout", { csrf: "x" })).status, 429);
-  assert.equal((await b.get("/portal/o/acme")).status, 303, "authenticated browsing is not rate limited here");
-  assert.ok(keys.length >= 3 && keys.every((k) => /^(login|callback|logout):([0-9a-f]{32}|unknown)$/.test(k)) && !keys.join().includes("203.0.113.7"), "keys are hashed");
+  assert.equal((await b.get("/portal/auth/callback?code=a&state=b", { headers: IP })).status, 429);
+  assert.equal((await b.post("/portal/logout", { csrf: "x" }, IP)).status, 429);
+  assert.equal((await b.get("/portal/o/acme", { headers: IP })).status, 303, "authenticated browsing is not rate limited here");
+  assert.equal(keys.length, 3);
+  assert.ok(keys.every((k) => /^(login|callback|logout):[0-9a-f]{32}$/.test(k)) && !keys.join().includes("203.0.113.7"), "keys are hashed");
+  assert.equal(new Set(keys).size, 3, "each bucket counts separately");
   w.env.PORTAL_RATE_LIMITER = { limit: async () => { throw new Error("limiter down"); } };
-  assert.equal((await w.browser().get("/portal/login?start=1")).status, 302, "a limiter failure does not lock people out");
+  assert.equal((await w.browser().get("/portal/login?start=1", { headers: IP })).status, 302, "a limiter failure does not lock people out");
   w.env.PORTAL_RATE_LIMITER = { limit: async () => ({ success: true }) };
-  assert.equal((await w.browser().get("/portal/login?start=1")).status, 302);
+  assert.equal((await w.browser().get("/portal/login?start=1", { headers: IP })).status, 302);
+});
+test("rate limiting: a limited request is rejected BEFORE any database or WorkOS work", async () => {
+  const { w } = await acme();
+  const touched = [];
+  w.env.PORTAL_DB = { prepare: (sql) => { touched.push("db"); throw new Error("db touched: " + sql); }, batch: async () => { touched.push("db"); throw new Error("db touched"); } };
+  w.env.PORTAL_RATE_LIMITER = { limit: async () => ({ success: false }) };
+  const realFetch = w.workos.fetch;
+  w.workos.fetch = async () => { touched.push("workos"); throw new Error("workos touched"); };
+  const b = w.browser();
+  b.jar.set("__Host-fw_portal", "A".repeat(43)); // a well-formed session cookie would normally cost a database read
+  b.jar.set("__Host-fw_auth", "x.y");
+  for (const [path, method] of [["/portal/login?start=1", "GET"], ["/portal/auth/callback?code=abc&state=" + "s".repeat(43), "GET"], ["/portal/logout", "POST"]]) {
+    const res = await b.send(path, { method, headers: { ...IP, ...(method === "POST" ? { "Content-Type": "application/x-www-form-urlencoded" } : {}) }, body: method === "POST" ? "csrf=x" : undefined });
+    assert.equal(res.status, 429, path);
+    assert.match(await res.text(), /Too many attempts/);
+  }
+  w.workos.fetch = realFetch;
+  assert.deepEqual(touched, []);
+});
+test("rate limiting: IPv6 clients are counted per /64; IPv4 per address; no usable address means no limiting (never a shared bucket)", async () => {
+  const { w } = await acme();
+  const keys = [];
+  w.env.PORTAL_RATE_LIMITER = { limit: async ({ key }) => { keys.push(key); return { success: true }; } };
+  const start = (ip) => w.browser().get("/portal/login?start=1", ip === undefined ? {} : { headers: { "CF-Connecting-IP": ip } });
+  for (const ip of ["2001:db8:1:2::1", "2001:db8:1:2:ffff:ffff:ffff:ffff", "2001:DB8:1:2:0:0:0:9"]) await start(ip);
+  assert.equal(new Set(keys).size, 1, "three addresses in one /64 share one counter");
+  await start("2001:db8:1:3::1");
+  assert.equal(new Set(keys).size, 2, "a different /64 is a different client");
+  const before = keys.length;
+  for (const bad of [undefined, "", "unknown", "not-an-ip", "999.1.1.1", "::", "::1", "1.2.3"]) assert.equal((await start(bad)).status, 302, String(bad));
+  assert.equal(keys.length, before, "unattributable requests are not put in a shared bucket (the limiter is not even consulted)");
+  assert.ok(!keys.join().match(/2001|db8|203\./i), "no raw address in any key");
+});
+test("rate limiting: no raw address reaches the logs", async () => {
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => lines.push(a.join(" "));
+  try {
+    const { w } = await acme();
+    w.env.PORTAL_RATE_LIMITER = { limit: async () => ({ success: false }) };
+    await w.browser().get("/portal/login?start=1", { headers: { "CF-Connecting-IP": "2001:db8:abcd:1234::1" } });
+    await w.browser().get("/portal/login?start=1", { headers: IP });
+  } finally { console.log = orig; }
+  const all = lines.join("\n");
+  assert.match(all, /"evt":"rate.limited"/);
+  assert.ok(!/2001|db8|abcd|203\.0\.113/.test(all));
+});
+
+/* ------------------------------------------------------------------ logout request-body bound */
+const streamBody = (chunks, stats) => new ReadableStream({
+  pull(controller) {
+    if (stats.i >= chunks.length) return controller.close();
+    stats.pulled += chunks[stats.i].length;
+    controller.enqueue(chunks[stats.i++]);
+  },
+}, { highWaterMark: 0 }); // nothing is pulled until a reader asks for it
+test("logout: a declared oversized body is refused without reading it or touching the database", async () => {
+  const { w } = await acme();
+  const b = await signedIn(w, ALICE(w), null);
+  const stats = { i: 0, pulled: 0 };
+  const big = new TextEncoder().encode("csrf=" + "a".repeat(100000));
+  const touched = [];
+  const real = w.env.PORTAL_DB;
+  w.env.PORTAL_DB = { prepare: (s) => { touched.push(s); return real.prepare(s); }, batch: (x) => real.batch(x) };
+  const req = new Request("https://staging.frameworkco.ca/portal/logout", {
+    method: "POST", body: streamBody([big], stats), duplex: "half",
+    headers: { Cookie: b.cookieHeader(), "Content-Type": "application/x-www-form-urlencoded", "Content-Length": String(big.length), "Sec-Fetch-Site": "same-origin", Origin: "null" },
+  });
+  const res = await handlePortal(req, w.env, { now: w.clock.now(), fetch: w.workos.fetch });
+  assert.equal(res.status, 413);
+  assert.equal(stats.pulled, 0, "not a byte of the body was read");
+  assert.deepEqual(touched, [], "no database work");
+  assert.equal(count(w.db, "portal_sessions", "revoked_at IS NULL"), 1, "the session is untouched");
+});
+test("logout: a chunked (no Content-Length) oversized body is cut off as soon as the limit is crossed", async () => {
+  const { w } = await acme();
+  const b = await signedIn(w, ALICE(w), null);
+  const stats = { i: 0, pulled: 0 };
+  const chunks = Array.from({ length: 500 }, () => new TextEncoder().encode("x".repeat(1024)));
+  const req = new Request("https://staging.frameworkco.ca/portal/logout", {
+    method: "POST", body: streamBody(chunks, stats), duplex: "half",
+    headers: { Cookie: b.cookieHeader(), "Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Site": "same-origin", Origin: "null" },
+  });
+  const res = await handlePortal(req, w.env, { now: w.clock.now(), fetch: w.workos.fetch });
+  assert.equal(res.status, 413);
+  assert.ok(stats.pulled <= 4096, "read at most a few chunks, not the whole 500 KB: " + stats.pulled);
+  assert.equal(count(w.db, "portal_sessions", "revoked_at IS NULL"), 1);
+});
+test("logout: malformed Content-Length is refused; a normal form still signs out; an exactly-at-limit body is accepted", async () => {
+  const { w } = await acme();
+  const b = await signedIn(w, ALICE(w), null);
+  const csrf = csrfOf(await text(await b.get("/portal/o/acme")));
+  for (const cl of ["abc", "-5", "1e9", "12 34"]) {
+    const res = await handlePortal(new Request("https://staging.frameworkco.ca/portal/logout", { method: "POST", body: "csrf=" + csrf, headers: { Cookie: b.cookieHeader(), "Content-Type": "application/x-www-form-urlencoded", "Content-Length": cl, "Sec-Fetch-Site": "same-origin" } }), w.env, { now: w.clock.now(), fetch: w.workos.fetch }).catch(() => null);
+    if (res) assert.ok([400, 413].includes(res.status), cl + " -> " + res.status);
+  }
+  assert.equal(count(w.db, "portal_sessions", "revoked_at IS NULL"), 1);
+  const padded = "csrf=" + csrf + "&pad=" + "p".repeat(2048 - ("csrf=" + csrf + "&pad=").length);
+  assert.equal(padded.length, 2048);
+  const ok = await b.send("/portal/logout", { method: "POST", body: padded, headers: { "Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Site": "same-origin", Origin: "null" } });
+  assert.equal(ok.status, 303, "2048 bytes is allowed");
+  const b2 = await signedIn(w, ALICE(w), null);
+  const csrf2 = csrfOf(await text(await b2.get("/portal/o/acme")));
+  assert.equal((await b2.send("/portal/logout", { method: "POST", body: "csrf=" + csrf2 + "&pad=" + "p".repeat(2048), headers: { "Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Site": "same-origin", Origin: "null" } })).status, 413, "2049+ bytes is refused");
 });
 
 /* ------------------------------------------------------------------ privacy: logs */

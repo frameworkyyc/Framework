@@ -144,6 +144,7 @@ const ERROR_COPY = {
   403: ["Request refused", "This request was not accepted. Please go back and try again."],
   404: ["Page not found", "We couldn’t find that page."],
   405: ["Not available", "That action isn’t available here."],
+  413: ["Request too large", "That request was too large to accept."],
   429: ["Too many attempts", "Please wait a moment and try again."],
   500: ["Something went wrong", "We hit a problem on our side. Please try again in a moment."],
   502: ["Sign-in service unavailable", "We couldn’t reach the sign-in service. Please try again in a moment."],
