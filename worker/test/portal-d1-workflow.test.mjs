@@ -27,7 +27,8 @@ test("inputs reach the shell only through env vars (no expression injection) and
   for (const m of code.matchAll(/run: \|?[^\n]*\n((?:\s{10,}[^\n]*\n?)*)/g)) assert.ok(!/\$\{\{/.test(m[1]), "no ${{ }} inside a run script");
   assert.ok(!/run:[^\n]*\$\{\{/.test(code));
   assert.match(code, /CONFIRM_DATABASE" != "framework-portal"/);
-  assert.match(code, /REF" != "refs\/heads\/Staging"[\s\S]*REF" != "refs\/heads\/main"/);
+  assert.match(code, /REF" != "refs\/heads\/Staging"\ \]; then echo "FAIL: run this only with ref Staging/);
+  assert.ok(!/refs\/heads\/main/.test(code), "main has no migration config; the run is refused there");
   const firstRun = code.indexOf("run: |"), checkout = code.indexOf("actions/checkout");
   assert.ok(firstRun > 0 && firstRun < checkout, "the input check runs before checkout and before any Cloudflare call");
 });
@@ -42,12 +43,14 @@ test("actions are on the allow-list and pinned to full SHAs; Wrangler is pinned 
   assert.equal(uses.length, 2);
   for (const u of uses) assert.match(u, /^actions\/(checkout|setup-node)@[0-9a-f]{40}$/, u);
   assert.match(code, /persist-credentials: false/);
-  assert.match(code, /WRANGLER_VERSION: "\d+\.\d+\.\d+"/);
-  assert.ok(!/wrangler@(latest|\^|~|\*)/.test(code));
-  for (const line of code.split("\n").filter((l) => /\bwrangler@/.test(l))) assert.match(line, /wrangler@\$WRANGLER_VERSION/);
+  assert.match(code, /WRANGLER_VERSION: "4\.147\.0"/, "an exact version published more than two weeks before this workflow was written");
+  assert.ok(!/wrangler@(latest|\^|~|\*)/.test(code) && !/\bnpx\b/.test(code));
+  const installs = code.split("\n").filter((l) => /\bwrangler@/.test(l));
+  assert.equal(installs.length, 1);
+  assert.match(installs[0], /npm install --prefix "\$RUNNER_TEMP\/wrangler" --ignore-scripts --no-audit --no-fund --no-save "wrangler@\$WRANGLER_VERSION"/);
 });
 test("every Wrangler call targets the Production config explicitly; PORTAL_DB only; remote calls say --remote", () => {
-  const calls = code.split("\n").filter((l) => /wrangler@/.test(l));
+  const calls = code.split("\n").filter((l) => l.includes('"$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler"'));
   assert.equal(calls.length, 7);
   for (const c of calls) {
     assert.match(c, /-c "\$CONFIG"/, c);
@@ -57,6 +60,19 @@ test("every Wrangler call targets the Production config explicitly; PORTAL_DB on
   assert.match(code, /CONFIG: migrations\/portal\/wrangler\.migrate\.production\.jsonc/);
   assert.ok(!/wrangler\.jsonc|wrangler\.migrate\.staging|framework-portal-staging|framework-staging|framework-feedback|47d90f94|1edda8a2|c4815cdc/.test(code));
   assert.ok(!/\bdeploy\b|wrangler (versions|publish|secret|r2|kv|delete)|d1 (delete|create|time-travel)/.test(code));
+});
+test("YAML hygiene: no inline run value starts with a quote (it would parse as a truncated string)", () => {
+  assert.ok(!/^\s*run:\s*["']/m.test(code));
+  assert.ok(!/\t/.test(raw));
+  for (const m of code.matchAll(/^(\s*)run: (\|)?\s*$/gm)) assert.equal(m[2], "|");
+});
+test("Wrangler is installed before any secret is exposed, in a step that has none; no secret-bearing step installs anything", () => {
+  const steps = code.split(/\n      - /).slice(1);
+  const install = steps.findIndex((s) => /npm install/.test(s));
+  const firstSecret = steps.findIndex((s) => /secrets\./.test(s));
+  assert.ok(install >= 0 && firstSecret > install);
+  assert.ok(!/secrets\./.test(steps[install]));
+  for (const s of steps.filter((x) => /secrets\./.test(x))) assert.ok(!/npm |npx |node_modules\/\.bin\/(?!wrangler)/.test(s) || !/install/.test(s));
 });
 test("the only SQL the workflow sends is read-only schema introspection; apply happens in exactly one step, only in apply mode", () => {
   const commands = [...code.matchAll(/--command "([^"]*)"/g)].map((m) => m[1]);

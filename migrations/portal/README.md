@@ -71,7 +71,8 @@ It is `workflow_dispatch` only, so nothing runs until someone starts it from the
 exactly (`framework-portal`) and a mode, **verify-only** (default; read-only) or **apply**. It fails closed on a name/id mismatch, on any pending
 migration other than `0001_portal_foundation.sql`, on output it cannot read, and (for apply) if the database already has portal tables.
 After an apply it checks that nothing is pending and that exactly the 7 tables and 13 indexes listed in the migration exist. Only one run can
-be active at a time.
+be active at a time. It refuses any ref except `Staging` (the migration config and SQL live there); Wrangler is installed in a step
+without secrets, with install scripts disabled, at an exact pinned version.
 
 **Before it can be used (a person does these; the repository cannot):**
 1. Create the GitHub environment `production-portal-d1` and add **required reviewers**. This needs a public repository or a GitHub plan that
