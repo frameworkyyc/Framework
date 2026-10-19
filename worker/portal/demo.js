@@ -13,7 +13,7 @@ import * as views from "./views.js";
 export const DEMO_BASE = "/portal/demo";
 export const isDemoPath = (p) => p === DEMO_BASE || p.startsWith(DEMO_BASE + "/");
 
-const BANNER = `<div class="demo-banner" role="note"><div class="wrap"><span><strong>Demonstration</strong> &nbsp;Sample data for a fictional client. Nothing here is real, saved or connected to your account.</span><a href="/portal/login">Go to sign-in</a></div></div>`;
+const BANNER = `<div class="demo-banner" role="note"><div class="wrap"><span><strong>Demo mode</strong> · Fictional client data</span><a href="/portal/login">Go to sign-in</a></div></div>`;
 const ACTIONS = `<a class="btn btn--small" href="/portal/login">Sign in</a>`;
 
 /** @param ctx {request, now, ref}  @param path the normalized request path */
