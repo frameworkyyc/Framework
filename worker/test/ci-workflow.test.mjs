@@ -9,8 +9,8 @@ const raw = readFileSync(new URL(".github/workflows/ci.yml", root), "utf8");
 const code = raw.replace(/^\s*#.*$/gm, "").replace(/\s+#\s.*$/gm, ""); // comments removed (full-line and trailing)
 const lines = code.split("\n");
 
-test("CI is the only workflow, and .node-version pins Node 22", () => {
-  assert.deepEqual(readdirSync(new URL(".github/workflows/", root)).sort(), ["ci.yml"], "a new workflow must be reviewed on purpose (update this test with it)");
+test("CI plus the one reviewed manual Production D1 migration workflow exist, and .node-version pins Node 22", () => {
+  assert.deepEqual(readdirSync(new URL(".github/workflows/", root)).sort(), ["ci.yml", "portal-production-d1-migration.yml"], "a new workflow must be reviewed on purpose (update this test with it)");
   assert.equal(readFileSync(new URL(".node-version", root), "utf8").trim(), "22");
   assert.match(code, /node-version-file: \.node-version/);
   assert.ok(!/^\s*node-version:/m.test(code), "one source of truth for the Node version");

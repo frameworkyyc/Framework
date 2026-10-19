@@ -64,6 +64,25 @@ npx wrangler d1 execute PORTAL_DB --remote -c migrations/portal/wrangler.migrate
 step 1 lists anything other than `0001_portal_foundation.sql`, or if a command was run without `-c`. If a migration fails part-way, do
 not re-run it blindly: check the tables, then restore from the Time Travel bookmark if the database is in doubt.
 
+### Optional: apply through the manual GitHub Actions workflow
+
+`.github/workflows/portal-production-d1-migration.yml` ("Portal Production D1 migration") runs the same checks and the same apply from GitHub.
+It is `workflow_dispatch` only, so nothing runs until someone starts it from the Actions tab. It has two inputs: the database name typed
+exactly (`framework-portal`) and a mode, **verify-only** (default; read-only) or **apply**. It fails closed on a name/id mismatch, on any pending
+migration other than `0001_portal_foundation.sql`, on output it cannot read, and (for apply) if the database already has portal tables.
+After an apply it checks that nothing is pending and that exactly the 7 tables and 13 indexes listed in the migration exist. Only one run can
+be active at a time.
+
+**Before it can be used (a person does these; the repository cannot):**
+1. Create the GitHub environment `production-portal-d1` and add **required reviewers**. This needs a public repository or a GitHub plan that
+   supports environment protection on private repositories; check Settings > Environments after creating it. Without reviewers the typed
+   confirmation is the only gate.
+2. In that environment (not as repository secrets) add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. The token should be a custom token
+   limited to this account with **D1: Edit** only. Cloudflare cannot restrict a D1 token to one database, so treat it as powerful: delete it
+   (or expire it) after the migration.
+3. Run **verify-only** first, read the log, then run **apply**. Record a Time Travel bookmark afterwards. Wrangler also takes its own backup
+   when it applies, and skips its interactive prompt in CI, so the approval gate is the environment reviewers, not Wrangler.
+
 ## Rules for future migrations
 
 Forward-only and additive; one numbered file each; no BEGIN/COMMIT, PRAGMA or triggers (D1); every tenant-owned table gets a NOT NULL
