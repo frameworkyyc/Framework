@@ -1,5 +1,5 @@
-// Client portal "Commit 1: wiring only". The router is connected to the Worker and the Phase 0 probe is gone, but the portal is NOT
-// enabled anywhere: every /portal path answers an explicit 404 until a separately approved activation adds PORTAL_ENABLED to the Preview vars.
+// Client portal wiring. The router is connected to the Worker and the Phase 0 probe is gone. The portal is enabled for STAGING only
+// (PORTAL_ENABLED in previews.vars); everywhere else every /portal path answers an explicit 404.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -35,9 +35,11 @@ test("only the Worker entry point and portal modules import the portal modules",
   walk("worker/");
   assert.deepEqual(offenders, []);
 });
-test("the portal is not enabled in configuration: no PORTAL_ENABLED, no Production override, no rate-limit binding", () => {
+test("configuration: PORTAL_ENABLED only in previews.vars, no Production override, no probe flag, no rate-limit binding", () => {
   const cfg = code("wrangler.jsonc");
-  assert.ok(!/PORTAL_ENABLED|PORTAL_ALLOW_PRODUCTION|PORTAL_PROBE/.test(cfg));
+  assert.equal([...cfg.matchAll(/PORTAL_ENABLED/g)].length, 1);
+  assert.ok(cfg.indexOf("PORTAL_ENABLED") > cfg.indexOf('"previews"'));
+  assert.ok(!/PORTAL_ALLOW_PRODUCTION|PORTAL_PROBE/.test(cfg));
   assert.ok(!/PORTAL_RATE_LIMITER|ratelimits|unsafe/.test(cfg));
   assert.match(cfg, /"run_worker_first": \["\/api\/\*", "\/admin", "\/admin\/\*", "\/card", "\/portal", "\/portal\/\*"\]/);
 });

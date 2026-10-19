@@ -2,6 +2,7 @@
 // /portal path; every other route keeps behaving as before. Uses a fake ASSETS binding; nothing touches a network or database.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import worker from "../index.js";
 
 const PROD = "https://frameworkco.ca";
@@ -61,7 +62,7 @@ test("every way of leaving the portal switched off gives the same 404, even on t
     assert.equal(assetCalls.length, 0);
   }
 });
-test("STAGING as configured today (settings present, PORTAL_ENABLED absent): inaccessible, database untouched", async () => {
+test("a Staging-shaped environment WITHOUT PORTAL_ENABLED is inaccessible and never touches the database", async () => {
   const { env } = makeEnv(stagingEnv());
   for (const p of PORTAL_PATHS) assertSafe404(await call(env, STAGING + p), p);
 });
@@ -142,4 +143,37 @@ test("the digital business card route is still handled by its own module", async
   const prod = await call(env, PROD + "/card");
   assert.equal(prod.status, 200);
   assert.ok(!/noindex/.test(prod.headers.get("X-Robots-Tag") || ""), "production card unchanged");
+});
+
+/* ------------------------------------------------------------------ the real wrangler.jsonc, as each environment would receive it */
+const wrangler = JSON.parse(readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""));
+const FAKE_SECRETS = { PORTAL_AUTH_CLIENT_SECRET: "sk_test_FAKE", PORTAL_SESSION_PEPPER: PEPPER };
+const NO_DB = { prepare() { throw new Error("db must not be touched"); }, batch() { throw new Error("db must not be touched"); } };
+
+test("PRODUCTION as the config really defines it (top-level vars, even with the secrets present): every /portal path is a safe 404", async () => {
+  const { env, assetCalls } = makeEnv({ ...wrangler.vars, ...FAKE_SECRETS, PORTAL_DB: NO_DB });
+  assert.equal(env.PORTAL_ENABLED, undefined);
+  for (const host of [PROD, "https://www.frameworkco.ca"]) for (const p of PORTAL_PATHS) assertSafe404(await call(env, host + p), host + p);
+  assert.equal(assetCalls.length, 0);
+});
+test("STAGING as the config really defines it (previews.vars + secrets + PORTAL_DB): the portal is on, only for the Staging host", async () => {
+  const { env } = makeEnv({ ...wrangler.previews.vars, ...FAKE_SECRETS, PORTAL_DB: NO_DB });
+  assert.equal(env.PORTAL_ENABLED, "1");
+  const login = await call(env, STAGING + "/portal/login");
+  assert.equal(login.status, 200);
+  assert.match(await login.text(), /Sign in/);
+  assert.equal(login.headers.get("Cache-Control"), "no-store");
+  const start = await call(env, STAGING + "/portal/login?start=1");
+  assert.equal(start.status, 302);
+  const to = new URL(start.headers.get("Location"));
+  assert.equal(to.origin + to.pathname, "https://api.workos.com/user_management/authorize");
+  assert.equal(to.searchParams.get("client_id"), wrangler.previews.vars.PORTAL_AUTH_CLIENT_ID);
+  assert.equal(to.searchParams.get("redirect_uri"), STAGING + "/portal/auth/callback");
+  assert.ok(!start.headers.get("Location").includes("FAKE"), "the API key never appears in the redirect");
+  for (const host of [PROD, "https://www.frameworkco.ca", "https://framework.example.workers.dev"]) assertSafe404(await call(env, host + "/portal/login"), host);
+  assert.equal((await call(env, STAGING + "/portal/o/anything")).status, 303, "unauthenticated organization routes go to sign-in");
+});
+test("without the secrets the Staging configuration fails closed (503), never half-works", async () => {
+  const { env } = makeEnv({ ...wrangler.previews.vars, PORTAL_DB: NO_DB });
+  assert.equal((await call(env, STAGING + "/portal/login")).status, 503);
 });

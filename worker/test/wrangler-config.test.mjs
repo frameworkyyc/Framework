@@ -43,10 +43,10 @@ test("the Production ID appears exactly once in the file (never inside the previ
   assert.ok(!JSON.stringify(config.previews).includes("framework-feedback"));
 });
 
-test("Production (top-level vars) and Staging (previews.vars) each carry the sender and the same public Turnstile site key; Staging adds the portal settings (and does NOT enable the portal yet)", () => {
+test("Production (top-level vars) and Staging (previews.vars) each carry the sender and the same public Turnstile site key; Staging adds the portal settings and enables the portal", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
   assert.deepEqual(config.vars, shared);
-  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED" });
+  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1" });
 });
 
 test("the verified WorkOS issuer is pinned and belongs to the configured client id (not the bare api.workos.com base)", () => {
@@ -78,11 +78,24 @@ test("shared routes: the existing worker routes are unchanged and /portal + /por
   assert.ok(!config.assets.run_worker_first.some((p) => p === "/*" || p === "/portal/login"), "no catch-all, no leftover probe paths");
 });
 
-test("the portal is NOT enabled anywhere in the configuration (no PORTAL_ENABLED, no probe flag, no Production override)", () => {
+test("the portal is enabled for Staging ONLY: PORTAL_ENABLED is \"1\" in previews.vars and exists nowhere else", () => {
   const code = raw.replace(/^\s*\/\/.*$/gm, "");
-  assert.ok(!("PORTAL_ENABLED" in config.previews.vars) && !("PORTAL_ENABLED" in config.vars));
-  assert.ok(!code.includes("PORTAL_ENABLED") && !code.includes("PORTAL_PROBE") && !code.includes("PORTAL_ALLOW_PRODUCTION"));
+  assert.equal(config.previews.vars.PORTAL_ENABLED, "1");
+  assert.equal([...code.matchAll(/PORTAL_ENABLED/g)].length, 1, "exactly one occurrence in the whole file");
+  assert.ok(code.indexOf("PORTAL_ENABLED") > code.indexOf('"previews"'), "and it is inside the previews block");
+  assert.ok(!("PORTAL_ENABLED" in config.vars), "Production vars do not enable the portal");
   assert.ok(!Object.keys(config.vars).some((k) => k.startsWith("PORTAL_")), "Production vars carry no portal setting at all");
+  assert.ok(!code.includes("PORTAL_PROBE") && !code.includes("PORTAL_ALLOW_PRODUCTION"), "no probe flag, and no override that would let the portal run on the live hosts");
+  assert.ok(!/PORTAL_RATE_LIMITER|ratelimits/.test(code));
+});
+
+test("the Preview environment has everything the portal needs: PORTAL_DB (Staging portal database) and the non-secret WorkOS settings; secrets are not in the file", () => {
+  assert.deepEqual(config.previews.d1_databases.find((d) => d.binding === "PORTAL_DB"), PORTAL_STAGING);
+  const v = config.previews.vars;
+  assert.match(v.PORTAL_AUTH_CLIENT_ID, /^client_/);
+  assert.equal(v.PORTAL_BASE_URL, "https://staging.frameworkco.ca");
+  assert.equal(v.PORTAL_AUTH_ISSUER, "https://api.workos.com/user_management/" + v.PORTAL_AUTH_CLIENT_ID);
+  assert.ok(!config.d1_databases.some((d) => d.binding === "PORTAL_DB"), "Production has no portal database");
 });
 
 test("the sender is a valid From value that the Worker accepts as-is (no correction needed)", () => {
@@ -95,7 +108,7 @@ test("the sender is a valid From value that the Worker accepts as-is (no correct
 });
 
 test("only whitelisted NON-secret names may ever appear under vars", () => {
-  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID"]);
+  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED"]);
   for (const vars of [config.vars, config.previews.vars]) for (const name of Object.keys(vars)) assert.ok(allowed.has(name), name + " is not an approved non-secret variable");
 });
 
