@@ -224,3 +224,43 @@ test("the migration-only Wrangler config targets the STAGING portal database and
   for (const forbidden of ["47d90f94-3846-4711-9495-ab3479431a6f", "c4815cdc-8948-4561-92a3-65e4860cdb94", "framework-feedback", "framework-staging\""]) assert.ok(!code.includes(forbidden), "must not reference " + forbidden);
   assert.ok(!/secret|sk_|token/i.test(code));
 });
+
+const migrationConfig = (name) => {
+  const raw = readFileSync(new URL(name, MIGRATIONS_DIR), "utf8");
+  return { raw, code: raw.replace(/^\s*\/\/.*$/gm, ""), cfg: JSON.parse(raw.replace(/^\s*\/\/.*$/gm, "")) };
+};
+
+test("the migration-only Wrangler config targets the PRODUCTION portal database and nothing else", () => {
+  const { code, cfg } = migrationConfig("wrangler.migrate.production.jsonc");
+  assert.equal(cfg.name, "framework-portal-migrations-production");
+  assert.deepEqual(cfg.d1_databases, [{ binding: "PORTAL_DB", database_name: "framework-portal", database_id: "b213b7db-ed29-4ab6-946c-0728dd6709e8", migrations_dir: "." }]);
+  for (const k of ["main", "vars", "assets", "r2_buckets", "ratelimits", "previews", "kv_namespaces", "routes"]) assert.equal(cfg[k], undefined, k);
+  for (const forbidden of ["47d90f94-3846-4711-9495-ab3479431a6f", "c4815cdc-8948-4561-92a3-65e4860cdb94", "1edda8a2-5249-4f40-9dbc-d29aa44e21f8", "framework-feedback", "framework-staging", "framework-portal-staging"]) assert.ok(!code.includes(forbidden), "must not reference " + forbidden);
+  assert.ok(!/secret|sk_|token|client_/i.test(code));
+});
+
+test("the Production and Staging migration configs target different databases (name, id, worker name) with the same binding and directory", () => {
+  const prod = migrationConfig("wrangler.migrate.production.jsonc").cfg, stag = migrationConfig("wrangler.migrate.staging.jsonc").cfg;
+  const [p] = prod.d1_databases, [s] = stag.d1_databases;
+  assert.equal(prod.d1_databases.length, 1);
+  assert.equal(stag.d1_databases.length, 1);
+  assert.equal(p.binding, s.binding);
+  assert.equal(p.migrations_dir, s.migrations_dir);
+  assert.notEqual(p.database_id, s.database_id);
+  assert.notEqual(p.database_name, s.database_name);
+  assert.notEqual(prod.name, stag.name);
+  // and neither is the database the main wrangler.jsonc binds for the feedback data or for Staging's DB binding
+  const main = JSON.parse(readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""));
+  const others = [...main.d1_databases, ...main.previews.d1_databases.filter((d) => d.binding === "DB")].map((d) => d.database_id);
+  for (const id of [p.database_id, s.database_id]) assert.ok(!others.includes(id));
+});
+
+test("the migrations README documents the Production procedure with its safeguards", () => {
+  const readme = readFileSync(new URL("README.md", MIGRATIONS_DIR), "utf8");
+  for (const needle of ["wrangler.migrate.production.jsonc", "b213b7db-ed29-4ab6-946c-0728dd6709e8", "VERIFY THE TARGET", "d1 info PORTAL_DB", "migrations list PORTAL_DB --remote -c migrations/portal/wrangler.migrate.production.jsonc", "migrations apply PORTAL_DB --remote -c migrations/portal/wrangler.migrate.production.jsonc", "Stop and do not apply", "never run these commands without `-c`", "already been recorded"]) assert.ok(readme.includes(needle), needle);
+  const prodSection = readme.slice(readme.indexOf("## Apply to the Production portal database"), readme.indexOf("## Rules for future migrations"));
+  const commands = prodSection.split("\n").filter((l) => l.startsWith("npx wrangler d1"));
+  assert.ok(commands.length >= 5);
+  for (const c of commands) assert.ok(c.includes("-c migrations/portal/wrangler.migrate.production.jsonc"), "every command carries the production -c flag: " + c);
+  assert.ok(!/bookmark[^\n]*[0-9a-f]{16,}/i.test(readme), "no bookmark value is stored");
+});
