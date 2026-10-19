@@ -1,6 +1,7 @@
 # Automated tests. This workflow ONLY runs the test suite: no deployment, no secrets, read-only token.
 # Cloudflare deploys on its own (Workers Builds); this check reports results and, once the `main` ruleset requires it, gates merges to main.
 # The job name "Node tests" is the required-check name: do not rename it without updating the branch ruleset.
+# On main the Node version is set here (not by a .node-version file) so Cloudflare Workers Builds keeps using its own default for Production builds.
 # Actions are pinned to full commit SHAs (verified against the upstream tags noted beside each).
 name: CI
 
@@ -29,7 +30,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version-file: .node-version
+          node-version: 22
           package-manager-cache: false
       - name: Require Node 22.13 or newer (node:sqlite)
         run: node -e "const [a,b]=process.versions.node.split('.').map(Number); console.log('node', process.version); if (a<22||(a===22&&b<13)) { console.error('Node 22.13+ required'); process.exit(1); }"
