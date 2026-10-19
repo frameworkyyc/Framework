@@ -12,13 +12,13 @@ const config = JSON.parse(raw.replace(/^\s*\/\/.*$/gm, "")); // the file only us
 const PRODUCTION = { binding: "DB", database_name: "framework-feedback", database_id: "47d90f94-3846-4711-9495-ab3479431a6f" };
 const STAGING = { binding: "DB", database_name: "framework-staging", database_id: "c4815cdc-8948-4561-92a3-65e4860cdb94" };
 
-const PORTAL_PRODUCTION = { binding: "PORTAL_DB", database_name: "framework-portal", database_id: "b213b7db-ed29-4ab6-946c-0728dd6709e8" };
+const PORTAL_PRODUCTION = { binding: "PORTAL_DB", database_name: "framework-portal", database_id: "b213b7db-ed29-4ab6-946c-0728dd6709e8", migrations_dir: "migrations/portal" };
 
 test("Production: exactly two D1 bindings: DB -> framework-feedback (original ID unchanged) and PORTAL_DB -> framework-portal", () => {
   assert.deepEqual(config.d1_databases, [PRODUCTION, PORTAL_PRODUCTION]);
 });
 
-const PORTAL_STAGING = { binding: "PORTAL_DB", database_name: "framework-portal-staging", database_id: "1edda8a2-5249-4f40-9dbc-d29aa44e21f8" };
+const PORTAL_STAGING = { binding: "PORTAL_DB", database_name: "framework-portal-staging", database_id: "1edda8a2-5249-4f40-9dbc-d29aa44e21f8", migrations_dir: "migrations/portal" };
 
 test("Staging (Preview): DB -> framework-staging is preserved, plus PORTAL_DB -> framework-portal-staging", () => {
   assert.deepEqual(config.previews.d1_databases, [STAGING, PORTAL_STAGING]);
@@ -161,4 +161,18 @@ test("observability does not otherwise reduce monitoring (either environment): n
   assert.equal(o.traces, undefined);
   assert.deepEqual(Object.keys(o.logs).sort(), ["enabled", "invocation_logs"]);
  }
+});
+
+test("migrations_dir safeguard: both PORTAL_DB bindings point at migrations/portal (portal migrations only); the feedback DB bindings keep their default", async () => {
+  const { readdirSync, existsSync } = await import("node:fs");
+  const portal = [config.d1_databases.find((d) => d.binding === "PORTAL_DB"), config.previews.d1_databases.find((d) => d.binding === "PORTAL_DB")];
+  for (const d of portal) assert.equal(d.migrations_dir, "migrations/portal", d.database_name);
+  for (const d of [...config.d1_databases, ...config.previews.d1_databases].filter((d) => d.binding === "DB")) assert.equal(d.migrations_dir, undefined, d.database_name + ": the feedback binding is unchanged (default ./migrations)");
+  const dir = new URL("../../migrations/portal/", import.meta.url);
+  assert.ok(existsSync(dir));
+  assert.deepEqual(readdirSync(dir).filter((f) => f.endsWith(".sql")), ["0001_portal_foundation.sql"], "exactly the one reviewed portal migration is visible through that directory");
+  const feedback = readdirSync(new URL("../../migrations/", import.meta.url)).filter((f) => f.endsWith(".sql"));
+  assert.ok(feedback.length >= 6 && !feedback.some((f) => /portal/.test(f)), "the feedback migrations stay in ./migrations and are never visible to PORTAL_DB");
+  const code = raw.replace(/^\s*\/\/.*$/gm, "");
+  assert.equal([...code.matchAll(/migrations_dir/g)].length, 2, "only the two portal bindings declare one");
 });

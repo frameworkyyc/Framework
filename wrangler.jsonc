@@ -45,7 +45,10 @@
     {
       "binding": "PORTAL_DB",
       "database_name": "framework-portal",
-      "database_id": "b213b7db-ed29-4ab6-946c-0728dd6709e8"
+      "database_id": "b213b7db-ed29-4ab6-946c-0728dd6709e8",
+      // Safeguard: without this, `wrangler d1 migrations ...` on this binding would default to ./migrations, the FEEDBACK database's folder.
+      // The portal's migrations live in migrations/portal (one .sql file). Nothing runs on deploy; the reviewed manual workflow applies them.
+      "migrations_dir": "migrations/portal"
     }
   ],
   // Portal abuse limiter (worker/portal/ratelimit.js): 20 requests / 60 s per client network on sign-in start, callback and sign-out. Inert while
@@ -93,7 +96,8 @@
       {
         "binding": "PORTAL_DB",
         "database_name": "framework-portal-staging",
-        "database_id": "1edda8a2-5249-4f40-9dbc-d29aa44e21f8"
+        "database_id": "1edda8a2-5249-4f40-9dbc-d29aa44e21f8",
+        "migrations_dir": "migrations/portal"
       }
     ],
     // Private bucket for client files. Not served publicly (no public access, no custom domain).
