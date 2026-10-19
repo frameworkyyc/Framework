@@ -1,0 +1,54 @@
+// Client portal "Commit 1: wiring only". The router is connected to the Worker and the Phase 0 probe is gone, but the portal is NOT
+// enabled anywhere: every /portal path answers an explicit 404 until a separately approved activation adds PORTAL_ENABLED to the Preview vars.
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
+
+const root = new URL("../../", import.meta.url);
+const read = (p) => readFileSync(new URL(p, root), "utf8");
+const code = (p) => read(p).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const MODULES = ["config", "crypto", "policy", "http", "log", "claims", "sessions", "workos", "ratelimit", "guard", "pages", "auth", "router"];
+
+test("worker/index.js imports only the portal router, and routes /portal and /portal/* to it with an explicit 404 fallback", () => {
+  const idx = code("worker/index.js");
+  assert.match(idx, /import \{ handlePortal, portalNotFound \} from "\.\/portal\/router\.js";/);
+  assert.equal([...idx.matchAll(/from "\.\/portal\//g)].length, 1, "one portal import");
+  assert.match(idx, /if \(path === "\/portal" \|\| path\.startsWith\("\/portal\/"\)\) \{\s*return \(await handlePortal\(request, env\)\) \|\| portalNotFound\(\);\s*\}/);
+  assert.ok(!/probe/i.test(idx));
+});
+test("the Phase 0 probe is gone everywhere in code and config (jwt.js stays: the new WorkOS client uses it)", () => {
+  assert.ok(!existsSync(new URL("worker/portal/probe.js", root)));
+  assert.ok(!existsSync(new URL("worker/test/portal-probe.test.mjs", root)));
+  assert.ok(existsSync(new URL("worker/portal/jwt.js", root)));
+  for (const f of ["worker/index.js", "wrangler.jsonc", ...readdirSync(new URL("worker/portal/", root)).filter((n) => n.endsWith(".js")).map((n) => "worker/portal/" + n)]) assert.ok(!/PROBE|probe/.test(code(f)), f);
+});
+test("only the Worker entry point and portal modules import the portal modules", () => {
+  const offenders = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(new URL(dir, root), { withFileTypes: true })) {
+      const p = dir + e.name;
+      if (e.isDirectory()) { walk(p + "/"); continue; }
+      if (!/\.(m?js)$/.test(e.name) || p.startsWith("worker/portal/") || p.startsWith("worker/test/") || p === "worker/index.js") continue;
+      if (/portal\//.test(read(p))) offenders.push(p);
+    }
+  };
+  walk("worker/");
+  assert.deepEqual(offenders, []);
+});
+test("the portal is not enabled in configuration: no PORTAL_ENABLED, no Production override, no rate-limit binding", () => {
+  const cfg = code("wrangler.jsonc");
+  assert.ok(!/PORTAL_ENABLED|PORTAL_ALLOW_PRODUCTION|PORTAL_PROBE/.test(cfg));
+  assert.ok(!/PORTAL_RATE_LIMITER|ratelimits|unsafe/.test(cfg));
+  assert.match(cfg, /"run_worker_first": \["\/api\/\*", "\/admin", "\/admin\/\*", "\/card", "\/portal", "\/portal\/\*"\]/);
+});
+test("portal modules do no work at import time, read no environment, and make no network calls except the WorkOS client", async () => {
+  for (const m of MODULES) {
+    const src = code(`worker/portal/${m}.js`);
+    assert.ok(!/\bprocess\.env\b|\bglobalThis\.env\b/.test(src), `${m}.js reads process.env`);
+    if (m !== "workos") assert.ok(!/\bfetch\s*\(/.test(src) || m === "router" || m === "auth", `${m}.js makes network calls`);
+    await import(`../portal/${m}.js`);
+  }
+});
+test("only the reviewed set of modules exists under worker/portal", () => {
+  assert.deepEqual(readdirSync(new URL("worker/portal/", root)).filter((f) => f.endsWith(".js")).sort(), ["auth.js", "claims.js", "config.js", "crypto.js", "guard.js", "http.js", "jwt.js", "log.js", "pages.js", "policy.js", "ratelimit.js", "router.js", "sessions.js", "workos.js"]);
+});

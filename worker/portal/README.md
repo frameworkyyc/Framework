@@ -1,8 +1,9 @@
-# Framework client portal (Stage 2: built, INERT, not wired in)
+# Framework client portal (Stage 2: wired into the Worker, NOT enabled)
 
-Nothing in this folder is reachable from the live Worker except the Phase 0 sign-in probe (`probe.js`, `jwt.js`). The permanent
-portal is `router.js` (`handlePortal(request, env)`), which `worker/index.js` does **not** import yet. It is off unless
-`PORTAL_ENABLED` is exactly `"1"`, and that variable is not set anywhere.
+`worker/index.js` routes `/portal` and `/portal/*` to `router.js` (`handlePortal(request, env)`). The router answers only when
+`PORTAL_ENABLED` is exactly `"1"`, the settings are valid and the request is on `PORTAL_BASE_URL`'s host; otherwise the Worker returns
+`portalNotFound()` (a bare, `no-store` 404 with no cookies and no HSTS). `PORTAL_ENABLED` is not set anywhere, so every `/portal` path is
+a 404 on Production and on Staging until a separately approved activation adds it to `previews.vars`. The Phase 0 probe has been removed.
 
 ## Modules
 
@@ -88,9 +89,9 @@ and invalidates in-flight sign-ins (acceptable on Staging).
 1. Staging only: confirm `PORTAL_SESSION_PEPPER` meets the rule above (rotate if unsure) and the API key secret is set.
 2. Run the reviewed seed (`migrations/portal-seed/README.md`) for the test email. The test email must already exist as a WorkOS user
    (it does from Phase 0) because WorkOS sign-up is disabled.
-3. One reviewed change to `worker/index.js` + `wrangler.jsonc`: call `handlePortal` first (fall through to the static site on `null`);
-   `run_worker_first` -> `/api/*`, `/admin`, `/admin/*`, `/card`, `/portal`, `/portal/*`; Staging vars `PORTAL_ENABLED="1"` replacing `PORTAL_PROBE`;
-   delete `probe.js` + its tests; update `wrangler-config.test.mjs` and `portal-inert.test.mjs`.
+3. DONE (wiring commit, portal still off): `worker/index.js` calls `handlePortal` for `/portal*` with an explicit 404 fallback; `run_worker_first`
+   is `/api/*`, `/admin`, `/admin/*`, `/card`, `/portal`, `/portal/*`; the probe, its test and `PORTAL_PROBE` are removed.
+   STILL TO DO, separately approved: add `"PORTAL_ENABLED": "1"` to `previews.vars` ONLY (and flip the pinned config/wiring tests).
 4. Cloudflare: "Always Use HTTPS" on for the zone (the Worker sends one-year HSTS without includeSubDomains/preload); create the one rate rule (or the binding).
 5. WorkOS dashboard: confirm redirect URI, initiate-login URL, sign-out URI are unchanged (`/portal/auth/callback`, `/portal/login`, `/portal/login`).
 6. Staging browser checks: invited sign-in; second browser; logout (both portal and WorkOS session end); expired session; uninvited email -> no access;

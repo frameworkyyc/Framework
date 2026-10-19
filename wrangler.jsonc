@@ -20,9 +20,10 @@
     "binding": "ASSETS",
     // The Worker runs for the API and for the private admin area (it checks the Cloudflare Access token before
     // serving anything under /admin), and for /card so its link-preview URLs match the environment. Every other public page is
-    // still served straight from static assets. The three /portal paths belong to the temporary Staging sign-in probe: on Production
-    // the probe is off, so the Worker hands those requests straight back to the static site (a 404 page, as before).
-    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/card", "/portal/login", "/portal/auth/callback", "/portal/logout"]
+    // still served straight from static assets. /portal and /portal/* belong to the client portal router (worker/portal/router.js): it
+    // answers only where PORTAL_ENABLED is "1" (never set at the top level, so never on Production); everywhere else the Worker returns
+    // an explicit 404 for these paths. Note "/portal/*" does not match "/portal" itself, so both are listed.
+    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/card", "/portal", "/portal/*"]
   },
   // Private client feedback responses (D1). This binding is used by normal `wrangler deploy` deployments.
   "d1_databases": [
@@ -57,9 +58,8 @@
       "PORTAL_AUTH_CLIENT_ID": "client_01M58C412YHC548S5JXP1TJ2ED",
       "PORTAL_BASE_URL": "https://staging.frameworkco.ca",
       // The exact token issuer, verified in the live Staging test (it embeds the client id).
-      "PORTAL_AUTH_ISSUER": "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED",
-      // Switches the Phase 0 sign-in probe on. Delete this line (and worker/portal/probe.js) when the probe is retired.
-      "PORTAL_PROBE": "1"
+      "PORTAL_AUTH_ISSUER": "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED"
+      // PORTAL_ENABLED is deliberately NOT set yet: the portal stays off (every /portal path answers 404) until a separately approved activation.
     },
     "d1_databases": [
       {

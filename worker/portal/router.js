@@ -1,8 +1,8 @@
 /**
- * Client portal router (Stage 2C/2D). INERT: nothing in the live Worker imports this yet. When it is wired in (a later, separately
- * authorized step) the Worker calls handlePortal(request, env) first and serves the static site if it returns null.
+ * Client portal router (Stage 2C/2D). Wired into worker/index.js for every /portal path. It only answers when PORTAL_ENABLED is exactly "1"
+ * and the settings are valid and the request is on PORTAL_BASE_URL's host; otherwise the Worker returns portalNotFound().
  *
- * Returns null (= "not mine, serve the static site as before") when the portal is off, or the request is not for the portal or not on the
+ * Returns null (= "not mine"; worker/index.js then answers portalNotFound(), never the static site) when the portal is off, or the request is not for the portal or not on the
  * portal host. When it IS enabled but misconfigured it fails closed with a generic 503 for portal paths.
  */
 import { portalMode, portalConfigProblems, readPortalConfig } from "./config.js";
@@ -17,6 +17,23 @@ import { listProjects, getProject } from "./repo/projects.js";
 import { listActivity } from "./repo/activity.js";
 import { validateSlug } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
+
+/**
+ * The answer for every /portal path when the portal is not serving this request (disabled, wrong host). Deliberately bare: no portal
+ * styling, no reference id, and NO Strict-Transport-Security (a disabled portal must not change HSTS state for the live site).
+ */
+export function portalNotFound() {
+  return new Response("Not found", {
+    status: 404,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+    },
+  });
+}
 
 const isPortalPath = (p) => p === "/portal" || p.startsWith("/portal/");
 
@@ -105,7 +122,8 @@ export async function handlePortal(request, env, deps = {}) {
   if (!isPortalPath(url.pathname)) return null;
   const ref = newRef();
   if (portalMode(env) === "misconfigured") {
-    logEvent({ evt: "config.invalid", outcome: "failed_closed", route: routeName(url.pathname), ref, count: portalConfigProblems(env).length });
+    const problems = portalConfigProblems(env); // setting NAMES / codes only, never values
+    logEvent({ evt: "config.invalid", outcome: "failed_closed", reason: problems[0].toLowerCase(), route: routeName(url.pathname), ref, count: problems.length });
     return errorPage(503, { ref });
   }
   const cfg = readPortalConfig(env);

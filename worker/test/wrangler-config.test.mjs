@@ -43,10 +43,10 @@ test("the Production ID appears exactly once in the file (never inside the previ
   assert.ok(!JSON.stringify(config.previews).includes("framework-feedback"));
 });
 
-test("Production (top-level vars) and Staging (previews.vars) each carry the sender and the same public Turnstile site key; Staging adds the portal settings", () => {
+test("Production (top-level vars) and Staging (previews.vars) each carry the sender and the same public Turnstile site key; Staging adds the portal settings (and does NOT enable the portal yet)", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
   assert.deepEqual(config.vars, shared);
-  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_PROBE: "1" });
+  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED" });
 });
 
 test("the verified WorkOS issuer is pinned and belongs to the configured client id (not the bare api.workos.com base)", () => {
@@ -61,8 +61,8 @@ test("the WorkOS client id is a public id (client_…), is Staging-only, and no 
   assert.ok(!/sk_(test|live)_/.test(raw));
 });
 
-test("every portal setting the probe needs is either declared in previews or listed as a Cloudflare secret", () => {
-  const needed = ["PORTAL_PROBE", "PORTAL_BASE_URL", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER"];
+test("every portal setting the portal needs is either declared in previews or listed as a Cloudflare secret", () => {
+  const needed = ["PORTAL_BASE_URL", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER"];
   for (const name of needed) assert.ok(name in config.previews.vars, name + " must be in previews.vars or the next deploy deletes it");
   const secrets = ["PORTAL_AUTH_CLIENT_SECRET", "PORTAL_SESSION_PEPPER"];
   for (const name of secrets) assert.ok(!(name in config.previews.vars) && !raw.replace(/^\s*\/\/.*$/gm, "").includes(name), name + " is a secret and must not be in the file");
@@ -73,9 +73,16 @@ test("the Staging portal base URL is the Staging host, not the live site", () =>
   assert.ok(!JSON.stringify(config.vars).includes("frameworkco.ca/portal"));
 });
 
-test("shared routes: the existing worker routes are unchanged and only the three exact probe paths were added", () => {
-  assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/admin", "/admin/*", "/card", "/portal/login", "/portal/auth/callback", "/portal/logout"]);
-  assert.ok(!config.assets.run_worker_first.some((p) => p === "/portal/*" || p === "/*"), "no portal wildcard");
+test("shared routes: the existing worker routes are unchanged and /portal + /portal/* were added in place of the three probe paths", () => {
+  assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/admin", "/admin/*", "/card", "/portal", "/portal/*"]);
+  assert.ok(!config.assets.run_worker_first.some((p) => p === "/*" || p === "/portal/login"), "no catch-all, no leftover probe paths");
+});
+
+test("the portal is NOT enabled anywhere in the configuration (no PORTAL_ENABLED, no probe flag, no Production override)", () => {
+  const code = raw.replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!("PORTAL_ENABLED" in config.previews.vars) && !("PORTAL_ENABLED" in config.vars));
+  assert.ok(!code.includes("PORTAL_ENABLED") && !code.includes("PORTAL_PROBE") && !code.includes("PORTAL_ALLOW_PRODUCTION"));
+  assert.ok(!Object.keys(config.vars).some((k) => k.startsWith("PORTAL_")), "Production vars carry no portal setting at all");
 });
 
 test("the sender is a valid From value that the Worker accepts as-is (no correction needed)", () => {
@@ -88,7 +95,7 @@ test("the sender is a valid From value that the Worker accepts as-is (no correct
 });
 
 test("only whitelisted NON-secret names may ever appear under vars", () => {
-  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_PROBE"]);
+  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID"]);
   for (const vars of [config.vars, config.previews.vars]) for (const name of Object.keys(vars)) assert.ok(allowed.has(name), name + " is not an approved non-secret variable");
 });
 
