@@ -4,6 +4,8 @@
 #     the pre-checks fail closed on any name/id mismatch, any other pending migration, unrecognised output, or any existing portal table.
 #   * Runs in the GitHub environment "production-portal-d1". Required reviewers on that environment are what make a human approve each run;
 #     this file cannot create or verify that protection (see migrations/portal/README.md). The Cloudflare secrets live in that environment only.
+#   * Only runs with ref Staging (where the migration config and SQL live); the file also exists on main only so GitHub lists it.
+#   * Wrangler is installed in a step that has no secrets, with install scripts disabled, at an exact version at least two weeks old.
 #   * One run at a time (concurrency, never cancelled mid-run). Read-only repository token. Actions pinned to full commit SHAs.
 # Required environment secrets (names only; never put values in the repository): CLOUDFLARE_API_TOKEN (D1 edit only), CLOUDFLARE_ACCOUNT_ID.
 name: Portal Production D1 migration
@@ -32,7 +34,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  WRANGLER_VERSION: "4.151.2"
+  WRANGLER_VERSION: "4.147.0"
   WRANGLER_SEND_METRICS: "false"
   CONFIG: migrations/portal/wrangler.migrate.production.jsonc
 
@@ -51,7 +53,7 @@ jobs:
         run: |
           if [ "$CONFIRM_DATABASE" != "framework-portal" ]; then echo "FAIL: the typed database name does not match."; exit 1; fi
           if [ "$MODE" != "verify-only" ] && [ "$MODE" != "apply" ]; then echo "FAIL: unknown mode."; exit 1; fi
-          if [ "$REF" != "refs/heads/Staging" ] && [ "$REF" != "refs/heads/main" ]; then echo "FAIL: run this only from Staging or main."; exit 1; fi
+          if [ "$REF" != "refs/heads/Staging" ]; then echo "FAIL: run this only with ref Staging (the migration config and SQL live there)."; exit 1; fi
           echo "mode: $MODE"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -60,6 +62,8 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+      - name: Install Wrangler (no secrets in this step, no install scripts)
+        run: npm install --prefix "$RUNNER_TEMP/wrangler" --ignore-scripts --no-audit --no-fund --no-save "wrangler@$WRANGLER_VERSION"
       - name: Check the migration config targets only the Production portal database
         run: node .github/scripts/portal-d1-check.mjs config "$CONFIG"
       - name: Verify the remote database name and id
@@ -67,7 +71,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 info PORTAL_DB --json -c "$CONFIG" > "$RUNNER_TEMP/info.json"
+          "$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler" d1 info PORTAL_DB --json -c "$CONFIG" > "$RUNNER_TEMP/info.json"
           node .github/scripts/portal-d1-check.mjs info < "$RUNNER_TEMP/info.json"
       - name: List pending migrations (before)
         env:
@@ -75,7 +79,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           MODE: ${{ inputs.mode }}
         run: |
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations list PORTAL_DB --remote -c "$CONFIG" > "$RUNNER_TEMP/pending-before.txt"
+          "$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler" d1 migrations list PORTAL_DB --remote -c "$CONFIG" > "$RUNNER_TEMP/pending-before.txt"
           node .github/scripts/portal-d1-check.mjs pending-before "$MODE" < "$RUNNER_TEMP/pending-before.txt"
       - name: List tables (before, read-only)
         env:
@@ -83,23 +87,24 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           MODE: ${{ inputs.mode }}
         run: |
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute PORTAL_DB --remote -c "$CONFIG" --json --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" > "$RUNNER_TEMP/tables-before.json"
+          "$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler" d1 execute PORTAL_DB --remote -c "$CONFIG" --json --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" > "$RUNNER_TEMP/tables-before.json"
           node .github/scripts/portal-d1-check.mjs tables-before "$MODE" < "$RUNNER_TEMP/tables-before.json"
       - name: Apply 0001_portal_foundation.sql
         if: ${{ inputs.mode == 'apply' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations apply PORTAL_DB --remote -c "$CONFIG"
+        run: |
+          "$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler" d1 migrations apply PORTAL_DB --remote -c "$CONFIG"
       - name: Verify completion (apply only)
         if: ${{ inputs.mode == 'apply' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 migrations list PORTAL_DB --remote -c "$CONFIG" > "$RUNNER_TEMP/pending-after.txt"
+          "$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler" d1 migrations list PORTAL_DB --remote -c "$CONFIG" > "$RUNNER_TEMP/pending-after.txt"
           node .github/scripts/portal-d1-check.mjs pending-after < "$RUNNER_TEMP/pending-after.txt"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute PORTAL_DB --remote -c "$CONFIG" --json --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" > "$RUNNER_TEMP/tables-after.json"
+          "$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler" d1 execute PORTAL_DB --remote -c "$CONFIG" --json --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name" > "$RUNNER_TEMP/tables-after.json"
           node .github/scripts/portal-d1-check.mjs tables-after < "$RUNNER_TEMP/tables-after.json"
-          npx --yes "wrangler@$WRANGLER_VERSION" d1 execute PORTAL_DB --remote -c "$CONFIG" --json --command "SELECT name FROM sqlite_master WHERE type='index' ORDER BY name" > "$RUNNER_TEMP/indexes-after.json"
+          "$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler" d1 execute PORTAL_DB --remote -c "$CONFIG" --json --command "SELECT name FROM sqlite_master WHERE type='index' ORDER BY name" > "$RUNNER_TEMP/indexes-after.json"
           node .github/scripts/portal-d1-check.mjs indexes-after < "$RUNNER_TEMP/indexes-after.json"
