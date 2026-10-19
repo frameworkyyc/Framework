@@ -207,6 +207,14 @@ A phone-first card to share when meeting people (text, AirDrop, QR code, or an N
 * The social preview image uses a system sans-serif for its text (the brand fonts are web fonts); regenerate it from the same layout if the name or description changes.
 * Tests: `worker/test/card.test.mjs`. No analytics, cookies or storage.
 
+## Automated tests and releases
+
+`node --test worker/test/*.test.mjs` runs the whole suite (no `npm install`; it needs Node 22.13 or newer because the portal tests use the built-in `node:sqlite`, and `.node-version` pins Node 22). The GitHub Actions workflow `.github/workflows/ci.yml` runs it, as the job **Node tests**, on every push and pull request to `Staging` and `main`, and can be started by hand (Actions tab, CI, Run workflow). It has read-only permissions, uses no secrets and deploys nothing; `worker/test/ci-workflow.test.mjs` fails if that changes.
+
+* **Reporting vs blocking.** On `Staging` the check reports a result next to each commit, but Cloudflare builds and deploys the push independently, so a red check does not stop a Staging deploy. Always look at the check. Once a GitHub ruleset on `main` requires **Node tests** (a separate, manual setting), nothing can be merged into `main` until it passes, and the Production deploy from `main` only ever receives tested code.
+* **Release process.** Work and test on `Staging`; when it is ready, open a pull request from `Staging` into `main`, wait for **Node tests** to pass, then merge. The portal stays disabled on Production: `PORTAL_ENABLED` exists only in the Preview vars of `wrangler.jsonc`, and the suite fails if it appears anywhere that Production reads.
+* Do not set `PRIVACY_PUBLISH` in CI; it is only for the manual Production publication check described in the Privacy item above.
+
 ## Client portal: routing and activation state
 
 `worker/index.js` sends every `/portal` and `/portal/*` request to the portal router (`worker/portal/router.js`; both paths are in `run_worker_first`). The router answers **only** when `PORTAL_ENABLED` is exactly `"1"`, the settings are valid and the request is on `PORTAL_BASE_URL`'s host. In every other case the Worker returns an explicit, non-cacheable `404` (plain text, no cookies, no HSTS) and never consults the static site. `PORTAL_ENABLED` is `"1"` in `previews.vars` only (Staging) and is **never** in the top-level `vars`, so on Production every `/portal` path answers 404. The Phase 0 WorkOS probe has been removed (`jwt.js` stays; the portal's WorkOS client uses it). Secrets (`PORTAL_AUTH_CLIENT_SECRET` = the WorkOS API key, `PORTAL_SESSION_PEPPER`) live only in Cloudflare. See `worker/portal/README.md`. Tests: `worker/test/portal-wiring.test.mjs`, `portal-worker-integration.test.mjs`, `wrangler-config.test.mjs`.
