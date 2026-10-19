@@ -60,7 +60,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version-file: .node-version
+          node-version: 22
           package-manager-cache: false
       - name: Install Wrangler (no secrets in this step, no install scripts)
         run: npm install --prefix "$RUNNER_TEMP/wrangler" --ignore-scripts --no-audit --no-fund --no-save "wrangler@$WRANGLER_VERSION"

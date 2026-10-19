@@ -2,18 +2,23 @@
 // the stable job name "Node tests" (the branch ruleset's required-check name). Plain-text checks: no YAML parser is needed or installed.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 
 const root = new URL("../../", import.meta.url);
 const raw = readFileSync(new URL(".github/workflows/ci.yml", root), "utf8");
 const code = raw.replace(/^\s*#.*$/gm, "").replace(/\s+#\s.*$/gm, ""); // comments removed (full-line and trailing)
 const lines = code.split("\n");
 
-test("CI plus the one reviewed manual Production D1 migration workflow exist, and .node-version pins Node 22", () => {
+test("CI plus the one reviewed manual Production D1 migration workflow exist; Node 22 is pinned in the workflows, NOT by a .node-version file", () => {
   assert.deepEqual(readdirSync(new URL(".github/workflows/", root)).sort(), ["ci.yml", "portal-production-d1-migration.yml"], "a new workflow must be reviewed on purpose (update this test with it)");
-  assert.equal(readFileSync(new URL(".node-version", root), "utf8").trim(), "22");
-  assert.match(code, /node-version-file: \.node-version/);
-  assert.ok(!/^\s*node-version:/m.test(code), "one source of truth for the Node version");
+  // Cloudflare Workers Builds reads .node-version and .nvmrc (and NODE_VERSION). Adding either would silently change the Node version of the
+  // Staging AND Production builds, which was decided against: they keep Cloudflare's own default.
+  for (const f of [".node-version", ".nvmrc", ".tool-versions"]) assert.ok(!existsSync(new URL(f, root)), `${f} must not exist: it would change the Node version of Cloudflare builds`);
+  assert.match(code, /actions\/setup-node@[0-9a-f]{40}\n\s+with:\n\s+node-version: 22\n/);
+  assert.ok(!/node-version-file/.test(code), "the Node version is set explicitly in the workflow");
+  const d1 = readFileSync(new URL(".github/workflows/portal-production-d1-migration.yml", root), "utf8");
+  assert.match(d1, /actions\/setup-node@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+node-version: 22\n/);
+  assert.ok(!/node-version-file/.test(d1));
 });
 test("triggers are limited to push and pull_request on Staging and main, plus manual dispatch", () => {
   const on = code.slice(code.indexOf("\non:"), code.indexOf("\npermissions:"));
