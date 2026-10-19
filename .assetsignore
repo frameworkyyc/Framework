@@ -8,6 +8,7 @@ CNAME
 node_modules/
 .wrangler/
 .dev.vars
+.node-version
 worker/
 migrations/
 PRIVACY-OPERATIONS.md

@@ -1,7 +1,7 @@
 /**
  * Framework — Cloudflare Worker
  *
- * Static pages are served by Workers static assets. This Worker only runs for /api/*, /admin, /admin/* and /card
+ * Static pages are served by Workers static assets. This Worker only runs for /api/*, /admin, /admin/*, /card and /portal, /portal/*
  * (see "run_worker_first" in wrangler.jsonc). /card is the static business card with environment-aware preview metadata.
  *
  * Public:
@@ -23,6 +23,7 @@ import { handleAdmin } from "./admin/router.js";
 import { combinedRevenue } from "./revenue.js";
 import { handleAssessmentSubmit, handleAssessmentConfig } from "./assessment.js";
 import { handleCardPage } from "./card.js";
+import { handlePortal, portalNotFound } from "./portal/router.js";
 
 const MAX_BODY_BYTES = 24 * 1024;
 const MAX_RECENT_SUBMISSIONS = 40; // flood guard: max stored submissions per 10 minutes, site-wide
@@ -284,6 +285,13 @@ export default {
 
     // Digital business card: static page, link-preview URLs follow the host (worker/card.js).
     if (path === "/card") return handleCardPage(request, env);
+
+    // Client portal. handlePortal answers only when PORTAL_ENABLED is exactly "1", the settings are valid and the request is on the
+    // portal's own host. In every other case (Production, other hosts, portal off) each /portal path is an explicit, non-cacheable 404
+    // from here: it never reaches the static site.
+    if (path === "/portal" || path.startsWith("/portal/")) {
+      return (await handlePortal(request, env)) || portalNotFound();
+    }
 
     // Public: the ONE combined, rounded-down client revenue figure. Individual figures stay in D1.
     if (path === "/api/client-revenue") {

@@ -1,0 +1,17 @@
+// Migration-only Wrangler config for the PRODUCTION portal database. It exists so that
+//   wrangler d1 migrations apply PORTAL_DB --remote -c migrations/portal/wrangler.migrate.production.jsonc
+// can never pick up the main wrangler.jsonc (which also binds the feedback database and the older feedback migrations in ./migrations)
+// or the Staging portal database. It contains no Worker settings and no secrets, and it is never deployed.
+// Creating this file does not apply anything: migrations run only when an operator runs the commands in README.md.
+{
+  "name": "framework-portal-migrations-production",
+  "compatibility_date": "2026-09-01",
+  "d1_databases": [
+    {
+      "binding": "PORTAL_DB",
+      "database_name": "framework-portal",
+      "database_id": "b213b7db-ed29-4ab6-946c-0728dd6709e8",
+      "migrations_dir": "."
+    }
+  ]
+}
