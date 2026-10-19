@@ -251,8 +251,11 @@ test("the Production and Staging migration configs target different databases (n
   assert.notEqual(prod.name, stag.name);
   // and neither is the database the main wrangler.jsonc binds for the feedback data or for Staging's DB binding
   const main = JSON.parse(readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""));
-  const others = [...main.d1_databases, ...main.previews.d1_databases.filter((d) => d.binding === "DB")].map((d) => d.database_id);
+  const others = [...main.d1_databases, ...main.previews.d1_databases].filter((d) => d.binding === "DB").map((d) => d.database_id); // the feedback / assessment databases
   for (const id of [p.database_id, s.database_id]) assert.ok(!others.includes(id));
+  // and the Worker config binds exactly these two portal databases, one per environment, under the same name
+  assert.equal(main.d1_databases.find((d) => d.binding === "PORTAL_DB").database_id, p.database_id);
+  assert.equal(main.previews.d1_databases.find((d) => d.binding === "PORTAL_DB").database_id, s.database_id);
 });
 
 test("the migrations README documents the Production procedure with its safeguards", () => {

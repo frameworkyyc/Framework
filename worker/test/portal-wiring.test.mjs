@@ -35,14 +35,14 @@ test("only the Worker entry point and portal modules import the portal modules",
   walk("worker/");
   assert.deepEqual(offenders, []);
 });
-test("configuration: PORTAL_ENABLED only in previews.vars, no Production override, no probe flag, the rate-limit binding only in previews", () => {
+test("configuration: PORTAL_ENABLED only in previews.vars, no enablement flag at all for Production, no probe flag, one limiter binding per environment", () => {
   const cfg = code("wrangler.jsonc");
   assert.equal([...cfg.matchAll(/PORTAL_ENABLED/g)].length, 1);
   assert.ok(cfg.indexOf("PORTAL_ENABLED") > cfg.indexOf('"previews"'));
-  assert.ok(!/PORTAL_ALLOW_PRODUCTION|PORTAL_PROBE/.test(cfg));
+  assert.ok(!/PORTAL_ALLOW_PRODUCTION|PORTAL_PROBE/.test(cfg), "neither the launch flag nor the production override exists anywhere in the file");
   assert.ok(!/\bunsafe\b/.test(cfg));
-  assert.equal([...cfg.matchAll(/ratelimits/g)].length, 1);
-  assert.ok(cfg.indexOf("ratelimits") > cfg.indexOf('"previews"'), "the limiter binding exists only in the Preview (Staging) block");
+  assert.equal([...cfg.matchAll(/"ratelimits"/g)].length, 2, "one in Production's top level and one in previews");
+  assert.equal([...cfg.matchAll(/PORTAL_RATE_LIMITER/g)].length, 2);
   assert.match(cfg, /"run_worker_first": \["\/api\/\*", "\/admin", "\/admin\/\*", "\/card", "\/portal", "\/portal\/\*"\]/);
 });
 test("portal modules do no work at import time, read no environment, and make no network calls except the WorkOS client", async () => {

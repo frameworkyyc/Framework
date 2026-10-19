@@ -197,10 +197,80 @@ test("STAGING rate limiter via the real wrangler config: the binding the config 
   assert.equal(seen.length, 3, "only the three limiter calls happened");
   assert.ok(seen.every((k) => /^(login|callback|logout):[0-9a-f]{32}$/.test(k)));
 });
-test("PRODUCTION (top-level config) has no limiter binding and never reaches the limiter: every /portal path stays the safe 404", async () => {
-  assert.equal(wrangler.ratelimits, undefined);
+test("PRODUCTION (top-level config) declares its own limiter binding but, with the portal off, never reaches it: every /portal path stays the safe 404", async () => {
+  assert.deepEqual(wrangler.ratelimits, [{ name: "PORTAL_RATE_LIMITER", namespace_id: "4201", simple: { limit: 20, period: 60 } }]);
   let called = false;
   const { env } = makeEnv({ ...wrangler.vars, ...FAKE_SECRETS, PORTAL_DB: NO_DB, PORTAL_RATE_LIMITER: { limit: async () => { called = true; return { success: false }; } } });
   for (const p of ["/portal/login?start=1", "/portal/auth/callback?code=a&state=b"]) assertSafe404(await call(env, PROD + p, { headers: { "CF-Connecting-IP": "203.0.113.7" } }), p);
   assert.equal(called, false);
+});
+
+/* ---------------------------------------------------------------- Production launch readiness: the config as it really is + each flag combination */
+const PROD_CLIENT = "client_01M58C4236FYNJDQ3MM0E8V691";
+const prodEnv = (extra = {}, { secrets = true } = {}) => makeEnv({ ...wrangler.vars, ...(secrets ? FAKE_SECRETS : {}), PORTAL_DB: NO_DB, ...extra });
+const seenCalls = () => { const calls = []; return { calls, db: { prepare() { calls.push("db"); throw new Error("db touched"); }, batch() { calls.push("db"); throw new Error("db touched"); } } }; };
+
+test("PRODUCTION fails closed in every flag combination that is not the complete launch configuration", async () => {
+  // only the launch flag (the production override is missing): enabled but unusable -> generic 503, no database or WorkOS work, no redirect
+  const { calls, db } = seenCalls();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => { calls.push("network"); throw new Error("network touched"); };
+  try {
+    const a = prodEnv({ PORTAL_ENABLED: "1", PORTAL_DB: db }).env;
+    for (const host of [PROD, "https://www.frameworkco.ca"]) for (const p of ["/portal", "/portal/login", "/portal/login?start=1", "/portal/o/acme"]) {
+      const res = await call(a, host + p);
+      assert.equal(res.status, 503, host + p); // enabled-but-unusable answers a generic 503 on any host (the check runs before the host check)
+      assert.equal(res.headers.get("Location"), null);
+      assert.equal(res.headers.get("Set-Cookie"), null);
+      assert.doesNotMatch(await res.text(), /production_host_not_approved|client_01|b213b7db|sk_/);
+    }
+    // only the production override (the launch flag is missing): the portal does not exist
+    assertSafe404(await call(prodEnv({ PORTAL_ALLOW_PRODUCTION: "1", PORTAL_DB: db }).env, PROD + "/portal/login"), "override without launch flag");
+    // any value other than exactly "1" is off, for both flags
+    for (const v of ["0", "true", "yes", "", " 2 ", "ON"]) assertSafe404(await call(prodEnv({ PORTAL_ENABLED: v, PORTAL_ALLOW_PRODUCTION: "1", PORTAL_DB: db }).env, PROD + "/portal/login"), "ENABLED=" + JSON.stringify(v));
+    for (const v of ["0", "true", "yes", "", "ON"]) assert.equal((await call(prodEnv({ PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: v, PORTAL_DB: db }).env, PROD + "/portal/login")).status, 503, "ALLOW=" + JSON.stringify(v));
+    // both flags but a secret is missing, or the pepper is weak: 503, never half-working
+    for (const missing of ["PORTAL_AUTH_CLIENT_SECRET", "PORTAL_SESSION_PEPPER"]) {
+      const { env } = prodEnv({ PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1", PORTAL_DB: db, [missing]: undefined });
+      assert.equal((await call(env, PROD + "/portal/login")).status, 503, missing);
+    }
+    assert.equal((await call(prodEnv({ PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1", PORTAL_SESSION_PEPPER: "short", PORTAL_DB: db }).env, PROD + "/portal/login")).status, 503);
+    // both flags but the database binding is missing
+    assert.equal((await call(makeEnv({ ...wrangler.vars, ...FAKE_SECRETS, PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1" }).env, PROD + "/portal/login")).status, 503);
+  } finally { globalThis.fetch = realFetch; }
+  assert.deepEqual(calls, [], "none of the failed-closed requests touched the database or the network");
+});
+test("PRODUCTION with the complete launch configuration (both flags + secrets + PORTAL_DB) works on the canonical host only, with the Production WorkOS client and exact URLs", async () => {
+  const { env } = prodEnv({ PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1" });
+  const login = await call(env, PROD + "/portal/login");
+  assert.equal(login.status, 200);
+  assert.equal(login.headers.get("Cache-Control"), "no-store");
+  assert.equal(login.headers.get("Strict-Transport-Security"), "max-age=31536000");
+  const start = await call(env, PROD + "/portal/login?start=1");
+  assert.equal(start.status, 302);
+  const to = new URL(start.headers.get("Location"));
+  assert.equal(to.origin + to.pathname, "https://api.workos.com/user_management/authorize");
+  assert.equal(to.searchParams.get("client_id"), PROD_CLIENT);
+  assert.notEqual(to.searchParams.get("client_id"), wrangler.previews.vars.PORTAL_AUTH_CLIENT_ID, "never the Staging client");
+  assert.equal(to.searchParams.get("redirect_uri"), "https://frameworkco.ca/portal/auth/callback", "must equal the redirect URI registered in WorkOS Production");
+  assert.ok(!start.headers.get("Location").includes("FAKE"));
+  const setCookie = start.headers.get("Set-Cookie");
+  assert.match(setCookie, /^__Host-fw_auth=/);
+  assert.match(setCookie, /; Path=\/; /); assert.match(setCookie, /; HttpOnly/); assert.match(setCookie, /; Secure/); assert.match(setCookie, /; SameSite=Lax/);
+  assert.ok(!/Domain=/i.test(setCookie), "host-only cookie");
+  for (const host of ["https://www.frameworkco.ca", STAGING, "https://framework.example.workers.dev", "http://frameworkco.ca"]) assertSafe404(await call(env, host + "/portal/login"), host);
+  assert.equal((await call(env, PROD + "/portal/o/anything")).status, 303, "unauthenticated organization routes go to sign-in");
+  assert.equal(new URL((await call(env, PROD + "/portal/o/anything")).headers.get("Location"), PROD).pathname, "/portal/login");
+});
+test("PRODUCTION config matches what is registered in WorkOS Production (client id, issuer pattern, base URL, callback / login / logout URLs)", () => {
+  const v = wrangler.vars;
+  assert.equal(v.PORTAL_AUTH_CLIENT_ID, PROD_CLIENT);
+  assert.equal(v.PORTAL_AUTH_ISSUER, "https://api.workos.com/user_management/" + PROD_CLIENT);
+  assert.equal(v.PORTAL_BASE_URL, "https://frameworkco.ca");
+  const REGISTERED = { redirect: "https://frameworkco.ca/portal/auth/callback", login: "https://frameworkco.ca/portal/login", logout: "https://frameworkco.ca/portal/login" };
+  assert.equal(v.PORTAL_BASE_URL + "/portal/auth/callback", REGISTERED.redirect);
+  assert.equal(v.PORTAL_BASE_URL + "/portal/login", REGISTERED.login);
+  assert.equal(v.PORTAL_BASE_URL + "/portal/login", REGISTERED.logout);
+  assert.notEqual(v.PORTAL_AUTH_CLIENT_ID, wrangler.previews.vars.PORTAL_AUTH_CLIENT_ID);
+  assert.notEqual(v.PORTAL_AUTH_ISSUER, wrangler.previews.vars.PORTAL_AUTH_ISSUER);
 });
