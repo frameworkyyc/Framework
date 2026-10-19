@@ -1,7 +1,8 @@
 // Unit tests for the portal rate limiter's client identification and fail-open behaviour (worker/portal/ratelimit.js).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clientNetwork, rateLimitKey, isRateLimited, BUCKETS } from "../portal/ratelimit.js";
+import { clientNetwork, rateLimitKey, isRateLimited, checkRateLimit, RATE_LIMIT_OUTCOMES, BUCKETS } from "../portal/ratelimit.js";
+import { readFileSync } from "node:fs";
 
 const PEPPER = "Zk3xQ9vB7mLr2TnW8yHcA5dJfG1sPuE4oXiK6bNtMe0";
 const CFG = { pepper: PEPPER };
@@ -65,4 +66,59 @@ test("one client cannot use up another's allowance: counters are separate per ne
   assert.equal(await isRateLimited(env, req("203.0.113.8"), CFG, "callback"), false, "another client is not");
   assert.equal(await isRateLimited(env, req("203.0.113.7"), CFG, "login"), false, "another bucket is not");
   assert.equal(await isRateLimited(env, req("2001:db8:1:2::5"), CFG, "callback"), false);
+});
+
+/* ------------------------------------------------------------------ diagnostic outcomes */
+const bind = (limit) => ({ PORTAL_RATE_LIMITER: { limit } });
+
+test("checkRateLimit: the fixed outcome set is exactly the six reviewed words", () => {
+  assert.deepEqual([...RATE_LIMIT_OUTCOMES], ["ok", "limited", "no_binding", "no_client_ip", "limiter_error", "unexpected_result"]);
+  assert.ok(Object.isFrozen(RATE_LIMIT_OUTCOMES));
+});
+test("checkRateLimit: ok and limited come from the binding's explicit answer, and only limited limits", async () => {
+  assert.deepEqual(await checkRateLimit(bind(async () => ({ success: true })), req("203.0.113.7"), CFG, "login"), { limited: false, outcome: "ok" });
+  assert.deepEqual(await checkRateLimit(bind(async () => ({ success: false })), req("203.0.113.7"), CFG, "login"), { limited: true, outcome: "limited" });
+});
+test("checkRateLimit: no_binding when the binding is absent or is not a limiter", async () => {
+  for (const env of [undefined, null, {}, { PORTAL_RATE_LIMITER: undefined }, { PORTAL_RATE_LIMITER: {} }, { PORTAL_RATE_LIMITER: { limit: "nope" } }, { PORTAL_RATE_LIMITER: "x" }]) {
+    assert.deepEqual(await checkRateLimit(env, req("203.0.113.7"), CFG, "login"), { limited: false, outcome: "no_binding" }, JSON.stringify(env));
+  }
+});
+test("checkRateLimit: no_client_ip when the address is missing or invalid, and the binding is never called", async () => {
+  let calls = 0;
+  const env = bind(async () => { calls++; return { success: false }; });
+  for (const ip of [undefined, "", "unknown", "not-an-ip", "999.1.1.1", "::", "::1", "1.2.3"]) {
+    assert.deepEqual(await checkRateLimit(env, req(ip), CFG, "callback"), { limited: false, outcome: "no_client_ip" }, String(ip));
+  }
+  assert.equal(calls, 0);
+});
+test("checkRateLimit: limiter_error when limit() throws (or the bucket is not ours), and nothing about the error is kept", async () => {
+  const secret = "203.0.113.7 sk_test_SECRET " + PEPPER;
+  const results = [
+    await checkRateLimit(bind(async () => { throw new Error(secret); }), req("203.0.113.7"), CFG, "login"),
+    await checkRateLimit(bind(() => { throw new TypeError(secret); }), req("203.0.113.7"), CFG, "logout"),
+    await checkRateLimit(bind(() => Promise.reject(secret)), req("203.0.113.7"), CFG, "callback"),
+    await checkRateLimit(bind(async () => ({ success: false })), req("203.0.113.7"), CFG, "admin"),
+  ];
+  for (const r of results) {
+    assert.deepEqual(r, { limited: false, outcome: "limiter_error" });
+    assert.deepEqual(Object.keys(r).sort(), ["limited", "outcome"], "no extra properties such as an error or key");
+    assert.ok(!JSON.stringify(r).includes("SECRET") && !JSON.stringify(r).includes("203"));
+  }
+});
+test("checkRateLimit: unexpected_result for anything but an explicit success true/false (and it fails open)", async () => {
+  for (const result of [undefined, null, {}, { success: "false" }, { success: "true" }, { success: 1 }, { success: null }, "no", 0, [], true]) {
+    assert.deepEqual(await checkRateLimit(bind(async () => result), req("203.0.113.7"), CFG, "login"), { limited: false, outcome: "unexpected_result" }, JSON.stringify(result));
+  }
+});
+test("isRateLimited keeps its boolean behaviour for every outcome", async () => {
+  const cases = [[async () => ({ success: false }), true], [async () => ({ success: true }), false], [async () => { throw new Error("x"); }, false], [async () => undefined, false], [async () => ({ success: "false" }), false]];
+  for (const [limit, expected] of cases) assert.equal(await isRateLimited(bind(limit), req("203.0.113.7"), CFG, "login"), expected);
+  assert.equal(await isRateLimited({}, req("203.0.113.7"), CFG, "login"), false);
+  assert.equal(await isRateLimited(bind(async () => ({ success: false })), req(undefined), CFG, "login"), false);
+});
+test("the limiter module itself never writes logs and its catch block keeps no error details", () => {
+  const src = readFileSync(new URL("../portal/ratelimit.js", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/console\.|logEvent/.test(src));
+  assert.ok(/catch \{/.test(src) && !/catch \(/.test(src), "the exception is not even bound to a variable");
 });

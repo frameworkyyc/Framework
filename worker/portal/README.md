@@ -81,6 +81,20 @@ Two independent layers, both Staging only today:
    * **Not verified from the repo:** that Cloudflare applies `previews.ratelimits` in the Preview runtime and that the Free plan includes the binding.
      Verify after deployment with a small, paced, supervised test (about 25 requests to `/portal/login?start=1` over ~50 seconds, kept under the WAF
      rule's rate): the first 20 should redirect, the rest return `429`.
+* **Diagnosing the limiter (`rl`).** The existing `request` log line for `/portal/login?start=1`, `/portal/auth/callback` and `POST /portal/logout`
+  carries one extra field, `rl`, with exactly one of these fixed words (no address, key or error text is ever logged; the logger rejects any other
+  value). Search the logs for `"evt":"request"` and read `rl`:
+
+  | `rl` | meaning |
+  | --- | --- |
+  | `ok` | the binding was called and allowed the request |
+  | `limited` | the binding refused it (the response is a 429, logged by the existing `rate.limited` event instead of `request`) |
+  | `no_binding` | `PORTAL_RATE_LIMITER` is not present at runtime, so nothing is limited |
+  | `no_client_ip` | `CF-Connecting-IP` was missing or invalid; the binding was not called |
+  | `limiter_error` | `limit()` threw (details deliberately not kept) |
+  | `unexpected_result` | `limit()` returned something other than `{ success: true }` or `{ success: false }` |
+
+  Every value except `limited` means the request was served (fail-open). The field is absent on endpoints that are not limited.
 * **Sign-out body bound:** `POST /portal/logout` accepts at most 2048 bytes. A declared oversized or malformed `Content-Length` is refused (`413`/`400`)
   before the session lookup and without reading the body; a chunked body is cancelled as soon as it crosses the limit.
 * No database counters are used (that would need a migration).

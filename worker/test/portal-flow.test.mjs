@@ -6,6 +6,7 @@ import { handlePortal } from "../portal/router.js";
 import { rows, count } from "./helpers/portal-db.mjs";
 import * as repo from "../portal/repo/index.js";
 import * as store from "../portal/repo/sessions.js";
+import { rateLimitKey, RATE_LIMIT_OUTCOMES } from "../portal/ratelimit.js";
 
 const ALICE = (w) => w.user(1, "alice@example.com");
 const text = (r) => r.text();
@@ -714,6 +715,110 @@ test("rate limiting: no raw address reaches the logs", async () => {
   const all = lines.join("\n");
   assert.match(all, /"evt":"rate.limited"/);
   assert.ok(!/2001|db8|abcd|203\.0\.113/.test(all));
+});
+
+/* ------------------------------------------------------------------ limiter outcome in the existing request log (rl) */
+async function captureLogs(fn) {
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => lines.push(a.join(" "));
+  try { await fn(); } finally { console.log = orig; }
+  return { lines, events: lines.map((l) => JSON.parse(l)) };
+}
+const DOC_IP = { "CF-Connecting-IP": "203.0.113.7" };
+
+test("rl: the request event for each limited endpoint carries exactly the limiter outcome, with no extra events", async () => {
+  const cases = [
+    ["ok", { limit: async () => ({ success: true }) }, DOC_IP],
+    ["no_binding", undefined, DOC_IP],
+    ["no_client_ip", { limit: async () => ({ success: true }) }, {}],
+    ["limiter_error", { limit: async () => { throw new Error("boom 203.0.113.7"); } }, DOC_IP],
+    ["unexpected_result", { limit: async () => ({ success: "maybe" }) }, DOC_IP],
+  ];
+  for (const [outcome, binding, headers] of cases) {
+    const { w } = await acme();
+    if (binding) w.env.PORTAL_RATE_LIMITER = binding;
+    const start = await captureLogs(() => w.browser().get("/portal/login?start=1", { headers }));
+    assert.deepEqual(start.events.map((e) => e.evt), ["auth.start", "request"], outcome + ": still exactly the two existing events");
+    assert.equal(start.events[1].rl, outcome, outcome);
+    assert.equal(start.events[1].status, 302, "fail-open behaviour unchanged: the request is served");
+    const cb = await captureLogs(() => w.browser().get("/portal/auth/callback?code=abc&state=" + "s".repeat(43), { headers }));
+    assert.equal(cb.events.filter((e) => e.evt === "request")[0].rl, outcome, "callback: " + outcome);
+    const lo = await captureLogs(() => w.browser().post("/portal/logout", { csrf: "x" }, headers));
+    assert.equal(lo.events.filter((e) => e.evt === "request")[0].rl, outcome, "logout: " + outcome);
+  }
+});
+test("rl: absent from endpoints that are not limited (plain login page, authenticated browsing, org pages, unknown paths)", async () => {
+  const { w } = await acme();
+  w.env.PORTAL_RATE_LIMITER = { limit: async () => ({ success: true }) };
+  const b = await signedIn(w, ALICE(w), null);
+  const { events } = await captureLogs(async () => {
+    await w.browser().get("/portal/login", { headers: DOC_IP });
+    await b.get("/portal", { headers: DOC_IP });
+    await b.get("/portal/o/acme", { headers: DOC_IP });
+    await b.get("/portal/o/acme/projects", { headers: DOC_IP });
+    await b.get("/portal/nothing-here", { headers: DOC_IP });
+  });
+  const requests = events.filter((e) => e.evt === "request");
+  assert.equal(requests.length, 5);
+  for (const r of requests) assert.ok(!("rl" in r), r.route + " must not carry rl");
+});
+test("rl: a limited request keeps its existing early return and its existing rate.limited event (no request event, no new events)", async () => {
+  const { w } = await acme();
+  w.env.PORTAL_RATE_LIMITER = { limit: async () => ({ success: false }) };
+  const { events } = await captureLogs(() => w.browser().get("/portal/login?start=1", { headers: DOC_IP }));
+  assert.deepEqual(events.map((e) => e.evt), ["rate.limited"]);
+  assert.equal(events[0].outcome, "login");
+  assert.equal(events[0].status, 429);
+  const res = await w.browser().get("/portal/login?start=1", { headers: DOC_IP });
+  assert.equal(res.status, 429);
+  assert.equal(res.headers.get("Retry-After"), "60");
+});
+test("rl privacy: across every outcome and client type, no address, key, cookie, state, secret or error text reaches any log line", async () => {
+  const addresses = ["203.0.113.7", "198.51.100.23", "2001:db8:abcd:1234::99", "::ffff:192.0.2.55"];
+  const secretError = "limiter blew up for 203.0.113.7 with pepper " + PEPPER + " sk_test_TOPSECRET";
+  const makers = [
+    () => ({ limit: async () => ({ success: true }) }),
+    () => ({ limit: async () => ({ success: false }) }),
+    () => ({ limit: async () => { throw new Error(secretError); } }),
+    () => ({ limit: async () => { throw secretError; } }),
+    () => ({ limit: async () => ({ success: "x", detail: secretError }) }),
+    () => undefined,
+  ];
+  const { w } = await acme();
+  const allLines = [];
+  const keys = [];
+  for (const ip of addresses) for (const make of makers) {
+    const binding = make();
+    if (binding) w.env.PORTAL_RATE_LIMITER = binding; else delete w.env.PORTAL_RATE_LIMITER;
+    keys.push(await rateLimitKey(PEPPER, "login", ip), await rateLimitKey(PEPPER, "callback", ip), await rateLimitKey(PEPPER, "logout", ip));
+    const b = w.browser();
+    b.jar.set("__Host-fw_portal", "C".repeat(43));
+    b.jar.set("__Host-fw_auth", "SEALED.STATEVALUE");
+    const { lines } = await captureLogs(async () => {
+      await b.get("/portal/login?start=1&login_hint=" + encodeURIComponent("victim@example.com"), { headers: { "CF-Connecting-IP": ip } });
+      await b.get("/portal/auth/callback?code=SECRETCODE123&state=" + "S".repeat(43), { headers: { "CF-Connecting-IP": ip } });
+      await b.post("/portal/logout", { csrf: "CSRFSECRET" }, { "CF-Connecting-IP": ip });
+    });
+    allLines.push(...lines);
+  }
+  assert.ok(allLines.length > 50, "lines were captured: " + allLines.length);
+  const text = allLines.join("\n");
+  for (const secret of [...addresses, "2001", "db8", "abcd", "203.0.113", "198.51", "192.0.2", ...keys.filter(Boolean).map((k) => k.split(":")[1]), ...keys.filter(Boolean), PEPPER, "TOPSECRET", "blew up", "limiter blew", "SECRETCODE123", "CSRFSECRET", "SEALED.STATEVALUE", "C".repeat(43), "S".repeat(43), "victim@example.com", "Error", "stack"]) {
+    assert.ok(!text.includes(secret), "leaked: " + String(secret).slice(0, 12));
+  }
+  for (const line of allLines) {
+    const e = JSON.parse(line);
+    if ("rl" in e) assert.ok(RATE_LIMIT_OUTCOMES.includes(e.rl), "rl must be one of the fixed words: " + e.rl);
+  }
+  assert.ok(allLines.some((l) => /"rl":"limiter_error"/.test(l)) && allLines.some((l) => /"rl":"no_binding"/.test(l)));
+});
+test("rl behaviour regression: reporting the outcome does not change who is limited (only an explicit refusal limits; everything else still fails open)", async () => {
+  const { w } = await acme();
+  for (const [binding, expectStatus] of [[{ limit: async () => ({ success: false }) }, 429], [{ limit: async () => ({ success: true }) }, 302], [{ limit: async () => { throw new Error("x"); } }, 302], [undefined, 302]]) {
+    if (binding) w.env.PORTAL_RATE_LIMITER = binding; else delete w.env.PORTAL_RATE_LIMITER;
+    assert.equal((await w.browser().get("/portal/login?start=1", { headers: DOC_IP })).status, expectStatus);
+  }
 });
 
 /* ------------------------------------------------------------------ logout request-body bound */

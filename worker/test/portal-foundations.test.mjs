@@ -5,7 +5,7 @@ import { portalMode, portalConfigProblems, readPortalConfig } from "../portal/co
 import * as C from "../portal/crypto.js";
 import { can, requirePermission, permissionsFor, PortalForbidden, ACTIONS } from "../portal/policy.js";
 import * as H from "../portal/http.js";
-import { buildLogEntry, logEvent, routeName } from "../portal/log.js";
+import { buildLogEntry, logEvent, routeName, LOG_FIELDS } from "../portal/log.js";
 import { validateAccessTokenClaims, identityFromWorkosUser } from "../portal/claims.js";
 
 const PEPPER = "Zk3xQ9vB7mLr2TnW8yHcA5dJfG1sPuE4oXiK6bNtMe0";
@@ -345,4 +345,14 @@ test("claims: identity needs a verified email and must match the token subject",
   assert.equal(identityFromWorkosUser(user({ first_name: "x".repeat(121), last_name: "" }), claims).identity.name, null, "an unusable name is dropped, not fatal");
   assert.equal(identityFromWorkosUser(user({ first_name: "Pat\u0000", last_name: null }), claims).identity.name, null);
   assert.equal(identityFromWorkosUser(user({ first_name: null, last_name: null }), claims).identity.name, null);
+});
+
+test("log: the rl field accepts only the six fixed limiter outcomes; anything else is redacted", () => {
+  for (const ok of ["ok", "limited", "no_binding", "no_client_ip", "limiter_error", "unexpected_result"]) assert.equal(buildLogEntry({ evt: "request", rl: ok }).rl, ok);
+  for (const bad of ["203.0.113.7", "2001:db8::1", "login:0123456789abcdef0123456789abcdef", "limiter_error: boom", "Error: x", "OK", "ok ", "", "true", 1, true, {}, [], "sk_test_x", "session_01ABC"]) {
+    assert.equal(buildLogEntry({ evt: "request", rl: bad }).rl, "[redacted]", JSON.stringify(bad));
+  }
+  assert.equal("rl" in buildLogEntry({ evt: "request" }), false, "omitted when not provided");
+  assert.equal("rl" in buildLogEntry({ evt: "request", rl: undefined }), false);
+  assert.ok(LOG_FIELDS.includes("rl"));
 });

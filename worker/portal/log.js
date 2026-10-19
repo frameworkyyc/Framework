@@ -7,6 +7,8 @@
  * (query strings are redacted in wrangler.jsonc); this module is for what OUR code says.
  */
 
+import { RATE_LIMIT_OUTCOMES } from "./ratelimit.js";
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const WORD = /^[a-z][a-z0-9_.]{0,39}$/; // lower-case snake words: a token or an email cannot match (capitals, dashes, '@', length)
 const ROUTE = /^\/[a-z0-9_:/-]{0,60}$/;
@@ -24,6 +26,7 @@ const FIELDS = {
   org: (v) => typeof v === "string" && UUID.test(v),
   user: (v) => typeof v === "string" && UUID.test(v),
   count: (v) => Number.isInteger(v) && v >= 0 && v <= 1000000,
+  rl: (v) => typeof v === "string" && RATE_LIMIT_OUTCOMES.includes(v), // limiter outcome: exactly one of a fixed set of words
 };
 
 export const LOG_FIELDS = Object.freeze(Object.keys(FIELDS));

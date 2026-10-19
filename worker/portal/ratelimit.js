@@ -82,15 +82,39 @@ export async function rateLimitKey(pepper, bucket, ip) {
   return hashed ? `${bucket}:${hashed}` : null;
 }
 
-export async function isRateLimited(env, request, cfg, bucket) {
+/**
+ * The fixed set of outcomes a limiter check can report. They are logged (field `rl` on the existing `request` event) so a silent
+ * fail-open can be told apart from a working limiter. Only these words are ever logged: never an address, key, header or error text.
+ */
+export const RATE_LIMIT_OUTCOMES = Object.freeze(["ok", "limited", "no_binding", "no_client_ip", "limiter_error", "unexpected_result"]);
+
+/**
+ * Consult the limiter for this request. Returns { limited, outcome }:
+ *   ok                 the binding allowed the request (success: true)
+ *   limited            the binding refused it (success: false)           -> the only case where `limited` is true
+ *   no_binding         PORTAL_RATE_LIMITER is absent or has no limit()
+ *   no_client_ip       CF-Connecting-IP is missing or not a valid IP; the binding is not called
+ *   limiter_error      limit() threw (nothing about the error is kept), or the bucket name was not one of ours
+ *   unexpected_result  limit() answered something other than { success: true } or { success: false }
+ * Everything except `limited` fails open.
+ */
+export async function checkRateLimit(env, request, cfg, bucket) {
   const binding = env && env.PORTAL_RATE_LIMITER;
-  if (!binding || typeof binding.limit !== "function") return false;
+  if (!binding || typeof binding.limit !== "function") return { limited: false, outcome: "no_binding" };
   try {
+    if (!BUCKETS.includes(bucket)) return { limited: false, outcome: "limiter_error" };
     const key = await rateLimitKey(cfg.pepper, bucket, request.headers.get("CF-Connecting-IP"));
-    if (!key) return false;
+    if (!key) return { limited: false, outcome: "no_client_ip" };
     const res = await binding.limit({ key });
-    return Boolean(res) && res.success === false;
+    if (res && res.success === false) return { limited: true, outcome: "limited" };
+    if (res && res.success === true) return { limited: false, outcome: "ok" };
+    return { limited: false, outcome: "unexpected_result" };
   } catch {
-    return false;
+    return { limited: false, outcome: "limiter_error" }; // deliberately keeps nothing about the exception
   }
+}
+
+/** Boolean form kept for existing callers: true only when the binding explicitly refused the request. */
+export async function isRateLimited(env, request, cfg, bucket) {
+  return (await checkRateLimit(env, request, cfg, bucket)).limited;
 }

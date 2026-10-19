@@ -9,7 +9,7 @@ import { portalMode, portalConfigProblems, readPortalConfig } from "./config.js"
 import { errorPage, newRef, redirect } from "./http.js";
 import { handleLogin, handleCallback, handleLogout } from "./auth.js";
 import { requireSession, requireOrgAccess, dbCall, Unavailable, unavailablePage, notFoundPage } from "./guard.js";
-import { isRateLimited } from "./ratelimit.js";
+import { checkRateLimit } from "./ratelimit.js";
 import { logEvent, routeName } from "./log.js";
 import * as pages from "./pages.js";
 import { listActiveMembershipsForUser, listMembers } from "./repo/memberships.js";
@@ -133,11 +133,14 @@ export async function handlePortal(request, env, deps = {}) {
   const started = Date.now();
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   let response;
+  let rl; // the limiter outcome (a fixed word), set only for the limited endpoints; logged on the final `request` event
   try {
     const bucket = LIMITED[path];
     const limited = bucket && !(path === "/portal/login" && request.method === "GET" && url.searchParams.get("start") !== "1"); // the plain login page is free; starting a sign-in is not
     if (limited) {
-      if (await isRateLimited(env, request, cfg, bucket)) {
+      const check = await checkRateLimit(env, request, cfg, bucket);
+      rl = check.outcome;
+      if (check.limited) {
         logEvent({ evt: "rate.limited", outcome: bucket, route: routeName(path), status: 429, ref });
         return errorPage(429, { ref, headers: { "Retry-After": "60" } });
       }
@@ -155,6 +158,6 @@ export async function handlePortal(request, env, deps = {}) {
     logEvent({ evt: "request.failed", outcome: "error", route: routeName(path), status: 500, ref });
     return errorPage(500, { ref });
   }
-  logEvent({ evt: "request", method: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(request.method) ? request.method : undefined, route: routeName(path), status: response.status, ms: Date.now() - started, ref });
+  logEvent({ evt: "request", method: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].includes(request.method) ? request.method : undefined, route: routeName(path), status: response.status, ms: Date.now() - started, ref, rl });
   return response;
 }
