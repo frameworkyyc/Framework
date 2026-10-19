@@ -11,17 +11,29 @@
     "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>",
     // Public Turnstile site key (safe to expose; it is rendered in the page). The matching TURNSTILE_SECRET is an
     // encrypted runtime secret stored in Cloudflare, never in this file. Both must be set for the check to be enforced.
-    "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss"
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss",
+    // Client portal, PRODUCTION settings (non-secret). INERT until the portal is switched on: it answers only when PORTAL_ENABLED is exactly "1",
+    // and on the live hosts it additionally needs PORTAL_ALLOW_PRODUCTION = "1" (worker/portal/config.js). BOTH flags are deliberately absent
+    // here and are added in one separate, reviewed launch change. PORTAL_AUTH_CLIENT_ID is the public WorkOS PRODUCTION client id (not Staging's).
+    // PORTAL_BASE_URL must match the WorkOS redirect, logout and initiate-login URLs exactly. PORTAL_AUTH_ISSUER follows the Staging pattern
+    // and is unverified until the first live Production sign-in test. Secrets stay in Cloudflare: PORTAL_AUTH_CLIENT_SECRET, PORTAL_SESSION_PEPPER.
+    "PORTAL_AUTH_CLIENT_ID": "client_01M58C4236FYNJDQ3MM0E8V691",
+    "PORTAL_BASE_URL": "https://frameworkco.ca",
+    "PORTAL_AUTH_ISSUER": "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691"
   },
   // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
-  "observability": { "enabled": true },
+  // redact_query_string keeps ?code= / ?invitation_token= out of platform logs; invocation_logs is OFF because the automatic per-request record
+  // keeps the WorkOS Referer. Same settings as Staging, applied BEFORE the portal can ever be enabled here.
+  "observability": { "enabled": true, "redact_query_string": true, "logs": { "enabled": true, "invocation_logs": false } },
   "assets": {
     "directory": "./",
     "binding": "ASSETS",
     // The Worker runs for the API and for the private admin area (it checks the Cloudflare Access token before
     // serving anything under /admin), and for /card so its link-preview URLs match the environment. Every other public page is
-    // still served straight from static assets.
-    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/card"]
+    // still served straight from static assets. /portal and /portal/* belong to the client portal router (worker/portal/router.js): it
+    // answers only where PORTAL_ENABLED is "1" (set in previews.vars for Staging only, never at the top level, so never on Production); everywhere else the Worker returns
+    // an explicit 404 for these paths. Note "/portal/*" does not match "/portal" itself, so both are listed.
+    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/card", "/portal", "/portal/*"]
   },
   // Private client feedback responses (D1). This binding is used by normal `wrangler deploy` deployments.
   "d1_databases": [
@@ -29,13 +41,30 @@
       "binding": "DB",
       "database_name": "framework-feedback",
       "database_id": "47d90f94-3846-4711-9495-ab3479431a6f"
+    },
+    {
+      "binding": "PORTAL_DB",
+      "database_name": "framework-portal",
+      "database_id": "b213b7db-ed29-4ab6-946c-0728dd6709e8"
     }
+  ],
+  // Portal abuse limiter (worker/portal/ratelimit.js): 20 requests / 60 s per client network on sign-in start, callback and sign-out. Inert while
+  // the portal is off. namespace_id must be unique in the account: 4201 is Production's, Staging uses 4101 in previews.ratelimits.
+  "ratelimits": [
+    { "name": "PORTAL_RATE_LIMITER", "namespace_id": "4201", "simple": { "limit": 20, "period": 60 } }
   ],
   // Branch builds (Staging) run `wrangler preview`. A Preview does NOT inherit the top-level bindings above:
   // it only gets what is listed here, so without this block env.DB is undefined and /api/feedback answers
   // 503 "storage_not_configured". Staging has its OWN database (framework-staging) so test submissions never mix with
   // Production's framework-feedback. Same binding name (DB), so the code is identical in both. Never swap these IDs.
   "previews": {
+    // Staging logging. Application logs (console.log/error, including the portal's own request events) and errors stay on.
+    // redact_query_string removes query strings from request URLs in Workers Logs and traces: Staging sign-in requests carry
+    // ?code= (authorization code) and possibly ?invitation_token=, which must not be retained in platform logs.
+    // invocation_logs is OFF because Cloudflare's automatic per-request record keeps request headers (cookies are redacted, but not
+    // Referer), and the WorkOS sign-in callback arrives with a Referer holding a WorkOS AuthKit /success?client_redirect_key=... URL.
+    // Production is deliberately unchanged here; it is decided separately and must be before the portal is ever enabled there.
+    "observability": { "enabled": true, "redact_query_string": true, "logs": { "enabled": true, "invocation_logs": false } },
     // Non-secret runtime settings for Previews. In Wrangler the config file is the source of truth: a plain variable
     // that exists only in the dashboard is deleted on the next deploy, and previews do not inherit top-level `vars`.
     // (Secrets such as RESEND_API_KEY are different: they live in Cloudflare and survive deploys.) The sender address
@@ -44,14 +73,42 @@
       "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>",
       // Public Turnstile site key (safe to expose; it is rendered in the page). The matching TURNSTILE_SECRET is an
       // encrypted secret stored in Cloudflare, never in this file. Production does not get this key from here.
-      "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss"
+      "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss",
+      // Client portal (Staging only). Non-secret settings must live here or the next deploy deletes them from the dashboard.
+      // PORTAL_AUTH_CLIENT_ID is the public WorkOS Staging client id (not a secret; it appears in the sign-in URL).
+      // Secrets stay in Cloudflare and are never written here: PORTAL_AUTH_CLIENT_SECRET (the WorkOS API key), PORTAL_SESSION_PEPPER.
+      "PORTAL_AUTH_CLIENT_ID": "client_01M58C412YHC548S5JXP1TJ2ED",
+      "PORTAL_BASE_URL": "https://staging.frameworkco.ca",
+      // The exact token issuer, verified in the live Staging test (it embeds the client id).
+      "PORTAL_AUTH_ISSUER": "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED",
+      // Switches the client portal on for Staging ONLY. It must never appear in the top-level vars (Production): without it every /portal path answers 404.
+      "PORTAL_ENABLED": "1"
     },
     "d1_databases": [
       {
         "binding": "DB",
         "database_name": "framework-staging",
         "database_id": "c4815cdc-8948-4561-92a3-65e4860cdb94"
+      },
+      {
+        "binding": "PORTAL_DB",
+        "database_name": "framework-portal-staging",
+        "database_id": "1edda8a2-5249-4f40-9dbc-d29aa44e21f8"
       }
+    ],
+    // Private bucket for client files. Not served publicly (no public access, no custom domain).
+    "r2_buckets": [
+      {
+        "binding": "PORTAL_FILES",
+        "bucket_name": "framework-portal-files-staging"
+      }
+    ],
+    // Application-level abuse limiter for the portal's unauthenticated endpoints (worker/portal/ratelimit.js): sign-in start, callback and
+    // sign-out, counted per client network (IPv4 address or IPv6 /64) and bucket, 20 requests per 60 seconds. Staging only: it must never appear
+    // at the top level (Production). It complements, and does not replace, the Cloudflare WAF rate-limiting rule. If the binding is missing the
+    // portal simply does not limit (fails open). namespace_id must be unique in the account (equal ids share counters): use a different one for Production later.
+    "ratelimits": [
+      { "name": "PORTAL_RATE_LIMITER", "namespace_id": "4101", "simple": { "limit": 20, "period": 60 } }
     ]
   }
 }
