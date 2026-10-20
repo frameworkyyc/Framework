@@ -5,7 +5,7 @@
 
 export const MODULES = [
   { id: "overview", label: "Overview", path: "/admin", enabled: true, load: () => import("./overview.js") },
-  { id: "feedback", label: "Feedback", path: "/admin/feedback", enabled: true, load: () => import("./feedback.js") },
+  { id: "feedback", label: "Client Feedback", path: "/admin/feedback", enabled: true, load: () => import("./feedback.js") },
   { id: "assessments", label: "Assessments", path: "/admin/assessments", enabled: true, load: () => import("./assessments.js") },
 
   { id: "clients", label: "Clients", path: "/admin/clients", enabled: false },

@@ -58,11 +58,11 @@ function deniedPage(status, code) {
   );
 }
 
-async function handleApi(request, env, principal, path) {
+async function handleApi(request, env, principal, path, deps = {}) {
   // Modules register here. Each handler returns a Response, or null when the path isn't one of its routes.
   const handlers = [handleFeedbackApi, handleAssessmentsApi, handleDatabaseApi];
   for (const handler of handlers) {
-    const res = await handler(request, env, principal, path);
+    const res = await handler(request, env, principal, path, deps);
     if (res) return res;
   }
   return json({ error: "not_found" }, 404);
@@ -89,6 +89,6 @@ export async function handleAdmin(request, env, deps = {}) {
     return deniedPage(auth.status, auth.code);
   }
 
-  if (isApi) return handleApi(request, env, auth, pathname.slice("/api/admin".length) || "/");
+  if (isApi) return handleApi(request, env, auth, pathname.slice("/api/admin".length) || "/", deps);
   return handlePage(request, env, pathname);
 }

@@ -5,6 +5,8 @@
  */
 
 import { COLUMNS, RATING_KEYS, ensureSchema, json, csvCell } from "../shared.js";
+import { sendEmail, emailConfig, notifyRecipient } from "../assessment.js";
+import { feedbackUrl, validateInvite, buildInvite } from "../feedback-invite.js";
 
 const ID_PATTERN = /^[A-Za-z0-9-]{16,64}$/;
 const LIST_LIMIT = 1000;
@@ -164,10 +166,32 @@ function sameOriginWrite(request) {
  * @param path pathname with the "/api/admin" prefix removed, e.g. "/feedback/export"
  * @returns Response, or null if the path is not a feedback route
  */
-export async function handleFeedbackApi(request, env, principal, path) {
+export async function handleFeedbackApi(request, env, principal, path, deps = {}) {
   const method = request.method;
 
   if (path === "/me") return method === "GET" ? me(principal) : json({ error: "method_not_allowed" }, 405, { Allow: "GET" });
+
+  // Sharing the existing feedback form: the link, whether this deployment can email, and a copyable invitation. Nothing is stored or sent here.
+  if (path === "/feedback/share") {
+    if (method !== "GET") return json({ error: "method_not_allowed" }, 405, { Allow: "GET" });
+    const url = feedbackUrl(new URL(request.url).origin);
+    const cfg = emailConfig(env);
+    const template = buildInvite({ name: "[Client name]", project: "", url });
+    return json({ form_url: url, email: { can_send: cfg.ok, from: cfg.ok ? cfg.from : null }, template: { subject: template.subject, text: template.text } });
+  }
+  // Send ONE invitation, only on an explicit admin request (POST from the admin app). Never automatic; nothing is stored.
+  if (path === "/feedback/invite") {
+    if (method !== "POST") return json({ error: "method_not_allowed" }, 405, { Allow: "POST" });
+    if (!sameOriginWrite(request)) return json({ error: "forbidden" }, 403);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400); }
+    const v = validateInvite(body);
+    if (!v.ok) return json({ error: "validation_failed", field: v.error.replace("invalid_", "") }, 422);
+    if (!emailConfig(env).ok) return json({ error: "email_not_configured" }, 409);
+    const mail = buildInvite({ name: v.name, project: v.project, url: feedbackUrl(new URL(request.url).origin) });
+    const sent = await sendEmail(env, { to: v.email, replyTo: notifyRecipient(env), subject: mail.subject, text: mail.text, html: mail.html }, deps.fetch || fetch);
+    return sent.ok ? json({ ok: true }) : json({ ok: false, error: "send_failed" }, 502); // the provider's detail is logged by sendEmail without the recipient; the admin sees a coarse code
+  }
 
   if (!env.DB) return json({ error: "database_unavailable" }, 503);
   const url = new URL(request.url);

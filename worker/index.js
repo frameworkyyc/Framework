@@ -31,7 +31,8 @@ const FORM_VERSION = "1";
 
 /* ---- Allowed values (must match client-feedback.html) ---- */
 
-const IMPROVEMENT = ["Significant improvement", "Moderate improvement", "Slight improvement", "About the same", "Worse"];
+// "I didn't have a website before." is not a rating: nothing scores or flags it, and it is stored as given.
+const IMPROVEMENT = ["Significant improvement", "Moderate improvement", "Slight improvement", "About the same", "Worse", "I didn\u2019t have a website before."];
 const IMPACT = [
   "Our business looks more professional",
   "Customers can find information more easily",

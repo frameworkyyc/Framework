@@ -275,3 +275,13 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-interaction__date { width: auto; min-height: 40px; padding: 6px 10px; font-size: 14px; }
 .adm-interaction__hint { margin: 10px 0 0; font-size: 12px; color: var(--slate); max-width: 38em; }
 .adm-search .btn[hidden] { display: none; }
+
+/* ---------- Client Feedback: share panel ---------- */
+.adm-share { margin: 0 0 40px; }
+.adm-share__linkrow { margin: 12px 0; max-width: 640px; }
+.adm-share__link, .adm-share__field, .adm-share__tpl { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--hairline); border-radius: 0; background: transparent; color: var(--ink); font: 400 15px/1.45 var(--font-body, inherit); }
+.adm-share__tpl { max-width: 640px; min-height: 180px; resize: vertical; }
+.adm-share__more { margin: 20px 0 0; max-width: 640px; } .adm-share__more > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+.adm-share__form { display: grid; gap: 14px; margin: 8px 0 20px; }
+.adm-share__row { display: grid; gap: 6px; } .adm-share__row label { font-size: 14px; font-weight: 600; }
+.adm-share__field:focus, .adm-share__link:focus, .adm-share__tpl:focus { outline: 2px solid var(--ink); outline-offset: 2px; }
