@@ -25,7 +25,9 @@ const first = (user) => {
   return n || String(user.email || "").split("@")[0] || "there";
 };
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
-const projectHref = (vm, id) => `${vm.base}/projects/${id}`;
+const projectHref = (vm, id) => `${vm.projectBase || `${vm.base}/projects`}/${id}`;
+/** Breadcrumb trail down to (not including) the current page. The demo sets vm.crumbs so a project keeps the service it was opened from. */
+const trail = (vm) => (vm.crumbs ? vm.crumbs.map(([label, h]) => `<a href="${e(h)}">${e(label)}</a>`).join(" / ") : `<a href="${e(vm.base)}/projects">Projects</a>`);
 const isActive = (p) => !["live", "maintenance", "archived"].includes(p.status);
 
 export const ACTIVITY_TYPES = Object.freeze([["all", "All"], ["milestone", "Milestones"], ["update", "Updates"], ["document", "Documents"], ["review", "Reviews"]]);
@@ -130,7 +132,7 @@ function milestones(vm, p) {
 }
 
 const DELIV = { delivered: ["Delivered", "done"], review: ["In review", "attention"], progress: ["In progress", "active"], todo: ["Not started", "idle"] };
-const delivHref = (vm, p, d) => `${vm.base}/projects/${p.id}/deliverables/${d.id}`;
+const delivHref = (vm, p, d) => `${projectHref(vm, p.id)}/deliverables/${d.id}`;
 const delivDate = (vm, d) => (d.due ? (d.state === "delivered" ? `Delivered ${fmtDay(d.due, vm.now)}` : `Due ${fmtDay(d.due, vm.now)}`) : "");
 function deliverables(vm, p) {
   if (!vm.has.deliverables || !p.deliverables) return notConnected("Deliverables", "What Framework is producing for you, and its status, will be listed here.");
@@ -153,7 +155,7 @@ export function deliverable(vm, p, d) {
   const st = DELIV[d.state];
   const dates = d.state === "delivered" ? [["Delivered", d.due]] : [["Due", d.due]];
   const review = d.state === "review";
-  return `<header class="page-head"><p class="crumb"><a href="${e(vm.base)}/projects">Projects</a> / <a href="${e(projectHref(vm, p.id))}">${e(p.name)}</a> / ${e(d.name)}</p><span class="eyebrow">Deliverable · ${e(p.name)}</span><h1 class="h1">${e(d.name)}</h1>${d.desc ? `<p class="lead">${e(d.desc)}</p>` : ""}</header>
+  return `<header class="page-head"><p class="crumb">${trail(vm)} / <a href="${e(projectHref(vm, p.id))}">${e(p.name)}</a> / ${e(d.name)}</p><span class="eyebrow">Deliverable · ${e(p.name)}</span><h1 class="h1">${e(d.name)}</h1>${d.desc ? `<p class="lead">${e(d.desc)}</p>` : ""}</header>
 <div class="cols">
 <div><section aria-labelledby="h-pv">${sectionHead("Preview")}<h2 id="h-pv" class="visually-hidden">Preview</h2><div class="doc__preview doc__preview--tall" role="img" aria-label="Sample deliverable: no preview available">Sample deliverable. Preview only: there is no file behind this entry.</div></section>
 ${review ? `<section class="section" aria-labelledby="h-fb">${sectionHead("Your feedback")}<h2 id="h-fb" class="visually-hidden">Your feedback</h2><p class="muted">In the live portal this is where you will review and respond. Commenting and approval are not available in this demonstration.</p><p class="actions-inert"><span class="btn btn--small" aria-disabled="true">Approve</span> <span class="btn btn--small" aria-disabled="true">Request changes</span></p></section>` : ""}</div>
@@ -175,7 +177,7 @@ export function project(vm, p) {
     ? `<dl class="facts"><div><dt>Stage</dt><dd>${e(statusLabel(p.status))}</dd></div><div><dt>Progress</dt><dd>${e(`${p.progress}%`)}</dd></div><div><dt>Started</dt><dd>${e(fmtDay(p.started, vm.now))}</dd></div><div><dt>Target launch</dt><dd>${e(fmtDay(p.target, vm.now))}</dd></div><div><dt>Project lead</dt><dd>${e(p.lead)}</dd></div></dl>`
     : `<dl class="facts"><div><dt>Stage</dt><dd>${e(statusLabel(p.status))}</dd></div><div><dt>Type</dt><dd>${e(humanize(p.kind))}</dd></div>${p.updatedAt ? `<div><dt>Last update</dt><dd>${e(relative(p.updatedAt, vm.now))}</dd></div>` : ""}</dl>`;
   const details = `<dl class="kv"><dt>Type</dt><dd>${e(humanize(p.kind))}</dd><dt>Stage</dt><dd>${status(p.status)}</dd>${live ? `<dt>Live site</dt><dd><a class="text-link" href="${e(live)}" rel="noopener noreferrer">${e(live.replace(/^https:\/\//, ""))}</a></dd>` : ""}${p.scope ? `<dt>Scope</dt><dd>${p.scope.map((s) => e(s)).join("<br>")}</dd>` : ""}${p.lead && vm.has.progress ? `<dt>Your contact</dt><dd>${e(p.lead)}</dd>` : ""}</dl>`;
-  return `<header class="page-head"><p class="crumb"><a href="${e(vm.base)}/projects">Projects</a> / ${e(p.name)}</p><span class="eyebrow">${e(humanize(p.kind))}</span><h1 class="h1">${e(p.name)}</h1>${p.summary ? `<p class="lead">${e(p.summary)}</p>` : ""}</header>
+  return `<header class="page-head"><p class="crumb">${trail(vm)} / ${e(p.name)}</p><span class="eyebrow">${e(humanize(p.kind))}</span><h1 class="h1">${e(p.name)}</h1>${p.summary ? `<p class="lead">${e(p.summary)}</p>` : ""}${vm.partOf ? `<p class="muted small">${vm.partOf}</p>` : ""}</header>
 <section aria-label="Project summary">${facts}<div class="section">${stageTrack(p.status)}${vm.has.progress ? `<div class="meter-wrap">${meter(p.progress, "Overall progress")}</div>` : ""}</div></section>
 ${pending(vm, p)}
 <nav class="jump" aria-label="On this page"><a href="#milestones">Milestones</a><a href="#deliverables">Deliverables</a><a href="#documents">Documents</a><a href="#details">Details</a></nav>

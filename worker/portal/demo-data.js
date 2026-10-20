@@ -10,7 +10,7 @@ export function demoViewModel(now = new Date()) {
   const at = (days, hours = 0) => new Date(now.getTime() + days * DAY + hours * 3600000).toISOString();
   const projects = [
     {
-      id: "brand-identity", name: "Brand identity", kind: "brand", status: "review", progress: 82, lead: "Sam Rivera", started: at(-74), target: at(12), updatedAt: at(-1, -3),
+      id: "brand-identity", name: "Brand identity", kind: "brand", services: ["branding"], status: "review", progress: 82, lead: "Sam Rivera", started: at(-74), target: at(12), updatedAt: at(-1, -3),
       summary: "A complete identity system: strategy, logo, typography, colour and usage guidelines.",
       scope: ["Brand strategy and positioning", "Primary logo and secondary marks", "Typography and colour system", "Brand guidelines (PDF)", "Social media templates"],
       milestones: [
@@ -30,7 +30,7 @@ export function demoViewModel(now = new Date()) {
       ],
     },
     {
-      id: "website", name: "Website", kind: "website", status: "build", progress: 54, lead: "Sam Rivera", started: at(-48), target: at(41), updatedAt: at(-2),
+      id: "website", name: "Website", kind: "website", services: ["website"], status: "build", progress: 54, lead: "Sam Rivera", started: at(-48), target: at(41), updatedAt: at(-2),
       summary: "A fast, editable website that explains what Harbour & Pine does and makes it easy to get in touch.",
       scope: ["Sitemap and content plan", "Design of key templates", "Build on a content-managed platform", "Launch support and training"],
       milestones: [
@@ -51,7 +51,7 @@ export function demoViewModel(now = new Date()) {
       ],
     },
     {
-      id: "launch-photography", name: "Launch photography", kind: "photography", status: "discovery", progress: 12, lead: "Sam Rivera", started: at(-9), target: at(58), updatedAt: at(-4),
+      id: "launch-photography", name: "Launch photography", kind: "photography", services: ["content", "website"], status: "discovery", progress: 12, lead: "Sam Rivera", started: at(-9), target: at(58), updatedAt: at(-4),
       summary: "A day of photography for the new website and launch materials.",
       scope: ["Creative brief and shot list", "One studio day", "Editing and retouching of 40 images"],
       milestones: [
@@ -65,6 +65,19 @@ export function demoViewModel(now = new Date()) {
         { name: "Creative brief", state: "progress", due: at(6) },
         { name: "Shot list", state: "todo", due: at(20) },
         { name: "Final image set (40 images)", state: "todo", due: at(58) },
+      ],
+    },
+    {
+      id: "menu-design", name: "Café menu design", kind: "brand", services: ["branding"], status: "live", progress: 100, lead: "Sam Rivera", started: at(-210), target: at(-140), updatedAt: at(-140),
+      summary: "Print and digital menus designed to carry the new look.",
+      scope: ["Menu layout and typography", "Print-ready files", "Digital version for the website"],
+      milestones: [
+        { name: "Menu concepts", state: "done", date: at(-190) },
+        { name: "Final menus delivered", state: "done", date: at(-140), note: "Print-ready and digital files." },
+      ],
+      deliverables: [
+        { name: "Print menu", state: "delivered", due: at(-140) },
+        { name: "Digital menu", state: "delivered", due: at(-140) },
       ],
     },
   ];
@@ -84,6 +97,8 @@ export function demoViewModel(now = new Date()) {
     "Launch checklist": ["The final checks before the website goes live.", "Not started"],
     "Creative brief": ["Goals, style, locations and the shot outline. Needs your reference images.", "v1 (draft)"],
     "Shot list": ["The list of images to capture on the studio day.", "Not started"],
+    "Print menu": ["The final print-ready café menu.", "v3 (final)"],
+    "Digital menu": ["The menu as a web page and a downloadable PDF.", "v2 (final)"],
     "Final image set (40 images)": ["Forty edited and retouched images in web and print sizes.", "Not started"],
   };
   for (const p of projects) for (const d of p.deliverables) {

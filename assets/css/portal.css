@@ -387,3 +387,12 @@ a.deliv--link { color: inherit; text-decoration: none; } a.deliv--link:hover .de
 .dash__updates { grid-area: updates; } .dash__projects { grid-area: projects; } .dash__actions { grid-area: actions; } .dash__activity { grid-area: activity; }
 @media (max-width: 880px) { .dash { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; } .dash__updates, .dash__projects, .dash__actions, .dash__activity { grid-area: auto; } }
 .auth__alt { margin-top: var(--space-3); }
+
+/* ---------- projects inside a service workspace ---------- */
+.projs > li { padding: 20px 0; border-top: 1px solid var(--hairline); display: grid; gap: 8px; justify-items: start; }
+.projs > li:last-child { border-bottom: 1px solid var(--hairline); }
+.proj__top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--space-2); width: 100%; }
+.proj__name { font-family: var(--font-display); font-weight: 600; font-size: 21px; line-height: 1.2; letter-spacing: -0.01em; }
+.proj__desc { max-width: 40em; } .proj__meter { width: min(100%, 360px); }
+.proj__go { display: inline-flex; align-items: center; min-height: 44px; }
+.choices__hint { margin-top: var(--space-2); }

@@ -16,7 +16,7 @@ const demoEnv = (over = {}) => ({ ...world.env, PORTAL_DEMO: "1", PORTAL_DB: thr
 const get = (path, env = demoEnv(), init) => handlePortal(new Request(ORIGIN + path, init), env, { now: T0 });
 
 const GUIDED = ["/portal/demo/progress", "/portal/demo/profile", ...["business", "location", "offering", "goals", "online", "contact", "personality"].map((x) => "/portal/demo/profile/" + x),
-  "/portal/demo/branding", ...["existing", "logo", "guidelines", "identity"].map((x) => "/portal/demo/branding/" + x), "/portal/demo/website", "/portal/demo/marketing", "/portal/demo/content", "/portal/demo/files",
+  "/portal/demo/branding", "/portal/demo/website/projects/website", "/portal/demo/content/projects/launch-photography", "/portal/demo/branding/projects/menu-design", "/portal/demo/branding/projects/brand-identity/deliverables/primary-logo-suite", ...["existing", "logo", "guidelines", "identity"].map((x) => "/portal/demo/branding/" + x), "/portal/demo/website", "/portal/demo/marketing", "/portal/demo/content", "/portal/demo/files",
   ...["new-logo", "brand-guidelines", "brand-identity", "website-development", "website-design", "marketing-campaign", "photography-session"].map((x) => "/portal/demo/requests/" + x)];
 const PAGES = [...GUIDED, "/portal/demo", "/portal/demo/projects", "/portal/demo/projects/website", "/portal/demo/projects/brand-identity", "/portal/demo/projects/launch-photography",
   "/portal/demo/projects/website/deliverables/interior-page-templates", "/portal/demo/projects/brand-identity/deliverables/brand-strategy-brief", "/portal/demo/activity", "/portal/demo/activity?type=milestone", "/portal/demo/documents", "/portal/demo/documents?project=website", "/portal/demo/account"];
@@ -144,7 +144,7 @@ test("project workspace: shared anchor nav sits above two independent stacks tha
   assert.match(css, /prefers-reduced-motion: no-preference\) \{ html \{ scroll-behavior: smooth; \} \}/);
 });
 
-test("guided home is a plain navigation hub: greeting, six area blocks, nothing else; project pages sit behind a secondary navigation", async () => {
+test("guided home is a plain navigation hub: greeting and six area blocks; the header is Home and Account only", async () => {
   const html = await (await get("/portal/demo")).text();
   assert.match(html, /<h1[^>]*>Welcome back, Alex\.<\/h1>/);
   assert.match(html, /What would you like to work on\?/);
@@ -152,15 +152,49 @@ test("guided home is a plain navigation hub: greeting, six area blocks, nothing 
   assert.deepEqual(links, ["profile", "branding", "website", "marketing", "content", "files"].map((a) => "/portal/demo/" + a));
   for (const gone of ["Recommended next step", "Onboarding progress", "get you set up", "<progress", "Continue your Business Profile", "complete across", "%"]) assert.ok(!html.includes(gone), gone + " is gone from Home");
   assert.ok(!/class="status/.test(html.slice(html.indexOf('class="tiles"'))), "no status badges on the blocks");
-  const main = html.slice(html.indexOf("<header class=\"bar\"")); 
-  for (const label of ["Home", "Projects", "Account"]) assert.match(main, new RegExp(`<a href="/portal/demo[^"]*"[^>]*>${label}</a>`));
-  for (const p of ["/portal/demo/progress", "/portal/demo/projects", "/portal/demo/activity", "/portal/demo/documents", "/portal/demo/projects/website"]) {
-    const h = await (await get(p)).text();
-    assert.match(h, /aria-label="Project pages"/, p);
-    for (const [label, path] of [["Progress", "progress"], ["Projects", "projects"], ["Activity", "activity"], ["Documents", "documents"]]) assert.match(h, new RegExp(`href="/portal/demo/${path}"[^>]*>${label}</a>`), p + " " + label);
-  }
+  const header = html.slice(html.indexOf('<nav class="primary"'), html.indexOf("</nav>", html.indexOf('<nav class="primary"')));
+  assert.deepEqual([...header.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]), ["Home", "Account"]);
+  for (const p of ["/portal/demo/progress", "/portal/demo/projects", "/portal/demo/activity", "/portal/demo/documents", "/portal/demo/projects/website", "/portal/demo/website"]) assert.ok(!/aria-label="Project pages"|class="filters subnav"/.test(await (await get(p)).text()), p + " has no competing secondary navigation");
   assert.match(await (await get("/portal/demo/progress")).text(), /Welcome back, Alex/);
-  assert.ok(!/aria-label="Project pages"/.test(await (await get("/portal/demo/profile")).text()), "guided areas have no project sub-navigation");
+});
+test("projects live inside their service workspaces, by explicit category, with one View project action each", async () => {
+  const d = await import("../portal/demo-data.js");
+  const projects = d.demoViewModel(T0).projects;
+  assert.deepEqual(projects.map((p) => [p.id, p.services]), [["brand-identity", ["branding"]], ["website", ["website"]], ["launch-photography", ["content", "website"]], ["menu-design", ["branding"]]]);
+  const where = { branding: ["brand-identity", "menu-design"], website: ["website", "launch-photography"], content: ["launch-photography"], marketing: [] };
+  for (const [key, ids] of Object.entries(where)) {
+    const html = await (await get("/portal/demo/" + key)).text();
+    const links = [...html.matchAll(/href="\/portal\/demo\/[a-z]+\/projects\/([a-z-]+)"/g)].map((m) => m[1]);
+    assert.deepEqual([...links].sort(), [...ids].sort(), key);
+    assert.equal([...html.matchAll(/View project/g)].length, ids.length, key + " has one action per project");
+  }
+  const marketing = await (await get("/portal/demo/marketing")).text();
+  assert.match(marketing, /No Marketing projects yet/); assert.match(marketing, /href="#requests"/); assert.match(marketing, /id="requests"/);
+  const branding = await (await get("/portal/demo/branding")).text();
+  assert.match(branding, /Active projects/); assert.match(branding, /Completed projects/);
+  assert.ok(branding.indexOf("Café menu design") > branding.indexOf("Brand identity"));
+  assert.ok(!/Café menu design/.test(await (await get("/portal/demo/website")).text()), "no keyword-based classification");
+});
+test("journeys keep their service in breadcrumbs and links; direct URLs keep working and list every service", async () => {
+  const proj = await (await get("/portal/demo/branding/projects/brand-identity")).text();
+  assert.match(proj, /class="crumb"><a href="\/portal\/demo">Home<\/a> \/ <a href="\/portal\/demo\/branding">Branding<\/a> \/ Brand identity/);
+  assert.match(proj, /href="\/portal\/demo\/branding\/projects\/brand-identity\/deliverables\/primary-logo-suite"/);
+  const del = await (await get("/portal/demo/website/projects/website/deliverables/interior-page-templates")).text();
+  assert.match(del, /<a href="\/portal\/demo">Home<\/a> \/ <a href="\/portal\/demo\/website">Website<\/a> \/ <a href="\/portal\/demo\/website\/projects\/website">Website<\/a> \/ Interior page templates/);
+  const photoWeb = await (await get("/portal/demo/website/projects/launch-photography")).text();
+  const photoContent = await (await get("/portal/demo/content/projects/launch-photography")).text();
+  assert.match(photoWeb, /<a href="\/portal\/demo\/website">Website<\/a> \/ Launch photography/); assert.match(photoContent, /<a href="\/portal\/demo\/content">Content &amp; Photography<\/a> \/ Launch photography/);
+  assert.match(photoContent, /Part of: <a href="\/portal\/demo\/content">Content &amp; Photography<\/a> · <a href="\/portal\/demo\/website">Website<\/a>/);
+  assert.equal((await get("/portal/demo/marketing/projects/website")).status, 404, "a project is only reachable through its own services");
+  assert.equal((await get("/portal/demo/website/projects/brand-identity")).status, 404);
+  assert.equal((await get("/portal/demo/website/projects/website/deliverables/nope")).status, 404);
+  const direct = await (await get("/portal/demo/projects/website")).text();
+  assert.match(direct, /Home<\/a> \/ <a href="\/portal\/demo\/files">Files &amp; Deliverables<\/a> \/ <a href="\/portal\/demo\/projects">Projects<\/a> \/ Website/);
+  assert.match((await (await get("/portal/demo/projects/website/deliverables/interior-page-templates")).text()), /Interior page templates/);
+  const files = await (await get("/portal/demo/files")).text();
+  for (const p of ["progress", "projects", "activity", "documents"]) assert.match(files, new RegExp(`href="/portal/demo/${p}"`));
+  assert.match(files, /href="\/portal\/demo\/documents\?project=website"/);
+  assert.match(await (await get("/portal/demo/activity")).text(), /Files &amp; Deliverables<\/a> \/ Activity/);
 });
 test("guided pages: simulated controls are inert and labelled; nothing can be submitted or uploaded", async () => {
   for (const p of GUIDED) {

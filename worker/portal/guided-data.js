@@ -146,3 +146,8 @@ export function progressSummary() {
 
 export const profileDone = () => PROFILE_STEPS.filter((s) => s.state === "done").length;
 export const workspaceDone = (area) => WORKSPACES[area].topics.filter((t) => t.state === "done").length;
+
+/** The service categories a project can belong to. A project lists its categories explicitly (project.services); nothing is inferred from names. */
+export const SERVICE_AREAS = Object.freeze(["branding", "website", "marketing", "content"]);
+export const projectsFor = (projects, key) => projects.filter((p) => Array.isArray(p.services) && p.services.includes(key));
+export const categoriesOf = (project) => (Array.isArray(project.services) ? project.services.filter((k) => SERVICE_AREAS.includes(k)) : []);
