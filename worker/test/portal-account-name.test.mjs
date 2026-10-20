@@ -125,3 +125,11 @@ test("isolation: a save changes only the signed-in person's own row; ids in the 
   assert.deepEqual(rows(w, "jj@alpha.test"), [{ name: "JJ" }]);
   assert.match(await text(mia, "/portal/o/alpha/account"), /<dt>Name<\/dt><dd>Not set<\/dd>/);
 });
+
+test("layout: Account's grid items are spaced by the grid gap only, so Organization and You share one top edge (the generic .section margin used to push You down)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../../assets/css/portal.css", import.meta.url), "utf8");
+  assert.match(css, /\.cols--even > \.section \{ margin-top: 0; \}/);
+  assert.match(css, /\.cols--even \{[^}]*align-items|\.cols \{[^}]*align-items: start/);
+  assert.ok(!/\.cols--even[^{]*\{[^}]*(position: absolute|height:)/.test(css), "no fixed heights or absolute positioning");
+});

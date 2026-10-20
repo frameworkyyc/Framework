@@ -71,6 +71,8 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; margin: 0; 
 .section__aside { font-size: 14px; color: var(--slate); }
 .cols { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); column-gap: clamp(40px, 6vw, 96px); row-gap: clamp(48px, 6vw, 80px); align-items: start; }
 .cols--even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+/* Sections that are direct grid items are spaced by the grid's row-gap alone. The generic .section margin would push every item except the first down. */
+.cols--even > .section { margin-top: 0; }
 @media (max-width: 880px) { .cols, .cols--even { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- top bar ---------- */
@@ -448,3 +450,4 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .name-form { margin-top: 24px; }
 .name-form .field { margin-bottom: 12px; }
 .name-form .field__hint { display: block; margin: 2px 0 8px; }
+.name-form [role="status"] { margin-top: 10px; }
