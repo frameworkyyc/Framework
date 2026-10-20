@@ -40,7 +40,7 @@ plus read-only queries of the Staging environment.
 * A WorkOS invitation created for an address stays valid at WorkOS until revoked there. Revoking in D1 already stops access; Phase 3 should also call WorkOS
   revoke so a stale link cannot create an unused WorkOS user.
 
-## Proposed migration `0004` (NOT APPLIED; file: `migrations/portal-proposed/0004_invitation_delivery.sql`)
+## Migration `0004` (prepared in `migrations/portal/0004_invitation_delivery.sql`; NOT yet applied to any database)
 Four additive columns on `invitations`:
 
 | Column | Type | Purpose |

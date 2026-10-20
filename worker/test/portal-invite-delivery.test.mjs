@@ -2,7 +2,7 @@
 // and the delivery orchestration. Every provider is a mock; nothing here can reach WorkOS, Resend or a real address.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { openPortalDb, migrationFiles, count } from "./helpers/portal-db.mjs";
 import * as repo from "../portal/repo/index.js";
 import { recordDeliveryAttempt, getDelivery } from "../portal/repo/invitation-delivery.js";
@@ -14,14 +14,11 @@ const T = new Date("2026-10-20T12:00:00.000Z");
 const at = (days) => new Date(T.getTime() + days * 86400000);
 const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
 const rows = (db, q, ...p) => db.raw.prepare(q).all(...p).map((r) => ({ ...r }));
-const PROPOSED = "migrations/portal-proposed/0004_invitation_delivery.sql";
+const MIGRATION = "migrations/portal/0004_invitation_delivery.sql";
 const BASE = "https://staging.frameworkco.ca";
 
-function openWithDelivery() {
-  const db = openPortalDb();
-  db.raw.exec(read(PROPOSED));
-  return db;
-}
+/** The test database applies every file in migrations/portal, so it already has the delivery columns. */
+const openWithDelivery = () => openPortalDb();
 async function org(db, slug = "acme", name = "Acme Co") {
   const r = await repo.createOrganization(db, { slug, name }, { now: T });
   assert.ok(r.ok);
@@ -50,17 +47,17 @@ const send = (m, db, o, inv, over = {}) => deliverInvitation(m.ctx(db, over.now)
 
 /* ------------------------------------------------------------------ the proposed migration */
 
-test("migration proposal: additive and compatible. It is NOT in migrations/portal (so nothing can apply it), existing invitations become 'not_sent', and the constraints hold", () => {
-  assert.ok(!migrationFiles().some((f) => /delivery/i.test(f)), "the real migration list is unchanged: 0001-0003 only");
-  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql"]);
-  assert.ok(existsSync(new URL("../../" + PROPOSED, import.meta.url)));
-  const sqlText = read(PROPOSED).replace(/^--.*$/gm, "");
+test("migration 0004: additive and compatible. It is the fourth portal migration, existing invitations become 'not_sent', and the constraints hold", () => {
+  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql"]);
+  assert.ok(!existsSync(new URL("../../migrations/portal-proposed/", import.meta.url)), "the proposal folder is gone: the file was moved, not copied");
+  const sqlText = read(MIGRATION).replace(/^--.*$/gm, "");
   assert.deepEqual(sqlText.match(/\b(ALTER|CREATE|DROP|INSERT|UPDATE|DELETE)\b/g), ["ALTER", "ALTER", "ALTER", "ALTER"], "four ALTER TABLE ... ADD COLUMN statements and nothing else");
+  assert.deepEqual([...sqlText.matchAll(/ALTER TABLE (\w+) ADD COLUMN (\w+)/g)].map((m) => m.slice(1)), [["invitations", "delivery_status"], ["invitations", "delivery_channel"], ["invitations", "delivery_attempted_at"], ["invitations", "delivery_error"]]);
   assert.ok(!/DROP|DELETE|UPDATE|INSERT|CREATE/.test(sqlText));
-  // existing rows in every status, then the migration
-  const db = openPortalDb();
-  const o = db.raw.prepare("SELECT 1").get() && null;
-  assert.equal(o, null);
+  // a database exactly as Staging is today (0001 to 0003), with invitations in every status, then the migration
+  const db = openPortalDb({ migrate: false });
+  db.raw.exec("PRAGMA foreign_keys = ON");
+  for (const f of migrationFiles().filter((f) => !f.startsWith("0004"))) db.raw.exec(read("migrations/portal/" + f));
   db.raw.exec(`INSERT INTO organizations (id, slug, name, status, created_at, updated_at) VALUES ('aaaaaaaa-0000-4000-8000-00000000000a', 'acme', 'Acme', 'active', '${T.toISOString()}', '${T.toISOString()}')`);
   db.raw.exec(`INSERT INTO portal_users (id, workos_user_id, email, status, created_at) VALUES ('11111111-1111-4111-8111-111111111111', 'user_01EXISTING', 'old@example.com', 'active', '${T.toISOString()}')`);
   const ins = (id, email, status, extra = "") => db.raw.exec(`INSERT INTO invitations (id, organization_id, email, role, status, created_at, created_by, expires_at ${extra ? ", " + extra.split("|")[0] : ""}) VALUES ('${id}', 'aaaaaaaa-0000-4000-8000-00000000000a', '${email}', 'member', '${status}', '${T.toISOString()}', 'seed', '${at(7).toISOString()}' ${extra ? ", " + extra.split("|")[1] : ""})`);
@@ -68,23 +65,25 @@ test("migration proposal: additive and compatible. It is NOT in migrations/porta
   ins("10000000-0000-4000-8000-000000000002", "r@example.com", "revoked", `revoked_at, revoked_by|'${at(1).toISOString()}', 'seed'`);
   ins("10000000-0000-4000-8000-000000000003", "a@example.com", "accepted", `accepted_at, accepted_user_id|'${at(1).toISOString()}', '11111111-1111-4111-8111-111111111111'`);
   ins("10000000-0000-4000-8000-000000000004", "e@example.com", "expired");
-  const before = rows(db, "SELECT id, organization_id, email, role, workos_invitation_id, status, created_at, created_by, expires_at, accepted_at, accepted_user_id, revoked_at, revoked_by FROM invitations ORDER BY id");
-  db.raw.exec(read(PROPOSED));
-  assert.deepEqual(rows(db, "SELECT id, organization_id, email, role, workos_invitation_id, status, created_at, created_by, expires_at, accepted_at, accepted_user_id, revoked_at, revoked_by FROM invitations ORDER BY id"), before, "every existing column is unchanged");
+  const COLS = "id, organization_id, email, role, workos_invitation_id, status, created_at, created_by, expires_at, accepted_at, accepted_user_id, revoked_at, revoked_by";
+  const before = rows(db, `SELECT ${COLS} FROM invitations ORDER BY id`);
+  db.raw.exec(read(MIGRATION));
+  assert.deepEqual(rows(db, `SELECT ${COLS} FROM invitations ORDER BY id`), before, "every existing column is unchanged");
   assert.deepEqual(rows(db, "SELECT delivery_status, delivery_channel, delivery_attempted_at, delivery_error FROM invitations"), Array(4).fill({ delivery_status: "not_sent", delivery_channel: null, delivery_attempted_at: null, delivery_error: null }));
+  assert.deepEqual(rows(db, "SELECT name FROM pragma_table_info('invitations') WHERE name LIKE 'delivery_%' ORDER BY cid").map((r) => r.name), ["delivery_status", "delivery_channel", "delivery_attempted_at", "delivery_error"]);
   // constraints
   const bad = (set) => assert.throws(() => db.raw.exec(`UPDATE invitations SET ${set} WHERE id = '10000000-0000-4000-8000-000000000001'`), /constraint/i, set);
   bad("delivery_status = 'delivered'"); bad("delivery_status = 'sent'"); bad("delivery_status = NULL"); bad("delivery_channel = 'smtp'"); bad("delivery_error = 'Has Spaces!'"); bad("delivery_error = ''"); bad("delivery_error = '" + "a".repeat(41) + "'");
   db.raw.exec("UPDATE invitations SET delivery_status = 'failed', delivery_channel = 'workos', delivery_error = 'workos_rejected' WHERE id = '10000000-0000-4000-8000-000000000001'");
-  // the existing data layer and its invariants work on the migrated database
   assert.equal(rows(db, "SELECT count(*) AS n FROM invitations WHERE status = 'pending'")[0].n, 1);
 });
 
-test("migration workflows: the Production workflow and its check still expect exactly 0001 (so Production is untouched by this proposal), and the Staging config reads migrations/portal", () => {
+test("migration workflows: the Production workflow and its check still expect exactly 0001 (so Production is untouched), and the Staging config reads migrations/portal", () => {
   assert.match(read(".github/scripts/portal-d1-check.mjs"), /migration: "0001_portal_foundation\.sql"/);
   assert.ok(!/delivery/i.test(read(".github/workflows/portal-production-d1-migration.yml")));
   assert.match(read("wrangler.jsonc"), /"migrations_dir": "migrations\/portal"/);
-  assert.deepEqual(readdirSync(new URL("../../migrations/portal-proposed/", import.meta.url)), ["0004_invitation_delivery.sql"]);
+  assert.match(read("migrations/portal/wrangler.migrate.staging.jsonc"), /"database_name": "framework-portal-staging"/);
+  assert.ok(!/delivery|0004/.test(read("migrations/portal/wrangler.migrate.production.jsonc")));
 });
 
 /* ------------------------------------------------------------------ delivery state recording */
