@@ -109,7 +109,7 @@ export const NAV = Object.freeze([
  * @param banner  HTML shown above the bar (the demo banner) - already escaped by the caller
  */
 export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions = "", banner = "", headers = {}, cookies = [] }) {
-  const items = [...NAV, ...(nav.items || [])];
+  const items = nav.list || [...NAV, ...(nav.items || [])];
   const links = items.map((n) => `<li><a href="${e(nav.base + n.path)}"${n.key === nav.active ? ' aria-current="page"' : ""}>${e(n.label)}</a></li>`).join("");
   const html = `<!DOCTYPE html>
 <html lang="en-CA"><head>${head(title)}</head>

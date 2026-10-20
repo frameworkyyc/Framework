@@ -9,8 +9,11 @@ import { errorPage } from "./http.js";
 import { demoViewModel } from "./demo-data.js";
 import { viewFilters } from "./filters.js";
 import * as views from "./views.js";
+import * as guided from "./guided.js";
+import { PROFILE_STEPS, BRAND_PATHS, SERVICES, WORKSPACES } from "./guided-data.js";
 
 export const DEMO_BASE = "/portal/demo";
+const NAV = [{ key: "home", label: "Home", path: "" }, { key: "progress", label: "Progress", path: "/progress" }, { key: "projects", label: "Projects", path: "/projects" }, { key: "activity", label: "Activity", path: "/activity" }, { key: "documents", label: "Documents", path: "/documents" }, { key: "account", label: "Account", path: "/account" }];
 export const isDemoPath = (p) => p === DEMO_BASE || p.startsWith(DEMO_BASE + "/");
 
 const BANNER = `<div class="demo-banner" role="note"><div class="wrap"><span><strong>Demo mode</strong> · Fictional client data</span><a href="/portal/login">Go to sign-in</a></div></div>`;
@@ -23,9 +26,17 @@ export function handleDemo(ctx, path) {
   const rest = path.slice(DEMO_BASE.length).replace(/^\/+/, "");
   const parts = rest ? rest.split("/") : [];
   const filters = viewFilters(ctx.url);
-  const page = (active, title, body) => appPage({ title: `${title} (demo)`, bodyHtml: body, nav: { base: DEMO_BASE, active }, who: { org: vm.org.name, user: vm.user.name }, actions: ACTIONS, banner: BANNER });
+  const page = (active, title, body) => appPage({ title: `${title} (demo)`, bodyHtml: body, nav: { base: DEMO_BASE, active, list: NAV }, who: { org: vm.org.name, user: vm.user.name }, actions: ACTIONS, banner: BANNER });
 
-  if (parts.length === 0) return page("dashboard", "Dashboard", views.dashboard(vm));
+  if (parts.length === 0) return page("home", "Home", guided.home(vm));
+  if (parts[0] === "progress" && parts.length === 1) return page("progress", "Progress and activity", views.dashboard(vm));
+  const area = parts[0];
+  if (area === "profile" && parts.length === 1) return page("home", "Business Profile", guided.profile(vm));
+  if (area === "profile" && parts.length === 2) { const s = PROFILE_STEPS.find((x) => x.id === parts[1]); return s ? page("home", `${s.title}: Business Profile`, guided.profileStep(vm, s)) : errorPage(404, { ref: ctx.ref }); }
+  if (area === "branding" && parts.length <= 2) { const sel = parts[1]; if (sel && !BRAND_PATHS.some((x) => x.id === sel)) return errorPage(404, { ref: ctx.ref }); return page("home", "Branding", guided.branding(vm, sel)); }
+  if ((area === "website" || area === "marketing" || area === "content") && parts.length === 1 && WORKSPACES[area]) return page("home", WORKSPACES[area].title, guided.workspace(vm, area));
+  if (area === "files" && parts.length === 1) return page("home", "Files and deliverables", guided.files(vm));
+  if (area === "requests" && parts.length === 2) { const s = SERVICES.find((x) => x.id === parts[1]); return s ? page("home", `${s.title}: service request`, guided.request(vm, s)) : errorPage(404, { ref: ctx.ref }); }
   if (parts[0] === "projects" && parts.length === 1) return page("projects", "Projects", views.projects(vm));
   if (parts[0] === "projects" && parts.length === 2) {
     const p = vm.projects.find((x) => x.id === parts[1]);

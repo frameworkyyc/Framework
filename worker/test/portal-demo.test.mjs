@@ -15,7 +15,10 @@ const world = await makeWorld();
 const demoEnv = (over = {}) => ({ ...world.env, PORTAL_DEMO: "1", PORTAL_DB: throwing, ...over });
 const get = (path, env = demoEnv(), init) => handlePortal(new Request(ORIGIN + path, init), env, { now: T0 });
 
-const PAGES = ["/portal/demo", "/portal/demo/projects", "/portal/demo/projects/website", "/portal/demo/projects/brand-identity", "/portal/demo/projects/launch-photography",
+const GUIDED = ["/portal/demo/progress", "/portal/demo/profile", ...["business", "location", "offering", "goals", "online", "contact", "personality"].map((x) => "/portal/demo/profile/" + x),
+  "/portal/demo/branding", ...["existing", "logo", "guidelines", "identity"].map((x) => "/portal/demo/branding/" + x), "/portal/demo/website", "/portal/demo/marketing", "/portal/demo/content", "/portal/demo/files",
+  ...["new-logo", "brand-guidelines", "brand-identity", "website-development", "website-design", "marketing-campaign", "photography-session"].map((x) => "/portal/demo/requests/" + x)];
+const PAGES = [...GUIDED, "/portal/demo", "/portal/demo/projects", "/portal/demo/projects/website", "/portal/demo/projects/brand-identity", "/portal/demo/projects/launch-photography",
   "/portal/demo/projects/website/deliverables/interior-page-templates", "/portal/demo/projects/brand-identity/deliverables/brand-strategy-brief", "/portal/demo/activity", "/portal/demo/activity?type=milestone", "/portal/demo/documents", "/portal/demo/documents?project=website", "/portal/demo/account"];
 
 test("every demo page renders from static data without touching the database, a session or a cookie", async () => {
@@ -139,4 +142,71 @@ test("project workspace: shared anchor nav sits above two independent stacks tha
   assert.ok(stacks[1].includes('id="deliverables"') && stacks[1].includes('id="details"'));
   assert.match(css, /@media \(min-width: 881px\) \{ \.cols--stacks > \.stack > \.section:first-child \{ margin-top: 0; \} \}/);
   assert.match(css, /prefers-reduced-motion: no-preference\) \{ html \{ scroll-behavior: smooth; \} \}/);
+});
+
+test("guided home: six area blocks, a progress indicator and one recommended next step; the approved dashboard lives at /progress", async () => {
+  const html = await (await get("/portal/demo")).text();
+  for (const a of ["profile", "branding", "website", "marketing", "content", "files"]) assert.match(html, new RegExp(`class="tile" href="/portal/demo/${a}"`));
+  assert.equal([...html.matchAll(/class="tile"/g)].length, 6);
+  assert.match(html, /Recommended next step/); assert.match(html, /<progress class="meter"/);
+  assert.match(html, /href="\/portal\/demo\/progress"/); assert.match(html, /href="\/portal\/demo\/projects"/);
+  const prog = await (await get("/portal/demo/progress")).text();
+  assert.match(prog, /Welcome back, Alex/); assert.match(prog, /Needs your attention/);
+  for (const nav of ["Home", "Progress", "Projects", "Activity", "Documents", "Account"]) assert.match(html, new RegExp(`<a href="/portal/demo[^"]*"[^>]*>${nav}</a>`));
+});
+test("guided pages: simulated controls are inert and labelled; nothing can be submitted or uploaded", async () => {
+  for (const p of GUIDED) {
+    const html = await (await get(p)).text();
+    assert.ok(!/<form|<button|type="file"|type="submit"|formaction/i.test(html), p + " has no submit or upload control");
+    if (/<input|<textarea|<select/.test(html)) assert.match(html, /Demonstration only/, p + " labels its fields as a demonstration");
+    for (const m of html.matchAll(/class="btn[^"]*"[^>]*>/g)) if (/(Save|Submit|Choose files|Approve)/.test(html.slice(m.index, m.index + 160))) assert.match(m[0], /aria-disabled="true"|href=/);
+  }
+});
+test("service requests state the review, scoping and quotation terms and never imply authorisation", async () => {
+  for (const id of ["new-logo", "brand-guidelines", "brand-identity", "website-development", "website-design", "marketing-campaign", "photography-session"]) {
+    const html = await (await get("/portal/demo/requests/" + id)).text();
+    assert.match(html, /subject to Framework’s review, scoping and quotation/);
+    assert.match(html, /does not authorise any paid work/);
+    assert.match(html, /<span class="btn" aria-disabled="true">Submit request/);
+    assert.ok(!/<a[^>]*>\s*Submit/i.test(html));
+  }
+});
+test("prerequisites are specific to each service, link to the exact missing step and do not lock sections", async () => {
+  const logo = await (await get("/portal/demo/requests/new-logo")).text();
+  assert.match(logo, /href="\/portal\/demo\/profile\/personality"/);
+  assert.ok(!/href="\/portal\/demo\/profile\/online"/.test(logo), "unrelated steps are not required");
+  const design = await (await get("/portal/demo/requests/website-design")).text();
+  assert.match(design, /One of these: Existing brand assets or an agreed branding direction/);
+  assert.match(design, /href="\/portal\/demo\/branding\/existing"/);
+  const photo = await (await get("/portal/demo/requests/photography-session")).text();
+  assert.match(photo, /Everything needed for this request is in place/);
+  const existing = await (await get("/portal/demo/branding/existing")).text();
+  assert.match(existing, /without completing your Business Profile/);
+  assert.equal([...existing.matchAll(/class="upload"/g)].length, 4);
+  for (const p of ["/portal/demo/branding", "/portal/demo/website", "/portal/demo/marketing", "/portal/demo/content", "/portal/demo/files"]) assert.equal((await get(p)).status, 200, p + " is always explorable");
+});
+test("guided routes reject unknown steps, services, paths and prototype names", async () => {
+  for (const p of ["/portal/demo/profile/nope", "/portal/demo/branding/nope", "/portal/demo/requests/nope", "/portal/demo/requests", "/portal/demo/constructor", "/portal/demo/__proto__", "/portal/demo/profile/constructor", "/portal/demo/requests/constructor", "/portal/demo/website/extra"]) assert.equal((await get(p)).status, 404, p);
+});
+test("guided data is consistent: done steps are fully answered, unstarted steps are empty, every prerequisite resolves", async () => {
+  const d = await import("../portal/guided-data.js");
+  for (const s of d.PROFILE_STEPS) {
+    const filled = s.fields.filter((f) => f.value).length;
+    if (s.state === "done") assert.equal(filled, s.fields.length, s.id);
+    if (s.state === "todo") assert.equal(filled, 0, s.id);
+  }
+  for (const s of d.SERVICES) assert.ok(d.serviceReadiness(s).reqs.length > 0, s.id);
+  const sum = d.progressSummary(); assert.ok(sum.done > 0 && sum.done < sum.total);
+});
+test("live portal pages are untouched by the guided demo", async () => {
+  const w = await makeWorld();
+  await w.org("alpha", "Alpha Co"); await w.invite(await w.org("alpha2", "Alpha Two"), "x@alpha.test", "owner");
+  const a = (await w.db.prepare("SELECT slug FROM organizations WHERE slug='alpha'").first());
+  assert.ok(a);
+  const br = w.browser();
+  await w.invite({ id: (await w.db.prepare("SELECT id FROM organizations WHERE slug='alpha'").first()).id }, "ann2@alpha.test", "owner");
+  await br.signIn(w.user(2, "ann2@alpha.test"));
+  const html = await (await br.get("/portal/o/alpha")).text();
+  assert.ok(!/Let’s get you set up|class="tile"/.test(html));
+  assert.equal((await br.get("/portal/o/alpha/demo")).status, 404);
 });
