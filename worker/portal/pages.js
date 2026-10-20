@@ -71,8 +71,8 @@ export async function pickerPage(ctx, session, memberships) {
 }
 
 /** The home of the connected portal: the six workspace blocks. Nothing from the demonstration is shown. */
-export async function homePage(ctx, a) {
-  const vm = liveModel(ctx, a, {});
+export async function homePage(ctx, a, moduleStatus = {}) {
+  const vm = { ...liveModel(ctx, a, {}), moduleStatus };
   return shell(ctx, a, { title: "Home", active: "home", body: guided.home(vm), vm, ref: "home" });
 }
 export async function overviewPage(ctx, a, data) {

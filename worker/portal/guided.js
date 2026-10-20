@@ -49,13 +49,32 @@ const HOME_BLURB = { profile: "Your business, customers and goals", branding: "L
  * Signed-in clients (vm.liveAreas) get a link only for sections that are built; the others are plain, muted list items that say "Coming soon" and
  * are not links, so nothing suggests they can be opened. The demo (no vm.liveAreas) links every section.
  */
+/**
+ * The progress and required-action block of a live module's tile (shared by every module: see module-status.js for the contract).
+ * Text carries the meaning (the percentage and "Action required" are words); the bar and the red dot are decorative and hidden from assistive technology.
+ * An unavailable status says so and shows no percentage and no indicator, so a failed read is never mistaken for "0% complete".
+ */
+export function tileStatus(s) {
+  if (!s || typeof s !== "object") return "";
+  if (s.state === "unavailable") return `<div class="tile__status"><p class="tile__pct tile__pct--muted">Progress unavailable right now</p></div>`;
+  if (s.state !== "ready" || !Number.isInteger(s.percent) || s.percent < 0 || s.percent > 100) return "";
+  const note = s.actionRequired
+    ? `<p class="tile__action"><span class="dot dot--attention" aria-hidden="true"></span>Action required</p>`
+    : s.complete
+      ? ""
+      : `<p class="tile__note">Optional details remain</p>`;
+  return `<div class="tile__status"><progress class="meter" max="100" value="${s.percent}" aria-hidden="true">${s.percent}%</progress><p class="tile__pct">${s.percent}% complete</p>${note}</div>`;
+}
+
 export function home(vm) {
   const isLive = (key) => !vm.liveAreas || vm.liveAreas.includes(key);
   const tiles = AREAS.map((a) => {
     const inner = `<span class="tile__n" aria-hidden="true">${e(a.n)}</span><span class="tile__title">${e(a.title)}</span><span class="tile__desc">${e(HOME_BLURB[a.key])}</span>`;
-    return isLive(a.key)
-      ? `<li><a class="tile" href="${e(href(vm, a.path))}">${inner}<span class="tile__arrow" aria-hidden="true">→</span></a></li>`
-      : `<li><div class="tile tile--soon">${inner}<span class="tile__soon">Coming soon</span></div></li>`;
+    if (!isLive(a.key)) return `<li><div class="tile tile--soon">${inner}<span class="tile__soon">Coming soon</span></div></li>`;
+    const st = vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : ""; // only signed-in, live modules have one; the demo and Coming soon blocks never do
+    return st
+      ? `<li><a class="tile tile--status" href="${e(href(vm, a.path))}">${inner}<span class="tile__foot">${st}<span class="tile__arrow" aria-hidden="true">→</span></span></a></li>`
+      : `<li><a class="tile" href="${e(href(vm, a.path))}">${inner}<span class="tile__arrow" aria-hidden="true">→</span></a></li>`;
   }).join("");
   return `<header class="page-head page-head--home"><h1 class="h1 h1--home">Welcome back, ${e(first(vm.user))}.</h1><p class="lead">What would you like to work on?</p></header>
 <nav aria-label="Your workspace"><ul class="tiles">${tiles}</ul></nav>`;

@@ -451,3 +451,21 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .name-form .field { margin-bottom: 12px; }
 .name-form .field__hint { display: block; margin: 2px 0 8px; }
 .name-form [role="status"] { margin-top: 10px; }
+
+/* ---------- Home: module progress and required-action indicators (one presentation for every module; see worker/portal/module-status.js) ---------- */
+.tile__foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.tile__status { flex: 1 1 auto; min-width: 0; display: grid; gap: 6px; }
+.tile__status progress.meter { height: 3px; }
+.tile__pct { margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tile__pct--muted { font-weight: 500; color: var(--slate); }
+.tile__note { margin: 0; font-size: 13px; color: var(--slate); }
+.tile__action { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.dot { flex: none; display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.dot--attention { background: var(--signal); }
+@media (forced-colors: active) { .dot { forced-color-adjust: none; background: Mark; } progress.meter { forced-color-adjust: none; } }
+@media (max-width: 560px) {
+  .tile--status { grid-template-areas: "n title arrow" ". desc arrow" ". status status"; grid-template-rows: auto auto auto; }
+  .tile--status .tile__foot { display: contents; }
+  .tile--status .tile__status { grid-area: status; margin-top: 10px; }
+  .tile--status .tile__arrow { grid-area: arrow; align-self: center; }
+}

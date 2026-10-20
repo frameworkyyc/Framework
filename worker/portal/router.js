@@ -22,7 +22,8 @@ import { validateSlug, validateName } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
 import { getProfileAnswers, saveProfileStep } from "./repo/business-profile.js";
 import { stepById } from "./profile-schema.js";
-import { comingSoonKeys } from "./guided-data.js";
+import { comingSoonKeys, LIVE_AREAS } from "./guided-data.js";
+import { moduleStatuses } from "./module-status.js";
 import { readForm, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES } from "./form.js";
 import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
 import { checkCsrf } from "./sessions.js";
@@ -121,20 +122,23 @@ async function saveProfile(ctx, a, stepId) {
  * only ever a DISPLAY fallback, and only when its contact email is the signed-in (verified) email, i.e. provably the same person. It is never
  * written to the account and never used for anyone else's account.
  */
-async function contactNameFor(ctx, a) {
-  let answers;
+/** This organization's saved Business Profile answers, or null when they cannot be read (an outage, or a database without the profile table). Never another organization's. */
+async function readAnswers(ctx, a) {
   try {
-    answers = await dbCall(() => getProfileAnswers(ctx.db, a.membership.organizationId));
+    return await dbCall(() => getProfileAnswers(ctx.db, a.membership.organizationId));
   } catch (err) {
-    if (err instanceof Unavailable) return "";
+    if (err instanceof Unavailable) return null;
     throw err;
   }
+}
+function contactNameFrom(answers, a) {
+  if (!answers) return "";
   const same = String(answers.cemail || "").trim().toLowerCase() === String(a.session.email || "").trim().toLowerCase();
   return same && validateName(answers.cname) ? validateName(answers.cname) : "";
 }
-async function withDisplayName(ctx, a) {
+function withDisplayName(a, answers) {
   if (a.session.name) return a;
-  const name = await contactNameFor(ctx, a);
+  const name = contactNameFrom(answers, a);
   return name ? { ...a, session: { ...a.session, name } } : a;
 }
 
@@ -188,7 +192,12 @@ async function saveFeedback(ctx, a) {
 }
 
 const ORG_ROUTES = [
-  { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => pages.homePage(ctx, await withDisplayName(ctx, a)) },
+  { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => {
+      // One read serves both the greeting's name fallback and the module progress. null (unreadable) shows "Progress unavailable", never 0%.
+      const answers = await readAnswers(ctx, a);
+      return pages.homePage(ctx, withDisplayName(a, answers), moduleStatuses(LIVE_AREAS, { profile: answers }));
+    },
+  },
   { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, a, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },
   { re: /^\/portal\/o\/([^/]+)\/profile$/, action: "profile.view", run: async (ctx, a) => pages.profileOverviewPage(ctx, a, await getProfileAnswers(ctx.db, a.membership.organizationId)) },
   {
@@ -232,7 +241,7 @@ const ORG_ROUTES = [
     postAction: "account.view", // everyone may edit only their own name; the target row comes from the session, never the request
     bucket: "profile",
     run: async (ctx, a) => {
-      const shown = await withDisplayName(ctx, a);
+      const shown = withDisplayName(a, await readAnswers(ctx, a));
       return pages.accountPage(ctx, shown, { saved: viewFilters(ctx.url).saved, derived: !a.session.name && Boolean(shown.session.name) });
     },
     post: (ctx, a) => saveAccountName(ctx, a),
