@@ -6,7 +6,7 @@
 import { validEmail } from "./assessment.js";
 
 export const FEEDBACK_PATH = "/client-feedback";
-export const INVITE_SUBJECT = "Your feedback on your new website";
+export const INVITE_SUBJECT = "We\u2019d love your feedback on your new website";
 
 const oneLine = (v) => String(v == null ? "" : v).replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/\s+/g, " ").trim();
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -30,26 +30,31 @@ export function validateInvite(body) {
   return { ok: true, name, email: email.toLowerCase(), project };
 }
 
+/** "Thank you for choosing Framework for X." with a project, "Thank you for choosing Framework." without one. */
+const thanksLine = (project) => `Thank you for choosing Framework${project ? ` for ${project}` : ""}.`;
+
+const P1 = "We\u2019d love to hear about your experience working with us and how your new website is performing.";
+const P2 = "Your feedback plays an important role in helping us improve our services and deliver an even better experience for our clients. We\u2019d really appreciate you taking a few minutes to share your thoughts.";
+const P3 = "The questionnaire takes approximately five minutes to complete.";
+const P4 = "Thank you for your time and for trusting Framework with your project.";
+
 /** The invitation as plain text and HTML. Every dynamic value is escaped in the HTML; headers (subject, recipient) never contain client input. */
 export function buildInvite({ name, project = "", url }) {
-  const about = project ? ` on ${project}` : "";
-  const text = [
-    `Hi ${name},`,
-    "",
-    `Thank you for working with Framework${about}. I’d value a few minutes of your feedback on how the project went and how your new website is working for you.`,
-    "",
-    `Share your feedback: ${url}`,
-    "",
-    "It takes about five minutes, and your answers help us improve how we work.",
-    "",
-    "Thank you,",
-    "Framework",
-  ].join("\n");
+  const text = [`Hi ${name},`, "", thanksLine(project), "", P1, "", P2, "", `Share your feedback: ${url}`, "", P3, "", P4, "", "Framework"].join("\n");
   const html = `<div style="font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:1.55;color:#0A0A0A;max-width:560px">
 <p>Hi ${esc(name)},</p>
-<p>Thank you for working with Framework${esc(about)}. I’d value a few minutes of your feedback on how the project went and how your new website is working for you.</p>
+<p>${esc(thanksLine(project))}</p>
+<p>${esc(P1)}</p>
+<p>${esc(P2)}</p>
 <p><a href="${esc(url)}" style="display:inline-block;background:#0A0A0A;color:#FFFFFF;text-decoration:none;padding:12px 22px;font-weight:600">Share your feedback</a></p>
-<p style="color:#5C5C5C">It takes about five minutes, and your answers help us improve how we work.</p>
-<p>Thank you,<br>Framework</p></div>`;
+<p style="color:#5C5C5C">${esc(P3)}</p>
+<p>${esc(P4)}</p>
+<p>Framework</p></div>`;
   return { subject: INVITE_SUBJECT, text, html };
+}
+
+/** The copyable template shown in the admin panel: the same wording with placeholders. The project line is the only optional part. */
+export function inviteTemplate(url) {
+  const m = buildInvite({ name: "[Client Name]", project: "[Project Name]", url });
+  return { subject: m.subject, text: m.text, projectNote: "If there is no project name, delete \u201C for [Project Name]\u201D so it reads \u201CThank you for choosing Framework.\u201D" };
 }

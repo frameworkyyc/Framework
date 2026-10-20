@@ -6,7 +6,7 @@
 
 import { COLUMNS, RATING_KEYS, ensureSchema, json, csvCell } from "../shared.js";
 import { sendEmail, emailConfig, notifyRecipient } from "../assessment.js";
-import { feedbackUrl, validateInvite, buildInvite } from "../feedback-invite.js";
+import { feedbackUrl, validateInvite, buildInvite, inviteTemplate } from "../feedback-invite.js";
 
 const ID_PATTERN = /^[A-Za-z0-9-]{16,64}$/;
 const LIST_LIMIT = 1000;
@@ -176,8 +176,8 @@ export async function handleFeedbackApi(request, env, principal, path, deps = {}
     if (method !== "GET") return json({ error: "method_not_allowed" }, 405, { Allow: "GET" });
     const url = feedbackUrl(new URL(request.url).origin);
     const cfg = emailConfig(env);
-    const template = buildInvite({ name: "[Client name]", project: "", url });
-    return json({ form_url: url, email: { can_send: cfg.ok, from: cfg.ok ? cfg.from : null }, template: { subject: template.subject, text: template.text } });
+    const template = inviteTemplate(url);
+    return json({ form_url: url, email: { can_send: cfg.ok, from: cfg.ok ? cfg.from : null }, template: { subject: template.subject, text: template.text, project_note: template.projectNote } });
   }
   // Send ONE invitation, only on an explicit admin request (POST from the admin app). Never automatic; nothing is stored.
   if (path === "/feedback/invite") {

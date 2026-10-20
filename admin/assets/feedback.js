@@ -15,9 +15,10 @@ const RATING_LABELS = [
 
 /* ---------- Shared pieces (the overview imports these too) ---------- */
 
-/** Question 3 answer for clients with no earlier website: shown as not applicable, never scored or flagged. */
-export const NO_PRIOR_WEBSITE = "I didn\u2019t have a website before.";
-const improvementText = (v) => (v === NO_PRIOR_WEBSITE ? [NO_PRIOR_WEBSITE, h("span", { class: "adm-muted" }, " (not applicable)")] : v);
+/** Question 3 answer for clients with no earlier website: shown as not applicable, never scored or flagged. Earlier responses stored the first wording, which reads the same way here. */
+export const NO_PRIOR_WEBSITE = "No previous website";
+const LEGACY_NO_PRIOR_WEBSITE = "I didn\u2019t have a website before.";
+const improvementText = (v) => (v === NO_PRIOR_WEBSITE || v === LEGACY_NO_PRIOR_WEBSITE ? [NO_PRIOR_WEBSITE, h("span", { class: "adm-muted" }, " (not applicable)")] : v);
 
 /** "Needs attention": a low score anywhere, or the new site rated worse than before. */
 export function needsAttention(r) {

@@ -47,7 +47,7 @@ test("share info: the existing form's link, whether email can send, and a copyab
   const j = await (await call("/api/admin/feedback/share")).json();
   assert.equal(j.form_url, ORIGIN + "/client-feedback");
   assert.equal(j.email.can_send, true); assert.equal(j.email.from, "Framework <hello@frameworkco.ca>");
-  assert.equal(j.template.subject, INVITE_SUBJECT); assert.match(j.template.text, /Hi \[Client name\],/); assert.ok(j.template.text.includes(j.form_url));
+  assert.equal(j.template.subject, INVITE_SUBJECT); assert.match(j.template.text, /^Hi \[Client Name\],\n\nThank you for choosing Framework for \[Project Name\]\.\n/); assert.ok(j.template.text.includes(j.form_url)); assert.match(j.template.project_note, /delete .* for \[Project Name\]/);
   assert.ok(!JSON.stringify(j).includes("re_secretkey"), "the API key never leaves the server");
   const none = await (await call("/api/admin/feedback/share", { e: { ...env, RESEND_API_KEY: "" } })).json();
   assert.equal(none.email.can_send, false); assert.equal(none.email.from, null);
@@ -70,7 +70,7 @@ test("sending: explicit POST, one email through the existing provider, to the re
   assert.equal(sent.length, 1); assert.equal(sent[0].url, "https://api.resend.com/emails");
   const mail = JSON.parse(sent[0].init.body);
   assert.deepEqual(mail.to, ["ann@client.example"]); assert.equal(mail.from, "Framework <hello@frameworkco.ca>"); assert.equal(mail.subject, INVITE_SUBJECT);
-  assert.match(mail.text, /^Hi Ann Client,/); assert.match(mail.text, /on Harbour site/); assert.ok(mail.text.includes(ORIGIN + "/client-feedback"));
+  assert.match(mail.text, /^Hi Ann Client,\n\nThank you for choosing Framework for Harbour site\.\n/); assert.ok(mail.text.includes(ORIGIN + "/client-feedback"));
   assert.ok(mail.html.includes(`href="${ORIGIN}/client-feedback"`));
   assert.equal(sent[0].init.headers.Authorization, "Bearer re_secretkey");
   assert.ok(!mail.cc && !mail.bcc, "no extra recipients");
@@ -120,13 +120,15 @@ test("the invitation wording is concise and professional, uses the form link, an
 /* ------------------------------------------------------------------ Question 3 */
 
 const GOOD = { id: "q3-aaaaaaaaaaaaaaaaaaaa", satisfaction: 9, ratings: { visual_design: 5, ease_of_use: 5, mobile_experience: 5, accuracy: 5, professionalism: 5, communication: 5, overall_product: 5 }, improvement: "Significant improvement", impact: ["Too early to tell"], fair_price: "Unsure", recommend: 9, liked: "Everything", testimonial_permission: "No", logo_permission: "No", services: ["None currently"] };
-const NO_PRIOR = "I didn’t have a website before.";
+const NO_PRIOR = "No previous website";
+const LEGACY = "I didn’t have a website before.";
 
 test("Question 3: the new option is on the form with the same markup as its siblings, and every existing option is unchanged", () => {
   const html = read("client-feedback.html");
   const q3 = html.slice(html.indexOf('data-q="improvement"'), html.indexOf('id="q-improvement-err"'));
   const opts = [...q3.matchAll(/<label class="fb-opt fb-opt--radio" for="(improvement-\d)"><input type="radio" id="\1" name="improvement" value="([^"]+)"><span class="fb-opt__mark" aria-hidden="true"><\/span><span class="fb-opt__text">([^<]+)<\/span><\/label>/g)].map((m) => [m[1], m[2], m[3]]);
   assert.deepEqual(opts, [["improvement-0", "Significant improvement", "Significant improvement"], ["improvement-1", "Moderate improvement", "Moderate improvement"], ["improvement-2", "Slight improvement", "Slight improvement"], ["improvement-3", "About the same", "About the same"], ["improvement-4", "Worse", "Worse"], ["improvement-5", NO_PRIOR, NO_PRIOR]]);
+  assert.ok(!/No previous website\.|I didn’t have a website before/.test(html), "no trailing period, and the first wording is gone from the form");
   assert.match(q3, /Compared with your previous website or online presence/, "the question wording is unchanged");
 });
 test("Question 3: submitting every option works, including the new one, and an existing-website answer is unaffected", () => {
@@ -135,6 +137,9 @@ test("Question 3: submitting every option works, including the new one, and an e
     assert.equal(r.ok, true, v); assert.equal(r.row.improvement, v, "stored exactly as chosen");
   }
   assert.equal(validate({ ...GOOD, improvement: "I did not have a website" }).ok, false, "only the exact option is accepted");
+  assert.equal(validate({ ...GOOD, improvement: "No previous website." }).ok, false, "a trailing period is not a valid option");
+  const old = validate({ ...GOOD, improvement: LEGACY });
+  assert.equal(old.ok, true, "a page loaded before the change can still submit the first wording"); assert.equal(old.row.improvement, NO_PRIOR, "and it is stored with the current wording");
   assert.equal(validate({ ...GOOD, improvement: undefined }).ok, false, "still required");
   const a = validate({ ...GOOD, improvement: NO_PRIOR }).row, b = validate({ ...GOOD, improvement: "Slight improvement" }).row;
   const { improvement: _a, id: _i, created_at: _c, ...restA } = a, { improvement: _b, id: _j, created_at: _d, ...restB } = b;
@@ -142,20 +147,19 @@ test("Question 3: submitting every option works, including the new one, and an e
 });
 test("Question 3 in admin reports: shown as not applicable, never flagged, never scored; old responses still display", async () => {
   const js = read("admin/assets/feedback.js");
-  assert.match(js, /export const NO_PRIOR_WEBSITE = "I didn\\u2019t have a website before\."/);
+  assert.match(js, /export const NO_PRIOR_WEBSITE = "No previous website";/); assert.match(js, /const LEGACY_NO_PRIOR_WEBSITE = "I didn\\u2019t have a website before\.";/); assert.match(js, /v === NO_PRIOR_WEBSITE \|\| v === LEGACY_NO_PRIOR_WEBSITE/, "old and new responses both read as not applicable");
   assert.match(js, /improvementText\(r\.improvement\)/g);
   assert.equal([...js.matchAll(/improvementText\(r\.improvement\)/g)].length, 2, "list and detail both use it");
   assert.match(js, /\(not applicable\)/);
   assert.match(js, /r\.improvement === "Worse"/, "only Worse flags a response");
-  const mod = JSON.parse(`"${"I didn\\u2019t have a website before.".replace("\\u2019", "’")}"`);
-  assert.equal(mod, NO_PRIOR);
   // no calculation anywhere averages or scores the improvement answer
   for (const f of ["admin/assets/overview.js", "worker/admin/feedback-api.js"]) assert.ok(!/improvement/.test(read(f).replace(/SUMMARY_COLUMNS[\s\S]*?\];/, "").replace(/"improvement",/g, "")), f + " does not compute with improvement");
 });
 test("existing feedback stays compatible: stored values are plain text with no constraint, so earlier rows and exports are untouched", () => {
   for (const f of ["migrations/0001_create_feedback_responses.sql", "migrations/staging-init.sql"]) assert.match(read(f), /improvement TEXT NOT NULL,/);
   assert.ok(!/CHECK \(improvement/.test(read("migrations/0001_create_feedback_responses.sql")));
-  assert.match(read("worker/index.js"), /"Significant improvement", "Moderate improvement", "Slight improvement", "About the same", "Worse", "I didn\\u2019t have a website before\."/);
+  assert.match(read("worker/index.js"), /"Slight improvement", "About the same", "Worse", NO_PREVIOUS_WEBSITE\]/);
+  assert.match(read("worker/index.js"), /LEGACY_NO_PREVIOUS_WEBSITE = "I didn\\u2019t have a website before\."/);
 });
 test("the admin navigation entry is Client Feedback and the page offers the share panel", () => {
   assert.match(read("admin/assets/modules.js"), /id: "feedback", label: "Client Feedback", path: "\/admin\/feedback", enabled: true/);
@@ -163,4 +167,33 @@ test("the admin navigation entry is Client Feedback and the page offers the shar
   assert.match(js, /"Client Feedback"/); assert.match(js, /await sharePanel\(\)/);
   const ui = read("admin/assets/feedback-share.js");
   assert.match(ui, /Copy feedback link/); assert.match(ui, /Open feedback form/); assert.match(ui, /Send feedback request/); assert.match(ui, /Invitation template/);
+});
+
+test("email wording: the exact subject and body, with and without a project, escaped, same button", () => {
+  const url = "https://frameworkco.ca/client-feedback";
+  assert.equal(INVITE_SUBJECT, "We\u2019d love your feedback on your new website");
+  const withP = buildInvite({ name: "Ann", project: "Harbour & Pine site", url });
+  assert.equal(withP.text, [
+    "Hi Ann,", "", "Thank you for choosing Framework for Harbour & Pine site.", "",
+    "We\u2019d love to hear about your experience working with us and how your new website is performing.", "",
+    "Your feedback plays an important role in helping us improve our services and deliver an even better experience for our clients. We\u2019d really appreciate you taking a few minutes to share your thoughts.", "",
+    `Share your feedback: ${url}`, "", "The questionnaire takes approximately five minutes to complete.", "",
+    "Thank you for your time and for trusting Framework with your project.", "", "Framework"].join("\n"));
+  const without = buildInvite({ name: "Ann", project: "", url });
+  assert.match(without.text, /^Hi Ann,\n\nThank you for choosing Framework\.\n\nWe\u2019d love to hear/);
+  for (const t of [without.text, without.html]) assert.ok(!/ for \.|for undefined|for null/.test(t), "no empty project reference");
+  assert.ok(!buildInvite({ name: "Ann", project: undefined, url }).text.includes("Framework for"), "an omitted project reads naturally");
+  assert.match(withP.html, /Thank you for choosing Framework for Harbour &amp; Pine site\./);
+  const btn = /<a href="https:\/\/frameworkco\.ca\/client-feedback" style="display:inline-block;background:#0A0A0A;color:#FFFFFF;text-decoration:none;padding:12px 22px;font-weight:600">Share your feedback<\/a>/;
+  assert.match(withP.html, btn); assert.match(without.html, btn);
+  assert.ok(buildInvite({ name: "<b>x</b>", project: "<i>p</i>", url }).html.includes("&lt;b&gt;x&lt;/b&gt;"));
+  const order = ["Hi Ann", "Thank you for choosing", "We\u2019d love to hear", "Your feedback plays", "Share your feedback</a>", "approximately five minutes", "trusting Framework", ">Framework</p>"].map((x) => withP.html.indexOf(x));
+  assert.deepEqual([...order].sort((a, b) => a - b), order); assert.ok(order.every((i) => i >= 0));
+});
+test("a send without a project uses the natural wording and the sending workflow is unchanged", async () => {
+  const r = await call("/api/admin/feedback/invite", { method: "POST", body: { name: "Ann", email: "ann@client.example" } });
+  assert.equal(r.status, 200); assert.equal(sent.length, 1);
+  const mail = JSON.parse(sent[0].init.body);
+  assert.equal(mail.subject, "We\u2019d love your feedback on your new website");
+  assert.match(mail.text, /Thank you for choosing Framework\.\n/); assert.deepEqual(mail.to, ["ann@client.example"]);
 });

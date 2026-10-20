@@ -89,7 +89,7 @@ export async function sharePanel() {
     live,
     h("details", { class: "adm-share__more" }, h("summary", null, "Invitation email"),
       send || h("p", { class: "adm-banner" }, "Email sending isn’t configured on this site, so nothing can be sent from here. Copy the invitation below and send it from your own email."),
-      h("p", { class: "adm-sub" }, "Invitation template (you can copy this and send it yourself)"), tpl, h("div", { class: "adm-actions" }, copyTpl),
+      h("p", { class: "adm-sub" }, "Invitation template (you can copy this and send it yourself)"), tpl, h("p", { class: "adm-sub" }, info.template.project_note || ""), h("div", { class: "adm-actions" }, copyTpl),
     ),
   );
 }
