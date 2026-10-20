@@ -21,6 +21,7 @@ import { validateSlug } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
 import { getProfileAnswers, saveProfileStep } from "./repo/business-profile.js";
 import { stepById } from "./profile-schema.js";
+import { comingSoonKeys } from "./guided-data.js";
 import { readForm, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES } from "./form.js";
 import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
 import { checkCsrf } from "./sessions.js";
@@ -73,7 +74,8 @@ async function noAccess(ctx) {
 }
 
 /** Organization pages: every one goes through requireOrgAccess; queries use ONLY the membership's organization id. */
-const SOON = "branding|website|marketing|content|files";
+/** The Coming Soon pages (members only, like every organization page) for each section that is not built yet; derived from the same list that drives Home. */
+const SOON = comingSoonKeys().join("|");
 
 /** Save one questionnaire step. Every check below runs on the server for every save; the organization comes from the membership, never the form. */
 async function saveProfile(ctx, a, stepId) {

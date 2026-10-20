@@ -144,16 +144,41 @@ test("repository: organization ids must be real UUIDs and every query is scoped 
 
 /* ------------------------------------------------------------------ routes: home, overview, steps */
 
-test("signed-in Home shows the six approved blocks and nothing from the demonstration", async () => {
+test("signed-in Home keeps six blocks: only Business Profile is a link; the other five are muted, non-interactive 'Coming soon' items", async () => {
   const { ann } = await setup();
   const res = await ann.get("/portal/o/alpha");
   assert.equal(res.status, 200);
   const html = await res.text();
-  assert.deepEqual([...html.matchAll(/class="tile" href="([^"]+)"/g)].map((m) => m[1]), ["profile", "branding", "website", "marketing", "content", "files"].map((x) => "/portal/o/alpha/" + x));
+  const list = html.slice(html.indexOf('<ul class="tiles">'), html.indexOf("</ul>", html.indexOf('<ul class="tiles">')));
+  assert.equal([...list.matchAll(/<li>/g)].length, 6, "all six blocks remain, in the same order");
+  assert.deepEqual([...list.matchAll(/<span class="tile__title">([^<]+)</g)].map((m) => m[1].replace(/&amp;/g, "&")), ["Business Profile", "Branding", "Website", "Marketing", "Content & Photography", "Files & Deliverables"]);
+  assert.deepEqual([...list.matchAll(/class="tile" href="([^"]+)"/g)].map((m) => m[1]), ["/portal/o/alpha/profile"], "Business Profile is the only link");
+  assert.equal([...list.matchAll(/<div class="tile tile--soon">/g)].length, 5);
+  assert.equal([...list.matchAll(/<span class="tile__soon">Coming soon<\/span>/g)].length, 5, "the label is visible on each card without clicking");
+  const soon = [...list.matchAll(/<li><div class="tile tile--soon">[\s\S]*?<\/div><\/li>/g)].map((m) => m[0]);
+  for (const t of soon) assert.ok(!/<a |href=|tabindex|role="link"|role="button"|onclick|tile__arrow/.test(t), "no link, no focus stop, no arrow, no handler");
+  assert.equal([...list.matchAll(/tile__arrow/g)].length, 1, "only the active block has an arrow");
+  assert.match(list, /<a class="tile" href="\/portal\/o\/alpha\/profile">[\s\S]*Business Profile[\s\S]*tile__arrow/);
+  assert.ok(!/tile--soon[^>]*>[\s\S]*?Business Profile/.test(list.slice(0, list.indexOf("Branding"))), "Business Profile is not marked as coming soon");
   assert.match(html, /What would you like to work on\?/);
   for (const fake of ["Harbour", "Brand identity", "Launch photography", "Sam Rivera", "Fictional", "DEMO MODE"]) assert.ok(!html.includes(fake), fake);
   const nav = html.slice(html.indexOf('<nav class="primary"'), html.indexOf("</nav>", html.indexOf('<nav class="primary"')));
   assert.deepEqual([...nav.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]), ["Home", "Account", "Team"], "owner: Home, Account, Team");
+});
+test("availability is one list: activating a section turns its block into a link; the Coming Soon route list is derived from the same list; the demo links everything", async () => {
+  const d = await import("../portal/guided-data.js");
+  const g = await import("../portal/guided.js");
+  assert.deepEqual([...d.LIVE_AREAS], ["profile"]);
+  assert.deepEqual(d.comingSoonKeys(), ["branding", "website", "marketing", "content", "files"]);
+  assert.deepEqual(d.comingSoonKeys(["profile", "website"]), ["branding", "marketing", "content", "files"]);
+  const vm = (liveAreas) => ({ base: "/portal/o/x", user: { name: "Ann" }, ...(liveAreas ? { liveAreas } : {}) });
+  const links = (h) => [...h.matchAll(/class="tile" href="([^"]+)"/g)].map((m) => m[1].split("/").pop());
+  assert.deepEqual(links(g.home(vm(["profile"]))), ["profile"]);
+  assert.deepEqual(links(g.home(vm(["profile", "website"]))), ["profile", "website"], "one more section released: nothing else changes");
+  assert.equal([...g.home(vm(["profile", "website"])).matchAll(/Coming soon/g)].length, 4);
+  assert.deepEqual(links(g.home(vm(null))), ["profile", "branding", "website", "marketing", "content", "files"], "the demo is unaffected");
+  assert.ok(!/Coming soon/.test(g.home(vm(null))));
+  assert.match(read("worker/portal/router.js"), /const SOON = comingSoonKeys\(\)\.join\("\|"\);/);
 });
 test("the five other sections are clean Coming Soon pages with no demonstration content, fake progress or controls", async () => {
   const { ann } = await setup();

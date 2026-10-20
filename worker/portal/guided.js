@@ -44,9 +44,19 @@ const backLink = (vm, from) => (from ? `<p class="backlink"><a class="text-link"
 
 const HOME_BLURB = { profile: "Your business, customers and goals", branding: "Logo and brand assets", website: "Plan or improve your site", marketing: "Goals, audience and channels", content: "Photos, video and creative", files: "Shared files and approvals" };
 
-/** The home screen is a navigation hub: a short greeting and the six areas. Progress and status live inside each area. */
+/**
+ * The home screen is a navigation hub: a short greeting and the six areas. Progress and status live inside each area.
+ * Signed-in clients (vm.liveAreas) get a link only for sections that are built; the others are plain, muted list items that say "Coming soon" and
+ * are not links, so nothing suggests they can be opened. The demo (no vm.liveAreas) links every section.
+ */
 export function home(vm) {
-  const tiles = AREAS.map((a) => `<li><a class="tile" href="${e(href(vm, a.path))}"><span class="tile__n" aria-hidden="true">${e(a.n)}</span><span class="tile__title">${e(a.title)}</span><span class="tile__desc">${e(HOME_BLURB[a.key])}</span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`).join("");
+  const isLive = (key) => !vm.liveAreas || vm.liveAreas.includes(key);
+  const tiles = AREAS.map((a) => {
+    const inner = `<span class="tile__n" aria-hidden="true">${e(a.n)}</span><span class="tile__title">${e(a.title)}</span><span class="tile__desc">${e(HOME_BLURB[a.key])}</span>`;
+    return isLive(a.key)
+      ? `<li><a class="tile" href="${e(href(vm, a.path))}">${inner}<span class="tile__arrow" aria-hidden="true">→</span></a></li>`
+      : `<li><div class="tile tile--soon">${inner}<span class="tile__soon">Coming soon</span></div></li>`;
+  }).join("");
   return `<header class="page-head page-head--home"><h1 class="h1 h1--home">Welcome back, ${e(first(vm.user))}.</h1><p class="lead">What would you like to work on?</p></header>
 <nav aria-label="Your workspace"><ul class="tiles">${tiles}</ul></nav>`;
 }

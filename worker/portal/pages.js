@@ -10,6 +10,7 @@ import { appPage } from "./ui.js";
 import * as views from "./views.js";
 import * as guided from "./guided.js";
 import * as live from "./profile-live.js";
+import { LIVE_AREAS } from "./guided-data.js";
 
 const OFF = Object.freeze({ progress: false, milestones: false, deliverables: false, documents: false, updates: false, actions: false, settings: false });
 
@@ -31,7 +32,7 @@ function liveModel(ctx, { session, membership: m }, data = {}) {
     return { type: views.activityType(a.action), title: views.actionTitle(a.action), detail, at: a.created_at, projectId: a.entity_type === "project" ? a.entity_id : undefined };
   });
   return {
-    mode: "live", base: `/portal/o/${m.slug}`, now: ctx.now,
+    mode: "live", base: `/portal/o/${m.slug}`, now: ctx.now, liveAreas: LIVE_AREAS,
     org: { name: m.name, website: m.websiteUrl, role: m.role },
     user: { name: session.name || "", email: session.email },
     projects, activity, updates: [], actions: [], documents: [], team: data.team || [], has: OFF,

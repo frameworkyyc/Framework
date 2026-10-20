@@ -13,6 +13,14 @@ export const AREAS = Object.freeze([
   { key: "files", n: "06", title: "Files & Deliverables", path: "/files", desc: "Everything Framework has shared with you, in one place." },
 ]);
 
+/**
+ * Which workspace sections are built for signed-in clients. To release a section: add its key here, build its pages and routes, and the Home block
+ * becomes a link by itself. Every area not listed here keeps its Coming Soon block on Home and its protected Coming Soon page (router.js). The
+ * fictional demo ignores this list: its Home links every section.
+ */
+export const LIVE_AREAS = Object.freeze(["profile"]);
+export const comingSoonKeys = (live = LIVE_AREAS) => AREAS.filter((a) => !live.includes(a.key)).map((a) => a.key);
+
 const f = (id, label, kind, value = "", extra = {}) => ({ id, label, kind, value, ...extra });
 const INDUSTRIES = ["Hospitality and food", "Retail", "Professional services", "Health and wellness", "Trades and construction", "Technology", "Non-profit", "Other"];
 const SIZES = ["Just me", "2 to 10 people", "11 to 50 people", "51 to 200 people", "More than 200 people"];
