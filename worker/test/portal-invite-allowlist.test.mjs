@@ -284,13 +284,12 @@ test("configuration: the allowlist and the two switches are Staging-only (previe
   assert.ok(!/lanoirbadasswitchery/i.test(raw), "the future client's address is not in the configuration at all");
   assert.equal(config.vars.PORTAL_INVITE_ALLOWED_EMAILS, undefined, "never in the top-level (Production) vars");
   const code = strip(raw);
-  // the two switches (authorized for the controlled live test) exist ONLY in previews.vars, exactly once each, and the allowlist still guards them
+  // the controlled live test is over: neither switch is set anywhere (the allowlist stays, in previews.vars only, for a future test)
   for (const name of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) {
-    assert.equal(config.previews.vars[name], "1", name);
-    assert.equal(config.vars[name], undefined, name + " is not a Production setting");
-    assert.equal(code.match(new RegExp(name, "g")).length, 1, name + " appears exactly once in the file");
+    assert.equal(config.previews.vars[name], undefined, name);
+    assert.equal(config.vars[name], undefined, name);
+    assert.ok(!code.includes(name), name + " appears nowhere in the configuration");
   }
-  assert.equal(code.indexOf("PORTAL_ADMIN_WRITES") > code.indexOf('"previews"'), true, "and it is inside the previews block");
   assert.ok(!/PORTAL_ADMIN_WRITES|PORTAL_INVITE_SENDING|PORTAL_INVITE_ALLOWED_EMAILS/.test(read("migrations/portal/wrangler.migrate.production.jsonc") + read(".github/workflows/ci.yml")));
   assert.equal(config.previews.vars.PORTAL_BASE_URL, "https://staging.frameworkco.ca");
   assert.equal(config.vars.PORTAL_ENABLED, undefined, "Production's portal stays disabled");
@@ -316,11 +315,30 @@ test("every path that can email an invitation is behind the check: only admin-ac
   assert.ok(!/invitations|portal/i.test(strip(read("worker/feedback-invite.js")).replace(/Feedback invitations|feedback invitation/gi, "")), "the feedback-request email code has no portal invitation code in it");
 });
 
-test("STAGING exactly as wrangler.jsonc defines it (previews.vars + fake secrets + mocked providers): both switches on; ONLY the two approved addresses are accepted, in any casing, and everything else is refused", async () => {
+test("STAGING exactly as wrangler.jsonc defines it is READ-ONLY: both switches are absent, so the capabilities say so and every write route answers 403 writes_disabled with nothing changed or sent", async () => {
+  const config = JSON.parse(strip(read("wrangler.jsonc")));
+  const s = await setup();
+  const env = { ...s.env, ...config.previews.vars };
+  delete env.PORTAL_ADMIN_WRITES; delete env.PORTAL_INVITE_SENDING; // the test harness sets them; the real configuration does not
+  for (const k of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) assert.equal(config.previews.vars[k], undefined, k);
+  assert.equal(config.previews.vars.PORTAL_ENABLED, "1");
+  assert.equal(config.previews.vars.PORTAL_INVITE_ALLOWED_EMAILS, "framework.yyc@gmail.com,sentbyjj@gmail.com");
+  const access = await body(await s.call(`/api/admin/clients/${s.org.id}/access`, { method: "GET", e: env }));
+  assert.deepEqual(access.capabilities, { writes: false, sending: false, recipients: "configured" });
+  const before = s.snap();
+  const r = await s.invite(APPROVED, "member", s.org, { e: env });
+  assert.equal(r.status, 403);
+  assert.equal((await body(r)).error, "writes_disabled");
+  assert.equal((await s.call("/api/admin/clients", { json: { name: "X" }, e: env })).status, 403);
+  assert.equal(s.snap(), before);
+  assert.equal(s.pv.calls.length, 0);
+});
+
+test("(for a future controlled test) STAGING configuration with both switches turned on: ONLY the two approved addresses are accepted, in any casing, and everything else is refused", async () => {
   const config = JSON.parse(strip(read("wrangler.jsonc")));
   const s = await setup();
   const env = { ...s.env, ...config.previews.vars }; // the real Staging configuration on top of the test secrets and database
-  for (const k of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_INVITE_ALLOWED_EMAILS"]) assert.ok(config.previews.vars[k], k);
+  assert.ok(config.previews.vars.PORTAL_INVITE_ALLOWED_EMAILS);
   const access = await body(await s.call(`/api/admin/clients/${s.org.id}/access`, { method: "GET", e: env }));
   assert.deepEqual(access.capabilities, { writes: true, sending: true, recipients: "configured" });
   const before = s.snap();

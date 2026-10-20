@@ -91,12 +91,9 @@
       // TEMPORARY recipient allowlist for the controlled live invitation test (worker/portal/invite-recipients.js). Staging ONLY: it must never appear at the top level (Production).
       // Exact addresses, separated by commas or spaces; if this is missing or empty, every invitation operation that could email someone is refused (fail closed).
       // It is not a secret.
-      "PORTAL_INVITE_ALLOWED_EMAILS": "framework.yyc@gmail.com,sentbyjj@gmail.com",
-      // CONTROLLED LIVE TEST (Staging ONLY; never at the top level / Production): the two administrative switches for Framework Admin -> Clients.
-      // PORTAL_ADMIN_WRITES lets the admin API change client access; PORTAL_INVITE_SENDING additionally lets it contact WorkOS and send email. Even with both on, the recipient
-      // allowlist above is enforced in the Worker for creating, replacing, sending and resending invitations. To end the test, remove BOTH switches (revert this block).
-      "PORTAL_ADMIN_WRITES": "1",
-      "PORTAL_INVITE_SENDING": "1"
+      "PORTAL_INVITE_ALLOWED_EMAILS": "framework.yyc@gmail.com,sentbyjj@gmail.com"
+      // The administrative switches for Framework Admin -> Clients (the write routes and invitation sending) are deliberately NOT set here: the Admin interface is read-only
+      // and every write endpoint answers 403 until a reviewed change turns them on again for a controlled test. The allowlist above stays in place for that future test.
     },
     "d1_databases": [
       {

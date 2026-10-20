@@ -70,8 +70,8 @@ test("the write routes are OFF unless PORTAL_ADMIN_WRITES is exactly '1': 403 wr
   assert.ok(!/PORTAL_ADMIN_WRITES/.test(code(".github/workflows/ci.yml")), "CI does not enable the write routes");
   const cfg = JSON.parse(code("wrangler.jsonc"));
   assert.equal(cfg.vars.PORTAL_ADMIN_WRITES, undefined, "never in the top-level (Production) vars");
-  assert.equal(cfg.previews.vars.PORTAL_ADMIN_WRITES, "1", "the controlled Staging test: set exactly once, in previews.vars only");
-  assert.equal(code("wrangler.jsonc").match(/PORTAL_ADMIN_WRITES/g).length, 1);
+  assert.equal(cfg.previews.vars.PORTAL_ADMIN_WRITES, undefined, "switched off on Staging as well: the Admin Clients interface is read-only");
+  assert.ok(!/PORTAL_ADMIN_WRITES/.test(code("wrangler.jsonc")), "the switch appears nowhere in the configuration");
 });
 
 test("authorization is unchanged: no token, a forged token, an unlisted admin and a client's cookie get nothing, for reads and writes alike", async () => {

@@ -93,7 +93,8 @@ test("sending needs its OWN switch: with writes on but PORTAL_INVITE_SENDING uns
   for (const f of [".github/workflows/ci.yml", "migrations/portal/wrangler.migrate.staging.jsonc", "migrations/portal/wrangler.migrate.production.jsonc"]) assert.ok(!/PORTAL_INVITE_SENDING|PORTAL_ADMIN_WRITES/.test(read(f).replace(/^\s*\/\/.*$/gm, "")), f);
   const cfg = JSON.parse(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, ""));
   assert.equal(cfg.vars.PORTAL_INVITE_SENDING, undefined, "never in the top-level (Production) vars");
-  assert.equal(cfg.previews.vars.PORTAL_INVITE_SENDING, "1", "the controlled Staging test: previews.vars only");
+  assert.equal(cfg.previews.vars.PORTAL_INVITE_SENDING, undefined, "switched off on Staging as well");
+  assert.ok(!/PORTAL_INVITE_SENDING/.test(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, "")), "the switch appears nowhere in the configuration");
 });
 
 /* ------------------------------------------------------------------ sending */
