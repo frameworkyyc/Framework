@@ -58,7 +58,7 @@ async function setup(over = {}) {
   const pv = providers();
   const env = {
     ...w.env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }),
-    PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_INVITE_ALLOWED_EMAILS: ALLOWED, PORTAL_AUTH_CLIENT_SECRET: KEY, RESEND_API_KEY: RESEND_KEY, ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", ...over,
+    PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_INVITE_ALLOWLIST: ALLOWED, PORTAL_AUTH_CLIENT_SECRET: KEY, RESEND_API_KEY: RESEND_KEY, ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", ...over,
   };
   const call = (path, { method = "POST", token, headers = {}, e = env, json = {}, now = NOW } = {}) => {
     const h = { Origin: ORIGIN, "X-Framework-Admin": "1", "Content-Type": "application/json", ...headers };

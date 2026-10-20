@@ -29,7 +29,7 @@ async function setup() {
   assert.ok((await saveProfileStep(w.db, B.id, uid("mia@both.test"), "business", { legal: "Bravo Co Ltd.", operating: "Bravo" })).ok);
   const calls = [];
   const env = { ...w.env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }), PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1",
-    PORTAL_INVITE_ALLOWED_EMAILS: "mia@both.test", PORTAL_AUTH_CLIENT_SECRET: "sk_test_FAKE", RESEND_API_KEY: "re_test_FAKE", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" };
+    PORTAL_INVITE_ALLOWLIST: "mia@both.test", PORTAL_AUTH_CLIENT_SECRET: "sk_test_FAKE", RESEND_API_KEY: "re_test_FAKE", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>" };
   const call = (path, { method = "POST", json = {}, headers = {}, token, e = env } = {}) => {
     const t = token === undefined ? sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, iat: T0, exp: T0 + 600 }) : token;
     const h = { Origin: ORIGIN, "X-Framework-Admin": "1", "Content-Type": "application/json", ...headers };

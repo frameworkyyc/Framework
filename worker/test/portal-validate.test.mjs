@@ -5,7 +5,7 @@ import { normalizeEmail, validateSlug, validateName, validateText, validateHttps
 import { requireId, requireOrgId, PortalDataError, UUID } from "../portal/repo/common.js";
 
 test("email: trimmed and lower-cased; anything ambiguous or hostile is rejected", () => {
-  assert.equal(normalizeEmail("  Sentbyjj@Gmail.COM "), "sentbyjj@gmail.com");
+  assert.equal(normalizeEmail("  Owner.Two@Example.TEST "), "owner.two@example.test");
   assert.equal(normalizeEmail("a+tag@example.co.uk"), "a+tag@example.co.uk");
   assert.equal(normalizeEmail("a@example.com\n"), "a@example.com", "surrounding whitespace (including a trailing newline) is trimmed; inner whitespace is rejected below");
   for (const bad of ["", "a", "a@b", "@example.com", "a@", "a b@example.com", "a@exa mple.com", "a@@example.com", "a\n@example.com", "a@example.com\u0000", "x".repeat(250) + "@example.com", null, undefined, 5, {}, ["a@example.com"]]) assert.equal(normalizeEmail(bad), null, JSON.stringify(bad)?.slice(0, 30));

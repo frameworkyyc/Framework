@@ -87,13 +87,11 @@
       // Switches the client portal on for Staging ONLY. It must never appear in the top-level vars (Production): without it every /portal path answers 404.
       "PORTAL_ENABLED": "1",
       // Serves the static, clearly labelled demo portal at /portal/demo (fictional data, no sign-in, no database). Staging ONLY: never at the top level, and the code also refuses it on the live hosts (worker/portal/config.js demoEnabled).
-      "PORTAL_DEMO": "1",
-      // TEMPORARY recipient allowlist for the controlled live invitation test (worker/portal/invite-recipients.js). Staging ONLY: it must never appear at the top level (Production).
-      // Exact addresses, separated by commas or spaces; if this is missing or empty, every invitation operation that could email someone is refused (fail closed).
-      // It is not a secret.
-      "PORTAL_INVITE_ALLOWED_EMAILS": "framework.yyc@gmail.com,sentbyjj@gmail.com"
+      "PORTAL_DEMO": "1"
       // The administrative switches for Framework Admin -> Clients (the write routes and invitation sending) are deliberately NOT set here: the Admin interface is read-only
-      // and every write endpoint answers 403 until a reviewed change turns them on again for a controlled test. The allowlist above stays in place for that future test.
+      // and every write endpoint answers 403 until a reviewed change turns them on again for a controlled test.
+      // The invitation RECIPIENT ALLOWLIST is not here either. It is a Cloudflare secret named PORTAL_INVITE_ALLOWLIST (this repository is public, and the list is people's
+      // email addresses). Missing, empty or malformed means every invitation operation is refused. Setup: worker/portal/INVITATION-DELIVERY-PLAN.md.
     },
     "d1_databases": [
       {

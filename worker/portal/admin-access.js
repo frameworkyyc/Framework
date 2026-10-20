@@ -12,7 +12,7 @@
  *   - Content-Type: application/json, a body of at most 2 KB, and exactly the documented fields (unknown fields are refused, not ignored).
  *
  * RECIPIENT ALLOWLIST (temporary, for the controlled live test): creating, replacing, sending or resending an invitation is refused with 403
- * recipient_not_allowed unless the address is on PORTAL_INVITE_ALLOWED_EMAILS, and with 403 recipient_allowlist_missing (fail closed) when that setting is
+ * recipient_not_allowed unless the address is on PORTAL_INVITE_ALLOWLIST, and with 403 recipient_allowlist_missing (fail closed) when that setting is
  * missing or empty. The check runs before any database change or provider call, on the address in the request or in the stored invitation (so an invitation
  * created earlier for another address can never be sent). See invite-recipients.js.
  *

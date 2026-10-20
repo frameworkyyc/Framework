@@ -1,4 +1,4 @@
-// Phase 5B: the temporary invitation RECIPIENT ALLOWLIST (PORTAL_INVITE_ALLOWED_EMAILS) for the controlled live test. Enforced in the Worker, before any database
+// Phase 5B: the temporary invitation RECIPIENT ALLOWLIST (PORTAL_INVITE_ALLOWLIST) for the controlled live test. Enforced in the Worker, before any database
 // change or provider call, for creating, replacing, sending and resending; fail closed when missing or empty. Providers are mocks; nothing here can reach the network.
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -12,7 +12,7 @@ import * as repo from "../portal/repo/index.js";
 import { parseAllowlist, recipientPolicy, checkRecipient, allowlistStatus } from "../portal/invite-recipients.js";
 import { deliverInvitation } from "../portal/invite-delivery.js";
 
-const APPROVED = "framework.yyc@gmail.com";
+const APPROVED = "owner.one@example.test";
 const TEAM = "framework.cloudflareaccess.com", AUD = "a".repeat(64), ORIGIN = "https://staging.frameworkco.ca", ADMIN = "owner@frameworkco.ca";
 const pair = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const b64u = (b) => Buffer.from(b).toString("base64url");
@@ -28,38 +28,51 @@ const sql = (db, q, ...p) => db.raw.prepare(q).all(...p).map((r) => ({ ...r }));
 
 test("parsing: exact addresses only, normalized the same way as every other portal email; patterns, domains and junk are discarded", () => {
   assert.deepEqual([...parseAllowlist(APPROVED)], [APPROVED]);
-  assert.deepEqual([...parseAllowlist("  Framework.YYC@Gmail.COM ")], [APPROVED], "trimmed and lower-cased");
+  assert.deepEqual([...parseAllowlist("  Owner.One@Example.TEST ")], [APPROVED], "trimmed and lower-cased");
   assert.deepEqual([...parseAllowlist("a@x.co, B@X.co;c@x.co\n d@x.co\t\te@x.co")].sort(), ["a@x.co", "b@x.co", "c@x.co", "d@x.co", "e@x.co"], "commas, semicolons, spaces and newlines separate entries");
   assert.deepEqual([...parseAllowlist("a@x.co a@x.co A@X.CO")], ["a@x.co"], "duplicates collapse");
-  for (const junk of ["", "   ", ",,;", "*", "*@gmail.com", "@gmail.com", "gmail.com", "gmail.*", "%@gmail.com", "<a@x.co>", "Name <a@x.co>", "\"a\"@x.co", "a@x.co?cc=b@y.co", "a(b)@x.co", "a@@x.co", ".a@x.co.", "a..b@x.co", "a@.x.co", "a b", "not-an-email", "a@x"]) {
+  for (const junk of ["", "   ", ",,;", "*", "*@example.test", "@example.test", "example.test", "gmail.*", "%@example.test", "<a@x.co>", "Name <a@x.co>", "\"a\"@x.co", "a@x.co?cc=b@y.co", "a(b)@x.co", "a@@x.co", ".a@x.co.", "a..b@x.co", "a@.x.co", "a b", "not-an-email", "a@x"]) {
     assert.equal(parseAllowlist(junk).size, 0, JSON.stringify(junk));
   }
   for (const nonString of [undefined, null, 5, {}, [], true, ["a@x.co"]]) assert.equal(parseAllowlist(nonString).size, 0);
   assert.equal(parseAllowlist("a@x.co ".repeat(2000)).size, 0, "an absurdly long setting is refused outright");
-  assert.deepEqual([...parseAllowlist("good@x.co *@gmail.com bad")], ["good@x.co"], "unusable entries are dropped, usable ones kept");
+  // MALFORMED means refused as a whole: one unusable entry locks the list, so a bad paste never leaves a half-understood list in force
+  for (const malformed of ["good@x.co *@example.test bad", "good@x.co, bad", "good@x.co;*", "good@x.co Name <b@x.co>", '"good@x.co"', "good@x.co,b@@x.co", "good@x.co a..b@x.co", `good@x.co ${"x".repeat(300)}@x.co`, "good@x.co\u0000"]) {
+    assert.equal(parseAllowlist(malformed).size, 0, JSON.stringify(malformed));
+    assert.equal(checkRecipient({ PORTAL_INVITE_ALLOWLIST: malformed }, "good@x.co").error, "recipient_allowlist_missing", JSON.stringify(malformed));
+  }
+  assert.deepEqual([...parseAllowlist("good@x.co, other@x.co,\n")], ["good@x.co", "other@x.co"], "ordinary separators and a trailing newline are fine");
+});
+
+test("the OLD variable name is not read: a list left under PORTAL_INVITE_ALLOWED_EMAILS (or put back into checked-in configuration) grants nothing", () => {
+  const legacy = { PORTAL_INVITE_ALLOWED_EMAILS: APPROVED };
+  assert.equal(allowlistStatus(legacy), "missing");
+  assert.equal(checkRecipient(legacy, APPROVED).error, "recipient_allowlist_missing");
+  assert.equal(allowlistStatus({ ...legacy, PORTAL_INVITE_ALLOWLIST: APPROVED }), "configured");
+  assert.ok(!/PORTAL_INVITE_ALLOWED_EMAILS/.test(strip(read("worker/portal/invite-recipients.js")) + strip(read("worker/portal/admin-access.js")) + strip(read("worker/portal/invite-delivery.js"))), "no code path reads the old name");
 });
 
 test("matching: approved address passes however it is typed; every other form fails (no plus, dot, domain, suffix, prefix, list, display-name or lookalike matching)", () => {
-  const env = { PORTAL_INVITE_ALLOWED_EMAILS: APPROVED };
-  for (const ok of [APPROVED, APPROVED.toUpperCase(), "  Framework.YYC@Gmail.com  ", `\t${APPROVED}\n`]) assert.deepEqual(checkRecipient(env, ok), { ok: true, email: APPROVED }, JSON.stringify(ok));
+  const env = { PORTAL_INVITE_ALLOWLIST: APPROVED };
+  for (const ok of [APPROVED, APPROVED.toUpperCase(), "  Owner.One@Example.test  ", `\t${APPROVED}\n`]) assert.deepEqual(checkRecipient(env, ok), { ok: true, email: APPROVED }, JSON.stringify(ok));
   const bad = [
-    "someone.else@gmail.com", "framework.yyc+test@gmail.com", "frameworkyyc@gmail.com", "framework.yyc@googlemail.com", "framework.yyc@gmail.co",
-    "framework.yyc@gmail.com.evil.example", "x.framework.yyc@gmail.com", "xframework.yyc@gmail.com", "framework.yyc@mail.gmail.com", "framework.yyc@gmail.com.",
+    "someone.else@example.test", "owner.one+test@example.test", "ownerone@example.test", "owner.one@example.net", "owner.one@gmail.co",
+    "owner.one@example.test.evil.example", "x.owner.one@example.test", "xowner.one@example.test", "owner.one@mail.example.test", "owner.one@example.test.",
     `evil@x.co,${APPROVED}`, `${APPROVED},evil@x.co`, `${APPROVED};evil@x.co`, `evil@x.co ${APPROVED}`, `Framework <${APPROVED}>`, `<${APPROVED}>`, `"${APPROVED}"`,
     `${APPROVED}\r\nBcc: evil@x.co`, `${APPROVED}\u0000@evil.example`, `${APPROVED}%0aBcc:evil@x.co`, `evil@x.co\n${APPROVED}`,
-    "frаmework.yyc@gmail.com" /* Cyrillic a */, "ｆｒａｍｅｗｏｒｋ.yyc@gmail.com" /* full-width */, "framework.yyc@gmaıl.com" /* dotless i */,
-    "", "   ", null, undefined, 5, {}, [], [APPROVED], "@gmail.com", "gmail.com", "*", "*@gmail.com",
+    "оwner.one@example.test" /* Cyrillic a */, "ｏｗｎｅｒ.one@example.test" /* full-width */, "owner.one@exampie.test" /* dotless i */,
+    "", "   ", null, undefined, 5, {}, [], [APPROVED], "@example.test", "example.test", "*", "*@example.test",
   ];
   for (const b of bad) {
     const r = checkRecipient(env, b);
     assert.deepEqual([r.ok, r.error], [false, "recipient_not_allowed"], JSON.stringify(b));
   }
-  assert.ok(!JSON.stringify(checkRecipient(env, "x@y.co")).includes("framework.yyc"), "the refusal never reveals what is allowed");
+  assert.ok(!JSON.stringify(checkRecipient(env, "x@y.co")).includes("owner.one"), "the refusal never reveals what is allowed");
 });
 
 test("fail closed: a missing, empty or unusable allowlist locks every recipient, including the usual test address", () => {
-  for (const setting of [undefined, null, "", "   ", ",;", "*", "*@gmail.com", "gmail.com", "@gmail.com", "bogus", 5, {}]) {
-    const env = { PORTAL_INVITE_ALLOWED_EMAILS: setting };
+  for (const setting of [undefined, null, "", "   ", ",;", "*", "*@example.test", "example.test", "@example.test", "bogus", 5, {}]) {
+    const env = { PORTAL_INVITE_ALLOWLIST: setting };
     for (const who of [APPROVED, "anyone@example.com", "", null]) {
       const r = checkRecipient(env, who);
       assert.deepEqual([r.ok, r.error], [false, "recipient_allowlist_missing"], `${JSON.stringify(setting)} / ${JSON.stringify(who)}`);
@@ -68,7 +81,7 @@ test("fail closed: a missing, empty or unusable allowlist locks every recipient,
     assert.equal(recipientPolicy(env).locked, true);
   }
   assert.deepEqual([checkRecipient({}, APPROVED).error, checkRecipient(undefined, APPROVED).error, checkRecipient(null, APPROVED).error], ["recipient_allowlist_missing", "recipient_allowlist_missing", "recipient_allowlist_missing"]);
-  assert.equal(allowlistStatus({ PORTAL_INVITE_ALLOWED_EMAILS: APPROVED }), "configured");
+  assert.equal(allowlistStatus({ PORTAL_INVITE_ALLOWLIST: APPROVED }), "configured");
   assert.ok(!/\*|wildcard|allow_all|ALLOW_ALL/.test(strip(read("worker/portal/invite-recipients.js")).replace(/PATTERN_CHARS[^\n]*/, "")), "there is no allow-everyone value in the code");
 });
 
@@ -95,7 +108,7 @@ async function setup(over = {}) {
   const org = await w.org("alpha", "Alpha Co"), other = await w.org("beta", "Beta Co");
   const pv = providers();
   const env = { ...w.env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }), PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1",
-    PORTAL_AUTH_CLIENT_SECRET: "sk_test_FAKE_FOR_ALLOWLIST", PORTAL_BASE_URL: ORIGIN, RESEND_API_KEY: "re_test_FAKE", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", PORTAL_INVITE_ALLOWED_EMAILS: APPROVED, ...over };
+    PORTAL_AUTH_CLIENT_SECRET: "sk_test_FAKE_FOR_ALLOWLIST", PORTAL_BASE_URL: ORIGIN, RESEND_API_KEY: "re_test_FAKE", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", PORTAL_INVITE_ALLOWLIST: APPROVED, ...over };
   const call = (path, { method = "POST", json, e = env, now = NOW, token, headers = {} } = {}) => {
     const t = token === undefined ? sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, iat: Math.floor(now / 1000), exp: Math.floor(now / 1000) + 600 }) : token;
     const h = { Origin: ORIGIN, "X-Framework-Admin": "1", "Content-Type": "application/json", ...headers };
@@ -118,7 +131,7 @@ const body = async (r) => r.json();
 
 test("an APPROVED recipient works end to end: create, send, resend and replace, with the usual audit trail and provider calls", async () => {
   const s = await setup();
-  const r1 = await s.invite("  Framework.YYC@Gmail.com ");
+  const r1 = await s.invite("  Owner.One@Example.test ");
   assert.equal(r1.status, 201);
   const inv = (await body(r1)).invitation;
   assert.equal(inv.email, APPROVED, "stored normalized");
@@ -131,19 +144,19 @@ test("an APPROVED recipient works end to end: create, send, resend and replace, 
   assert.deepEqual(sql(s.w.db, "SELECT action FROM activity_log ORDER BY created_at, rowid").map((a) => a.action), ["invitation.created", "invitation.delivery_submitted", "invitation.delivery_submitted", "invitation.revoked", "invitation.workos_revoked", "invitation.replaced"]);
   const access = await body(await s.call(`/api/admin/clients/${s.org.id}/access`, { method: "GET" }));
   assert.deepEqual(access.capabilities, { writes: true, sending: true, recipients: "configured" });
-  assert.ok(!JSON.stringify(access).includes("framework.yyc") || access.invitations.every((i) => i.email === APPROVED), "the list holds only the approved address, and the setting itself is never returned");
+  assert.ok(!JSON.stringify(access).includes("owner.one") || access.invitations.every((i) => i.email === APPROVED), "the list holds only the approved address, and the setting itself is never returned");
 });
 
 test("a REJECTED recipient on creation: 403 recipient_not_allowed, no database change, no audit entry, no provider call, and no hint of what is allowed", async () => {
   const s = await setup();
   const before = s.snap();
-  const attempts = ["someone@example.com", "framework.yyc+x@gmail.com", "frameworkyyc@gmail.com", "framework.yyc@gmail.com.evil.example", "FRAMEWORK.YYC@gmail.co", "pending@example.com"];
+  const attempts = ["someone@example.com", "owner.one+x@example.test", "ownerone@example.test", "owner.one@example.test.evil.example", "OWNER.ONE@gmail.co", "pending@example.com"];
   for (const email of attempts) {
     const r = await s.invite(email);
     const text = await r.text();
     assert.equal(r.status, 403, email);
     assert.deepEqual([JSON.parse(text).error], ["recipient_not_allowed"], email);
-    assert.ok(!/framework\.yyc|sentbyjj|gmail/i.test(text), "the refusal never names an allowed address");
+    assert.ok(!/owner\.one|owner.two|example\.test/i.test(text), "the refusal never names an allowed address");
     assert.match(JSON.parse(text).message, /Nothing|no invitation was created or sent/i);
   }
   assert.equal(s.snap(), before, "byte-for-byte unchanged, including the audit log");
@@ -153,12 +166,12 @@ test("a REJECTED recipient on creation: 403 recipient_not_allowed, no database c
 test("bypass attempts on creation are refused or rejected, never created: extra recipient fields, address lists, display names, header injection, lookalikes", async () => {
   const s = await setup();
   const before = s.snap();
-  const forms = [`evil@example.com,${APPROVED}`, `${APPROVED},evil@example.com`, `${APPROVED};evil@example.com`, `Name <${APPROVED}>`, `${APPROVED}\r\nBcc: evil@example.com`, `${APPROVED}\u0000evil@example.com`, "frаmework.yyc@gmail.com", `${APPROVED} evil@example.com`];
+  const forms = [`evil@example.com,${APPROVED}`, `${APPROVED},evil@example.com`, `${APPROVED};evil@example.com`, `Name <${APPROVED}>`, `${APPROVED}\r\nBcc: evil@example.com`, `${APPROVED}\u0000evil@example.com`, "оwner.one@example.test", `${APPROVED} evil@example.com`];
   for (const email of forms) {
     const r = await s.invite(email);
     assert.ok([403, 422].includes(r.status), `${JSON.stringify(email)} -> ${r.status}`);
   }
-  for (const extra of [{ to: "evil@example.com" }, { cc: "evil@example.com" }, { bcc: "evil@example.com" }, { recipient: "evil@example.com" }, { allowlist: "evil@example.com" }, { PORTAL_INVITE_ALLOWED_EMAILS: "evil@example.com" }, { email2: "evil@example.com" }]) {
+  for (const extra of [{ to: "evil@example.com" }, { cc: "evil@example.com" }, { bcc: "evil@example.com" }, { recipient: "evil@example.com" }, { allowlist: "evil@example.com" }, { PORTAL_INVITE_ALLOWLIST: "evil@example.com" }, { email2: "evil@example.com" }]) {
     const r = await s.call(`/api/admin/clients/${s.org.id}/invitations`, { json: { email: APPROVED, role: "member", ...extra } });
     assert.equal(r.status, 400, JSON.stringify(extra));
   }
@@ -166,7 +179,7 @@ test("bypass attempts on creation are refused or rejected, never created: extra 
     assert.ok([400, 422].includes((await s.call(`/api/admin/clients/${s.org.id}/invitations`, { json: e })).status));
   }
   // a query string or header cannot change the policy
-  assert.equal((await s.call(`/api/admin/clients/${s.org.id}/invitations?allow=1&PORTAL_INVITE_ALLOWED_EMAILS=evil@example.com`, { json: { email: "evil@example.com", role: "member" }, headers: { "X-Allowed-Emails": "evil@example.com", "X-Forwarded-Email": "evil@example.com" } })).status, 403);
+  assert.equal((await s.call(`/api/admin/clients/${s.org.id}/invitations?allow=1&PORTAL_INVITE_ALLOWLIST=evil@example.com`, { json: { email: "evil@example.com", role: "member" }, headers: { "X-Allowed-Emails": "evil@example.com", "X-Forwarded-Email": "evil@example.com" } })).status, 403);
   assert.equal(s.snap(), before);
   assert.equal(s.pv.calls.length, 0);
 });
@@ -208,8 +221,8 @@ test("FAIL CLOSED through the API: with the allowlist missing, empty or unusable
   const seeded = s.seed("seeded@example.com", "revoked");
   s.pv.calls.length = 0;
   const before = s.snap();
-  for (const setting of [undefined, "", "   ", ",", "*", "*@gmail.com", "gmail.com", "garbage"]) {
-    const e = { ...s.env, PORTAL_INVITE_ALLOWED_EMAILS: setting };
+  for (const setting of [undefined, "", "   ", ",", "*", "*@example.test", "example.test", "garbage"]) {
+    const e = { ...s.env, PORTAL_INVITE_ALLOWLIST: setting };
     for (const r of [await s.invite(APPROVED, "owner", s.org, { e }), await s.act(mine, "send", s.org, { e }), await s.act(mine, "resend", s.org, { e }), await s.act(mine, "replace", s.org, { e }), await s.act(seeded, "replace", s.org, { e }), await s.act({ id: crypto.randomUUID() }, "send", s.org, { e })]) {
       assert.deepEqual([r.status, (await body(r)).error], [403, "recipient_allowlist_missing"], JSON.stringify(setting));
     }
@@ -218,12 +231,12 @@ test("FAIL CLOSED through the API: with the allowlist missing, empty or unusable
   }
   assert.equal(s.snap(), before);
   assert.equal(s.pv.calls.length, 0);
-  const env2 = { ...s.env }; delete env2.PORTAL_INVITE_ALLOWED_EMAILS; // the variable simply absent
+  const env2 = { ...s.env }; delete env2.PORTAL_INVITE_ALLOWLIST; // the variable simply absent
   assert.equal((await s.invite(APPROVED, "member", s.org, { e: env2 })).status, 403);
 });
 
 test("operations that cannot email anyone are not blocked by the allowlist: revoke, role change, remove access, create organization", async () => {
-  const s = await setup({ PORTAL_INVITE_ALLOWED_EMAILS: undefined });
+  const s = await setup({ PORTAL_INVITE_ALLOWLIST: undefined });
   const mk = await s.call("/api/admin/clients", { json: { name: "Delta Co" } });
   assert.equal(mk.status, 201, "creating an organization sends nothing");
   const u = (await repo.upsertUserFromIdentity(s.w.db, { workosUserId: "user_01PERSONONE", email: "p1@example.com" }, { now: NOW })).user;
@@ -275,24 +288,69 @@ test("defence in depth: the delivery code itself refuses to contact a provider w
 
 /* ------------------------------------------------------------------ configuration and code paths */
 
-test("configuration: the allowlist and the two switches are Staging-only (previews.vars); the allowlist is exactly the two approved addresses; Production is untouched", () => {
+test("configuration: the recipient allowlist is a Cloudflare SECRET, not configuration: no address and no value in any checked-in file; the switches stay off; Production is untouched", () => {
   const raw = read("wrangler.jsonc");
   const config = JSON.parse(strip(raw));
-  const LIST = config.previews.vars.PORTAL_INVITE_ALLOWED_EMAILS;
-  assert.equal(LIST, "framework.yyc@gmail.com,sentbyjj@gmail.com");
-  assert.deepEqual([...parseAllowlist(LIST)].sort(), ["framework.yyc@gmail.com", "sentbyjj@gmail.com"], "exactly two usable addresses");
-  assert.ok(!/lanoirbadasswitchery/i.test(raw), "the future client's address is not in the configuration at all");
-  assert.equal(config.vars.PORTAL_INVITE_ALLOWED_EMAILS, undefined, "never in the top-level (Production) vars");
+  for (const name of ["PORTAL_INVITE_ALLOWLIST", "PORTAL_INVITE_ALLOWED_EMAILS"]) {
+    assert.equal(config.vars[name], undefined, name + " is not a Production variable");
+    assert.equal(config.previews.vars[name], undefined, name + " is not a Staging variable either: it is a secret");
+    assert.ok(!strip(raw).includes(name), name + " is not in the configuration at all (only the explanatory comment names it)");
+  }
+  assert.match(raw, /PORTAL_INVITE_ALLOWLIST/, "the comment tells the next person where the list lives");
+  const addresses = (raw.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).filter((a) => a !== "hello@frameworkco.ca");
+  assert.deepEqual(addresses, [], "no personal or recipient address appears in the public configuration");
+  for (const f of ["migrations/portal/wrangler.migrate.production.jsonc", "migrations/portal/wrangler.migrate.staging.jsonc", ".github/workflows/ci.yml"]) assert.ok(!/PORTAL_INVITE_ALLOW/.test(read(f)), f);
+  // the controlled live test is over: neither switch is set anywhere
   const code = strip(raw);
-  // the controlled live test is over: neither switch is set anywhere (the allowlist stays, in previews.vars only, for a future test)
   for (const name of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) {
     assert.equal(config.previews.vars[name], undefined, name);
     assert.equal(config.vars[name], undefined, name);
     assert.ok(!code.includes(name), name + " appears nowhere in the configuration");
   }
-  assert.ok(!/PORTAL_ADMIN_WRITES|PORTAL_INVITE_SENDING|PORTAL_INVITE_ALLOWED_EMAILS/.test(read("migrations/portal/wrangler.migrate.production.jsonc") + read(".github/workflows/ci.yml")));
   assert.equal(config.previews.vars.PORTAL_BASE_URL, "https://staging.frameworkco.ca");
+  assert.equal(config.previews.vars.PORTAL_ENABLED, "1", "removing the allowlist variable does not switch the portal off");
   assert.equal(config.vars.PORTAL_ENABLED, undefined, "Production's portal stays disabled");
+  assert.ok(!/secrets"?\s*:\s*\{\s*"?required/.test(code), "no required-secrets block: a missing allowlist must never block a deploy or the portal");
+});
+
+test("the portal itself does not depend on the allowlist: with it missing, sign-in configuration is valid, the portal stays on, and Business Profile pages and saves work", async () => {
+  const { portalMode, portalConfigProblems } = await import("../portal/config.js");
+  const { makeWorld, csrfOf, revOf } = await import("./helpers/portal-e2e.mjs");
+  const w = await makeWorld();
+  assert.equal(w.env.PORTAL_INVITE_ALLOWLIST, undefined, "the test world has no allowlist");
+  assert.equal(portalMode(w.env), "on");
+  assert.deepEqual(portalConfigProblems(w.env), []);
+  const org = await w.org("alpha", "Alpha Co"); await w.invite(org, "ann@alpha.test", "owner");
+  const ann = w.browser(); assert.equal((await ann.signIn(w.user(1, "ann@alpha.test"))).status, 303);
+  assert.equal((await ann.get("/portal/o/alpha")).status, 200);
+  const page = await (await ann.get("/portal/o/alpha/profile/business")).text();
+  const save = await ann.post("/portal/o/alpha/profile/business", { csrf: csrfOf(page), rev: revOf(page), legal: "Acme", intent: "save" });
+  assert.equal(save.status, 303);
+});
+
+test("the operations document explains the secret: its name, the Wrangler commands, the format and the public-repository rule, without any real address", () => {
+  const doc = read("worker/portal/INVITATION-DELIVERY-PLAN.md");
+  const section = doc.slice(doc.indexOf("## Invitation recipient allowlist (secret)"));
+  assert.ok(section.length > 500);
+  for (const must of ["PORTAL_INVITE_ALLOWLIST", "npx wrangler preview secret put PORTAL_INVITE_ALLOWLIST --name Staging", "npx wrangler preview secret list --name Staging", "npx wrangler preview secret delete PORTAL_INVITE_ALLOWLIST --name Staging", "hidden prompt", "public", "malformed", "refuses", "example.test"]) assert.ok(section.toLowerCase().includes(must.toLowerCase()), must);
+  const addresses = (doc.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).filter((a) => !/@example\.test$|@frameworkco\.ca$|@b\.co$/.test(a));
+  assert.deepEqual(addresses, [], "no real address in the operations document");
+});
+
+test("no recipient address reaches the logs: every allowlist refusal and success is logged with fixed fields only", async () => {
+  const s = await setup();
+  const lines = [];
+  const real = { log: console.log, error: console.error, warn: console.warn, info: console.info };
+  for (const k of Object.keys(real)) console[k] = (...a) => lines.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
+  try {
+    const bad = ["someone@example.com", "stranger.person@example.org"];
+    for (const who of bad) await s.invite(who);
+    await s.invite(APPROVED);
+    await s.invite(APPROVED, "owner", s.org, { e: { ...s.env, PORTAL_INVITE_ALLOWLIST: undefined } });
+    await s.invite(APPROVED, "owner", s.org, { e: { ...s.env, PORTAL_INVITE_ALLOWLIST: "bad, *@x.co" } });
+  } finally { Object.assign(console, real); }
+  const text = lines.join("\n");
+  for (const addr of ["someone@example.com", "stranger.person@example.org", APPROVED, "owner.one", "owner.two"]) assert.ok(!text.includes(addr), "a recipient address appeared in the logs: " + addr.replace(/@.*/, "@…"));
 });
 
 test("every path that can email an invitation is behind the check: only admin-access.js reaches the creation, replacement and delivery code, and it checks before each", () => {
@@ -319,12 +377,12 @@ test("STAGING exactly as wrangler.jsonc defines it is READ-ONLY: both switches a
   const config = JSON.parse(strip(read("wrangler.jsonc")));
   const s = await setup();
   const env = { ...s.env, ...config.previews.vars };
-  delete env.PORTAL_ADMIN_WRITES; delete env.PORTAL_INVITE_SENDING; // the test harness sets them; the real configuration does not
+  delete env.PORTAL_ADMIN_WRITES; delete env.PORTAL_INVITE_SENDING; delete env.PORTAL_INVITE_ALLOWLIST; // the harness sets them; the committed configuration sets none of them
   for (const k of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) assert.equal(config.previews.vars[k], undefined, k);
   assert.equal(config.previews.vars.PORTAL_ENABLED, "1");
-  assert.equal(config.previews.vars.PORTAL_INVITE_ALLOWED_EMAILS, "framework.yyc@gmail.com,sentbyjj@gmail.com");
+  assert.equal(config.previews.vars.PORTAL_INVITE_ALLOWLIST, undefined);
   const access = await body(await s.call(`/api/admin/clients/${s.org.id}/access`, { method: "GET", e: env }));
-  assert.deepEqual(access.capabilities, { writes: false, sending: false, recipients: "configured" });
+  assert.deepEqual(access.capabilities, { writes: false, sending: false, recipients: "missing" }, "the committed configuration alone allows no recipient at all");
   const before = s.snap();
   const r = await s.invite(APPROVED, "member", s.org, { e: env });
   assert.equal(r.status, 403);
@@ -334,36 +392,35 @@ test("STAGING exactly as wrangler.jsonc defines it is READ-ONLY: both switches a
   assert.equal(s.pv.calls.length, 0);
 });
 
-test("(for a future controlled test) STAGING configuration with both switches turned on: ONLY the two approved addresses are accepted, in any casing, and everything else is refused", async () => {
+test("(for a future controlled test) the Staging configuration plus the allowlist SECRET and both switches turned on: ONLY the two listed addresses are accepted, in any casing, and everything else is refused", async () => {
   const config = JSON.parse(strip(read("wrangler.jsonc")));
   const s = await setup();
-  const env = { ...s.env, ...config.previews.vars }; // the real Staging configuration on top of the test secrets and database
-  assert.ok(config.previews.vars.PORTAL_INVITE_ALLOWED_EMAILS);
+  const env = { ...s.env, ...config.previews.vars, PORTAL_INVITE_ALLOWLIST: "owner.one@example.test,owner.two@example.test" }; // the secret, as Cloudflare would inject it
   const access = await body(await s.call(`/api/admin/clients/${s.org.id}/access`, { method: "GET", e: env }));
   assert.deepEqual(access.capabilities, { writes: true, sending: true, recipients: "configured" });
   const before = s.snap();
   const refused = [
-    "lanoirbadasswitchery@gmail.com", "LanoirBadassSwitchery@Gmail.com", /* the future client: never */
-    "someone@example.com", "frameworkyyc@gmail.com", "framework.yyc+1@gmail.com", "framework.yyc@googlemail.com", "sentbyjj+1@gmail.com", "sent.byjj@gmail.com", "sentbyjj@gmail.co",
-    "framework.yyc@gmail.com.evil.example", "xframework.yyc@gmail.com", "sentbyjj@gmail.com,evil@example.com", "evil@example.com;sentbyjj@gmail.com", "Name <sentbyjj@gmail.com>",
-    "sentbyjj@gmail.com\r\nBcc: lanoirbadasswitchery@gmail.com", "frаmework.yyc@gmail.com", "owner@frameworkco.ca", "hello@frameworkco.ca",
+    "future.client@example.test", "Future.Client@Example.test", /* the future client: never */
+    "someone@example.com", "ownerone@example.test", "owner.one+1@example.test", "owner.one@example.net", "owner.two+1@example.test", "owner.t.wo@example.test", "owner.two@gmail.co",
+    "owner.one@example.test.evil.example", "xowner.one@example.test", "owner.two@example.test,evil@example.com", "evil@example.com;owner.two@example.test", "Name <owner.two@example.test>",
+    "owner.two@example.test\r\nBcc: future.client@example.test", "оwner.one@example.test", "owner@frameworkco.ca", "hello@frameworkco.ca",
   ];
   for (const email of refused) {
     const r = await s.invite(email, "owner", s.org, { e: env });
     assert.ok([403, 422].includes(r.status), `${JSON.stringify(email)} -> ${r.status}`);
     assert.notEqual(r.status, 201);
   }
-  assert.equal((await body(await s.invite("lanoirbadasswitchery@gmail.com", "owner", s.org, { e: env }))).error, "recipient_not_allowed");
+  assert.equal((await body(await s.invite("future.client@example.test", "owner", s.org, { e: env }))).error, "recipient_not_allowed");
   assert.equal(s.snap(), before, "nothing was created");
   assert.equal(s.pv.calls.length, 0, "no provider was contacted");
   // the two approved addresses, typed loosely
-  const a = await s.invite("  Framework.YYC@Gmail.com ", "owner", s.org, { e: env });
-  const b = await s.invite("SENTBYJJ@gmail.com", "member", s.org, { e: env });
+  const a = await s.invite("  Owner.One@Example.test ", "owner", s.org, { e: env });
+  const b = await s.invite("OWNER.TWO@example.test", "member", s.org, { e: env });
   assert.deepEqual([a.status, b.status], [201, 201]);
   const [invA, invB] = [(await body(a)).invitation, (await body(b)).invitation];
-  assert.deepEqual([invA.email, invB.email], ["framework.yyc@gmail.com", "sentbyjj@gmail.com"]);
-  // framework.yyc has no WorkOS user: a WorkOS invitation. sentbyjj already has one: Framework's own email (the existing-user path). Both through mocks.
-  s.pv.existing.add("sentbyjj@gmail.com");
+  assert.deepEqual([invA.email, invB.email], ["owner.one@example.test", "owner.two@example.test"]);
+  // owner.one has no WorkOS user: a WorkOS invitation. owner.two already has one: Framework's own email (the existing-user path). Both through mocks.
+  s.pv.existing.add("owner.two@example.test");
   assert.equal((await s.act(invA, "send", s.org, { e: env })).status, 200);
   assert.equal((await s.act(invB, "send", s.org, { e: env })).status, 200);
   assert.deepEqual(s.pv.calls, [
@@ -371,22 +428,22 @@ test("(for a future controlled test) STAGING configuration with both switches tu
     "GET api.workos.com/user_management/users", "POST api.resend.com/emails",
   ]);
   assert.deepEqual(sql(s.w.db, "SELECT email, delivery_status, delivery_channel FROM invitations ORDER BY email"), [
-    { email: "framework.yyc@gmail.com", delivery_status: "submitted", delivery_channel: "workos" }, { email: "sentbyjj@gmail.com", delivery_status: "submitted", delivery_channel: "resend" },
+    { email: "owner.one@example.test", delivery_status: "submitted", delivery_channel: "workos" }, { email: "owner.two@example.test", delivery_status: "submitted", delivery_channel: "resend" },
   ]);
   // a third address can still not be added once the two exist, and the old client address is still refused for replace/resend of anything stored for it
-  const seeded = s.seed("lanoirbadasswitchery@gmail.com", "revoked");
+  const seeded = s.seed("future.client@example.test", "revoked");
   for (const action of ["send", "resend", "replace"]) assert.equal((await s.act(seeded, action, s.org, { e: env })).status, 403, action);
   assert.equal(s.pv.calls.length, 4, "still only the two approved sends reached a provider");
   // fail closed is preserved with the real configuration minus the allowlist
-  const { PORTAL_INVITE_ALLOWED_EMAILS: _removed, ...noList } = env;
-  assert.equal((await s.invite("framework.yyc@gmail.com", "owner", s.org, { e: noList })).status, 403);
-  assert.equal((await body(await s.invite("sentbyjj@gmail.com", "owner", s.org, { e: noList }))).error, "recipient_allowlist_missing");
+  const { PORTAL_INVITE_ALLOWLIST: _removed, ...noList } = env;
+  assert.equal((await s.invite("owner.one@example.test", "owner", s.org, { e: noList })).status, 403);
+  assert.equal((await body(await s.invite("owner.two@example.test", "owner", s.org, { e: noList }))).error, "recipient_allowlist_missing");
 });
 
-test("policy with the two real Staging addresses: both pass in any casing or spacing, and nothing else does", () => {
-  const env = { PORTAL_INVITE_ALLOWED_EMAILS: "framework.yyc@gmail.com,sentbyjj@gmail.com" };
-  for (const ok of ["framework.yyc@gmail.com", " FRAMEWORK.YYC@GMAIL.COM ", "sentbyjj@gmail.com", "SentByJJ@Gmail.com\n"]) assert.equal(checkRecipient(env, ok).ok, true, JSON.stringify(ok));
-  for (const no of ["lanoirbadasswitchery@gmail.com", "frameworkyyc@gmail.com", "framework.yyc+a@gmail.com", "sentbyjj+a@gmail.com", "sent.byjj@gmail.com", "x@gmail.com", "framework.yyc@gmail.com,sentbyjj@gmail.com", "", null]) {
+test("policy with a two-address list: both pass in any casing or spacing, and nothing else does", () => {
+  const env = { PORTAL_INVITE_ALLOWLIST: "owner.one@example.test,owner.two@example.test" };
+  for (const ok of ["owner.one@example.test", " OWNER.ONE@EXAMPLE.TEST ", "owner.two@example.test", "Owner.Two@Example.test\n"]) assert.equal(checkRecipient(env, ok).ok, true, JSON.stringify(ok));
+  for (const no of ["future.client@example.test", "ownerone@example.test", "owner.one+a@example.test", "owner.two+a@example.test", "owner.t.wo@example.test", "x@example.test", "owner.one@example.test,owner.two@example.test", "", null]) {
     assert.deepEqual([checkRecipient(env, no).ok, checkRecipient(env, no).error], [false, "recipient_not_allowed"], JSON.stringify(no));
   }
   assert.equal(allowlistStatus(env), "configured");

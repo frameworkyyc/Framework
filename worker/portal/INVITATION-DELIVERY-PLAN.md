@@ -125,9 +125,9 @@ sent-email events, then remove or keep the switches as decided.
 5. Run the onboarding checklist: create client, invite, send, receive, sign in, save a profile answer, remove access, re-invite.
 
 ## Phase 5B: temporary recipient allowlist for the controlled live test
-`PORTAL_INVITE_ALLOWED_EMAILS` (Staging `previews.vars` only; currently exactly one approved address) restricts every operation that could email a portal invitation:
+`PORTAL_INVITE_ALLOWLIST` (a Cloudflare **secret** on the Staging Preview; see "Invitation recipient allowlist (secret)" below) restricts every operation that could email a portal invitation:
 **create, replace, send and resend** are refused unless the address is on the list (`403 recipient_not_allowed`), and **all four are locked** when the list is missing,
-empty or unusable (`403 recipient_allowlist_missing`: fail closed; there is no allow-everyone value). Matching is exact after the portal's usual normalization: no plus-address,
+empty or malformed (`403 recipient_allowlist_missing`: fail closed; there is no allow-everyone value; one bad entry refuses the whole list). Matching is exact after the portal's usual normalization: no plus-address,
 dot, domain or wildcard matching. The check runs in the Worker (`worker/portal/admin-access.js`, again inside `invite-delivery.js`), after authentication, CSRF and input validation and
 before any database change or provider call; send, resend and replace check the address STORED on the invitation, so an older invitation for another address can never be sent.
 Revoke, role changes, removing access and creating an organization email nobody and are not restricted. The existing admin "feedback request" email is a separate feature (a link to the public
@@ -135,3 +135,27 @@ feedback form) and is unchanged.
 The Admin interface shows whether recipients are `configured` or `missing` (never the addresses) and explains refusals in plain words.
 **Lifting the restriction after the test is an explicit, reviewed code change**, by design: remove the setting AND change the policy, rather than leaving a setting unset.
 The two administrative switches are still not set anywhere.
+
+
+## Invitation recipient allowlist (secret)
+The repository is public, so the list of people who may be invited is **not** kept in `wrangler.jsonc` (it used to be a `previews.vars` entry named `PORTAL_INVITE_ALLOWED_EMAILS`; that
+name is no longer read anywhere). It is now the Cloudflare secret **`PORTAL_INVITE_ALLOWLIST`** on the Staging Preview. Nothing about the portal itself depends on it: a missing list
+only locks invitations (which are off anyway while `PORTAL_ADMIN_WRITES` and `PORTAL_INVITE_SENDING` are unset); sign-in, sessions and the Business Profile do not read it.
+
+**Format.** Exact email addresses separated by commas, semicolons or whitespace, for example `first@example.test,second@example.test` (use real addresses only when you set it). No wildcards, domains, quotes,
+display names ("Name <a@b.co>") or other punctuation: **any** unusable entry (or a value over 4096 characters) makes the whole list malformed, and a malformed, empty or missing list refuses create, replace, send and resend (`recipient_allowlist_missing`).
+The Admin screen only ever shows `configured` or `missing`, never the addresses.
+
+**Set or change it (a person does this; never paste the value into chat, a ticket, a commit, a document or a command line):**
+1. Use Wrangler 4.135.0 or newer, signed in to the Cloudflare account (`npx wrangler login`).
+2. Run `npx wrangler preview secret put PORTAL_INVITE_ALLOWLIST --name Staging`. Wrangler asks for the value with a hidden prompt: type or paste the list there. (`--name Staging` is the Preview for the `Staging` branch, as in the README's other Staging secrets. Confirm the name in the dashboard: Workers & Pages > framework > the Preview menu.)
+   Setting a secret on a Preview creates a new deployment of that Preview with the same code.
+3. Check that it exists (names only, never values): `npx wrangler preview secret list --name Staging` must list `PORTAL_INVITE_ALLOWLIST`.
+4. Do not use `--var`, an `.env` file in the repository, a shell variable on the command line, or the dashboard's plain "variable" field: only a **secret** is hidden from the dashboard and never written to the Wrangler file. Secrets are not removed by later deployments; plain variables and anything in `wrangler.jsonc` are.
+5. To remove it (invitations lock at once): `npx wrangler preview secret delete PORTAL_INVITE_ALLOWLIST --name Staging`.
+
+**Rules.** Keep the list to the people you have decided to invite for this beta; add an address only when you are about to invite that person; remove it afterwards. Do not add an address to any file in the repository, including tests, docs and this page (use `example.test` addresses in
+examples). Git history is public and permanent: addresses committed earlier remain visible in old commits.
+
+**Transition for this change (no gap).** Create the secret under the NEW name (`PORTAL_INVITE_ALLOWLIST`) first, then deploy the code that reads it: there is never a moment
+without a list, and the old plain variable is dropped by the same deployment that removes it from `wrangler.jsonc`. If the secret were ever missing at deploy time the result is the safe one (invitations locked).

@@ -29,7 +29,7 @@ async function setup({ writes = true } = {}) {
   const w = await makeWorld();
   const alpha = await w.org("alpha", "Alpha Co"), beta = await w.org("beta", "Beta Co");
   const net = { calls: 0 };
-  const env = { ...w.env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }), PORTAL_INVITE_ALLOWED_EMAILS: ALLOWED, ...(writes ? { PORTAL_ADMIN_WRITES: "1" } : {}) };
+  const env = { ...w.env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }), PORTAL_INVITE_ALLOWLIST: ALLOWED, ...(writes ? { PORTAL_ADMIN_WRITES: "1" } : {}) };
   const call = (path, { method = "GET", token, headers = {}, e = env, body, json, now = NOW } = {}) => {
     const h = { Origin: ORIGIN, "X-Framework-Admin": "1", ...(json !== undefined ? { "Content-Type": "application/json" } : {}), ...headers };
     // a valid admin token by default, minted relative to the (injected) current time so that tests can move time forward

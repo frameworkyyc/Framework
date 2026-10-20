@@ -33,7 +33,7 @@ async function setup(over = {}) {
     if (m) return new Response("{}", { status: 500 });
     throw new Error("no network");
   };
-  const env = { ...w.env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }), PORTAL_INVITE_ALLOWED_EMAILS: "plain@example.com sent@example.com", ...over };
+  const env = { ...w.env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }), PORTAL_INVITE_ALLOWLIST: "plain@example.com sent@example.com", ...over };
   const call = (path, { method = "GET", json, e = env, now = NOW } = {}) => {
     const t = sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, iat: Math.floor(now / 1000), exp: Math.floor(now / 1000) + 600 });
     return handleAdmin(new Request(ORIGIN + path, { method, headers: { Origin: ORIGIN, "X-Framework-Admin": "1", "Content-Type": "application/json", "Cf-Access-Jwt-Assertion": t }, body: json === undefined ? undefined : JSON.stringify(json) }), e, { now, fetch: fetchMock });
