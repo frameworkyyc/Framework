@@ -5,6 +5,7 @@ They are never applied to `framework-staging` / `framework-feedback` (the feedba
 older SQL files in `../` are never applied here.
 
 * `0001_portal_foundation.sql`: organizations, portal_users, memberships, invitations, portal_sessions, projects, activity_log.
+* `0002_business_profile.sql`: business_profile_answers (Business Profile answers, one row per answered question). **Staging only for now**: Production already has 0001 and the Production migration workflow fails closed while 0002 is pending, so it cannot be applied to Production by accident. A Production change needs its own review.
 * `wrangler.migrate.staging.jsonc`: a migration-only Wrangler config that binds **only** the Staging portal database. Use it with
   `-c` so Wrangler cannot fall back to the main `wrangler.jsonc` (which also binds Production's database).
 * `wrangler.migrate.production.jsonc`: the same, binding **only** the Production portal database `framework-portal`.

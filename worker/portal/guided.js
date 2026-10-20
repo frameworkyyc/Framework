@@ -221,3 +221,6 @@ ${note("Demonstration only. Requests cannot be submitted yet.")}
 ${checklist}${form}${optionalHtml}${doneHtml}
 <p class="req-submit">${inert(blocked ? "Submit request (complete the required items first)" : "Submit request (not available in the demo)", false)}</p>`;
 }
+
+// Shared building blocks for the connected (authenticated) workspace pages, which use the same row layout as the demonstration.
+export { overview, crumb };

@@ -8,7 +8,7 @@ const sql = readFileSync(new URL("0001_portal_foundation.sql", MIGRATIONS_DIR), 
 const uuid = () => crypto.randomUUID();
 const T = "2026-10-20T12:00:00.000Z";
 const LATER = "2026-10-27T12:00:00.000Z";
-const TABLES = ["activity_log", "invitations", "memberships", "organizations", "portal_sessions", "portal_users", "projects"];
+const TABLES = ["activity_log", "business_profile_answers", "invitations", "memberships", "organizations", "portal_sessions", "portal_users", "projects"];
 
 const insertOrg = (db, id = uuid(), slug = "acme-" + id.slice(0, 6)) => (db.raw.prepare("INSERT INTO organizations (id, slug, name) VALUES (?, ?, 'Acme')").run(id, slug), id);
 const insertUser = (db, id = uuid(), email = `u${id.slice(0, 6)}@example.com`) => (db.raw.prepare("INSERT INTO portal_users (id, workos_user_id, email) VALUES (?, ?, ?)").run(id, "user_" + id.slice(0, 12), email), id);
@@ -22,7 +22,7 @@ const insertInvitation = (db, org, email = "a@example.com", extra = {}) => {
 const rejects = (fn, re = /constraint failed/i, label = "") => assert.throws(fn, re, label);
 
 test("migration files: one numbered file, applied in order, named for wrangler", () => {
-  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql"]);
+  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql"]);
 });
 
 test("applies to an empty database and creates exactly the portal tables", () => {
@@ -47,7 +47,7 @@ test("Cloudflare D1 compatibility: no transaction control, PRAGMA, triggers or A
 
 test("the migration touches only portal tables (never the feedback, assessment or revenue tables)", () => {
   const created = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).sort();
-  assert.deepEqual(created, TABLES);
+  assert.deepEqual(created, TABLES.filter((t) => t !== "business_profile_answers"), "0001 is unchanged; the Business Profile table lives in 0002");
   for (const other of ["feedback_responses", "client_revenue", "assessment_requests", "framework_environment"]) assert.ok(!sql.replace(/--.*$/gm, "").includes(other), other);
 });
 

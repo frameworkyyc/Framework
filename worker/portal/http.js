@@ -29,8 +29,11 @@ export const PORTAL_CSP = [
 ].join("; ");
 
 
+/** The same policy plus scripts from this site only (never inline): used only by pages that load /assets/js/portal-profile.js. */
+export const PORTAL_CSP_WITH_SCRIPT = PORTAL_CSP.replace("default-src 'none'; ", "default-src 'none'; script-src 'self'; ");
+
 /** Headers every portal response carries. `extra` may add headers (never weaken the fixed ones: they are applied last). */
-export function securityHeaders(extra = {}) {
+export function securityHeaders(extra = {}, { scripts = false } = {}) {
   const h = new Headers();
   for (const [k, v] of Object.entries(extra)) {
     if (Array.isArray(v)) v.forEach((x) => h.append(k, x));
@@ -38,7 +41,7 @@ export function securityHeaders(extra = {}) {
   }
   h.set("Cache-Control", "no-store");
   h.set("Referrer-Policy", "no-referrer");
-  h.set("Content-Security-Policy", PORTAL_CSP);
+  h.set("Content-Security-Policy", scripts ? PORTAL_CSP_WITH_SCRIPT : PORTAL_CSP);
   h.set("X-Content-Type-Options", "nosniff");
   h.set("X-Frame-Options", "DENY");
   h.set("X-Robots-Tag", "noindex, nofollow");

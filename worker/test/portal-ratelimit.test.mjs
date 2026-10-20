@@ -43,7 +43,7 @@ test("keys are per bucket and per client network, hashed, never contain the addr
   for (const k of [a, await rateLimitKey(PEPPER, "logout", "2001:db8:1:2::1")]) assert.ok(!/203|2001|db8|v4|v6/.test(k.split(":")[1]), k);
   assert.equal(await rateLimitKey(PEPPER, "login", "nope"), null);
   assert.equal(await rateLimitKey(PEPPER, "admin", "203.0.113.7"), null, "unknown buckets are refused");
-  assert.deepEqual([...BUCKETS], ["login", "callback", "logout"]);
+  assert.deepEqual([...BUCKETS], ["login", "callback", "logout", "profile"]);
 });
 test("isRateLimited: only an explicit success:false limits; a missing binding, bad result, error or unattributable client never does", async () => {
   const mk = (limit) => ({ PORTAL_RATE_LIMITER: { limit } });

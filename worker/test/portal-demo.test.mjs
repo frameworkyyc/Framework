@@ -291,18 +291,6 @@ test("guided data is consistent: done steps are fully answered, unstarted steps 
   for (const s of d.SERVICES) assert.ok(d.serviceReadiness(s).reqs.length > 0, s.id);
   const sum = d.progressSummary(); assert.ok(sum.done > 0 && sum.done < sum.total);
 });
-test("live portal pages are untouched by the guided demo", async () => {
-  const w = await makeWorld();
-  await w.org("alpha", "Alpha Co"); await w.invite(await w.org("alpha2", "Alpha Two"), "x@alpha.test", "owner");
-  const a = (await w.db.prepare("SELECT slug FROM organizations WHERE slug='alpha'").first());
-  assert.ok(a);
-  const br = w.browser();
-  await w.invite({ id: (await w.db.prepare("SELECT id FROM organizations WHERE slug='alpha'").first()).id }, "ann2@alpha.test", "owner");
-  await br.signIn(w.user(2, "ann2@alpha.test"));
-  const html = await (await br.get("/portal/o/alpha")).text();
-  assert.ok(!/Let’s get you set up|class="tile"/.test(html));
-  assert.equal((await br.get("/portal/o/alpha/demo")).status, 404);
-});
 
 test("all six overviews share one layout: breadcrumb, title, optional progress, hairline navigation rows; detail stays behind the rows", async () => {
   const rowsOf = (html) => [...html.matchAll(/<a class="row row--step[^"]*" href="([^"]+)"><span class="step__n"[^>]*>(\d\d)<\/span><span class="row__name">([^<]+)/g)].map((m) => [m[1].replace("/portal/demo", ""), m[2], m[3]]);

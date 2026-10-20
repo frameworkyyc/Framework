@@ -13,6 +13,10 @@ const GRANTS = Object.freeze({
   "documents.view": Object.freeze(["owner", "member"]),
   "account.view": Object.freeze(["owner", "member"]),
   "members.view": Object.freeze(["owner"]),
+  // Business Profile: any active member of the organization may read and edit its answers; the six workspace pages are visible to the same roles.
+  "profile.view": Object.freeze(["owner", "member"]),
+  "profile.edit": Object.freeze(["owner", "member"]),
+  "workspace.view": Object.freeze(["owner", "member"]),
 });
 
 export const ACTIONS = Object.freeze(Object.keys(GRANTS));

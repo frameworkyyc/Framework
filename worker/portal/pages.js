@@ -8,6 +8,8 @@ import { csrfFor } from "./sessions.js";
 import { permissionsFor } from "./policy.js";
 import { appPage } from "./ui.js";
 import * as views from "./views.js";
+import * as guided from "./guided.js";
+import * as live from "./profile-live.js";
 
 const OFF = Object.freeze({ progress: false, milestones: false, deliverables: false, documents: false, updates: false, actions: false, settings: false });
 
@@ -36,10 +38,11 @@ function liveModel(ctx, { session, membership: m }, data = {}) {
   };
 }
 
-async function shell(ctx, a, { title, active, body, status = 200, vm }) {
+async function shell(ctx, a, { title, active, body, status = 200, vm, script = null }) {
   const { session, membership: m } = a;
-  const items = permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [];
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active, items }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session) });
+  // Header navigation of the connected portal: Home and Account (and Team for owners). Every other page is reached from Home.
+  const list = [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: active === "account" || active === "team" ? active : "home", list }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), script });
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null }) {
@@ -66,9 +69,28 @@ export async function pickerPage(ctx, session, memberships) {
   return htmlPage({ title: "Choose an organization", bodyHtml: `<p class="lead">You belong to more than one organization.</p><ul class="rows">${items}</ul><div class="auth__alt">${await signOutForm(ctx, session)}</div>` });
 }
 
+/** The home of the connected portal: the six workspace blocks. Nothing from the demonstration is shown. */
+export async function homePage(ctx, a) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Home", active: "home", body: guided.home(vm), vm });
+}
 export async function overviewPage(ctx, a, data) {
   const vm = liveModel(ctx, a, data);
-  return shell(ctx, a, { title: "Dashboard", active: "dashboard", body: views.dashboard(vm), vm });
+  return shell(ctx, a, { title: "Progress", active: "dashboard", body: views.dashboard(vm), vm });
+}
+export async function profileOverviewPage(ctx, a, saved) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Business Profile", active: "home", body: live.profileOverview(vm, saved), vm });
+}
+/** @param o see profile-live.js profileStep; `status` is the HTTP status (422 for rejected answers, 503 when the save could not be stored) */
+export async function profileStepPage(ctx, a, step, saved, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  return shell(ctx, a, { title: `${step.title}: Business Profile`, active: "home", body: live.profileStep(vm, step, saved, { ...o, csrf }), vm, status: o.status || 200, script: "/assets/js/portal-profile.js" });
+}
+export async function comingSoonPage(ctx, a, key) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Coming soon", active: "home", body: live.comingSoon(vm, key), vm });
 }
 export async function projectsPage(ctx, a, projects) {
   const vm = liveModel(ctx, a, { projects });

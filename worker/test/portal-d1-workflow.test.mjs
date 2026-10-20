@@ -130,6 +130,8 @@ test("script: pending migrations - apply needs exactly 0001; anything else fails
   throwsFail(() => checkPendingBefore(LIST_NONE, "apply"), /exactly one pending/);
   throwsFail(() => checkPendingBefore(LIST_PENDING.replace("0001_portal_foundation.sql", "0001_create_feedback_responses.sql"), "verify-only"), /unexpected pending/);
   throwsFail(() => checkPendingBefore(LIST_PENDING.replace("└", "│ 0002_something.sql │\n└"), "apply"), /exactly one pending|unexpected/);
+  throwsFail(() => checkPendingBefore(LIST_PENDING.replace("0001_portal_foundation.sql", "0002_business_profile.sql"), "verify-only"), /unexpected pending/); // Production has 0001; the Business Profile migration is Staging-only until separately approved
+  throwsFail(() => checkPendingBefore(LIST_PENDING.replace("0001_portal_foundation.sql", "0002_business_profile.sql"), "apply"), /unexpected pending|exactly/);
   throwsFail(() => checkPendingBefore("something unexpected", "verify-only"), /unrecognised/);
   throwsFail(() => checkPendingBefore("", "apply"), /unrecognised/);
   throwsFail(() => checkPendingBefore(LIST_PENDING + LIST_NONE, "apply"), /contradictory/);
@@ -156,5 +158,6 @@ test("script: the expected tables, indexes and migration name are exactly what 0
   assert.deepEqual([...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).sort(), [...EXPECTED.tables].sort());
   assert.deepEqual([...sql.matchAll(/CREATE (?:UNIQUE )?INDEX IF NOT EXISTS (\w+)/g)].map((m) => m[1]).sort(), [...EXPECTED.indexes].sort());
   assert.ok(readdirSync(new URL("migrations/portal/", root)).includes(EXPECTED.migration));
-  assert.deepEqual(readdirSync(new URL("migrations/portal/", root)).filter((f) => /^\d{4}_.*\.sql$/.test(f)), [EXPECTED.migration], "no other migration file would be applied with it");
+  // 0002 (Business Profile) is Staging-only for now. The Production check expects exactly 0001, so a pending 0002 makes it fail closed (see the next test).
+  assert.deepEqual(readdirSync(new URL("migrations/portal/", root)).filter((f) => /^\d{4}_.*\.sql$/.test(f)), [EXPECTED.migration, "0002_business_profile.sql"]);
 });

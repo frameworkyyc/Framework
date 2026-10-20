@@ -417,3 +417,13 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .req-done li { display: flex; justify-content: space-between; gap: var(--space-2); padding: 10px 0; border-top: 1px solid var(--hairline); font-size: 15px; }
 .req-submit { margin-top: var(--space-4); }
 .backlink { margin: 0 0 var(--space-3); }
+
+/* ---------- connected Business Profile ---------- */
+.field__error { color: var(--signal); font-size: 14px; font-weight: 500; }
+.field__opt { font-weight: 400; font-size: 13px; color: var(--slate); margin-left: 6px; }
+.field [aria-invalid="true"] { border-color: var(--signal) !important; }
+.form-banner { margin: 0 0 var(--space-3); padding-left: 14px; border-left: 2px solid var(--ink); font-size: 15px; max-width: 40em; }
+.form-banner--error { border-left-color: var(--signal); color: var(--signal); }
+.form-status { min-height: 20px; margin: 0 0 var(--space-2); }
+.soon { max-width: 36em; display: grid; gap: var(--space-2); justify-items: start; } .soon .lead { margin: 0; }
+.btn[type="submit"] { font-family: inherit; }

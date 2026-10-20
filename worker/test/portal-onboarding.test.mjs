@@ -253,7 +253,7 @@ test("end to end through the real router: SQL-onboarded organization works for i
   const home = await b.get("/portal");
   assert.equal(home.status, 303);
   assert.equal(home.headers.get("Location"), "/portal/o/acme-co", "one organization: straight to it");
-  const org = await b.get("/portal/o/acme-co");
+  const org = await b.get("/portal/o/acme-co/progress"); // the project dashboard moved off the home page (the home is the six workspace blocks)
   assert.equal(org.status, 200);
   const html = await org.text();
   assert.match(html, /Acme Co/); assert.match(html, /Acme website/);

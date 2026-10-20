@@ -8,3 +8,4 @@ export * from "./invitations.js";
 export * from "./projects.js";
 export * from "./activity.js";
 export * from "./offboarding.js";
+export * from "./business-profile.js";

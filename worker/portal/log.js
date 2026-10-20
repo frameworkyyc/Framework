@@ -54,7 +54,7 @@ export function logEvent(fields, sink = (line) => console.log(line)) {
   return entry;
 }
 
-const STATIC_SEGMENTS = new Set(["portal", "login", "auth", "callback", "logout", "select", "o", "projects", "activity", "members", "documents", "account", "demo", "assets", "no-access"]);
+const STATIC_SEGMENTS = new Set(["portal", "login", "auth", "callback", "logout", "select", "o", "projects", "activity", "members", "documents", "account", "demo", "assets", "no-access", "progress", "profile", "branding", "website", "marketing", "content", "files"]);
 
 /** A safe route NAME for a path: organization slugs and ids become placeholders, so a log never reveals which organization. */
 export function routeName(pathname) {
