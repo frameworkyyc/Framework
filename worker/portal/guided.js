@@ -62,11 +62,12 @@ export function home(vm) {
 
 /* ------------------------------------------------------------------ standard workspace overview (shared) */
 
-const DONE_MARK = '<span class="check" aria-hidden="true">✓</span><span class="visually-hidden">Complete</span>';
-/** One navigation row: number, short title, optional status (checkmark when complete), arrow. Rows are hairline-divided, never boxed. */
+/** One navigation row: number, short title, optional plain-text status, arrow. Rows are hairline-divided, never boxed; the arrow is always present. */
 function navRow(vm, n, r) {
-  const st = r.state === "done" ? DONE_MARK : r.state === "current" ? '<span class="rowstat">In progress</span>' : r.state === "todo" ? '<span class="visually-hidden">Not started</span>' : r.status ? `<span class="rowstat${r.attention ? " rowstat--attention" : ""}">${e(r.status)}</span>` : "";
-  return `<li><a class="row row--step" href="${e(href(vm, r.href))}"><span class="step__n" aria-hidden="true">${String(n).padStart(2, "0")}</span><span class="row__name">${e(r.title)}</span><span class="row__st">${st}</span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`;
+  const label = r.state === "done" ? "Complete" : r.state === "current" ? "In progress" : r.status || "";
+  const st = label ? `<span class="rowstat${r.attention ? " rowstat--attention" : ""}">${e(label)}</span>` : "";
+  const sr = r.state === "todo" ? '<span class="visually-hidden">, not started</span>' : "";
+  return `<li><a class="row row--step" href="${e(href(vm, r.href))}"><span class="step__n" aria-hidden="true">${String(n).padStart(2, "0")}</span><span class="row__name">${e(r.title)}${sr}</span><span class="row__st">${st}</span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`;
 }
 /** The standard workspace overview: breadcrumb, title, one progress indicator when meaningful, rows. */
 function overview(vm, { key, title, progress, rows }) {

@@ -254,7 +254,7 @@ test("live portal pages are untouched by the guided demo", async () => {
 });
 
 test("all six overviews share one layout: breadcrumb, title, optional progress, hairline navigation rows; detail stays behind the rows", async () => {
-  const rowsOf = (html) => [...html.matchAll(/<a class="row row--step[^"]*" href="([^"]+)"><span class="step__n"[^>]*>(\d\d)<\/span><span class="row__name">([^<]+)<\/span>/g)].map((m) => [m[1].replace("/portal/demo", ""), m[2], m[3]]);
+  const rowsOf = (html) => [...html.matchAll(/<a class="row row--step[^"]*" href="([^"]+)"><span class="step__n"[^>]*>(\d\d)<\/span><span class="row__name">([^<]+)/g)].map((m) => [m[1].replace("/portal/demo", ""), m[2], m[3]]);
   const expected = {
     profile: ["Your business", "Location and size", "Products, services and customers", "Goals and competitors", "Online presence", "Primary contact", "Brand personality and positioning"],
     branding: ["Existing brand assets", "Logo and identity", "Brand guidelines", "Brand discovery", "Projects", "Request a service"],
@@ -276,7 +276,8 @@ test("all six overviews share one layout: breadcrumb, title, optional progress, 
 test("progress is only about onboarding questions: Business Profile 3 of 7, no inflation from projects, files or requests", async () => {
   const prof = await (await get("/portal/demo/profile")).text();
   assert.match(prof, /3 of 7 steps complete/); assert.equal([...prof.matchAll(/<progress/g)].length, 1);
-  assert.equal([...prof.matchAll(/class="check"/g)].length, 3);
+  assert.equal([...prof.matchAll(/class="rowstat">Complete</g)].length, 3); assert.match(prof, /class="rowstat">In progress</); assert.ok(!/✓|class="check"/.test(prof), "no checkmark glyphs");
+  assert.equal([...prof.matchAll(/class="tile__arrow"/g)].length, 7, "every row keeps its arrow");
   for (const [k, text] of [["website", "2 of 6 areas complete"], ["marketing", "0 of 5 areas complete"], ["content", "0 of 4 areas complete"]]) assert.match(await (await get("/portal/demo/" + k)).text(), new RegExp(text));
   for (const k of ["branding", "files"]) assert.ok(!/<progress/.test(await (await get("/portal/demo/" + k)).text()), k + " shows no artificial progress");
   const d = await import("../portal/guided-data.js");
