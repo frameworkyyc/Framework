@@ -46,3 +46,25 @@ A single "Send feedback" link in the footer opens `/portal/o/<slug>/feedback`: o
 4. Build the feedback mechanism (above).
 5. Add a short consent and privacy notice to the Business Profile (what is collected, why, who sees it).
 6. Optional: data export and deletion procedure for a profile; a "mark section as not applicable" control for questions a client cannot answer.
+
+## Readiness review (Step 401)
+Verified against the real Staging database (read-only, 2026-10-20): `framework-portal-staging` (`1edda8a2-5249-4f40-9dbc-d29aa44e21f8`); `business_profile_answers` exists and matches 0002 exactly; `portal_feedback` does not exist; `d1_migrations` lists only 0001 (so 0002 and 0003 are the only pending migrations); neither migration has a destructive statement; the Staging migration config binds only that database. Applying 0002 and 0003 was NOT possible from this environment (Wrangler is not authenticated; see the manual steps below). Staging data today: 2 organizations, 1 user with an active membership, 1 accepted invitation, 2 projects, 0 saved profile answers.
+
+**Manual steps (run by you, with `npx wrangler login` done):**
+1. `npx wrangler d1 migrations list PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc`: the output must name `framework-portal-staging` and list exactly `0002_business_profile.sql` and `0003_portal_feedback.sql`. Stop if anything else appears or any output names `framework-portal` or `framework-staging`.
+2. `npx wrangler d1 migrations apply PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc` (confirm the prompt).
+3. Run step 1 again (nothing pending) and `... d1 execute PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc --command "SELECT name FROM d1_migrations ORDER BY id"` (three rows) and `--command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"` (the earlier tables plus `business_profile_answers` and `portal_feedback`).
+
+**Mandatory launch blockers (do not invite a real client until done)**
+1. Migrations 0002 and 0003 applied and recorded on Staging; then a real Staging pass of the acceptance checklist in `PRODUCTION-BETA-PLAN.md` (sign-in, save, persist after sign-out, feedback, Admin review). None of this has been verified live yet.
+2. The website privacy policy updated to cover the portal, Business Profile and portal feedback (the current `privacy.html` mentions neither; effective October 17, 2026).
+3. Decisions the owner must make: a retention period for Business Profile answers and portal feedback; who handles correction and deletion requests, by what process and how fast (today: email to `hello@frameworkco.ca` plus manual database work, with no tooling); whether staff access needs a stated rule; whether the owner's adviser wants explicit consent or an acknowledgement.
+4. Provider and location wording confirmed to cover the portal (WorkOS for sign-in, Cloudflare for hosting and the database; the policy already says information may be processed outside Canada).
+5. Account management for beta: a named person who creates invitations (runbook plus WorkOS user), disables accounts, and responds to access problems; the Admin cannot invite yet.
+6. The earlier launch items in `LAUNCH.md` (MFA Required in WorkOS Production, first-sign-in test behind a WAF rule, tenant-isolation check) and the Production migration workflow update in `PRODUCTION-BETA-PLAN.md`.
+
+**Optional improvements (not blockers)**
+* An audit entry when staff view a client's profile, and a "no sensitive personal information" hint on free-text boxes.
+* Staff-side deletion and export of one organization's profile and feedback (a tested, reviewed procedure).
+* Admin invitation creation (needs a WorkOS management client; see "Staff administration").
+* An email notification to staff when portal feedback arrives, and a "not applicable" option for questions a client cannot answer.
