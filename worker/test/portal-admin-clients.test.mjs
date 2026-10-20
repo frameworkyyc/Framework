@@ -183,7 +183,7 @@ test("failures answer generically and nothing sensitive is logged", async () => 
 
 /* ------------------------------------------------------------------ interface */
 
-test("the Clients entry is live in the admin navigation, and the page is read-only: no edit, send or impersonation controls", () => {
+test("the Clients entry is live in the admin navigation, and the Business Profile review module itself is read-only (access changes live in clients-access.js, covered by portal-admin-ui.test.mjs)", () => {
   assert.match(read("admin/assets/modules.js"), /id: "clients", label: "Clients", path: "\/admin\/clients", enabled: true, load: \(\) => import\("\.\/clients\.js"\)/);
   const ui = read("admin/assets/clients.js");
   assert.ok(!/method: "(POST|PUT|PATCH|DELETE)"|<form|"input"|"textarea"|"select"|onsubmit|impersonat|sign in as/i.test(ui), "no write, form or impersonation");

@@ -63,7 +63,7 @@ async function answersFor(rdb, organizationId) {
   }
 }
 
-async function list(rdb, now) {
+async function list(rdb, now, capabilities) {
   const t = now.toISOString();
   const orgs = (await rdb.prepare(
     `SELECT o.id, o.name, o.slug, o.status, o.created_at,
@@ -79,6 +79,7 @@ async function list(rdb, now) {
   for (const a of ans.rows) (byOrg.get(a.organization_id) || byOrg.set(a.organization_id, []).get(a.organization_id)).push(a);
   return json({
     profile_available: ans.ok,
+    capabilities, // booleans only: whether this deployment accepts access changes (so the interface can explain itself)
     clients: orgs.map((o) => ({
       id: o.id, name: o.name, slug: o.slug, status: o.status, created_at: o.created_at, active_members: o.active_members,
       invitations: { pending: o.pending, accepted: o.accepted, revoked: o.revoked, lapsed: o.lapsed },
@@ -112,7 +113,7 @@ export async function handleClientsApi(request, env, principal, path, deps = {})
   const rdb = readOnlyDb(env.PORTAL_DB);
   const now = deps.now || new Date();
   try {
-    if (!m[1]) return await list(rdb, now);
+    if (!m[1]) return await list(rdb, now, { writes: env.PORTAL_ADMIN_WRITES === "1" });
     if (!UUID.test(m[1])) return json({ error: "not_found" }, 404);
     return await one(rdb, m[1], now);
   } catch (err) {

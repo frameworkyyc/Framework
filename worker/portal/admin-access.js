@@ -104,9 +104,14 @@ const deliveryOf = (i) =>
 const publicInvitation = (i, nowIso) => ({
   id: i.id, email: i.email, role: i.role, status: i.status, created_at: i.created_at, created_by: i.created_by, expires_at: i.expires_at,
   accepted_at: i.accepted_at, revoked_at: i.revoked_at, past_expiry: i.status === "pending" && i.expires_at <= nowIso, delivery: deliveryOf(i),
+  // For a REVOKED invitation that was submitted to WorkOS: has the WorkOS side been cancelled? "pending" means D1 is revoked but the cleanup still needs a retry.
+  workos_cleanup: i.workos_cleanup || "none",
 });
 /** A freshly created or replaced invitation has not been sent: true by construction (the column default). */
 const fresh = (i, nowIso) => publicInvitation({ ...i, delivery_status: "not_sent", delivery_channel: null, delivery_attempted_at: null, delivery_error: null }, nowIso);
+const CLEANUP_COLUMN = `, CASE WHEN status = 'revoked' AND workos_invitation_id IS NOT NULL
+    THEN CASE WHEN EXISTS (SELECT 1 FROM activity_log a WHERE a.organization_id = invitations.organization_id AND a.entity_id = invitations.id AND a.action = 'invitation.workos_revoked') THEN 'done' ELSE 'pending' END
+    ELSE 'none' END AS workos_cleanup`;
 const DELIVERY_COLUMNS = ", delivery_status, delivery_channel, delivery_attempted_at, delivery_error";
 
 async function readAccess(env, org, now) {
@@ -120,7 +125,7 @@ async function readAccess(env, org, now) {
       .bind(org.id)
       .all()
   ).results;
-  const invitationSql = (extra) => `SELECT id, email, role, status, created_at, created_by, expires_at, accepted_at, revoked_at${extra} FROM invitations WHERE organization_id = ? ORDER BY created_at DESC, id LIMIT 200`;
+  const invitationSql = (extra) => `SELECT id, email, role, status, created_at, created_by, expires_at, accepted_at, revoked_at${extra}${CLEANUP_COLUMN} FROM invitations WHERE organization_id = ? ORDER BY created_at DESC, id LIMIT 200`;
   let invitations;
   try {
     invitations = (await rdb.prepare(invitationSql(DELIVERY_COLUMNS)).bind(org.id).all()).results;
@@ -138,6 +143,8 @@ async function readAccess(env, org, now) {
     })),
     invitations: invitations.map((i) => publicInvitation(i, nowIso)),
     delivery_tracking: invitations.length === 0 ? undefined : invitations[0].delivery_status !== undefined,
+    // Whether this deployment accepts changes, and whether it may contact providers. Booleans only: lets the interface explain itself instead of failing on click.
+    capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", sending: env.PORTAL_ADMIN_WRITES === "1" && env.PORTAL_INVITE_SENDING === "1" },
   };
 }
 
@@ -175,7 +182,7 @@ async function hasDeliveryColumns(db) {
 }
 
 async function readInvitationRow(db, organizationId, id) {
-  const sqlText = (extra) => `SELECT id, email, role, status, created_at, created_by, expires_at, accepted_at, revoked_at${extra} FROM invitations WHERE id = ? AND organization_id = ?`;
+  const sqlText = (extra) => `SELECT id, email, role, status, created_at, created_by, expires_at, accepted_at, revoked_at${extra}${CLEANUP_COLUMN} FROM invitations WHERE id = ? AND organization_id = ?`;
   try {
     return await db.prepare(sqlText(DELIVERY_COLUMNS)).bind(id, organizationId).first();
   } catch {

@@ -1,9 +1,12 @@
-/* Framework Admin — Clients module (read-only): /admin/clients (organizations) and /admin/clients/:id (profile review). */
+/* Framework Admin — Clients: /admin/clients (organizations, New client) and /admin/clients/:id (organization, invitations, members, Business Profile review).
+   Access management lives in clients-access.js; the Business Profile review below stays read-only. */
 
 import { h, api, fmtDate, fmtDateTime, stateBlock } from "./ui.js";
+import { newClientPanel, accessSections } from "./clients-access.js";
 
 const STATE_TEXT = { complete: "Complete", partial: "Partial", missing: "Missing" };
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 
 function inviteSummary(i) {
   const parts = [];
@@ -18,12 +21,12 @@ const profileCell = (p) => (p ? h("span", null, `${p.done} of ${p.total} steps`,
 
 export async function render(ctx) {
   const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)$/);
-  return m ? renderDetail(decodeURIComponent(m[1])) : renderList();
+  return m ? renderDetail(decodeURIComponent(m[1]), ctx) : renderList(ctx);
 }
 
 /* ---------- List ---------- */
 
-async function renderList() {
+async function renderList(ctx) {
   const data = await api("/clients");
   const rows = data.clients;
   const table = h("table", { class: "adm-table" },
@@ -36,11 +39,15 @@ async function renderList() {
       h("td", { "data-label": "" }, h("a", { class: "adm-link", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "", "aria-label": "View " + c.name }, "View →")),
     ))),
   );
+  const writes = Boolean(data.capabilities && data.capabilities.writes);
+  const create = newClientPanel({ navigate: ctx.navigate, writesEnabled: writes });
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Clients"),
-      h("p", { class: "adm-sub" }, "Invited client organizations and their Business Profiles. Read-only."))),
+      h("p", { class: "adm-sub" }, "Client organizations, the people who can open their portal, and their Business Profiles.")), h("div", { class: "adm-actions" }, create.button)),
+    writes ? null : h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at clients, but not create them or change who has access."),
+    create.panel,
     data.profile_available ? null : h("p", { class: "adm-banner" }, "Business Profile data isn’t available on this deployment (its database migration hasn’t been applied)."),
-    rows.length ? table : stateBlock({ title: "No client organizations yet", body: "Organizations appear here once they have been created in the portal database." }),
+    rows.length ? table : stateBlock({ title: "No client organizations yet", body: writes ? "Use New client to add the first one, then invite its first owner." : "Nothing has been created yet. Changes are switched off on this site." }),
     rows.length ? h("p", { class: "adm-sub", role: "status" }, `${plural(rows.length, "organization")}.`) : null,
   );
   return { title: "Clients", node };
@@ -64,12 +71,11 @@ function stepBlock(s, index) {
   );
 }
 
-async function renderDetail(id) {
+async function renderDetail(id, ctx) {
   const data = await api("/clients/" + encodeURIComponent(id));
   const o = data.organization;
   const p = data.profile;
-  const members = data.members;
-  const invitations = data.invitations;
+  const welcome = ctx.url.searchParams.get("welcome") === "1";
 
   const profile = !data.profile_available
     ? h("p", { class: "adm-banner" }, "Business Profile data isn’t available on this deployment.")
@@ -80,35 +86,20 @@ async function renderDetail(id) {
         p.steps.map(stepBlock),
       ];
 
-  const memberList = members.length
-    ? h("table", { class: "adm-table" }, h("thead", null, h("tr", null, ["Member", "Role", "Status", "Last sign-in"].map((t) => h("th", { scope: "col" }, t)))),
-        h("tbody", null, members.map((u) => h("tr", null,
-          h("td", { "data-label": "Member" }, h("span", { class: "adm-client" }, u.name || u.email), u.name ? h("span", { class: "adm-client__sub" }, u.email) : null),
-          h("td", { "data-label": "Role" }, u.role),
-          h("td", { "data-label": "Status" }, u.status === "active" && u.user_status === "active" ? "Active" : u.status === "revoked" ? "Access revoked" : "Account disabled"),
-          h("td", { "data-label": "Last sign-in" }, u.last_login_at ? fmtDate(u.last_login_at) : h("span", { class: "adm-muted" }, "Never"))))))
-    : h("p", { class: "adm-muted" }, "No members yet.");
-
-  const inviteList = invitations.length
-    ? h("table", { class: "adm-table" }, h("thead", null, h("tr", null, ["Invited", "Role", "Status", "Sent", "Expires"].map((t) => h("th", { scope: "col" }, t)))),
-        h("tbody", null, invitations.map((i) => h("tr", null,
-          h("td", { "data-label": "Invited" }, i.email),
-          h("td", { "data-label": "Role" }, i.role),
-          h("td", { "data-label": "Status" }, i.status[0].toUpperCase() + i.status.slice(1), i.past_expiry ? h("span", { class: "adm-muted" }, " (past its expiry date)") : null,
-            i.accepted_at ? h("span", { class: "adm-muted" }, " " + fmtDate(i.accepted_at)) : null),
-          h("td", { "data-label": "Sent" }, fmtDate(i.created_at)),
-          h("td", { "data-label": "Expires" }, fmtDate(i.expires_at))))))
-    : h("p", { class: "adm-muted" }, "No invitations recorded.");
+  const info = spec([
+    ["Status", o.status === "active" ? "Active" : cap(o.status)],
+    ["Portal address", h("code", { class: "adm-code" }, "/portal/o/" + o.slug)],
+    o.website_url ? ["Website", h("a", { class: "adm-link", href: o.website_url, rel: "noopener noreferrer", target: "_blank" }, o.website_url.replace(/^https:\/\//, ""))] : ["Website", h("span", { class: "adm-muted" }, "Not given")],
+    ["Created", fmtDate(o.created_at)],
+  ]);
 
   const node = h("div", { class: "adm-page" },
     h("a", { class: "adm-back", href: "/admin/clients", "data-link": "" }, "← All clients"),
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Client"), h("h1", { class: "adm-title", tabindex: "-1" }, o.name),
-      h("p", { class: "adm-sub" }, `${o.status === "active" ? "Active" : o.status[0].toUpperCase() + o.status.slice(1)} · created ${fmtDate(o.created_at)}`))),
-    h("p", { class: "adm-banner" }, "Read-only. Answers are shown as the client saved them; staff cannot edit them here."),
-    section("Business Profile", profile),
-    section("Members", memberList),
-    section("Invitations", inviteList,
-      h("p", { class: "adm-sub" }, "These are the invitations recorded in the portal database. Invitations are created with the reviewed runbook (migrations/portal-ops) together with the person’s WorkOS account; this page cannot send or change them.")),
+      h("p", { class: "adm-sub" }, `${o.status === "active" ? "Active" : cap(o.status)} · created ${fmtDate(o.created_at)}`))),
+    section("Organization", info),
+    accessSections({ orgId: o.id, orgName: o.name, welcome }),
+    section("Business Profile", h("p", { class: "adm-banner" }, "Answers are shown as the client saved them; staff cannot edit them here."), profile),
   );
   return { title: o.name + " — Clients", node };
 }

@@ -45,12 +45,21 @@ export async function api(path, { method = "GET", body } = {}) {
   if (!isJson) throw new ApiError(res.ok ? 401 : res.status, res.ok ? "session" : "error");
   const data = await res.json().catch(() => ({}));
   if (res.ok) return data;
-  if (res.status === 401 || res.status === 403) throw new ApiError(res.status, "denied");
-  if (res.status === 404) throw new ApiError(404, "not_found");
-  if (res.status === 409) throw new ApiError(409, data.error || "conflict");
-  if (res.status === 422) { const e = new ApiError(422, data.error || "invalid"); e.detail = typeof data.message === "string" ? data.message : ""; throw e; }
-  if (res.status === 503) throw new ApiError(503, "unavailable");
-  throw new ApiError(res.status, "error");
+  // The server's own short code and plain-language message travel with the error (never raw text, never a stack): callers show friendly copy for the codes they know.
+  const fail = (status, code) => {
+    const e = new ApiError(status, code);
+    e.detail = typeof data.message === "string" ? data.message : "";
+    e.data = data && typeof data === "object" ? data : {};
+    return e;
+  };
+  if (res.status === 401 || res.status === 403) throw fail(res.status, res.status === 403 && ["writes_disabled", "sending_disabled"].includes(data.error) ? data.error : "denied");
+  if (res.status === 404) throw fail(404, "not_found");
+  if (res.status === 409) throw fail(409, data.error || "conflict");
+  if (res.status === 422) throw fail(422, data.error || "invalid");
+  if (res.status === 502 && data.error === "delivery_failed") throw fail(502, "delivery_failed");
+  if (res.status === 500 && data.error === "delivery_unrecorded") throw fail(500, "delivery_unrecorded");
+  if (res.status === 503) throw fail(503, ["provider_not_configured", "delivery_tracking_unavailable"].includes(data.error) ? data.error : "unavailable");
+  throw fail(res.status, "error");
 }
 
 /* ---------- Formatting ---------- */

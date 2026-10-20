@@ -107,3 +107,19 @@ never reach responses or the audit trail; simultaneous sends make ONE provider r
 
 Enabling procedure (not done): set both switches in `previews.vars` through a reviewed change, run one invitation to an inbox you control, watch the WorkOS dashboard's
 sent-email events, then remove or keep the switches as decided.
+
+## Phase 4: the Admin interface (Admin -> Clients)
+`admin/assets/clients.js` (list and detail, Business Profile review unchanged and read-only) now uses `admin/assets/clients-access.js`:
+* **List:** New client (business name, optional website, optional URL name; a bare domain gets `https://` the way the portal's own field does; field-level server errors); on success the administrator lands on the client with a "next step: invite its first owner" prompt and focus in the invite field.
+* **Detail:** Organization facts; **Invitations** (invite form with Owner/Member, a confirmation that says creating does not email anyone; table with invitation status and delivery state in separate columns; Send, Try again, Resend, Replace, Revoke, Retry WorkOS cancel as appropriate); **Members** (Make owner/member, Remove access with a confirmation that says the organization's data is kept; the only active owner's buttons are disabled with a reason); Business Profile review.
+* **Honesty rules in the copy:** "Submitted to WorkOS / Framework email" always comes with "the provider accepted the request; arrival in the inbox isn't confirmed"; failures say "Nothing was sent" with a plain reason; an expired invitation says it can't be sent again and must be replaced; a revoke whose WorkOS cancel failed says access is closed, the cancel failed, and how to finish.
+* **Safety:** all rules stay server-side (the page only reads `last_active_owner`, `past_expiry`, `capabilities`, `workos_cleanup`); controls lock while a request runs; no raw server text, ids or provider messages are displayed; no inline styles or HTML injection (the admin CSP is unchanged and was observed clean in the browser).
+* **Additive API changes:** `capabilities` (booleans) on the clients list and the access listing; `workos_cleanup` (`none|pending|done`, from the audit trail) on invitations; `api()` in `ui.js` now carries the server's short error code and message on 403/409/422/500/502/503 (existing codes are unchanged).
+* **With both switches off (today on Staging)** the interface renders fully and explains itself: banners say changes/sending are switched off and the relevant buttons are disabled.
+
+### Before a controlled live Staging onboarding test
+1. Resolve the WorkOS live-verification list above with one invitation to an inbox you control.
+2. Decide how the invitee reaches the portal from the WorkOS email (the link must land on `/portal/login?invitation_token=...`).
+3. Set `PORTAL_ADMIN_WRITES` and `PORTAL_INVITE_SENDING` in `previews.vars` through a reviewed change (and confirm `RESEND_API_KEY`, `ASSESSMENT_FROM`, `PORTAL_AUTH_CLIENT_SECRET` exist on Staging).
+4. Confirm the Cloudflare Access policy for `/admin*` and `/api/admin/*`.
+5. Run the onboarding checklist: create client, invite, send, receive, sign in, save a profile answer, remove access, re-invite.
