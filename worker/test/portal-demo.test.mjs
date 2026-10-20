@@ -16,7 +16,7 @@ const demoEnv = (over = {}) => ({ ...world.env, PORTAL_DEMO: "1", PORTAL_DB: thr
 const get = (path, env = demoEnv(), init) => handlePortal(new Request(ORIGIN + path, init), env, { now: T0 });
 
 const PAGES = ["/portal/demo", "/portal/demo/projects", "/portal/demo/projects/website", "/portal/demo/projects/brand-identity", "/portal/demo/projects/launch-photography",
-  "/portal/demo/activity", "/portal/demo/activity?type=milestone", "/portal/demo/documents", "/portal/demo/documents?project=website", "/portal/demo/account"];
+  "/portal/demo/projects/website/deliverables/interior-page-templates", "/portal/demo/projects/brand-identity/deliverables/brand-strategy-brief", "/portal/demo/activity", "/portal/demo/activity?type=milestone", "/portal/demo/documents", "/portal/demo/documents?project=website", "/portal/demo/account"];
 
 test("every demo page renders from static data without touching the database, a session or a cookie", async () => {
   for (const p of PAGES) {
@@ -66,6 +66,20 @@ test("query filters are allow-listed: unknown values are ignored and are never r
   const filtered = await (await get("/portal/demo/activity?type=milestone")).text();
   const all = await (await get("/portal/demo/activity")).text();
   assert.ok(filtered.length < all.length);
+});
+test("project pages: pending client actions link to deliverables and hide when nothing is pending; deliverable pages do not pretend", async () => {
+  const web = await (await get("/portal/demo/projects/website")).text();
+  assert.match(web, /Needs your attention/);
+  assert.match(web, /href="\/portal\/demo\/projects\/website\/deliverables\/interior-page-templates"/);
+  assert.ok(!/class="attention"/.test(await (await get("/portal/demo/projects/launch-photography")).text()), "hidden when nothing is pending");
+  assert.match(web, /Completed/); assert.match(web, /Target/);
+  for (const id of ["milestones", "deliverables", "documents", "details"]) assert.match(web, new RegExp(`href="#${id}"[^>]*>`) ), assert.match(web, new RegExp(`id="${id}"`));
+  const d = await (await get("/portal/demo/projects/website/deliverables/interior-page-templates")).text();
+  assert.match(d, /not available in this demonstration/i);
+  assert.match(d, /aria-disabled="true"/);
+  assert.ok(!/<button|<form|<input|<textarea/i.test(d), "no working controls");
+  assert.equal((await get("/portal/demo/projects/website/deliverables/nope")).status, 404);
+  assert.equal((await get("/portal/demo/projects/brand-identity/deliverables/interior-page-templates")).status, 404);
 });
 test("demo documents are preview-only: downloads are visibly inert and no file link exists", async () => {
   const html = await (await get("/portal/demo/documents")).text();

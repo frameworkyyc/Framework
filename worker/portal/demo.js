@@ -31,6 +31,11 @@ export function handleDemo(ctx, path) {
     const p = vm.projects.find((x) => x.id === parts[1]);
     return p ? page("projects", p.name, views.project(vm, p)) : errorPage(404, { ref: ctx.ref });
   }
+  if (parts[0] === "projects" && parts.length === 4 && parts[2] === "deliverables") {
+    const p = vm.projects.find((x) => x.id === parts[1]);
+    const d = p && (p.deliverables || []).find((x) => x.id === parts[3]);
+    return d ? page("projects", `${d.name}: ${p.name}`, views.deliverable(vm, p, d)) : errorPage(404, { ref: ctx.ref });
+  }
   if (parts[0] === "activity" && parts.length === 1) return page("activity", "Activity", views.activity(vm, filters));
   if (parts[0] === "documents" && parts.length === 1) return page("documents", "Documents", views.documents(vm, filters));
   if (parts[0] === "account" && parts.length === 1) return page("account", "Account", views.account(vm));

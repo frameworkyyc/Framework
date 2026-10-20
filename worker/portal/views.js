@@ -126,13 +126,40 @@ ${done.length ? `<section class="section">${sectionHead("Live and completed")}${
 
 function milestones(vm, p) {
   if (!vm.has.milestones || !p.milestones) return notConnected("Milestones", "The key dates of this project, and where each one stands, will be shown here.");
-  return `<ol class="miles">${p.milestones.map((m) => `<li class="is-${m.state === "done" ? "done" : m.state === "current" ? "current" : "next"}"><span class="miles__dot" aria-hidden="true"></span><span><span class="miles__name">${e(m.name)}</span> ${m.state === "done" ? '<span class="tag tag--ink">Done</span>' : m.state === "current" ? '<span class="tag tag--ink">In progress</span>' : ""}</span><span class="miles__date">${m.date ? e(fmtDay(m.date, vm.now)) : ""}</span>${m.note ? `<span class="miles__note">${e(m.note)}</span>` : ""}</li>`).join("")}</ol>`;
+  return `<ol class="miles">${p.milestones.map((m) => `<li class="is-${m.state === "done" ? "done" : m.state === "current" ? "current" : "next"}"><span class="miles__dot" aria-hidden="true"></span><span><span class="miles__name">${e(m.name)}</span> ${m.state === "done" ? '<span class="tag tag--ink">Done</span>' : m.state === "current" ? '<span class="tag tag--ink">In progress</span>' : ""}</span><span class="miles__date${m.state === "done" ? " is-done" : ""}">${m.date ? `<span class="miles__when">${m.state === "done" ? "Completed" : "Target"}</span> ${e(fmtDay(m.date, vm.now))}` : ""}</span>${m.note ? `<span class="miles__note">${e(m.note)}</span>` : ""}</li>`).join("")}</ol>`;
 }
 
 const DELIV = { delivered: ["Delivered", "done"], review: ["In review", "attention"], progress: ["In progress", "active"], todo: ["Not started", "idle"] };
+const delivHref = (vm, p, d) => `${vm.base}/projects/${p.id}/deliverables/${d.id}`;
+const delivDate = (vm, d) => (d.due ? (d.state === "delivered" ? `Delivered ${fmtDay(d.due, vm.now)}` : `Due ${fmtDay(d.due, vm.now)}`) : "");
 function deliverables(vm, p) {
   if (!vm.has.deliverables || !p.deliverables) return notConnected("Deliverables", "What Framework is producing for you, and its status, will be listed here.");
-  return `<div>${p.deliverables.map((d) => `<div class="deliv"><span class="deliv__name">${e(d.name)}</span><span class="deliv__due">${d.due ? e(d.state === "delivered" ? `Delivered ${fmtDay(d.due, vm.now)}` : `Due ${fmtDay(d.due, vm.now)}`) : ""}</span><span class="status status--${e(DELIV[d.state][1])}">${e(DELIV[d.state][0])}</span></div>`).join("")}</div>`;
+  return `<div>${p.deliverables.map((d) => {
+    const inner = `<span class="deliv__name">${e(d.name)}</span><span class="deliv__due">${e(delivDate(vm, d))}</span><span class="status status--${e(DELIV[d.state][1])}">${e(DELIV[d.state][0])}</span>`;
+    return d.id ? `<a class="deliv deliv--link" href="${e(delivHref(vm, p, d))}">${inner}</a>` : `<div class="deliv">${inner}</div>`;
+  }).join("")}</div>`;
+}
+
+/** Items waiting on the client for this project: deliverables in review. Empty when nothing is pending. */
+function pending(vm, p) {
+  if (!vm.has.deliverables || !p.deliverables) return "";
+  const items = p.deliverables.filter((d) => d.state === "review" && d.id);
+  if (!items.length) return "";
+  return `<section class="attention" aria-labelledby="h-att"><h2 id="h-att" class="section__title">Needs your attention</h2><ul>${items.map((d) => `<li><a href="${e(delivHref(vm, p, d))}"><span class="status status--attention">Feedback needed</span> <span class="attention__name">${e(d.name)}</span></a><span class="attention__due">${e(delivDate(vm, d))}</span></li>`).join("")}</ul></section>`;
+}
+
+/** A single deliverable: what it is, where it stands and when. Nothing here is actionable; approval and files are not connected. */
+export function deliverable(vm, p, d) {
+  const st = DELIV[d.state];
+  const dates = d.state === "delivered" ? [["Delivered", d.due]] : [["Due", d.due]];
+  const review = d.state === "review";
+  return `<header class="page-head"><p class="crumb"><a href="${e(vm.base)}/projects">Projects</a> / <a href="${e(projectHref(vm, p.id))}">${e(p.name)}</a> / ${e(d.name)}</p><span class="eyebrow">Deliverable · ${e(p.name)}</span><h1 class="h1">${e(d.name)}</h1>${d.desc ? `<p class="lead">${e(d.desc)}</p>` : ""}</header>
+<div class="cols">
+<div><section aria-labelledby="h-pv">${sectionHead("Preview")}<h2 id="h-pv" class="visually-hidden">Preview</h2><div class="doc__preview doc__preview--tall" role="img" aria-label="Sample deliverable: no preview available">Sample deliverable. Preview only: there is no file behind this entry.</div></section>
+${review ? `<section class="section" aria-labelledby="h-fb">${sectionHead("Your feedback")}<h2 id="h-fb" class="visually-hidden">Your feedback</h2><p class="muted">In the live portal this is where you will review and respond. Commenting and approval are not available in this demonstration.</p><p class="actions-inert"><span class="btn btn--small" aria-disabled="true">Approve</span> <span class="btn btn--small" aria-disabled="true">Request changes</span></p></section>` : ""}</div>
+<section aria-labelledby="h-dt">${sectionHead("Details")}<h2 id="h-dt" class="visually-hidden">Details</h2><dl class="kv"><dt>Status</dt><dd><span class="status status--${e(st[1])}">${e(st[0])}</span></dd><dt>Version</dt><dd>${e(d.version || "—")}</dd>${dates.map(([k, v]) => (v ? `<dt>${k}</dt><dd>${e(fmtDay(v, vm.now))}</dd>` : "")).join("")}<dt>Project</dt><dd><a class="text-link" href="${e(projectHref(vm, p.id))}">${e(p.name)}</a></dd><dt>Download</dt><dd class="muted">Not available in the demo</dd></dl>
+<p><a class="text-link" href="${e(projectHref(vm, p.id))}#deliverables">Back to ${e(p.name)}</a></p></section>
+</div>`;
 }
 
 function projectDocs(vm, p) {
@@ -150,12 +177,17 @@ export function project(vm, p) {
   const details = `<dl class="kv"><dt>Type</dt><dd>${e(humanize(p.kind))}</dd><dt>Stage</dt><dd>${status(p.status)}</dd>${live ? `<dt>Live site</dt><dd><a class="text-link" href="${e(live)}" rel="noopener noreferrer">${e(live.replace(/^https:\/\//, ""))}</a></dd>` : ""}${p.scope ? `<dt>Scope</dt><dd>${p.scope.map((s) => e(s)).join("<br>")}</dd>` : ""}${p.lead && vm.has.progress ? `<dt>Your contact</dt><dd>${e(p.lead)}</dd>` : ""}</dl>`;
   return `<header class="page-head"><p class="crumb"><a href="${e(vm.base)}/projects">Projects</a> / ${e(p.name)}</p><span class="eyebrow">${e(humanize(p.kind))}</span><h1 class="h1">${e(p.name)}</h1>${p.summary ? `<p class="lead">${e(p.summary)}</p>` : ""}</header>
 <section aria-label="Project summary">${facts}<div class="section">${stageTrack(p.status)}${vm.has.progress ? `<div class="meter-wrap">${meter(p.progress, "Overall progress")}</div>` : ""}</div></section>
+${pending(vm, p)}
 <nav class="jump" aria-label="On this page"><a href="#milestones">Milestones</a><a href="#deliverables">Deliverables</a><a href="#documents">Documents</a><a href="#details">Details</a></nav>
-<div class="cols">
+<div class="cols cols--stacks">
+<div class="stack">
 <section class="section" id="milestones" aria-labelledby="h-m">${sectionHead("Milestones")}<h2 id="h-m" class="visually-hidden">Milestones</h2>${milestones(vm, p)}</section>
-<section class="section" id="deliverables" aria-labelledby="h-d">${sectionHead("Deliverables")}<h2 id="h-d" class="visually-hidden">Deliverables</h2>${deliverables(vm, p)}</section>
 <section class="section" id="documents" aria-labelledby="h-f">${sectionHead("Documents")}<h2 id="h-f" class="visually-hidden">Documents</h2>${projectDocs(vm, p)}</section>
+</div>
+<div class="stack">
+<section class="section" id="deliverables" aria-labelledby="h-d">${sectionHead("Deliverables")}<h2 id="h-d" class="visually-hidden">Deliverables</h2>${deliverables(vm, p)}</section>
 <section class="section" id="details" aria-labelledby="h-i">${sectionHead("Project information")}<h2 id="h-i" class="visually-hidden">Project information</h2>${details}</section>
+</div>
 </div>`;
 }
 

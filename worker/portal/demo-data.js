@@ -69,6 +69,29 @@ export function demoViewModel(now = new Date()) {
     },
   ];
 
+  // Description and version for each demonstration deliverable (matched by name); ids are derived from the name.
+  const INFO = {
+    "Brand strategy brief": ["Positioning, audience, voice and the idea the identity expresses.", "v2 (final)"],
+    "Primary logo suite": ["The primary logo, secondary marks and a monogram, shown at small and large sizes and in application mock-ups.", "v2 (draft)"],
+    "Typography and colour system": ["Type pairings, the colour palette and the rules for using them together.", "v1 (in progress)"],
+    "Brand guidelines": ["A usage guide covering logo, colour, type and tone of voice.", "Not started"],
+    "Social media templates": ["Reusable templates for announcements, quotes and photography posts.", "Not started"],
+    "Sitemap": ["Every page of the website, its purpose and who provides the content.", "v2 (final)"],
+    "Wireframes": ["Page layouts for the homepage and key templates, before visual design.", "v3 (final)"],
+    "Homepage design": ["The approved homepage composition for desktop and mobile.", "v3 (final)"],
+    "Interior page templates": ["Services, about and contact templates in desktop and mobile layouts, awaiting your feedback.", "v2 (draft)"],
+    "Staging site": ["A private working version of the website for a first walkthrough.", "Being assembled"],
+    "Launch checklist": ["The final checks before the website goes live.", "Not started"],
+    "Creative brief": ["Goals, style, locations and the shot outline. Needs your reference images.", "v1 (draft)"],
+    "Shot list": ["The list of images to capture on the studio day.", "Not started"],
+    "Final image set (40 images)": ["Forty edited and retouched images in web and print sizes.", "Not started"],
+  };
+  for (const p of projects) for (const d of p.deliverables) {
+    const [desc, version] = INFO[d.name] || ["", ""];
+    d.id = d.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    d.desc = desc; d.version = version;
+  }
+
   const updates = [
     { title: "Logo refinement round 2 is ready for your review", detail: "Three directions, each shown on a website, a sign and a business card. Please comment by Thursday so we can keep the schedule.", at: at(-1, -3), projectId: "brand-identity", tone: "attention" },
     { title: "Interior page templates: feedback window closes Friday", detail: "Templates for services, about and contact. We’ve noted two questions in the document.", at: at(-2), projectId: "website", tone: "attention" },
