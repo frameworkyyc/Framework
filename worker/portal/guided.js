@@ -57,24 +57,19 @@ function serviceList(vm, areaKey) {
 
 /* ------------------------------------------------------------------ home */
 
+const HOME_BLURB = { profile: "Your business, customers and goals", branding: "Logo and brand assets", website: "Plan or improve your site", marketing: "Goals, audience and channels", content: "Photos, video and creative", files: "Shared files and approvals" };
+
+/** The home screen is a navigation hub: a short greeting and the six areas. Progress and status live inside each area. */
 export function home(vm) {
-  const sum = progressSummary();
-  const cur = PROFILE_STEPS.find((s) => s.state === "current") || PROFILE_STEPS.find((s) => s.state === "todo");
-  const reviewCount = vm.projects.reduce((n, p) => n + (p.deliverables || []).filter((d) => d.state === "review").length, 0);
-  const tileStatus = {
-    profile: [`${profileDone()} of ${PROFILE_STEPS.length} steps`, "active"],
-    branding: ["Choose your path", "idle"],
-    website: [`${workspaceDone("website")} of ${WORKSPACES.website.topics.length} topics`, "active"],
-    marketing: ["Not started", "idle"],
-    content: [`${workspaceDone("content")} of ${WORKSPACES.content.topics.length} topics`, "active"],
-    files: [reviewCount ? `${plural(reviewCount, "item")} to review` : "Up to date", reviewCount ? "attention" : "done"],
-  };
-  const tiles = AREAS.map((a) => `<li><a class="tile" href="${e(href(vm, a.path))}"><span class="tile__n" aria-hidden="true">${e(a.n)}</span><span class="tile__title">${e(a.title)}</span><span class="tile__desc">${e(a.desc)}</span><span class="tile__foot"><span class="status status--${tileStatus[a.key][1]}">${e(tileStatus[a.key][0])}</span><span class="tile__arrow" aria-hidden="true">→</span></span></a></li>`).join("");
-  return `<header class="page-head"><span class="eyebrow">${e(vm.org.name)}</span><h1 class="h1">Let’s get you set up, ${e(first(vm.user))}.</h1><p class="lead">Six areas, in any order. Share what you have, tell us what you need, and follow your projects.</p></header>
-<section class="next" aria-labelledby="h-next"><div><span class="eyebrow">Recommended next step</span><h2 id="h-next" class="next__title">${e(cur.title)}</h2><p class="muted">${e(cur.intro)} About ${e(String(cur.minutes))} minutes.</p><p><a class="btn btn--primary" href="${e(href(vm, `/profile/${cur.id}`))}">Continue your Business Profile <span aria-hidden="true">→</span></a></p></div>
-<div class="next__progress"><span class="eyebrow">Onboarding progress</span>${meter(sum.percent, "Onboarding progress")}<p class="muted small">${e(`${sum.done} of ${sum.total} steps complete across your profile, website, marketing and content.`)}</p></div></section>
-<section class="section" aria-labelledby="h-areas">${head("Your workspace")}<h2 id="h-areas" class="visually-hidden">Your workspace</h2><ul class="tiles">${tiles}</ul></section>
-<section class="section" aria-labelledby="h-follow">${head("Follow your projects")}<h2 id="h-follow" class="visually-hidden">Follow your projects</h2><ul class="rows"><li><a class="row row--service" href="${e(href(vm, "/progress"))}"><span><strong class="row__name">Progress &amp; activity</strong><span class="row__meta">Your project overview, next actions and recent updates.</span></span><span></span><span class="tile__arrow" aria-hidden="true">→</span></a></li><li><a class="row row--service" href="${e(href(vm, "/projects"))}"><span><strong class="row__name">Projects</strong><span class="row__meta">${e(plural(vm.projects.length, "project"))}: milestones, deliverables and documents.</span></span><span></span><span class="tile__arrow" aria-hidden="true">→</span></a></li></ul></section>`;
+  const tiles = AREAS.map((a) => `<li><a class="tile" href="${e(href(vm, a.path))}"><span class="tile__n" aria-hidden="true">${e(a.n)}</span><span class="tile__title">${e(a.title)}</span><span class="tile__desc">${e(HOME_BLURB[a.key])}</span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`).join("");
+  return `<header class="page-head page-head--home"><h1 class="h1 h1--home">Welcome back, ${e(first(vm.user))}.</h1><p class="lead">What would you like to work on?</p></header>
+<nav aria-label="Your workspace"><ul class="tiles">${tiles}</ul></nav>`;
+}
+
+/** The project-management pages (Progress, Projects, Activity, Documents) share a quiet secondary navigation. */
+export function projectNav(vm, current) {
+  const items = [["progress", "Progress", "/progress"], ["projects", "Projects", "/projects"], ["activity", "Activity", "/activity"], ["documents", "Documents", "/documents"]];
+  return `<nav class="filters subnav" aria-label="Project pages">${items.map(([k, label, p]) => `<a href="${e(href(vm, p))}"${k === current ? ' aria-current="true"' : ""}>${e(label)}</a>`).join("")}</nav>`;
 }
 
 /* ------------------------------------------------------------------ business profile */

@@ -144,15 +144,23 @@ test("project workspace: shared anchor nav sits above two independent stacks tha
   assert.match(css, /prefers-reduced-motion: no-preference\) \{ html \{ scroll-behavior: smooth; \} \}/);
 });
 
-test("guided home: six area blocks, a progress indicator and one recommended next step; the approved dashboard lives at /progress", async () => {
+test("guided home is a plain navigation hub: greeting, six area blocks, nothing else; project pages sit behind a secondary navigation", async () => {
   const html = await (await get("/portal/demo")).text();
-  for (const a of ["profile", "branding", "website", "marketing", "content", "files"]) assert.match(html, new RegExp(`class="tile" href="/portal/demo/${a}"`));
-  assert.equal([...html.matchAll(/class="tile"/g)].length, 6);
-  assert.match(html, /Recommended next step/); assert.match(html, /<progress class="meter"/);
-  assert.match(html, /href="\/portal\/demo\/progress"/); assert.match(html, /href="\/portal\/demo\/projects"/);
-  const prog = await (await get("/portal/demo/progress")).text();
-  assert.match(prog, /Welcome back, Alex/); assert.match(prog, /Needs your attention/);
-  for (const nav of ["Home", "Progress", "Projects", "Activity", "Documents", "Account"]) assert.match(html, new RegExp(`<a href="/portal/demo[^"]*"[^>]*>${nav}</a>`));
+  assert.match(html, /<h1[^>]*>Welcome back, Alex\.<\/h1>/);
+  assert.match(html, /What would you like to work on\?/);
+  const links = [...html.matchAll(/class="tile" href="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(links, ["profile", "branding", "website", "marketing", "content", "files"].map((a) => "/portal/demo/" + a));
+  for (const gone of ["Recommended next step", "Onboarding progress", "get you set up", "<progress", "Continue your Business Profile", "complete across", "%"]) assert.ok(!html.includes(gone), gone + " is gone from Home");
+  assert.ok(!/class="status/.test(html.slice(html.indexOf('class="tiles"'))), "no status badges on the blocks");
+  const main = html.slice(html.indexOf("<header class=\"bar\"")); 
+  for (const label of ["Home", "Projects", "Account"]) assert.match(main, new RegExp(`<a href="/portal/demo[^"]*"[^>]*>${label}</a>`));
+  for (const p of ["/portal/demo/progress", "/portal/demo/projects", "/portal/demo/activity", "/portal/demo/documents", "/portal/demo/projects/website"]) {
+    const h = await (await get(p)).text();
+    assert.match(h, /aria-label="Project pages"/, p);
+    for (const [label, path] of [["Progress", "progress"], ["Projects", "projects"], ["Activity", "activity"], ["Documents", "documents"]]) assert.match(h, new RegExp(`href="/portal/demo/${path}"[^>]*>${label}</a>`), p + " " + label);
+  }
+  assert.match(await (await get("/portal/demo/progress")).text(), /Welcome back, Alex/);
+  assert.ok(!/aria-label="Project pages"/.test(await (await get("/portal/demo/profile")).text()), "guided areas have no project sub-navigation");
 });
 test("guided pages: simulated controls are inert and labelled; nothing can be submitted or uploaded", async () => {
   for (const p of GUIDED) {
