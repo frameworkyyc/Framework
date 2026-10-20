@@ -52,7 +52,7 @@ export async function api(path, { method = "GET", body } = {}) {
     e.data = data && typeof data === "object" ? data : {};
     return e;
   };
-  if (res.status === 401 || res.status === 403) throw fail(res.status, res.status === 403 && ["writes_disabled", "sending_disabled"].includes(data.error) ? data.error : "denied");
+  if (res.status === 401 || res.status === 403) throw fail(res.status, res.status === 403 && ["writes_disabled", "sending_disabled", "recipient_not_allowed", "recipient_allowlist_missing"].includes(data.error) ? data.error : "denied");
   if (res.status === 404) throw fail(404, "not_found");
   if (res.status === 409) throw fail(409, data.error || "conflict");
   if (res.status === 422) throw fail(422, data.error || "invalid");

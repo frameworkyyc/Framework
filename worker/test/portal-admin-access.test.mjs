@@ -20,6 +20,8 @@ const claims = (over = {}) => ({ iss: `https://${TEAM}`, aud: [AUD], email: ADMI
 const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
 const sql = (db, q, ...p) => db.raw.prepare(q).all(...p).map((r) => ({ ...r }));
 const NOW = new Date("2026-10-20T12:00:00.000Z");
+// The recipient allowlist is mandatory (fail closed); these tests use these addresses. The allowlist itself is tested in portal-invite-allowlist.test.mjs.
+const ALLOWED = "a@b.co ann@alpha.test bob@alpha.test bob@beta.test late@example.com mia@alpha.test new.person@example.com old@example.com pending@example.com sam@example.com zed@example.com";
 const at = (days) => new Date(NOW.getTime() + days * 86400000);
 
 async function setup({ writes = true } = {}) {
@@ -27,7 +29,7 @@ async function setup({ writes = true } = {}) {
   const w = await makeWorld();
   const alpha = await w.org("alpha", "Alpha Co"), beta = await w.org("beta", "Beta Co");
   const net = { calls: 0 };
-  const env = { ...w.env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }), ...(writes ? { PORTAL_ADMIN_WRITES: "1" } : {}) };
+  const env = { ...w.env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }), PORTAL_INVITE_ALLOWED_EMAILS: ALLOWED, ...(writes ? { PORTAL_ADMIN_WRITES: "1" } : {}) };
   const call = (path, { method = "GET", token, headers = {}, e = env, body, json, now = NOW } = {}) => {
     const h = { Origin: ORIGIN, "X-Framework-Admin": "1", ...(json !== undefined ? { "Content-Type": "application/json" } : {}), ...headers };
     // a valid admin token by default, minted relative to the (injected) current time so that tests can move time forward
@@ -64,7 +66,7 @@ test("the write routes are OFF unless PORTAL_ADMIN_WRITES is exactly '1': 403 wr
   assert.equal(off.snap(), before);
   assert.equal((await off.call(`/api/admin/clients/${off.alpha.id}/access`)).status, 200);
   for (const v of ["0", "true", "yes", " 1", "1 "]) assert.equal((await off.post("/api/admin/clients", { name: "X" }, { e: { ...off.env, PORTAL_ADMIN_WRITES: v } })).status, 403, JSON.stringify(v));
-  for (const f of ["wrangler.jsonc", ".github/workflows/ci.yml"]) assert.ok(!/PORTAL_ADMIN_WRITES/.test(read(f)), f + " does not enable the write routes");
+  for (const f of ["wrangler.jsonc", ".github/workflows/ci.yml"]) assert.ok(!/PORTAL_ADMIN_WRITES/.test(read(f).replace(/^\s*\/\/.*$/gm, "")), f + " does not enable the write routes (comments aside)");
 });
 
 test("authorization is unchanged: no token, a forged token, an unlisted admin and a client's cookie get nothing, for reads and writes alike", async () => {
@@ -306,7 +308,7 @@ test("failures are safe: a database error answers 500 server_error with no SQL, 
 test("the module imports exactly the reviewed modules, and no other file imports the delivery code", () => {
   const src = read("worker/portal/admin-access.js");
   const imports = [...src.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(imports, ["./admin-clients.js", "./repo/orgs.js", "./repo/invitations.js", "./repo/memberships.js", "./repo/validate.js", "./repo/common.js", "./workos-admin.js", "./invite-delivery.js", "../assessment.js"]);
+  assert.deepEqual(imports, ["./admin-clients.js", "./repo/orgs.js", "./repo/invitations.js", "./repo/memberships.js", "./repo/validate.js", "./repo/common.js", "./workos-admin.js", "./invite-delivery.js", "../assessment.js", "./invite-recipients.js"]);
   for (const f of ["worker/index.js", "worker/admin/router.js", "worker/portal/router.js", "worker/portal/auth.js", "worker/portal/admin-clients.js", "worker/portal/admin-feedback.js"]) {
     assert.ok(!/invite-delivery|workos-admin|invitation-delivery/.test(read(f)), f + " does not import the unwired delivery code");
   }

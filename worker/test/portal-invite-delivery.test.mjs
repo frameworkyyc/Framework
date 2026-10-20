@@ -41,7 +41,7 @@ function mocks({ userExists = false, lookup, create, resend, email, createId = "
     async revokeInvitation() { throw new Error("not used"); },
   };
   const sendEmail = async (m) => { calls.email.push(m); if (email instanceof Error) throw email; return email || { ok: true }; };
-  return { calls, ctx: (db, now = T) => ({ db, workos, sendEmail, baseUrl: BASE, now }) };
+  return { calls, ctx: (db, now = T) => ({ db, workos, sendEmail, baseUrl: BASE, now, checkRecipient: () => ({ ok: true }) }) };
 }
 const send = (m, db, o, inv, over = {}) => deliverInvitation(m.ctx(db, over.now), { organizationId: o.id, invitationId: inv.id, actor: ADMIN, mode: over.mode || "send" });
 

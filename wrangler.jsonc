@@ -87,7 +87,11 @@
       // Switches the client portal on for Staging ONLY. It must never appear in the top-level vars (Production): without it every /portal path answers 404.
       "PORTAL_ENABLED": "1",
       // Serves the static, clearly labelled demo portal at /portal/demo (fictional data, no sign-in, no database). Staging ONLY: never at the top level, and the code also refuses it on the live hosts (worker/portal/config.js demoEnabled).
-      "PORTAL_DEMO": "1"
+      "PORTAL_DEMO": "1",
+      // TEMPORARY recipient allowlist for the controlled live invitation test (worker/portal/invite-recipients.js). Staging ONLY: it must never appear at the top level (Production).
+      // Exact addresses, separated by commas or spaces; if this is missing or empty, every invitation operation that could email someone is refused (fail closed).
+      // It is not a secret. The two administrative switches (PORTAL_ADMIN_WRITES, PORTAL_INVITE_SENDING) are NOT set here and stay off until the test is approved.
+      "PORTAL_INVITE_ALLOWED_EMAILS": "lanoirbadasswitchery@gmail.com"
     },
     "d1_databases": [
       {

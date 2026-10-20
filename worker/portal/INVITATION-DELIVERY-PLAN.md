@@ -123,3 +123,15 @@ sent-email events, then remove or keep the switches as decided.
 3. Set `PORTAL_ADMIN_WRITES` and `PORTAL_INVITE_SENDING` in `previews.vars` through a reviewed change (and confirm `RESEND_API_KEY`, `ASSESSMENT_FROM`, `PORTAL_AUTH_CLIENT_SECRET` exist on Staging).
 4. Confirm the Cloudflare Access policy for `/admin*` and `/api/admin/*`.
 5. Run the onboarding checklist: create client, invite, send, receive, sign in, save a profile answer, remove access, re-invite.
+
+## Phase 5B: temporary recipient allowlist for the controlled live test
+`PORTAL_INVITE_ALLOWED_EMAILS` (Staging `previews.vars` only; currently exactly one approved address) restricts every operation that could email a portal invitation:
+**create, replace, send and resend** are refused unless the address is on the list (`403 recipient_not_allowed`), and **all four are locked** when the list is missing,
+empty or unusable (`403 recipient_allowlist_missing`: fail closed; there is no allow-everyone value). Matching is exact after the portal's usual normalization: no plus-address,
+dot, domain or wildcard matching. The check runs in the Worker (`worker/portal/admin-access.js`, again inside `invite-delivery.js`), after authentication, CSRF and input validation and
+before any database change or provider call; send, resend and replace check the address STORED on the invitation, so an older invitation for another address can never be sent.
+Revoke, role changes, removing access and creating an organization email nobody and are not restricted. The existing admin "feedback request" email is a separate feature (a link to the public
+feedback form) and is unchanged.
+The Admin interface shows whether recipients are `configured` or `missing` (never the addresses) and explains refusals in plain words.
+**Lifting the restriction after the test is an explicit, reviewed code change**, by design: remove the setting AND change the policy, rather than leaving a setting unset.
+The two administrative switches are still not set anywhere.

@@ -40,7 +40,7 @@ export function existingUserEmail({ orgName, role, email, expiresAt, loginUrl })
 }
 
 /**
- * @param ctx { db, workos, sendEmail, baseUrl, now }  workos: the client from workos-admin.js (or a mock); sendEmail: ({to, subject, text, html}) => {ok, error?}
+ * @param ctx { db, workos, sendEmail, baseUrl, now, checkRecipient }  checkRecipient(email) -> {ok}: REQUIRED (see invite-recipients.js)  workos: the client from workos-admin.js (or a mock); sendEmail: ({to, subject, text, html}) => {ok, error?}
  * @param req { organizationId, invitationId, actor, mode: "send" | "resend" }
  * @returns {ok:true, delivery:{state:"submitted", channel}} | {ok:false, error, message, delivery?:{state:"failed", channel, error}}
  */
@@ -57,6 +57,9 @@ export async function deliverInvitation(ctx, { organizationId, invitationId, act
   const org = await getOrganizationById(db, organizationId);
   if (!org || org.status !== "active") return refuse("organization_inactive", "This organization is not active.");
   const inv = await getInvitation(db, organizationId, invitationId);
+  // The recipient allowlist is checked here too (defence in depth: the route checks it first). No checker means no sending: fail closed.
+  const gate = typeof ctx.checkRecipient === "function" ? ctx.checkRecipient(inv.email) : { ok: false, error: "recipient_allowlist_missing", message: "No recipient policy was supplied. Nothing was sent." };
+  if (!gate.ok) return refuse(gate.error, gate.message);
   // Only one request may talk to a provider for this invitation at a time (compare-and-swap on the last attempt time).
   const claim = await claimDeliveryAttempt(db, organizationId, invitationId, d.delivery_attempted_at, { now });
   if (!claim.ok) return refuse(claim.error, claim.message);

@@ -50,6 +50,8 @@ const ERROR_TEXT = {
   not_found: "That item no longer exists. The page has been refreshed.",
   writes_disabled: "Changes are switched off on this site, so nothing was changed.",
   sending_disabled: "Sending is switched off on this site. The invitation was saved but nothing was sent.",
+  recipient_not_allowed: "That address isn’t on the approved list for the controlled test, so nothing was created or sent.",
+  recipient_allowlist_missing: "Invitations are locked on this site: no approved recipients are configured. Nothing was created or sent.",
   provider_not_configured: "The email and WorkOS settings are incomplete on this site. Nothing was sent.",
   delivery_tracking_unavailable: "Delivery tracking isn’t available on this database. Nothing was sent.",
   delivery_unrecorded: "The provider was asked, but the result couldn’t be saved. Check the invitation’s status before trying again.",
@@ -238,7 +240,7 @@ export function accessSections({ orgId, orgName, welcome = false }) {
   function inviteForm(caps) {
     const email = h("input", { id: "iv-email", class: "input", type: "email", maxlength: "254", autocomplete: "off", spellcheck: "false", autocapitalize: "none", required: true });
     const radio = (value, checked) => h("label", { class: "adm-choice" }, h("input", { type: "radio", name: "iv-role", value, checked: checked ? true : null }), h("span", null, h("strong", { text: ROLE_LABEL[value] }), h("span", { class: "adm-muted", text: " — " + ROLE_HELP[value] })));
-    const submit = h("button", { class: "btn btn--primary", type: "submit", disabled: caps.writes ? null : true }, "Review invitation");
+    const submit = h("button", { class: "btn btn--primary", type: "submit", disabled: caps.writes && caps.recipients !== "missing" ? null : true }, "Review invitation");
     const emailError = h("p", { class: "adm-field__error", id: "iv-email-e", role: "alert", hidden: true });
     email.setAttribute("aria-describedby", "iv-email-e");
     return h("form", { class: "adm-form adm-form--inline", novalidate: true, "aria-label": "Invite someone", onsubmit: (ev) => {
@@ -270,8 +272,8 @@ export function accessSections({ orgId, orgName, welcome = false }) {
 
   function inviteActions(i, caps) {
     const to = i.email;
-    const cannotSend = !caps.sending;
-    const sendTitle = cannotSend ? "Sending is switched off on this site" : null;
+    const cannotSend = !caps.sending || caps.recipients === "missing";
+    const sendTitle = cannotSend ? (caps.recipients === "missing" ? "Invitations are locked: no approved recipients" : "Sending is switched off on this site") : null;
     const btns = [];
     const sendNow = (mode) => perform({
       confirm: mode === "send"
@@ -315,7 +317,7 @@ export function accessSections({ orgId, orgName, welcome = false }) {
       }) }));
     }
     if (isExpired(i) || i.status === "revoked") {
-      btns.push(textButton("Replace", { "aria-label": "Replace invitation for " + to, onclick: () => perform({
+      btns.push(textButton("Replace", { "aria-label": "Replace invitation for " + to, disabled: caps.recipients === "missing" ? true : null, title: caps.recipients === "missing" ? "Invitations are locked: no approved recipients" : null, onclick: () => perform({
         confirm: {
           title: "Replace this invitation?",
           body: `Creates a new invitation for the same person, valid for 7 days. The old one stays in the history. Nothing is sent until you choose Send.`,
@@ -358,6 +360,7 @@ export function accessSections({ orgId, orgName, welcome = false }) {
       h("div", { class: "adm-section-title" }, h("h2", { id: "adm-inv-h", text: "Invitations" })),
       h("p", { class: "adm-sub" }, "Creating an invitation and sending it are separate steps. Access is only granted when the person signs in with the invited email address."),
       !caps.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site. You can look, but not create, send, revoke or remove.") : !caps.sending ? h("p", { class: "adm-banner" }, "Sending is switched off on this site. You can create and revoke invitations, but nothing will be emailed.") : null,
+      caps.recipients === "missing" ? h("p", { class: "adm-banner adm-banner--alert" }, "Invitations are locked: no approved recipients are configured on this site, so none can be created or sent.") : caps.recipients === "configured" ? h("p", { class: "adm-banner" }, "Controlled test: invitations can only be created for, and sent to, approved recipients. The server refuses any other address.") : null,
       inviteForm(caps),
       table,
     );

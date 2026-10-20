@@ -16,6 +16,7 @@ const b64u = (b) => Buffer.from(b).toString("base64url");
 const jwk = { ...pair.publicKey.export({ format: "jwk" }), kid: "k1", alg: "RS256", use: "sig" };
 const sign = (claims) => { const head = b64u(JSON.stringify({ alg: "RS256", kid: "k1", typ: "JWT" })), body = b64u(JSON.stringify(claims)); return `${head}.${body}.${b64u(createSign("RSA-SHA256").update(head + "." + body).sign(pair.privateKey))}`; };
 const NOW = new Date("2026-10-20T12:00:00.000Z");
+const ALLOWED = "kim@example.com sam@example.com x@example.com mallory@example.com"; // the recipient allowlist is mandatory (fail closed); see portal-invite-allowlist.test.mjs
 const at = (days) => new Date(NOW.getTime() + days * 86400000);
 const tokenAt = (now, over = {}) => sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, iat: Math.floor(now / 1000), exp: Math.floor(now / 1000) + 600, ...over });
 const sql = (db, q, ...p) => db.raw.prepare(q).all(...p).map((r) => ({ ...r }));
@@ -57,7 +58,7 @@ async function setup(over = {}) {
   const pv = providers();
   const env = {
     ...w.env, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }),
-    PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_AUTH_CLIENT_SECRET: KEY, RESEND_API_KEY: RESEND_KEY, ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", ...over,
+    PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_INVITE_ALLOWED_EMAILS: ALLOWED, PORTAL_AUTH_CLIENT_SECRET: KEY, RESEND_API_KEY: RESEND_KEY, ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", ...over,
   };
   const call = (path, { method = "POST", token, headers = {}, e = env, json = {}, now = NOW } = {}) => {
     const h = { Origin: ORIGIN, "X-Framework-Admin": "1", "Content-Type": "application/json", ...headers };
@@ -89,7 +90,7 @@ test("sending needs its OWN switch: with writes on but PORTAL_INVITE_SENDING uns
   const off = await setup({ PORTAL_ADMIN_WRITES: undefined });
   assert.equal((await off.call(`/api/admin/clients/${off.alpha.id}/invitations/${crypto.randomUUID()}/send`)).status, 403);
   assert.equal(off.pv.calls.length, 0);
-  for (const f of ["wrangler.jsonc", ".github/workflows/ci.yml", "migrations/portal/wrangler.migrate.staging.jsonc"]) assert.ok(!/PORTAL_INVITE_SENDING|PORTAL_ADMIN_WRITES/.test(read(f)), f);
+  for (const f of ["wrangler.jsonc", ".github/workflows/ci.yml", "migrations/portal/wrangler.migrate.staging.jsonc"]) assert.ok(!/PORTAL_INVITE_SENDING|PORTAL_ADMIN_WRITES/.test(read(f).replace(/^\s*\/\/.*$/gm, "")), f + " (comments aside)");
 });
 
 /* ------------------------------------------------------------------ sending */

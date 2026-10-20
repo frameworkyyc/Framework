@@ -11,6 +11,11 @@
  *   - a same-origin request carrying X-Framework-Admin: 1 (CSRF defence: a cross-site page cannot set that header without a CORS preflight, which is never granted);
  *   - Content-Type: application/json, a body of at most 2 KB, and exactly the documented fields (unknown fields are refused, not ignored).
  *
+ * RECIPIENT ALLOWLIST (temporary, for the controlled live test): creating, replacing, sending or resending an invitation is refused with 403
+ * recipient_not_allowed unless the address is on PORTAL_INVITE_ALLOWED_EMAILS, and with 403 recipient_allowlist_missing (fail closed) when that setting is
+ * missing or empty. The check runs before any database change or provider call, on the address in the request or in the stored invitation (so an invitation
+ * created earlier for another address can never be sent). See invite-recipients.js.
+ *
  * Every operation is organization-scoped: the organization id comes from the URL (validated as a UUID and looked up), and the membership or
  * invitation id must belong to it, otherwise 404. Emergency global offboarding is deliberately NOT reachable from here.
  *
@@ -36,6 +41,7 @@ import { UUID } from "./repo/common.js";
 import { createWorkosAdminClient } from "./workos-admin.js";
 import { deliverInvitation, revokeInvitationEverywhere } from "./invite-delivery.js";
 import { sendEmail } from "../assessment.js";
+import { checkRecipient, allowlistStatus } from "./invite-recipients.js";
 
 const MAX_BODY = 2048;
 const json = (body, status = 200, headers = {}) =>
@@ -48,7 +54,7 @@ const STATUS = {
   slug_taken: 409, revenue_client_taken: 409, already_pending: 409, already_member: 409, last_owner: 409, still_pending: 409, already_revoked: 409,
   already_expired: 409, already_accepted: 409, not_revoked: 409, organization_inactive: 409,
   expired_replace_required: 409, already_submitted: 409, not_yet_submitted: 409, invitation_revoked: 409, send_in_progress: 409,
-  delivery_unrecorded: 500,
+  delivery_unrecorded: 500, recipient_not_allowed: 403, recipient_allowlist_missing: 403,
 };
 
 /** The data layer's structured failure, as a safe HTTP response. Anything it does not know about becomes a bare 500. */
@@ -144,7 +150,7 @@ async function readAccess(env, org, now) {
     invitations: invitations.map((i) => publicInvitation(i, nowIso)),
     delivery_tracking: invitations.length === 0 ? undefined : invitations[0].delivery_status !== undefined,
     // Whether this deployment accepts changes, and whether it may contact providers. Booleans only: lets the interface explain itself instead of failing on click.
-    capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", sending: env.PORTAL_ADMIN_WRITES === "1" && env.PORTAL_INVITE_SENDING === "1" },
+    capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", sending: env.PORTAL_ADMIN_WRITES === "1" && env.PORTAL_INVITE_SENDING === "1", recipients: allowlistStatus(env) }, // "configured" | "missing": never the addresses
   };
 }
 
@@ -168,7 +174,20 @@ function deliveryContext(env, deps, db, now) {
     return { error: err(503, "provider_not_configured", "The portal address is not configured on this deployment. Nothing was sent.") };
   }
   const f = deps.fetch || fetch;
-  return { db, workos: wk.client, sendEmail: (m) => sendEmail(env, m, f), baseUrl: base, now };
+  return { db, workos: wk.client, sendEmail: (m) => sendEmail(env, m, f), baseUrl: base, now, checkRecipient: (email) => checkRecipient(env, email) };
+}
+
+/**
+ * The allowlist check for an operation on an existing invitation. Returns a Response to answer with, or null to carry on.
+ * Order: a locked allowlist answers first (nothing is looked at); an unknown invitation is the usual 404; otherwise its stored address must be approved.
+ */
+async function gateStoredInvitation(env, db, organizationId, invitationId) {
+  const locked = checkRecipient(env, null);
+  if (locked.error === "recipient_allowlist_missing") return err(403, locked.error, locked.message);
+  const row = await db.prepare("SELECT email FROM invitations WHERE id = ? AND organization_id = ?").bind(invitationId, organizationId).first();
+  if (!row) return err(404, "not_found", "No such invitation in this organization.");
+  const gate = checkRecipient(env, row.email);
+  return gate.ok ? null : err(403, gate.error, gate.message);
 }
 
 /** Does this database have migration 0004's delivery columns? (A database that has not been migrated answers false.) */
@@ -255,8 +274,16 @@ export async function handleAccessApi(request, env, principal, path, deps = {}) 
     if (route.kind === "invite") {
       if (typeof body.email !== "string" || !normalizeEmail(body.email)) return err(422, "invalid_email", "Enter a valid email address.");
       if (!validateEnum(body.role, ROLES)) return err(422, "invalid_role", "The role must be owner or member.");
+      const gate = checkRecipient(env, body.email);
+      if (!gate.ok) return err(403, gate.error, gate.message); // before any write
       const r = await createInvitation(db, org.id, { email: body.email, role: body.role, createdBy: actor }, { now });
       return r.ok ? json({ invitation: fresh(r.invitation, now.toISOString()) }, 201) : fromFailure(r);
+    }
+
+    // Send, resend and replace act on a STORED invitation: its own address must be approved (an invitation made earlier for another address can never be sent).
+    if (route.kind === "invitation_send" || route.kind === "invitation_resend" || route.kind === "invitation_replace") {
+      const gate = await gateStoredInvitation(env, db, org.id, route.target);
+      if (gate) return gate;
     }
 
     if (route.kind === "invitation_send" || route.kind === "invitation_resend") {
