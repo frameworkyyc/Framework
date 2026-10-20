@@ -4,7 +4,7 @@
  * is NOT inside a form, so nothing can be submitted, and every page says so. There is no script and no inline style (the portal CSP forbids both).
  */
 import { e, status, meter, fmtDay, relative } from "./ui.js";
-import { AREAS, SERVICE_AREAS, projectsFor, categoriesOf, PROFILE_STEPS, WORKSPACES, BRAND_PATHS, UPLOAD_SLOTS, DISCOVERY, SERVICES, serviceById, serviceReadiness, progressSummary, profileDone, workspaceDone } from "./guided-data.js";
+import { WORKSPACE_ROWS, rowState, rowProgress, AREAS, SERVICE_AREAS, projectsFor, categoriesOf, PROFILE_STEPS, WORKSPACES, BRAND_PATHS, UPLOAD_SLOTS, DISCOVERY, SERVICES, serviceById, serviceReadiness, progressSummary, profileDone, workspaceDone } from "./guided-data.js";
 
 const NOTE = "Demonstration only. Nothing you type or choose here is saved, uploaded or sent.";
 const COMMERCIAL = "Requests are subject to Framework’s review, scoping and quotation. Sending a request does not authorise any paid work: you will receive a proposal to approve or decline first.";
@@ -49,12 +49,6 @@ function prereqPanel(vm, service, heading = "Before you request") {
 
 const readinessLine = (service) => { const { missing } = serviceReadiness(service); return missing.length ? `Needs ${plural(missing.length, "thing")}` : "Ready to request"; };
 
-function serviceList(vm, areaKey) {
-  const items = SERVICES.filter((s) => s.area === areaKey);
-  if (!items.length) return "";
-  return `<section class="section" id="requests" aria-labelledby="h-svc-${e(areaKey)}">${head("Request a service")}<h2 id="h-svc-${e(areaKey)}" class="visually-hidden">Request a service</h2><p class="muted">${e(COMMERCIAL)}</p><ul class="rows">${items.map((s) => { const { missing } = serviceReadiness(s); return `<li><a class="row row--service" href="${e(href(vm, `/requests/${s.id}`))}"><span><strong class="row__name">${e(s.title)}</strong><span class="row__meta">${e(s.blurb)}</span></span><span class="status status--${missing.length ? "idle" : "done"}">${e(readinessLine(s))}</span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`; }).join("")}</ul></section>`;
-}
-
 /* ------------------------------------------------------------------ home */
 
 const HOME_BLURB = { profile: "Your business, customers and goals", branding: "Logo and brand assets", website: "Plan or improve your site", marketing: "Goals, audience and channels", content: "Photos, video and creative", files: "Shared files and approvals" };
@@ -66,16 +60,29 @@ export function home(vm) {
 <nav aria-label="Your workspace"><ul class="tiles">${tiles}</ul></nav>`;
 }
 
+/* ------------------------------------------------------------------ standard workspace overview (shared) */
+
+const DONE_MARK = '<span class="check" aria-hidden="true">✓</span><span class="visually-hidden">Complete</span>';
+/** One navigation row: number, short title, optional status (checkmark when complete), arrow. Rows are hairline-divided, never boxed. */
+function navRow(vm, n, r) {
+  const st = r.state === "done" ? DONE_MARK : r.state === "current" ? '<span class="rowstat">In progress</span>' : r.state === "todo" ? '<span class="visually-hidden">Not started</span>' : r.status ? `<span class="rowstat${r.attention ? " rowstat--attention" : ""}">${e(r.status)}</span>` : "";
+  return `<li><a class="row row--step" href="${e(href(vm, r.href))}"><span class="step__n" aria-hidden="true">${String(n).padStart(2, "0")}</span><span class="row__name">${e(r.title)}</span><span class="row__st">${st}</span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`;
+}
+/** The standard workspace overview: breadcrumb, title, one progress indicator when meaningful, rows. */
+function overview(vm, { key, title, progress, rows }) {
+  const a = area(key);
+  return `<header class="page-head page-head--compact">${crumb(vm, [[title || a.title]])}<h1 class="h1 h1--section">${e(title || a.title)}</h1></header>
+${progress ? `<div class="progress-line">${meter(Math.round((progress.done / progress.total) * 100), `${title || a.title} progress`)}<p class="muted small">${e(`${progress.done} of ${progress.total} ${progress.noun || "areas"} complete`)}</p></div>` : ""}
+<nav aria-label="${e(title || a.title)}"><ol class="rows rows--plain rows--nav">${rows.map((r, i) => navRow(vm, i + 1, r)).join("")}</ol></nav>`;
+}
+/** Back navigation + breadcrumb for a detail page under an area. */
+const detailHead = (vm, key, title, extra = []) => `<header class="page-head page-head--compact">${crumb(vm, [[area(key).title, area(key).path], ...extra, [title]])}<h1 class="h1 h1--section">${e(title)}</h1></header>`;
+
 /* ------------------------------------------------------------------ business profile */
 
 export function profile(vm) {
   const done = profileDone(), total = PROFILE_STEPS.length;
-  const next = PROFILE_STEPS.find((s) => s.state !== "done");
-  const rows = PROFILE_STEPS.map((s, i) => `<li><a class="row row--step" href="${e(href(vm, `/profile/${s.id}`))}"><span class="step__n" aria-hidden="true">${i + 1}</span><span><strong class="row__name">${e(s.title)}</strong><span class="row__meta">${e(s.intro)} About ${e(String(s.minutes))} min.</span></span>${chip(s.state)}<span class="tile__arrow" aria-hidden="true">→</span></a></li>`).join("");
-  return `<header class="page-head">${crumb(vm, [["Business Profile"]])}${pageHead("01 · Business Profile", "Business Profile", "Seven short steps. Answer what you can now and come back to the rest. Each service only asks for the parts it needs.")}</header>
-${note()}
-<section aria-label="Progress">${meter(Math.round((done / total) * 100), "Business Profile progress")}<p class="muted small">${e(`${done} of ${total} steps complete`)}${next ? ` · <a class="text-link" href="${e(href(vm, `/profile/${next.id}`))}">Continue: ${e(next.title)}</a>` : ""}</p></section>
-<section class="section" aria-labelledby="h-steps">${head("Steps")}<h2 id="h-steps" class="visually-hidden">Steps</h2><ol class="rows rows--plain">${rows}</ol></section>`;
+  return overview(vm, { key: "profile", progress: { done, total, noun: "steps" }, rows: PROFILE_STEPS.map((st) => ({ title: st.title, href: `/profile/${st.id}`, state: st.state })) });
 }
 
 export function profileStep(vm, step) {
@@ -105,31 +112,36 @@ function projectItem(vm, key, p) {
   return `<li class="proj"><div class="proj__top"><h3 class="proj__name">${e(p.name)}</h3>${act ? status(p.status) : '<span class="status status--done">Completed</span>'}</div><p class="muted proj__desc">${e(p.summary)}</p>${act && vm.has.progress ? `<div class="proj__meter">${meter(p.progress, `${p.name} progress`)}</div>` : ""}<a class="text-link proj__go" href="${e(href(vm, `/${key}/projects/${p.id}`))}">View project <span aria-hidden="true">→</span><span class="visually-hidden">: ${e(p.name)}</span></a></li>`;
 }
 
-/** Active projects (or a useful empty state) and, separately, completed ones, for one service. */
-function projectSections(vm, key) {
+/** The projects page of one service: active, then completed, or a useful empty state. */
+export function projectsPage(vm, key) {
   const list = projectsFor(vm.projects, key), act = list.filter(isActive), done = list.filter((p) => !isActive(p));
-  const title = area(key).title;
-  const sec = (id, heading, items) => `<section class="section" aria-labelledby="h-${id}-${key}">${head(heading)}<h2 id="h-${id}-${key}" class="visually-hidden">${e(heading)}</h2><ul class="projs">${items.map((p) => projectItem(vm, key, p)).join("")}</ul></section>`;
-  const emptyState = `<section class="section" aria-labelledby="h-projects-${key}">${head("Projects")}<h2 id="h-projects-${key}" class="visually-hidden">Projects</h2><div class="empty"><strong>No ${e(title)} projects yet</strong>A project appears here once Framework has reviewed, scoped and agreed a service with you.<p><a class="text-link" href="#requests">Request a service</a></p></div></section>`;
-  return { active: list.length ? (act.length ? sec("active", "Active projects", act) : "") : emptyState, completed: done.length ? sec("done", "Completed projects", done) : "" };
+  const sec = (id, heading, items) => `<section class="section" aria-labelledby="h-${id}">${head(heading)}<h2 id="h-${id}" class="visually-hidden">${e(heading)}</h2><ul class="projs">${items.map((p) => projectItem(vm, key, p)).join("")}</ul></section>`;
+  const body = list.length ? (act.length ? sec("active", "Active", act) : "") + (done.length ? sec("done", "Completed", done) : "") : `<div class="empty"><strong>No ${e(area(key).title)} projects yet</strong>A project appears here once Framework has reviewed, scoped and agreed a service with you.<p><a class="text-link" href="${e(href(vm, `/${key}/requests`))}">Request a service</a></p></div>`;
+  return `${detailHead(vm, key, "Projects")}${body}`;
 }
 
-function serviceDocs(vm, key) {
-  const ids = projectsFor(vm.projects, key).map((p) => p.id);
-  const docs = vm.documents.filter((d) => ids.includes(d.projectId)).slice(0, 3);
-  if (!docs.length) return "";
-  return `<section class="section" aria-labelledby="h-docs-${key}">${head("Documents", `<a class="text-link" href="${e(href(vm, "/files"))}">All files</a>`)}<h2 id="h-docs-${key}" class="visually-hidden">Documents</h2><ul class="rows">${docs.map((d) => docRow(vm, d)).join("")}</ul></section>`;
+const projectsRow = (vm, key) => { const list = projectsFor(vm.projects, key), n = list.filter(isActive).length; return { title: "Projects", href: `/${key}/projects`, status: list.length ? (n ? `${n} active` : "Completed") : "None yet" }; };
+const requestsRow = (key) => ({ title: "Request a service", href: `/${key}/requests` });
+
+/** Every service request for one area. The request flow itself carries the prerequisites and the quotation terms. */
+export function requestsPage(vm, key) {
+  const items = SERVICES.filter((s) => s.area === key);
+  return `${detailHead(vm, key, "Request a service")}<p class="notice-line">${e(COMMERCIAL)}</p><ul class="rows rows--plain rows--nav">${items.map((s) => { const { missing } = serviceReadiness(s); return `<li><a class="row row--step row--plainstep" href="${e(href(vm, `/requests/${s.id}`))}"><span class="row__name">${e(s.title)}</span><span class="row__st"><span class="rowstat">${e(missing.length ? `Needs ${plural(missing.length, "thing")}` : "Ready")}</span></span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`; }).join("")}</ul>`;
 }
-const docRow = (vm, d) => `<li><a class="row row--service" href="${e(href(vm, `/documents${d.projectId ? `?project=${d.projectId}` : ""}`))}"><span><strong class="row__name">${e(d.name)}</strong><span class="row__meta">${e(d.ext.toUpperCase())} · ${e(d.size)} · added ${e(relative(d.at, vm.now))}</span></span><span></span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`;
 
 /* ------------------------------------------------------------------ branding */
+
+const BRAND_ROWS = [["Existing brand assets", "/branding/existing"], ["Logo and identity", "/branding/logo"], ["Brand guidelines", "/branding/guidelines"], ["Brand discovery", "/branding/discovery"]];
+
+export function brandingOverview(vm) {
+  return overview(vm, { key: "branding", rows: [...BRAND_ROWS.map(([title, h]) => ({ title, href: h })), projectsRow(vm, "branding"), requestsRow("branding")] });
+}
 
 export function branding(vm, pathId) {
   const sel = BRAND_PATHS.find((p) => p.id === pathId);
   const chooser = `<nav class="choices" aria-label="Branding path"><ul>${BRAND_PATHS.map((p) => `<li><a href="${e(href(vm, `/branding/${p.id}`))}"${p === sel ? ' aria-current="true"' : ""}><span class="choices__t">${e(p.title)}</span><span class="choices__d">${e(p.blurb)}</span></a></li>`).join("")}</ul></nav>`;
   let body;
-  if (!sel) body = `<p class="muted choices__hint">Choose the option that fits. You can change your mind at any time.</p>`;
-  else if (sel.id === "existing") {
+  if (sel.id === "existing") {
     body = `<section class="section" aria-labelledby="h-up">${head("Share your brand assets")}<h2 id="h-up" class="visually-hidden">Share your brand assets</h2>${note("Demonstration only. No files can be uploaded, and nothing is stored.")}<ul class="uploads">${UPLOAD_SLOTS.map((u) => `<li class="upload"><span><strong class="row__name">${e(u.title)}</strong><span class="row__meta">${e(u.hint)}</span></span>${inert("Choose files (not available in the demo)")}</li>`).join("")}</ul></section>
 <section class="section" aria-labelledby="h-need">${head("What you need first")}<h2 id="h-need" class="visually-hidden">What you need first</h2><p>Nothing. You can share existing brand assets without completing your Business Profile.</p><p class="muted">Not sure the assets are enough? You can also <a class="text-link" href="${e(href(vm, "/branding/guidelines"))}">ask for brand guidelines</a>.</p></section>`;
   } else {
@@ -138,40 +150,65 @@ export function branding(vm, pathId) {
 <section class="section" aria-labelledby="h-pre">${head("Requirements")}<h2 id="h-pre" class="visually-hidden">Requirements</h2>${prereqPanel(vm, svc)}</section>
 <section class="section" aria-labelledby="h-go">${head("Next step")}<h2 id="h-go" class="visually-hidden">Next step</h2><p class="muted">${e(COMMERCIAL)}</p><p><a class="btn btn--primary" href="${e(href(vm, `/requests/${svc.id}`))}">Preview the request <span aria-hidden="true">→</span></a></p></section>`;
   }
-  const pj = projectSections(vm, "branding");
-  return `<header class="page-head">${crumb(vm, [["Branding"]])}${pageHead("02 · Branding", "Branding", "Your brand projects, and what to do next if you need something new.")}</header>${pj.active}<section class="section" aria-labelledby="h-need-b">${head("What do you need?")}<h2 id="h-need-b" class="visually-hidden">What do you need?</h2>${chooser}</section>${body}${serviceDocs(vm, "branding")}${pj.completed}`;
+  return `${detailHead(vm, "branding", sel.id === "existing" ? "Existing brand assets" : sel.id === "logo" ? "Logo and identity" : sel.id === "guidelines" ? "Brand guidelines" : "Complete brand identity")}${chooser}${body}`;
+}
+
+/** Brand discovery: the information Framework asks for before any new brand work. Fields are inert. */
+export function brandDiscovery(vm) {
+  return `${detailHead(vm, "branding", "Brand discovery")}${note()}<div class="questions">${DISCOVERY.map((d, i) => field("bd", { id: String(i), label: d, kind: "textarea", value: "" })).join("")}</div><div class="step-nav"><a class="btn" href="${e(href(vm, "/branding"))}"><span aria-hidden="true">←</span> Back to Branding</a>${inert("Save (not available in the demo)", false)}</div>`;
 }
 
 /* ------------------------------------------------------------------ website / marketing / content */
 
 export function workspace(vm, key) {
-  const w = WORKSPACES[key], a = area(key), done = workspaceDone(key), total = w.topics.length, pj = projectSections(vm, key);
-  const topics = w.topics.map((t) => `<details class="topic"${t.state === "current" ? " open" : ""}><summary><span class="topic__t">${e(t.title)}</span><span class="topic__s">${chip(t.state)}</span><span class="topic__x" aria-hidden="true"></span></summary><div class="topic__body"><p class="muted">${e(t.summary)}</p><div class="questions">${t.fields.map((fd) => field(`${key}-${t.id}`, fd)).join("")}</div><fieldset class="field choice"><legend>Who will provide this?</legend><label class="choice__opt"><input type="radio" name="${e(`${key}-${t.id}-who`)}" value="client"${t.helpWith === "client" ? " checked" : ""}> <span>I will provide it</span></label><label class="choice__opt"><input type="radio" name="${e(`${key}-${t.id}-who`)}" value="framework"${t.helpWith === "framework" ? " checked" : ""}> <span>I would like Framework’s help</span></label></fieldset>${note()}</div></details>`).join("");
-  return `<header class="page-head">${crumb(vm, [[a.title]])}${pageHead(`${a.n} · ${a.title}`, a.title, w.intro)}</header>
-<section aria-label="Progress">${meter(Math.round((done / total) * 100), `${a.title} progress`)}<p class="muted small">${e(`${done} of ${total} topics complete`)}</p></section>
-${pj.active}
-<section class="section" aria-labelledby="h-topics">${head("Your brief")}<h2 id="h-topics" class="visually-hidden">Your brief</h2><div class="topics">${topics}</div></section>
-${serviceDocs(vm, key)}${serviceList(vm, key)}${pj.completed}`;
+  const rows = WORKSPACE_ROWS[key].map((r) => ({ title: r.title, href: `/${key}/${r.id}`, state: rowState(key, r) }));
+  return overview(vm, { key, progress: { ...rowProgress(key), noun: "areas" }, rows: [...rows, projectsRow(vm, key), requestsRow(key)] });
+}
+
+const who = (key, t) => `<fieldset class="field choice"><legend>Who will provide this?</legend><label class="choice__opt"><input type="radio" name="${e(`${key}-${t.id}-who`)}" value="client"${t.helpWith === "client" ? " checked" : ""}> <span>I will provide it</span></label><label class="choice__opt"><input type="radio" name="${e(`${key}-${t.id}-who`)}" value="framework"${t.helpWith === "framework" ? " checked" : ""}> <span>I would like Framework’s help</span></label></fieldset>`;
+
+/** One row of a workspace: its questions, with Previous / Next through the questionnaire rows. */
+export function workspaceRow(vm, key, row) {
+  const rows = WORKSPACE_ROWS[key], i = rows.indexOf(row), prev = rows[i - 1], next = rows[i + 1], topics = row.topics.map((id) => WORKSPACES[key].topics.find((t) => t.id === id));
+  const body = topics.map((t) => `<section class="qgroup">${topics.length > 1 ? `<h2 class="qgroup__title">${e(t.title)}</h2>` : ""}<div class="questions">${t.fields.map((fd) => field(`${key}-${t.id}`, fd)).join("")}</div>${who(key, t)}</section>`).join("");
+  return `${detailHead(vm, key, row.title)}${note()}${body}
+<div class="step-nav">${prev ? `<a class="btn" href="${e(href(vm, `/${key}/${prev.id}`))}"><span aria-hidden="true">←</span> Previous</a>` : `<a class="btn" href="${e(href(vm, `/${key}`))}"><span aria-hidden="true">←</span> Back</a>`}${inert("Save (not available in the demo)", false)}${next ? `<a class="btn btn--primary" href="${e(href(vm, `/${key}/${next.id}`))}">Next <span aria-hidden="true">→</span></a>` : `<a class="btn btn--primary" href="${e(href(vm, `/${key}`))}">Back to ${e(area(key).title)}</a>`}</div>`;
 }
 
 /* ------------------------------------------------------------------ files & deliverables */
 
-export function files(vm) {
-  const review = vm.projects.flatMap((p) => (p.deliverables || []).filter((d) => d.state === "review" && d.id).map((d) => ({ p, d })));
-  const docs = [...vm.documents].sort((x, y) => (x.at < y.at ? 1 : -1)).slice(0, 5);
-  return `<header class="page-head">${crumb(vm, [["Files & Deliverables"]])}${pageHead("06 · Files & Deliverables", "Files & Deliverables", "What Framework has shared with you, and what you have shared with Framework.")}</header>
-${review.length ? `<section class="section" aria-labelledby="h-rev">${head("Waiting for your review")}<h2 id="h-rev" class="visually-hidden">Waiting for your review</h2><ul class="rows">${review.map(({ p, d }) => `<li><a class="row row--service" href="${e(href(vm, `/projects/${p.id}/deliverables/${d.id}`))}"><span><strong class="row__name">${e(d.name)}</strong><span class="row__meta">${e(p.name)} · due ${e(fmtDay(d.due, vm.now))}</span></span><span class="status status--attention">In review</span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`).join("")}</ul></section>` : ""}
-<section class="section" aria-labelledby="h-docs">${head("Latest documents", `<a class="text-link" href="${e(href(vm, "/documents"))}">Document library</a>`)}<h2 id="h-docs" class="visually-hidden">Latest documents</h2><ul class="rows">${docs.map((d) => docRow(vm, d)).join("")}</ul></section>
-<section class="section" aria-labelledby="h-yours">${head("Files you have shared")}<h2 id="h-yours" class="visually-hidden">Files you have shared</h2>${note("Demonstration only. File sharing is not connected yet.")}<p class="muted">Logos, fonts and other files you share will be listed here. <a class="text-link" href="${e(href(vm, "/branding/existing"))}">Preview the brand asset upload</a></p></section>
-<section class="section" aria-labelledby="h-all">${head("Across all services")}<h2 id="h-all" class="visually-hidden">Across all services</h2><ul class="rows">${[["/progress", "Progress & activity", "Where every project stands, next actions and recent updates."], ["/projects", "All projects", `${plural(vm.projects.length, "project")} across branding, website, marketing and content.`], ["/activity", "Activity", "Everything that has happened, newest first."], ["/documents", "Documents", "The full document library."]].map(([p, t, d]) => `<li><a class="row row--service" href="${e(href(vm, p))}"><span><strong class="row__name">${e(t)}</strong><span class="row__meta">${e(d)}</span></span><span></span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`).join("")}</ul></section>`;
+const docRow = (vm, d) => `<li><a class="row row--service" href="${e(href(vm, `/documents${d.projectId ? `?project=${d.projectId}` : ""}`))}"><span><strong class="row__name">${e(d.name)}</strong><span class="row__meta">${e(d.ext.toUpperCase())} · ${e(d.size)} · added ${e(relative(d.at, vm.now))}</span></span><span></span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`;
+const delivRow = (vm, p, d, tag) => `<li><a class="row row--service" href="${e(href(vm, `/projects/${p.id}/deliverables/${d.id}`))}"><span><strong class="row__name">${e(d.name)}</strong><span class="row__meta">${e(p.name)} · ${e(d.state === "delivered" ? "delivered" : "due")} ${e(fmtDay(d.due, vm.now))}</span></span>${tag}<span class="tile__arrow" aria-hidden="true">→</span></a></li>`;
+const inReview = (vm) => vm.projects.flatMap((p) => (p.deliverables || []).filter((d) => d.state === "review" && d.id).map((d) => ({ p, d })));
+const delivered = (vm) => vm.projects.flatMap((p) => (p.deliverables || []).filter((d) => d.state === "delivered" && d.id).map((d) => ({ p, d }))).sort((x, y) => (x.d.due < y.d.due ? 1 : -1));
+const OLD_DAYS = 30;
+const historical = (vm) => vm.documents.filter((d) => vm.now.getTime() - new Date(d.at).getTime() > OLD_DAYS * 86400000).sort((x, y) => (x.at < y.at ? 1 : -1));
+
+/** Files & Deliverables is a library, not an onboarding area: same visual language, no progress indicator. */
+export function filesOverview(vm) {
+  const n = inReview(vm).length;
+  return overview(vm, { key: "files", rows: [
+    { title: "Waiting for your review", href: "/files/review", status: n ? String(n) : "", attention: true },
+    { title: "Shared documents", href: "/documents" },
+    { title: "Completed deliverables", href: "/files/completed" },
+    { title: "Project files", href: "/files/projects" },
+    { title: "Historical documents", href: "/files/history" },
+    { title: "Project overview", href: "/progress" },
+  ] });
 }
+const filesPage = (vm, title, body) => `<header class="page-head page-head--compact">${crumb(vm, [["Files & Deliverables", "/files"], [title]])}<h1 class="h1 h1--section">${e(title)}</h1></header>${body}`;
+const emptyList = (text) => `<div class="empty"><strong>${e(text)}</strong></div>`;
+export function filesReview(vm) { const r = inReview(vm); return filesPage(vm, "Waiting for your review", r.length ? `<ul class="rows">${r.map(({ p, d }) => delivRow(vm, p, d, '<span class="status status--attention">In review</span>')).join("")}</ul>` : emptyList("Nothing is waiting for your review.")); }
+export function filesCompleted(vm) { const r = delivered(vm); return filesPage(vm, "Completed deliverables", r.length ? `<ul class="rows">${r.map(({ p, d }) => delivRow(vm, p, d, '<span class="status status--done">Delivered</span>')).join("")}</ul>` : emptyList("No deliverables have been completed yet.")); }
+export function filesProjects(vm) { return filesPage(vm, "Project files", `<ul class="rows">${vm.projects.map((p) => { const n = vm.documents.filter((d) => d.projectId === p.id).length; return `<li><a class="row row--service" href="${e(href(vm, `/documents?project=${p.id}`))}"><span><strong class="row__name">${e(p.name)}</strong><span class="row__meta">${e(plural(n, "document"))}</span></span><span></span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`; }).join("")}</ul>`); }
+export function filesHistory(vm) { const r = historical(vm); return filesPage(vm, "Historical documents", r.length ? `<ul class="rows">${r.map((d) => docRow(vm, d)).join("")}</ul>` : emptyList("No older documents.")); }
 
 /* ------------------------------------------------------------------ service request (preview) */
 
 export function request(vm, service) {
   const a = area(service.area), { missing } = serviceReadiness(service);
   const nextMissing = missing[0];
-  return `<header class="page-head">${crumb(vm, [[a.title, a.path], [service.title]])}${pageHead(`Service request · ${a.title}`, service.title, service.blurb)}</header>
+  return `<header class="page-head">${crumb(vm, [[a.title, a.path], ["Request a service", `/${service.area}/requests`], [service.title]])}${pageHead(`Service request · ${a.title}`, service.title, service.blurb)}</header>
 <p class="notice-line">${e(COMMERCIAL)}</p>
 ${note("Demonstration only. Requests cannot be submitted yet.")}
 <div class="cols cols--even"><div>${prereqPanel(vm, service, "What this needs")}${nextMissing ? `<p><a class="btn btn--primary" href="${e(href(vm, (nextMissing.anyOf || [nextMissing])[0].href))}">${e(nextMissing.anyOf ? "Provide what is needed" : `Complete: ${nextMissing.label}`)} <span aria-hidden="true">→</span></a></p>` : ""}</div>

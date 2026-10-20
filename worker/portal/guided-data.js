@@ -151,3 +151,38 @@ export const workspaceDone = (area) => WORKSPACES[area].topics.filter((t) => t.s
 export const SERVICE_AREAS = Object.freeze(["branding", "website", "marketing", "content"]);
 export const projectsFor = (projects, key) => projects.filter((p) => Array.isArray(p.services) && p.services.includes(key));
 export const categoriesOf = (project) => (Array.isArray(project.services) ? project.services.filter((k) => SERVICE_AREAS.includes(k)) : []);
+
+/**
+ * How each service workspace overview is organised: one row per group of topics. A row's state is derived from its topics' states, so the
+ * demo completion states are unchanged; progress counts rows, never projects, files or requests.
+ */
+export const WORKSPACE_ROWS = Object.freeze({
+  website: [
+    { id: "information", title: "Website information", topics: ["type"] },
+    { id: "goals", title: "Goals and audience", topics: ["purpose"] },
+    { id: "pages", title: "Pages and features", topics: ["pages"] },
+    { id: "content", title: "Content and assets", topics: ["content", "brand"] },
+    { id: "domain", title: "Domain and hosting", topics: ["domain"] },
+    { id: "integrations", title: "Integrations", topics: ["integrations"] },
+  ],
+  marketing: [
+    { id: "goals", title: "Marketing goals", topics: ["goals"] },
+    { id: "audience", title: "Target audience", topics: ["audience"] },
+    { id: "channels", title: "Existing channels", topics: ["channels"] },
+    { id: "campaigns", title: "Campaign information", topics: ["campaigns", "budget"] },
+    { id: "assets", title: "Marketing assets", topics: ["materials"] },
+  ],
+  content: [
+    { id: "needs", title: "Photography and video needs", topics: ["photo", "video"] },
+    { id: "direction", title: "Creative direction", topics: ["references"] },
+    { id: "media", title: "Existing media", topics: ["media"] },
+    { id: "requirements", title: "Content requirements", topics: ["uses", "requests"] },
+  ],
+});
+/** "done" when every topic is done, "current" when some work has been done, otherwise "todo". */
+export function rowState(key, row) {
+  const ts = row.topics.map((id) => WORKSPACES[key].topics.find((t) => t.id === id).state);
+  if (ts.every((x) => x === "done")) return "done";
+  return ts.some((x) => x === "done" || x === "current") ? "current" : "todo";
+}
+export const rowProgress = (key) => { const rows = WORKSPACE_ROWS[key]; return { done: rows.filter((r) => rowState(key, r) === "done").length, total: rows.length }; };

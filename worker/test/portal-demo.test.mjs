@@ -16,7 +16,7 @@ const demoEnv = (over = {}) => ({ ...world.env, PORTAL_DEMO: "1", PORTAL_DB: thr
 const get = (path, env = demoEnv(), init) => handlePortal(new Request(ORIGIN + path, init), env, { now: T0 });
 
 const GUIDED = ["/portal/demo/progress", "/portal/demo/profile", ...["business", "location", "offering", "goals", "online", "contact", "personality"].map((x) => "/portal/demo/profile/" + x),
-  "/portal/demo/branding", "/portal/demo/website/projects/website", "/portal/demo/content/projects/launch-photography", "/portal/demo/branding/projects/menu-design", "/portal/demo/branding/projects/brand-identity/deliverables/primary-logo-suite", ...["existing", "logo", "guidelines", "identity"].map((x) => "/portal/demo/branding/" + x), "/portal/demo/website", "/portal/demo/marketing", "/portal/demo/content", "/portal/demo/files",
+  "/portal/demo/branding", "/portal/demo/branding/discovery", "/portal/demo/website/projects", "/portal/demo/branding/projects", "/portal/demo/marketing/projects", "/portal/demo/content/projects", "/portal/demo/website/requests", "/portal/demo/branding/requests", "/portal/demo/marketing/requests", "/portal/demo/content/requests", "/portal/demo/files/review", "/portal/demo/files/completed", "/portal/demo/files/projects", "/portal/demo/files/history", ...["information", "goals", "pages", "content", "domain", "integrations"].map((x) => "/portal/demo/website/" + x), ...["goals", "audience", "channels", "campaigns", "assets"].map((x) => "/portal/demo/marketing/" + x), ...["needs", "direction", "media", "requirements"].map((x) => "/portal/demo/content/" + x), "/portal/demo/website/projects/website", "/portal/demo/content/projects/launch-photography", "/portal/demo/branding/projects/menu-design", "/portal/demo/branding/projects/brand-identity/deliverables/primary-logo-suite", ...["existing", "logo", "guidelines", "identity"].map((x) => "/portal/demo/branding/" + x), "/portal/demo/website", "/portal/demo/marketing", "/portal/demo/content", "/portal/demo/files",
   ...["new-logo", "brand-guidelines", "brand-identity", "website-development", "website-design", "marketing-campaign", "photography-session"].map((x) => "/portal/demo/requests/" + x)];
 const PAGES = [...GUIDED, "/portal/demo", "/portal/demo/projects", "/portal/demo/projects/website", "/portal/demo/projects/brand-identity", "/portal/demo/projects/launch-photography",
   "/portal/demo/projects/website/deliverables/interior-page-templates", "/portal/demo/projects/brand-identity/deliverables/brand-strategy-brief", "/portal/demo/activity", "/portal/demo/activity?type=milestone", "/portal/demo/documents", "/portal/demo/documents?project=website", "/portal/demo/account"];
@@ -163,27 +163,28 @@ test("projects live inside their service workspaces, by explicit category, with 
   assert.deepEqual(projects.map((p) => [p.id, p.services]), [["brand-identity", ["branding"]], ["website", ["website"]], ["launch-photography", ["content", "website"]], ["menu-design", ["branding"]]]);
   const where = { branding: ["brand-identity", "menu-design"], website: ["website", "launch-photography"], content: ["launch-photography"], marketing: [] };
   for (const [key, ids] of Object.entries(where)) {
-    const html = await (await get("/portal/demo/" + key)).text();
+    const html = await (await get(`/portal/demo/${key}/projects`)).text();
     const links = [...html.matchAll(/href="\/portal\/demo\/[a-z]+\/projects\/([a-z-]+)"/g)].map((m) => m[1]);
     assert.deepEqual([...links].sort(), [...ids].sort(), key);
     assert.equal([...html.matchAll(/View project/g)].length, ids.length, key + " has one action per project");
   }
-  const marketing = await (await get("/portal/demo/marketing")).text();
-  assert.match(marketing, /No Marketing projects yet/); assert.match(marketing, /href="#requests"/); assert.match(marketing, /id="requests"/);
-  const branding = await (await get("/portal/demo/branding")).text();
-  assert.match(branding, /Active projects/); assert.match(branding, /Completed projects/);
+  const marketing = await (await get("/portal/demo/marketing/projects")).text();
+  assert.match(marketing, /No Marketing projects yet/); assert.match(marketing, /href="\/portal\/demo\/marketing\/requests"/);
+  const branding = await (await get("/portal/demo/branding/projects")).text();
+  assert.match(branding, />Active</); assert.match(branding, />Completed</);
   assert.ok(branding.indexOf("Café menu design") > branding.indexOf("Brand identity"));
-  assert.ok(!/Café menu design/.test(await (await get("/portal/demo/website")).text()), "no keyword-based classification");
+  assert.ok(!/Café menu design/.test(await (await get("/portal/demo/website/projects")).text()), "no keyword-based classification");
+  for (const key of ["branding", "website", "marketing", "content"]) assert.ok(!/View project|class="proj"/.test(await (await get("/portal/demo/" + key)).text()), key + " overview carries no project summaries");
 });
 test("journeys keep their service in breadcrumbs and links; direct URLs keep working and list every service", async () => {
   const proj = await (await get("/portal/demo/branding/projects/brand-identity")).text();
-  assert.match(proj, /class="crumb"><a href="\/portal\/demo">Home<\/a> \/ <a href="\/portal\/demo\/branding">Branding<\/a> \/ Brand identity/);
+  assert.match(proj, /class="crumb"><a href="\/portal\/demo">Home<\/a> \/ <a href="\/portal\/demo\/branding">Branding<\/a> \/ <a href="\/portal\/demo\/branding\/projects">Projects<\/a> \/ Brand identity/);
   assert.match(proj, /href="\/portal\/demo\/branding\/projects\/brand-identity\/deliverables\/primary-logo-suite"/);
   const del = await (await get("/portal/demo/website/projects/website/deliverables/interior-page-templates")).text();
-  assert.match(del, /<a href="\/portal\/demo">Home<\/a> \/ <a href="\/portal\/demo\/website">Website<\/a> \/ <a href="\/portal\/demo\/website\/projects\/website">Website<\/a> \/ Interior page templates/);
+  assert.match(del, /<a href="\/portal\/demo">Home<\/a> \/ <a href="\/portal\/demo\/website">Website<\/a> \/ <a href="\/portal\/demo\/website\/projects">Projects<\/a> \/ <a href="\/portal\/demo\/website\/projects\/website">Website<\/a> \/ Interior page templates/);
   const photoWeb = await (await get("/portal/demo/website/projects/launch-photography")).text();
   const photoContent = await (await get("/portal/demo/content/projects/launch-photography")).text();
-  assert.match(photoWeb, /<a href="\/portal\/demo\/website">Website<\/a> \/ Launch photography/); assert.match(photoContent, /<a href="\/portal\/demo\/content">Content &amp; Photography<\/a> \/ Launch photography/);
+  assert.match(photoWeb, /<a href="\/portal\/demo\/website">Website<\/a> \/ <a [^>]*>Projects<\/a> \/ Launch photography/); assert.match(photoContent, /<a href="\/portal\/demo\/content">Content &amp; Photography<\/a> \/ <a [^>]*>Projects<\/a> \/ Launch photography/);
   assert.match(photoContent, /Part of: <a href="\/portal\/demo\/content">Content &amp; Photography<\/a> · <a href="\/portal\/demo\/website">Website<\/a>/);
   assert.equal((await get("/portal/demo/marketing/projects/website")).status, 404, "a project is only reachable through its own services");
   assert.equal((await get("/portal/demo/website/projects/brand-identity")).status, 404);
@@ -191,9 +192,8 @@ test("journeys keep their service in breadcrumbs and links; direct URLs keep wor
   const direct = await (await get("/portal/demo/projects/website")).text();
   assert.match(direct, /Home<\/a> \/ <a href="\/portal\/demo\/files">Files &amp; Deliverables<\/a> \/ <a href="\/portal\/demo\/projects">Projects<\/a> \/ Website/);
   assert.match((await (await get("/portal/demo/projects/website/deliverables/interior-page-templates")).text()), /Interior page templates/);
-  const files = await (await get("/portal/demo/files")).text();
-  for (const p of ["progress", "projects", "activity", "documents"]) assert.match(files, new RegExp(`href="/portal/demo/${p}"`));
-  assert.match(files, /href="\/portal\/demo\/documents\?project=website"/);
+  assert.match(await (await get("/portal/demo/files/projects")).text(), /href="\/portal\/demo\/documents\?project=website"/);
+  assert.match(await (await get("/portal/demo/files")).text(), /href="\/portal\/demo\/progress"/);
   assert.match(await (await get("/portal/demo/activity")).text(), /Files &amp; Deliverables<\/a> \/ Activity/);
 });
 test("guided pages: simulated controls are inert and labelled; nothing can be submitted or uploaded", async () => {
@@ -251,4 +251,54 @@ test("live portal pages are untouched by the guided demo", async () => {
   const html = await (await br.get("/portal/o/alpha")).text();
   assert.ok(!/Let’s get you set up|class="tile"/.test(html));
   assert.equal((await br.get("/portal/o/alpha/demo")).status, 404);
+});
+
+test("all six overviews share one layout: breadcrumb, title, optional progress, hairline navigation rows; detail stays behind the rows", async () => {
+  const rowsOf = (html) => [...html.matchAll(/<a class="row row--step[^"]*" href="([^"]+)"><span class="step__n"[^>]*>(\d\d)<\/span><span class="row__name">([^<]+)<\/span>/g)].map((m) => [m[1].replace("/portal/demo", ""), m[2], m[3]]);
+  const expected = {
+    profile: ["Your business", "Location and size", "Products, services and customers", "Goals and competitors", "Online presence", "Primary contact", "Brand personality and positioning"],
+    branding: ["Existing brand assets", "Logo and identity", "Brand guidelines", "Brand discovery", "Projects", "Request a service"],
+    website: ["Website information", "Goals and audience", "Pages and features", "Content and assets", "Domain and hosting", "Integrations", "Projects", "Request a service"],
+    marketing: ["Marketing goals", "Target audience", "Existing channels", "Campaign information", "Marketing assets", "Projects", "Request a service"],
+    content: ["Photography and video needs", "Creative direction", "Existing media", "Content requirements", "Projects", "Request a service"],
+    files: ["Waiting for your review", "Shared documents", "Completed deliverables", "Project files", "Historical documents", "Project overview"],
+  };
+  const names = { profile: "Business Profile", branding: "Branding", website: "Website", marketing: "Marketing", content: "Content &amp; Photography", files: "Files &amp; Deliverables" };
+  for (const [key, titles] of Object.entries(expected)) {
+    const html = await (await get("/portal/demo/" + key)).text();
+    assert.deepEqual(rowsOf(html).map((r) => r[2].replace(/&amp;/g, "&")), titles, key);
+    assert.deepEqual(rowsOf(html).map((r) => r[1]), titles.map((_, i) => String(i + 1).padStart(2, "0")), key + " numbering");
+    assert.match(html, new RegExp(`class="crumb"><a href="/portal/demo">Home</a> / ${names[key]}</p>`), key + " breadcrumb");
+    assert.equal([...html.matchAll(/<h1/g)].length, 1);
+    assert.ok(!/<input|<textarea|<select|<details|class="notice-line"|class="demo-note"|class="prereq"|class="uploads"|class="proj"/.test(html), key + " overview holds no forms, uploads, prerequisites or project details");
+  }
+});
+test("progress is only about onboarding questions: Business Profile 3 of 7, no inflation from projects, files or requests", async () => {
+  const prof = await (await get("/portal/demo/profile")).text();
+  assert.match(prof, /3 of 7 steps complete/); assert.equal([...prof.matchAll(/<progress/g)].length, 1);
+  assert.equal([...prof.matchAll(/class="check"/g)].length, 3);
+  for (const [k, text] of [["website", "2 of 6 areas complete"], ["marketing", "0 of 5 areas complete"], ["content", "0 of 4 areas complete"]]) assert.match(await (await get("/portal/demo/" + k)).text(), new RegExp(text));
+  for (const k of ["branding", "files"]) assert.ok(!/<progress/.test(await (await get("/portal/demo/" + k)).text()), k + " shows no artificial progress");
+  const d = await import("../portal/guided-data.js");
+  for (const key of ["website", "marketing", "content"]) { const r = d.rowProgress(key); assert.equal(r.total, d.WORKSPACE_ROWS[key].length); }
+});
+test("workspace detail pages carry the questions with Previous / Next; the request flow keeps prerequisites and terms", async () => {
+  const pages = await (await get("/portal/demo/website/pages")).text();
+  assert.match(pages, /Which pages do you need\?/); assert.match(pages, /href="\/portal\/demo\/website\/goals"[^>]*>[^<]*<span aria-hidden="true">←<\/span> Previous/); assert.match(pages, /href="\/portal\/demo\/website\/content"[^>]*>Next/);
+  const content = await (await get("/portal/demo/website/content")).text();
+  assert.match(content, /Content and assets/); assert.match(content, /Branding readiness/);
+  const camp = await (await get("/portal/demo/marketing/campaigns")).text(); assert.match(camp, /Roughly what range/);
+  assert.match(await (await get("/portal/demo/content/needs")).text(), /What photography do you need\?/);
+  const reqs = await (await get("/portal/demo/website/requests")).text();
+  assert.match(reqs, /subject to Framework’s review, scoping and quotation/); assert.match(reqs, /Website development/); assert.match(reqs, /Website design/);
+  assert.match(await (await get("/portal/demo/requests/website-design")).text(), /Home<\/a> \/ <a href="\/portal\/demo\/website">Website<\/a> \/ <a href="\/portal\/demo\/website\/requests">Request a service<\/a> \/ Website design/);
+  assert.match(await (await get("/portal/demo/branding/discovery")).text(), /What your brand stands for/);
+  assert.match(await (await get("/portal/demo/branding/existing")).text(), /class="upload"/);
+  for (const p of ["/portal/demo/website/nope", "/portal/demo/files/nope", "/portal/demo/files/constructor", "/portal/demo/marketing/information", "/portal/demo/website/requests/x"]) assert.equal((await get(p)).status, 404, p);
+});
+test("files overview is a library: review, completed, project files and history are real lists", async () => {
+  assert.match(await (await get("/portal/demo/files/review")).text(), /Interior page templates/);
+  assert.match(await (await get("/portal/demo/files/completed")).text(), /Sitemap/);
+  assert.match(await (await get("/portal/demo/files/history")).text(), /Brand strategy brief/);
+  const f = await (await get("/portal/demo/files")).text(); assert.match(f, /href="\/portal\/demo\/progress"/); assert.match(f, /rowstat--attention">2</);
 });
