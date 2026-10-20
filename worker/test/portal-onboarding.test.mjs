@@ -33,6 +33,8 @@ function normalized(d) {
   return JSON.stringify(Object.fromEntries(TABLES.map((t) => [t, d[t].map((r) => JSON.stringify(clean(r))).sort()])));
 }
 const exec = (db, sql) => db.raw.exec(sql);
+/** The data layer now audits invitation creation itself ('invitation.created'); the hand-run runbooks record their own entries (org.onboarded, member.invited). Compare everything else. */
+const dropAutoAudit = (db) => db.raw.exec("DELETE FROM activity_log WHERE action = 'invitation.created'");
 const bySlug = (db, slug) => rows(db, "SELECT id FROM organizations WHERE slug = ?", slug)[0]?.id;
 
 /** A world with two unrelated organizations that must never be touched. */
@@ -55,6 +57,7 @@ test("onboarding SQL = data layer: the same organization and owner invitation as
   assert.ok(org.ok);
   assert.ok((await repo.createInvitation(byCode, org.organization.id, { email: "owner@acme.example", role: "owner", createdBy: ACTOR })).ok);
   assert.ok((await repo.recordActivity(byCode, { organizationId: org.organization.id, actorType: "admin", actorRef: ACTOR, action: "org.onboarded", entityType: "organization", entityId: org.organization.id, visibility: "internal" })).ok);
+  dropAutoAudit(byCode);
   assert.equal(normalized(dump(bySql)), normalized(dump(byCode)));
   const inv = rows(bySql, "SELECT * FROM invitations WHERE email = 'owner@acme.example'")[0];
   assert.equal(inv.role, "owner"); assert.equal(inv.status, "pending");
@@ -142,6 +145,7 @@ test("project SQL = data layer: the same project and CLIENT-visible 'project cre
   const pr = await repo.createProject(byCode, org.organization.id, { name: "Acme website", kind: "website", status: "build" });
   assert.ok(pr.ok);
   await repo.recordActivity(byCode, { organizationId: org.organization.id, actorType: "admin", actorRef: ACTOR, action: "project.created", entityType: "project", entityId: pr.project.id, visibility: "client" });
+  dropAutoAudit(byCode);
   assert.equal(normalized(dump(bySql)), normalized(dump(byCode)));
 });
 test("project SQL is repeatable, resumable, scoped to one active organization, and rejects a bad status", () => {
@@ -174,6 +178,7 @@ test("invite SQL = data layer: the same invitation as createInvitation (+ one in
   const inv = await repo.createInvitation(byCode, org.organization.id, { email: "second@acme.example", role: "member", createdBy: ACTOR });
   assert.ok(inv.ok);
   await repo.recordActivity(byCode, { organizationId: org.organization.id, actorType: "admin", actorRef: ACTOR, action: "member.invited", entityType: "invitation", entityId: inv.invitation.id, visibility: "internal" });
+  dropAutoAudit(byCode);
   assert.equal(normalized(dump(bySql)), normalized(dump(byCode)));
   const once = JSON.stringify(dump(bySql));
   exec(bySql, fill(INVITE)); exec(bySql, fill(INVITE));

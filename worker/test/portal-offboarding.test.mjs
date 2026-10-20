@@ -189,7 +189,7 @@ test("offboard, re-enable and offboard again are each recorded once", async () =
   const db = freshWorld();
   await repo.offboardUser(db, ID.T, { actor: ACTOR, now: new Date("2026-10-20T01:00:00Z") });
   await repo.reenableUser(db, ID.T, { actor: ACTOR, now: new Date("2026-10-20T02:00:00Z") });
-  await repo.restoreMembership(db, ID.A, ID.T);
+  await repo.restoreMembership(db, ID.A, ID.T, { actor: "admin:test" });
   await repo.offboardUser(db, ID.T, { actor: ACTOR, now: new Date("2026-10-20T03:00:00Z") });
   assert.equal(count(db, "activity_log", "action = 'user.offboarded'"), 2);
   assert.equal(count(db, "activity_log", "action = 'user.reenabled'"), 1);
@@ -230,7 +230,7 @@ test("end to end: two devices are cut off, sign-in is refused while disabled, re
   assert.equal((await fresh.get("/portal")).headers.get("Location"), "/portal/no-access", "but she has no organizations");
   for (const slug of ["alpha", "bravo", "gamma"]) assert.equal((await fresh.get("/portal/o/" + slug)).status, 404, slug);
   assert.equal(count(w.db, "memberships", "user_id = ? AND status = 'active'", aliceId), 0, "signing in did not resurrect anything, and the revoked invitation granted nothing");
-  await repo.restoreMembership(w.db, alpha.id, aliceId);
+  await repo.restoreMembership(w.db, alpha.id, aliceId, { actor: "admin:test" });
   assert.equal((await fresh.get("/portal/o/alpha")).status, 200, "access returns only when granted again on purpose");
   assert.equal((await fresh.get("/portal/o/bravo")).status, 404);
   await w.invite(gamma, "alice@example.com", "member"); // a NEW invitation works as usual

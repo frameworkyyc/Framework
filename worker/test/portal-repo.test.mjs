@@ -21,7 +21,17 @@ async function user(db, wid, email, name) {
 async function invite(db, o, email, role = "member", extra = {}) {
   const r = await repo.createInvitation(db, o.id, { email, role, createdBy: ADMIN, ...extra }, { now: NOW });
   assert.ok(r.ok, JSON.stringify(r));
+  // The data layer audits invitation creation itself (covered in portal-access-management.test.mjs). The acceptance tests below count the audit entries
+  // that ACCEPTANCE writes, so the creation entry is removed here to keep those assertions about one thing.
+  db.raw.exec("DELETE FROM activity_log WHERE action IN ('invitation.created', 'invitation.expired')");
   return r.invitation;
+}
+/** A second active owner, so the last-owner rule does not stand in the way of tests that are about something else. */
+async function otherOwner(db, o, n = 1) {
+  const u = await user(db, "user_01OWNER" + n, `owner${n}@example.com`);
+  await invite(db, o, u.email, "owner");
+  await activate(db, u);
+  return u;
 }
 const activate = (db, u, over = {}, now = at(1)) => repo.activatePendingInvitations(db, { user: u, emailVerified: true, ...over }, { now });
 
@@ -110,13 +120,15 @@ test("invitations: create, list, revoke; email normalised; clean errors; a valid
   assert.equal(inv.role, "owner");
   assert.equal(inv.expires_at, at(7).toISOString());
   assert.equal(inv.created_by, ADMIN);
-  assert.deepEqual(await repo.createInvitation(db, o.id, { email: "NEW.person@example.com", role: "member", createdBy: ADMIN }, { now: NOW }), { ok: false, error: "already_pending" });
+  const dup = await repo.createInvitation(db, o.id, { email: "NEW.person@example.com", role: "member", createdBy: ADMIN }, { now: NOW });
+  assert.deepEqual([dup.ok, dup.error, dup.invitationId], [false, "already_pending", inv.id], "the structured error names the live invitation");
+  assert.ok(dup.message);
   for (const [input, error] of [[{ email: "bad", role: "member", createdBy: ADMIN }, "invalid_email"], [{ email: "a@example.com", role: "admin", createdBy: ADMIN }, "invalid_role"], [{ email: "a@example.com", role: "member", createdBy: "" }, "invalid_actor"], [{ email: "a@example.com", role: "member", createdBy: ADMIN, expiresInDays: 0 }, "invalid_expiry"], [{ email: "a@example.com", role: "member", createdBy: ADMIN, expiresInDays: 31 }, "invalid_expiry"], [{ email: "a@example.com", role: "member", createdBy: ADMIN, workosInvitationId: "x" }, "invalid_workos_invitation_id"]]) assert.equal((await repo.createInvitation(db, o.id, input, { now: NOW })).error, error, error);
   assert.equal((await repo.createInvitation(db, crypto.randomUUID(), { email: "a@example.com", role: "member", createdBy: ADMIN })).error, "invalid_organization", "unknown organization");
   assert.deepEqual((await repo.listInvitations(db, o.id)).map((i) => i.id), [inv.id]);
   assert.equal((await repo.revokeInvitation(db, o.id, inv.id, ADMIN, { now: at(1) })).ok, true);
   assert.equal((await repo.getInvitation(db, o.id, inv.id)).status, "revoked");
-  assert.equal((await repo.revokeInvitation(db, o.id, inv.id, ADMIN)).error, "not_found", "already revoked");
+  assert.equal((await repo.revokeInvitation(db, o.id, inv.id, ADMIN)).error, "already_revoked", "already revoked");
   const again = await invite(db, o, "new.person@example.com"); // a revoked invitation does not block a new one
   assert.equal(again.status, "pending");
   assert.deepEqual((await repo.listInvitations(db, o.id, { status: "pending" })).map((i) => i.id), [again.id]);
@@ -174,7 +186,7 @@ test("acceptance is IDEMPOTENT: repeating it changes nothing and creates no dupl
   for (let i = 0; i < 3; i++) assert.deepEqual(await activate(db, u, {}, at(2 + i)), { ok: true, activated: [] });
   assert.equal(JSON.stringify([rows(db, "SELECT * FROM memberships"), rows(db, "SELECT * FROM invitations"), rows(db, "SELECT * FROM activity_log")]), before);
   assert.equal(count(db, "memberships"), 1);
-  assert.equal(count(db, "activity_log"), 1);
+  assert.equal(count(db, "activity_log", "action = 'invitation.accepted'"), 1);
 });
 
 test("expired, revoked, unverified, wrong-email, disabled-user and not-yet-valid cases NEVER grant access", async () => {
@@ -213,7 +225,7 @@ test("expired, revoked, unverified, wrong-email, disabled-user and not-yet-valid
   assert.deepEqual(await activate(db, undefined, {}, at(6)), { ok: false, error: "invalid_user" });
   assert.equal(count(db, "memberships"), 0, "nothing above granted access");
   assert.equal((await repo.getInvitation(db, o.id, live.invitation.id)).status, "pending", "and the valid invitation is untouched");
-  assert.equal(count(db, "activity_log"), 0);
+  assert.equal(count(db, "activity_log", "action = 'invitation.accepted'"), 0);
 });
 
 test("a REUSED invitation can never re-grant access an admin has since revoked", async () => {
@@ -222,6 +234,7 @@ test("a REUSED invitation can never re-grant access an admin has since revoked",
   const inv = await invite(db, o, "sam@example.com", "owner");
   const sam = await user(db, "user_01AAAAA", "sam@example.com");
   await activate(db, sam);
+  await otherOwner(db, o);
   assert.ok((await repo.revokeMembership(db, o.id, sam.id, ADMIN, { now: at(2) })).ok);
   assert.equal(await repo.getActiveMembership(db, sam.id, "acme"), null);
   for (let i = 0; i < 3; i++) assert.deepEqual(await activate(db, sam, {}, at(3 + i)), { ok: true, activated: [] });
@@ -235,7 +248,7 @@ test("a REUSED invitation can never re-grant access an admin has since revoked",
   assert.equal(m.status, "active");
   assert.equal(m.role, "member", "a revoked membership comes back with the newly invited role");
   assert.equal(m.revoked_at, null);
-  assert.equal(count(db, "memberships"), 1, "still one row for this user and organization");
+  assert.equal(count(db, "memberships", `user_id = '${sam.id}'`), 1, "still one row for this user and organization");
 });
 
 test("re-inviting someone who is already ACTIVE never changes their role (no silent downgrade)", async () => {
@@ -244,7 +257,9 @@ test("re-inviting someone who is already ACTIVE never changes their role (no sil
   const sam = await user(db, "user_01AAAAA", "sam@example.com");
   await invite(db, o, "sam@example.com", "owner");
   await activate(db, sam);
-  await invite(db, o, "sam@example.com", "member");
+  // createInvitation now refuses an address that is already an active member (already_member), so this stale second invitation is seeded directly:
+  // acceptance must still behave when one exists (for example one issued before the person joined).
+  db.raw.exec(`INSERT INTO invitations (id, organization_id, email, role, status, created_at, created_by, expires_at) VALUES ('${crypto.randomUUID()}', '${o.id}', 'sam@example.com', 'member', 'pending', '${at(1).toISOString()}', '${ADMIN}', '${at(9).toISOString()}')`);
   const res = await activate(db, sam, {}, at(2));
   assert.equal(res.activated.length, 1, "the second invitation is consumed");
   assert.equal((await repo.getMembership(db, o.id, sam.id)).role, "owner");
@@ -283,7 +298,7 @@ test("acceptance is ATOMIC: if any part of the batch fails, no membership, invit
   db.raw.exec(`CREATE TRIGGER fail_bravo BEFORE INSERT ON memberships WHEN NEW.organization_id = '${b.id}' BEGIN SELECT RAISE(ABORT, 'simulated failure'); END`);
   await assert.rejects(() => activate(db, sam), /simulated failure/);
   assert.equal(count(db, "memberships"), 0, "the first organization's membership was rolled back too");
-  assert.equal(count(db, "activity_log"), 0);
+  assert.equal(count(db, "activity_log", "action = 'invitation.accepted'"), 0);
   assert.equal((await repo.getInvitation(db, a.id, ia.id)).status, "pending");
   assert.equal((await repo.getInvitation(db, b.id, ib.id)).status, "pending");
   // Once the fault is gone the very same call succeeds (nothing was half-consumed).
@@ -336,7 +351,7 @@ test("STALE READ: an invitation that expired or was revoked after it was read st
     db.prepare = real;
     assert.deepEqual(res, { ok: true, activated: [] }, how);
     assert.equal(count(db, "memberships"), 0, how + ": no membership");
-    assert.equal(count(db, "activity_log"), 0, how + ": no audit entry");
+    assert.equal(count(db, "activity_log", "action = 'invitation.accepted'"), 0, how + ": no audit entry");
     assert.equal((await repo.getInvitation(db, o.id, inv.id)).status, how === "expired" ? "pending" : "revoked", how + ": status not changed by a failed claim");
   }
 });
@@ -364,10 +379,11 @@ test("memberships: the organization resolves ONLY through the user's own active 
   assert.equal(await repo.getActiveMembership(db, sam.id, "alpha"), null, "archived organization");
   await repo.setOrganizationStatus(db, a.id, "active");
   assert.ok((await repo.getActiveMembership(db, sam.id, "alpha")));
+  await otherOwner(db, a);
   assert.ok((await repo.revokeMembership(db, a.id, sam.id, ADMIN, { now: at(3) })).ok);
   assert.equal(await repo.getActiveMembership(db, sam.id, "alpha"), null, "revoked membership: access ends immediately");
   assert.deepEqual(await repo.listActiveMembershipsForUser(db, sam.id), []);
-  assert.ok((await repo.restoreMembership(db, a.id, sam.id, { role: "member" })).ok);
+  assert.ok((await repo.restoreMembership(db, a.id, sam.id, { role: "member", actor: ADMIN })).ok);
   assert.equal((await repo.getActiveMembership(db, sam.id, "alpha")).role, "member");
   await assert.rejects(() => repo.getActiveMembership(db, "not-a-uuid", "alpha"), (e) => e.code === "invalid_user_id");
 });
@@ -380,15 +396,16 @@ test("memberships: list, change role, revoke and restore are scoped to one organ
   await invite(db, b, "sam@example.com", "member");
   await activate(db, sam);
   assert.deepEqual((await repo.listMembers(db, a.id)).map((m) => [m.email, m.name, m.role, m.status]), [["sam@example.com", "Sam", "member", "active"]]);
-  assert.equal((await repo.setMemberRole(db, a.id, sam.id, "owner")).ok, true);
+  assert.equal((await repo.setMemberRole(db, a.id, sam.id, "owner", ADMIN)).ok, true);
   assert.equal((await repo.getMembership(db, a.id, sam.id)).role, "owner");
+  await otherOwner(db, a);
   assert.equal((await repo.getMembership(db, b.id, sam.id)).role, "member", "the other organization is untouched");
-  assert.equal((await repo.setMemberRole(db, a.id, sam.id, "admin")).error, "invalid_role");
+  assert.equal((await repo.setMemberRole(db, a.id, sam.id, "admin", ADMIN)).error, "invalid_role");
   assert.equal((await repo.revokeMembership(db, a.id, sam.id, "")).error, "invalid_actor");
   assert.ok((await repo.revokeMembership(db, a.id, sam.id, ADMIN)).ok);
-  assert.equal((await repo.revokeMembership(db, a.id, sam.id, ADMIN)).error, "not_found", "already revoked");
-  assert.equal((await repo.setMemberRole(db, a.id, sam.id, "owner")).error, "not_found", "no role changes on a revoked membership");
-  assert.equal((await repo.restoreMembership(db, b.id, sam.id)).error, "not_found", "bravo's membership was never revoked");
+  assert.equal((await repo.revokeMembership(db, a.id, sam.id, ADMIN)).error, "already_revoked", "already revoked");
+  assert.equal((await repo.setMemberRole(db, a.id, sam.id, "owner", ADMIN)).error, "not_found", "no role changes on a revoked membership");
+  assert.equal((await repo.restoreMembership(db, b.id, sam.id, { actor: ADMIN })).error, "not_revoked", "bravo's membership was never revoked");
   assert.equal((await repo.getMembership(db, b.id, sam.id)).status, "active");
 });
 

@@ -122,7 +122,7 @@ test("revoking a membership takes effect on the very next request, without signi
   assert.equal((await browsers.amy.get("/portal/o/alpha/projects")).status, 404);
   assert.equal(loc(await browsers.amy.get("/portal")), "/portal/no-access");
   assert.equal((await browsers.amy.get("/portal/no-access")).status, 403, "still signed in, simply without access");
-  assert.equal((await repo.restoreMembership(w.db, A.id, await userId("amy"))).ok, true);
+  assert.equal((await repo.restoreMembership(w.db, A.id, await userId("amy"), { actor: "admin@frameworkco.ca" })).ok, true);
   assert.equal((await browsers.amy.get("/portal/o/alpha")).status, 200, "and restoring is immediate too");
 });
 test("an old invitation can never re-grant a revoked membership", async () => {
@@ -135,11 +135,13 @@ test("an old invitation can never re-grant a revoked membership", async () => {
 test("role changes take effect immediately: demoting an owner removes owner-only pages on the next request", async () => {
   const { w, A, browsers, userId } = await world();
   assert.equal((await browsers.alice.get("/portal/o/alpha/members")).status, 200);
-  await repo.setMemberRole(w.db, A.id, await userId("alice"), "member");
+  assert.equal((await repo.setMemberRole(w.db, A.id, await userId("alice"), "member", "admin@frameworkco.ca")).error, "last_owner", "alice is alpha's only owner: the database refuses the demotion");
+  assert.equal((await repo.setMemberRole(w.db, A.id, await userId("amy"), "owner", "admin@frameworkco.ca")).ok, true);
+  await repo.setMemberRole(w.db, A.id, await userId("alice"), "member", "admin@frameworkco.ca");
   assert.equal((await browsers.alice.get("/portal/o/alpha/members")).status, 403);
   assert.equal((await browsers.alice.get("/portal/o/alpha")).status, 200);
   assert.ok(!/Team<\/a>/.test(await text(await browsers.alice.get("/portal/o/alpha"))), "the navigation no longer offers it");
-  await repo.setMemberRole(w.db, A.id, await userId("alice"), "owner");
+  await repo.setMemberRole(w.db, A.id, await userId("alice"), "owner", "admin@frameworkco.ca");
   assert.equal((await browsers.alice.get("/portal/o/alpha/members")).status, 200);
 });
 test("a suspended or archived organization is closed to everyone at once, and disappears from the picker", async () => {

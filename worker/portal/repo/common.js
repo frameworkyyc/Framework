@@ -41,3 +41,6 @@ export const isConstraintViolation = (err) => /constraint failed/i.test(String((
 
 /** Which column a UNIQUE violation named, for example "organizations.slug". */
 export const uniqueColumns = (err) => (/UNIQUE constraint failed:\s*([^:]+)/i.exec(String((err && err.message) || "")) || [, ""])[1].trim();
+
+/** Who made an administrative change: a short, single-line label (normally the admin's email). Recorded in the audit trail. */
+export const validActor = (actor) => typeof actor === "string" && actor.trim().length >= 1 && actor.trim().length <= 254 && !/[\u0000-\u001F\u007F]/.test(actor);
