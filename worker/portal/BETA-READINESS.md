@@ -2,6 +2,8 @@
 
 Status: Staging only. The Production portal stays disabled; migration `0002_business_profile.sql` is **not** approved for Production.
 
+Staging database `framework-portal-staging` (`1edda8a2-5249-4f40-9dbc-d29aa44e21f8`): 0002 was applied on 2026-10-20 as its single `CREATE TABLE IF NOT EXISTS business_profile_answers` statement (identical to the file; a test pins that), executed through the Cloudflare tool with the owner's explicit approval. It is therefore **not recorded in `d1_migrations`**; running `wrangler d1 migrations apply` against Staging later is harmless (IF NOT EXISTS) and will record it. Production was not touched.
+
 ## What is functional (signed-in clients)
 * Home: the six workspace blocks. Business Profile is real; Branding, Website, Marketing, Content & Photography and Files & Deliverables are Coming Soon pages.
 * Business Profile: seven steps (schema `worker/portal/profile-schema.js`, version 1). Server-side validation, saved per organization, resumable, re-openable, unsaved-changes warning and a Saving state (`assets/js/portal-profile.js`, optional enhancement).

@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { makeWorld, csrfOf } from "./helpers/portal-e2e.mjs";
+import { makeWorld, csrfOf, ORIGIN } from "./helpers/portal-e2e.mjs";
 import { handlePortal } from "../portal/router.js";
 import { PROFILE_STEPS, PROFILE_SCHEMA_VERSION, validateAnswer, validateStep, stepStatus, profileProgress, stepById, FIELD_IDS } from "../portal/profile-schema.js";
 import { getProfileAnswers, saveProfileStep } from "../portal/repo/business-profile.js";
@@ -313,4 +313,112 @@ test("database: the answers table has one row per answered question per organiza
   assert.throws(() => ins(alpha.id, "legal3", "x".repeat(2001)), /constraint failed/i);
   assert.throws(() => ins("00000000-0000-4000-8000-000000000000", "legal", "x"), /constraint failed/i, "must belong to a real organization");
   assert.ok(FIELD_IDS.has("legal"));
+});
+
+/* ------------------------------------------------------------------ Step 398: end-to-end verification (integration level) */
+
+test("answers persist across sign-out and a brand-new sign-in; the ended session no longer works; progress is recomputed from the saved rows", async () => {
+  const { w, ann } = await setup();
+  assert.equal((await save(w, ann, "alpha", "business", ANSWERS.business)).status, 303);
+  await save(w, ann, "alpha", "location", { city: "Calgary", size: "" });
+  const pageBefore = await (await ann.get("/portal/o/alpha/profile")).text();
+  assert.match(pageBefore, /1 of 7 steps complete/);
+  const out = await handlePortal(new Request(ORIGIN + "/portal/logout", { method: "POST", body: form({ csrf: csrfOf(pageBefore) }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now(), fetch: w.workos.fetch });
+  assert.equal(out.status, 303);
+  const stale = await ann.get("/portal/o/alpha/profile"); // the old cookie
+  assert.equal(stale.status, 303); assert.match(stale.headers.get("Location"), /\/portal\/login/);
+  const again = w.browser();
+  await again.signIn(w.user(1, "ann@alpha.test"));
+  const overview = await (await again.get("/portal/o/alpha/profile")).text();
+  assert.match(overview, /1 of 7 steps complete/); assert.match(overview, /class="rowstat">In progress</);
+  const step = await (await again.get("/portal/o/alpha/profile/business")).text();
+  for (const v of ["Acme Co. Ltd.", "Acme", "We sell things."]) assert.ok(step.includes(`>${v}<`) || step.includes(`value="${v}"`), v);
+  assert.match(step, /<option selected>Retail<\/option>/);
+  assert.match(await (await again.get("/portal/o/alpha/profile/location")).text(), /value="Calgary"/);
+  // editing and saving again replaces the answer
+  await save(w, again, "alpha", "business", { ...ANSWERS.business, legal: "Acme Renamed Ltd." });
+  assert.match(await (await again.get("/portal/o/alpha/profile/business")).text(), /value="Acme Renamed Ltd\."/);
+  assert.equal(sql(w.db, "SELECT count(*) AS n FROM business_profile_answers WHERE field_id = 'legal'")[0].n, 1, "an edit updates the row, it never adds one");
+});
+test("every question renders with the right input, its Optional marker only where optional, and the saved-state flags", async () => {
+  const { ann } = await setup();
+  for (const step of PROFILE_STEPS) {
+    const html = await (await ann.get(`/portal/o/alpha/profile/${step.id}`)).text();
+    for (const f of step.fields) {
+      assert.ok(html.includes(f.label.replace(/&/g, "&amp;")), `${step.id}/${f.id} label`);
+      const tag = f.kind === "textarea" ? `<textarea id="p-${step.id}-${f.id}" name="${f.id}"` : f.kind === "select" ? `<select id="p-${step.id}-${f.id}" name="${f.id}"` : f.kind === "choice" ? `name="${f.id}" value=` : `<input id="p-${step.id}-${f.id}" name="${f.id}" type="${f.kind}"`;
+      assert.ok(html.includes(tag), `${step.id}/${f.id} control`);
+    }
+    const optionals = step.fields.filter((f) => !f.required).length;
+    assert.equal([...html.matchAll(/class="field__opt">Optional</g)].length, optionals, step.id + " optional markers");
+  }
+});
+test("revoked membership: read and write are refused at once and nothing is written", async () => {
+  const { w, mia } = await setup();
+  assert.equal((await save(w, mia, "alpha", "location", { city: "Calgary", size: "Just me" })).status, 303);
+  const page = await (await mia.get("/portal/o/alpha/profile/location")).text();
+  const token = csrfOf(page);
+  w.db.raw.exec("UPDATE memberships SET status='revoked', revoked_at='2026-03-10T00:00:00.000Z' WHERE user_id IN (SELECT id FROM portal_users WHERE email='mia@alpha.test')");
+  const before = sql(w.db, "SELECT field_id, value, updated_at FROM business_profile_answers ORDER BY field_id");
+  const write = await handlePortal(new Request(ORIGIN + "/portal/o/alpha/profile/location", { method: "POST", body: form({ csrf: token, city: "HACKED", size: "Just me" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: mia.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() });
+  assert.equal(write.status, 404);
+  for (const p of ["profile", "profile/location", ""]) assert.equal((await mia.get(`/portal/o/alpha/${p}`)).status, 404, p);
+  assert.deepEqual(sql(w.db, "SELECT field_id, value, updated_at FROM business_profile_answers ORDER BY field_id"), before);
+});
+test("forged organization identifiers grant nothing: another organization's id or slug in the path, query or form", async () => {
+  const { w, ann, bob, beta, alpha } = await setup();
+  await save(w, bob, "beta", "business", { ...ANSWERS.business, legal: "Beta Secret Ltd" });
+  for (const p of [`/portal/o/${beta.id}/profile`, `/portal/o/${beta.id}/profile/business`, "/portal/o/beta/profile", "/portal/o/BETA/profile", "/portal/o/beta%2Fx/profile", "/portal/o/alpha/../beta/profile", "/portal/o/alpha/profile/business?organization_id=" + beta.id + "&org=beta"]) {
+    const r = await ann.get(p);
+    const text = r.status === 200 ? await r.text() : "";
+    assert.ok(r.status !== 200 || !text.includes("Beta Secret"), p + " " + r.status);
+    if (!p.includes("?organization_id")) assert.ok([404, 400].includes(r.status), p + " " + r.status);
+  }
+  const page = await (await ann.get("/portal/o/alpha/profile/business")).text();
+  const r = await handlePortal(new Request(ORIGIN + "/portal/o/alpha/profile/business", { method: "POST", body: form({ csrf: csrfOf(page), legal: "Alpha Ltd", industry: "Retail", about: "x", organization_id: beta.id, organizationId: beta.id, slug: "beta" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() });
+  assert.equal(r.status, 303);
+  assert.deepEqual(sql(w.db, "SELECT organization_id AS o, value FROM business_profile_answers WHERE field_id='legal' ORDER BY value").map((x) => ({ ...x })), [{ o: alpha.id, value: "Alpha Ltd" }, { o: beta.id, value: "Beta Secret Ltd" }]);
+});
+test("server-side validation cannot be bypassed by crafting the request", async () => {
+  const { w, ann } = await setup();
+  const attempts = [
+    ["personality", { words: "x", tone: "Made up tone" }, "tone"],
+    ["business", { legal: "A", industry: "Spaceships", about: "x" }, "industry"],
+    ["business", { legal: "A".repeat(201), industry: "Retail", about: "x" }, "legal"],
+    ["business", { legal: "A", industry: "Retail", about: "x".repeat(2001) }, "about"],
+    ["contact", { cname: "A", cemail: "a@b" }, "cemail"],
+    ["online", { site: "javascript:alert(1)" }, "site"],
+    ["online", { site: "http://insecure.example" }, "site"],
+    ["business", { legal: "A\u0000B", industry: "Retail", about: "x" }, "legal"],
+  ];
+  for (const [step, fields, bad] of attempts) {
+    const res = await save(w, ann, "alpha", step, fields);
+    assert.equal(res.status, 422, `${step}/${bad}`);
+    assert.match(await res.text(), /class="field__error"/, bad + " has a visible message");
+  }
+  assert.deepEqual(sql(w.db, "SELECT * FROM business_profile_answers"), [], "nothing from a rejected request was stored");
+  // unknown or array-style field names are ignored, never stored
+  const ok = await save(w, ann, "alpha", "business", { ...ANSWERS.business, "legal[]": "x", __proto__x: "y", extra: "z" });
+  assert.equal(ok.status, 303);
+  assert.deepEqual(sql(w.db, "SELECT field_id FROM business_profile_answers ORDER BY field_id").map((r) => r.field_id), ["about", "industry", "legal", "operating"]);
+  assert.equal((await handlePortal(new Request(ORIGIN + "/portal/o/alpha/profile/__proto__", { method: "POST", body: form({ csrf: "x" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() })).status, 404);
+});
+test("save rate limit: after the allowance is used, further saves are refused with 429 and write nothing", async () => {
+  const { w, ann } = await setup();
+  const counts = {};
+  const env = { ...w.env, PORTAL_RATE_LIMITER: { limit: async ({ key }) => ({ success: (counts[key] = (counts[key] || 0) + 1) <= 3 }) } };
+  const page = await (await ann.get("/portal/o/alpha/profile/offering")).text();
+  const token = csrfOf(page), statuses = [];
+  for (let i = 0; i < 6; i++) statuses.push((await handlePortal(new Request(ORIGIN + "/portal/o/alpha/profile/offering", { method: "POST", body: form({ csrf: token, offer: "o" + i, customers: "c" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: ORIGIN, "CF-Connecting-IP": "203.0.113.50" } }), env, { now: w.clock.now() })).status);
+  assert.deepEqual(statuses, [303, 303, 303, 429, 429, 429]);
+  assert.equal(sql(w.db, "SELECT value FROM business_profile_answers WHERE field_id='offer'")[0].value, "o2", "limited saves never reached the database");
+  const keys = Object.keys(counts); assert.equal(keys.length, 1); assert.match(keys[0], /^profile:[0-9a-f]{32}$/, "a hashed per-network key, never the address");
+});
+test("the DDL applied to the Staging database is exactly migration 0002 (whitespace aside), and is non-destructive", () => {
+  const applied = "CREATE TABLE IF NOT EXISTS business_profile_answers (organization_id TEXT NOT NULL REFERENCES organizations (id) ON DELETE RESTRICT, field_id TEXT NOT NULL CHECK (length(field_id) BETWEEN 1 AND 40 AND field_id NOT GLOB '*[^a-z0-9_]*'), value TEXT NOT NULL CHECK (length(value) BETWEEN 1 AND 2000), schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version >= 1), updated_by TEXT NOT NULL REFERENCES portal_users (id) ON DELETE RESTRICT, updated_at TEXT NOT NULL, PRIMARY KEY (organization_id, field_id)) WITHOUT ROWID";
+  const file = readFileSync(new URL("../../migrations/portal/0002_business_profile.sql", import.meta.url), "utf8").replace(/--.*$/gm, "");
+  const norm = (x) => x.replace(/\s+/g, " ").replace(/\s*([(),])\s*/g, "$1").replace(/;\s*$/, "").trim();
+  assert.equal(norm(file), norm(applied));
+  assert.ok(!/\b(DROP|ALTER|TRUNCATE|UPDATE|INSERT)\b|(?<!ON )\bDELETE\b/i.test(file), "creates one table and nothing else");
+  assert.equal([...file.matchAll(/CREATE TABLE/g)].length, 1);
 });
