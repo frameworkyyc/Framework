@@ -22,10 +22,14 @@ A step is **complete** when every required question has a saved answer; a step w
 * Logs carry fixed fields only (never answers). Errors show a generic message and keep what the person typed.
 * CSP: profile pages add `script-src 'self'` (no inline); all other portal pages keep no scripts.
 
-## Staff (admin) findings
-* Staff authorization exists for `/admin` (Cloudflare Access token check, `worker/admin/access.js`), but the admin Worker does not read the portal database (`PORTAL_DB`) and there is no portal staff UI.
-* Minimum needed, not built here: a read-only admin page or API that (1) lists organizations with member and pending-invitation counts, (2) shows each organization's profile completion (steps done of 7) and answers, (3) lists incomplete profiles. It needs the `PORTAL_DB` binding on the admin route, a cross-tenant read module with the repository's `cross-tenant:` marking and test pin, and reuse of `profileProgress`. Until then staff can use the reviewed SQL in `migrations/portal-ops` (`verify-organization.sql`).
-* Inviting clients uses the existing reviewed runbooks in `migrations/portal-ops` plus the WorkOS flow; no invitation was created or sent.
+## Staff administration (Admin > Clients, read-only)
+* Same Worker, same `/admin` app, same locks: a verified Cloudflare Access token AND an email on `ADMIN_EMAILS` (`worker/admin/access.js`). The new `/api/admin/clients` routes (`worker/portal/admin-clients.js`) are reached only after that check.
+* The admin Worker reads the portal database through the existing `PORTAL_DB` binding (bound for Staging and, separately, for Production). Access goes through `readOnlyDb()`, which refuses anything but a single SELECT. Every route is GET; there is no edit, no sending, no impersonation. Client answers are never logged.
+* Lists organizations (active members, invitation summary, Business Profile steps complete) and shows one organization: all seven sections with saved answers (complete / partial / missing), members, and invitations as the database records them.
+* Invitations: the system can record and read them (`invitations` table: pending, accepted, revoked, expired), but cannot create them from the admin. Missing pieces for safe creation: (1) a WorkOS management client in the Worker (a server-side API key with user-management scope; today the Worker only completes user sign-ins), because public sign-up is off and the person must exist in WorkOS with the same email first; (2) an admin write route with its own confirmation, CSRF and audit entry; (3) a decision on who may invite and for which role. Until then use the reviewed runbook in `migrations/portal-ops`.
+
+## Staging migration history (reconciliation)
+`d1_migrations` is `(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL)` and holds only `0001_portal_foundation.sql`. The `business_profile_answers` table already exists with exactly the DDL of 0002. Recommended, supported fix (needs a Cloudflare login; nothing was changed): `npx wrangler d1 migrations list PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc` (expect only 0002 pending, and the prompt must name `framework-portal-staging`), then `... migrations apply ...`. 0002 is `CREATE TABLE IF NOT EXISTS`, so it changes nothing and Wrangler records it in its own format. Do not hand-insert a history row unless Wrangler cannot be used.
 
 ## Beta feedback (design only, not built)
 A single "Send feedback" link in the footer opens `/portal/o/<slug>/feedback`: one textarea (max 2000 characters) and an optional "page you were on" chosen from a fixed list, POSTed with the same CSRF, size, rate-limit and membership checks as the profile. Backend: one table `beta_feedback (id, organization_id, user_id, page, message, created_at)` in the portal database (migration 0003), tenant-scoped, internal audit entry without the message text, and the same staff read page as above. No external service.
@@ -33,7 +37,7 @@ A single "Send feedback" link in the footer opens `/portal/o/<slug>/feedback`: o
 ## Required before inviting the first beta client
 1. Approve and apply `0002_business_profile.sql` to the Staging portal database (done only on explicit approval), then run a full Staging sign-in test with a test user.
 2. Decide the Production plan for 0002 (the Production migration check deliberately fails closed while 0002 is pending), and a Production launch approval (flags, WorkOS settings, MFA, privacy notice review: see `LAUNCH.md`, `PRIVACY-DRAFT.md`).
-3. Build the staff read page (above) so Framework can see who has completed what.
+3. Reconcile the Staging migration history (above) and deploy-test Admin > Clients with a real admin sign-in.
 4. Build the feedback mechanism (above).
 5. Add a short consent and privacy notice to the Business Profile (what is collected, why, who sees it).
 6. Optional: data export and deletion procedure for a profile; a "mark section as not applicable" control for questions a client cannot answer.

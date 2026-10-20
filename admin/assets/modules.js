@@ -8,7 +8,7 @@ export const MODULES = [
   { id: "feedback", label: "Client Feedback", path: "/admin/feedback", enabled: true, load: () => import("./feedback.js") },
   { id: "assessments", label: "Assessments", path: "/admin/assessments", enabled: true, load: () => import("./assessments.js") },
 
-  { id: "clients", label: "Clients", path: "/admin/clients", enabled: false },
+  { id: "clients", label: "Clients", path: "/admin/clients", enabled: true, load: () => import("./clients.js") },
   { id: "projects", label: "Projects", path: "/admin/projects", enabled: false },
   { id: "testimonials", label: "Testimonials", path: "/admin/testimonials", enabled: false },
   { id: "files", label: "Files", path: "/admin/files", enabled: false },

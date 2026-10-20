@@ -285,3 +285,14 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-share__form { display: grid; gap: 14px; margin: 8px 0 20px; }
 .adm-share__row { display: grid; gap: 6px; } .adm-share__row label { font-size: 14px; font-weight: 600; }
 .adm-share__field:focus, .adm-share__link:focus, .adm-share__tpl:focus { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ---------- Clients (read-only) ---------- */
+.adm-step { padding: 20px 0; border-top: 1px solid var(--hairline); }
+.adm-step__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; margin-bottom: 10px; }
+.adm-step__title { font-size: 18px; line-height: 1.25; font-weight: 600; }
+.adm-cstate { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); }
+.adm-cstate--complete { color: var(--ink); }
+.adm-cstate--missing { color: var(--stone); }
+.adm-answer { white-space: pre-wrap; overflow-wrap: anywhere; }
+.adm-meter { width: 100%; max-width: 420px; height: 4px; margin: 4px 0 20px; appearance: none; border: 0; background: var(--hairline); border-radius: 0; display: block; }
+.adm-meter::-webkit-progress-bar { background: var(--hairline); } .adm-meter::-webkit-progress-value { background: var(--ink); } .adm-meter::-moz-progress-bar { background: var(--ink); }
