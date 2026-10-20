@@ -33,21 +33,11 @@ function field(scope, fd) {
   return `<div class="field">${label}<input id="${e(id)}" type="${e(fd.kind)}" value="${e(fd.value)}" placeholder="${e(fd.placeholder || "")}"${desc} autocomplete="off"></div>`;
 }
 
-/* ------------------------------------------------------------------ prerequisites (reusable) */
+/* ------------------------------------------------------------------ return-to-request context */
 
-function reqItem(vm, r) {
-  if (r.anyOf) return `<li class="${r.met ? "is-met" : "is-needed"}"><span class="prereq__mark" aria-hidden="true"></span><span class="prereq__body"><span class="prereq__label">One of these: ${e(r.label)}</span><span class="prereq__state">${r.met ? "Met" : "Needed"}</span><ul class="prereq__sub">${r.anyOf.map((o) => `<li>${e(o.label)} ${o.met ? "(provided)" : `· <a class="text-link" href="${e(href(vm, o.href))}">Provide this</a>`}</li>`).join("")}</ul></span></li>`;
-  return `<li class="${r.met ? "is-met" : "is-needed"}"><span class="prereq__mark" aria-hidden="true"></span><span class="prereq__body"><span class="prereq__label">${e(r.label)}</span><span class="prereq__state">${r.met ? "Complete" : `<a class="text-link" href="${e(href(vm, r.href))}">Complete this</a>`}</span></span></li>`;
-}
-
-/** What a service specifically needs, what is already in place, and a direct link to each missing piece. */
-function prereqPanel(vm, service, heading = "Before you request") {
-  const { reqs, missing } = serviceReadiness(service);
-  const summary = missing.length ? `${plural(missing.length, "thing")} still needed. Everything else you can explore freely.` : "Everything needed for this request is in place.";
-  return `<section class="prereq" aria-labelledby="h-pre-${e(service.id)}"><h3 id="h-pre-${e(service.id)}" class="prereq__title">${e(heading)}: ${e(service.title)}</h3><p class="muted">${e(summary)}</p><ul class="prereq__list">${reqs.map((r) => reqItem(vm, r)).join("")}</ul></section>`;
-}
-
-const readinessLine = (service) => { const { missing } = serviceReadiness(service); return missing.length ? `Needs ${plural(missing.length, "thing")}` : "Ready to request"; };
+/** A service request the client came from, carried as ?from=<id> so a questionnaire can offer a way back. */
+const q = (from) => (from ? `?from=${from.id}` : "");
+const backLink = (vm, from) => (from ? `<p class="backlink"><a class="text-link" href="${e(href(vm, `/requests/${from.id}`))}"><span aria-hidden="true">←</span> Back to request: ${e(from.title)}</a></p>` : "");
 
 /* ------------------------------------------------------------------ home */
 
@@ -86,16 +76,14 @@ export function profile(vm) {
   return overview(vm, { key: "profile", progress: { done, total, noun: "steps" }, rows: PROFILE_STEPS.map((st) => ({ title: st.title, href: `/profile/${st.id}`, state: st.state })) });
 }
 
-export function profileStep(vm, step) {
+export function profileStep(vm, step, from = null) {
   const i = PROFILE_STEPS.indexOf(step), total = PROFILE_STEPS.length;
   const prev = PROFILE_STEPS[i - 1], next = PROFILE_STEPS[i + 1];
-  const neededFor = SERVICES.filter((s) => s.needs.some(([k, id]) => k === "profile" && id === step.id));
   return `<header class="page-head">${crumb(vm, [["Business Profile", "/profile"], [step.title]])}${pageHead(`Step ${i + 1} of ${total}`, step.title, step.intro)}</header>
-<nav class="stepper" aria-label="Business Profile steps"><ol>${PROFILE_STEPS.map((s, n) => `<li class="is-${s.state}"><a href="${e(href(vm, `/profile/${s.id}`))}"${s === step ? ' aria-current="step"' : ""}><span class="visually-hidden">Step ${n + 1}: ${e(s.title)}, ${e(STATE[s.state][1])}</span><span aria-hidden="true">${n + 1}</span></a></li>`).join("")}</ol></nav>
+${backLink(vm, from)}<nav class="stepper" aria-label="Business Profile steps"><ol>${PROFILE_STEPS.map((s, n) => `<li class="is-${s.state}"><a href="${e(href(vm, `/profile/${s.id}${q(from)}`))}"${s === step ? ' aria-current="step"' : ""}><span class="visually-hidden">Step ${n + 1}: ${e(s.title)}, ${e(STATE[s.state][1])}</span><span aria-hidden="true">${n + 1}</span></a></li>`).join("")}</ol></nav>
 ${note()}
 <div class="questions">${step.fields.map((fd) => field(`p-${step.id}`, fd)).join("")}</div>
-${neededFor.length ? `<p class="muted small">Needed for: ${neededFor.map((s) => `<a class="text-link" href="${e(href(vm, `/requests/${s.id}`))}">${e(s.title)}</a>`).join(", ")}</p>` : ""}
-<div class="step-nav">${prev ? `<a class="btn" href="${e(href(vm, `/profile/${prev.id}`))}"><span aria-hidden="true">←</span> Previous</a>` : `<a class="btn" href="${e(href(vm, "/profile"))}"><span aria-hidden="true">←</span> All steps</a>`}${inert("Save (not available in the demo)", false)}${next ? `<a class="btn btn--primary" href="${e(href(vm, `/profile/${next.id}`))}">Next <span aria-hidden="true">→</span></a>` : `<a class="btn btn--primary" href="${e(href(vm, "/profile"))}">Back to your steps</a>`}</div>`;
+<div class="step-nav">${prev ? `<a class="btn" href="${e(href(vm, `/profile/${prev.id}${q(from)}`))}"><span aria-hidden="true">←</span> Previous</a>` : `<a class="btn" href="${e(href(vm, `/profile${q(from)}`))}"><span aria-hidden="true">←</span> All steps</a>`}${inert("Save (not available in the demo)", false)}${next ? `<a class="btn btn--primary" href="${e(href(vm, `/profile/${next.id}${q(from)}`))}">Next <span aria-hidden="true">→</span></a>` : `<a class="btn btn--primary" href="${e(href(vm, `/profile${q(from)}`))}">Back to your steps</a>`}</div>`;
 }
 
 /* ------------------------------------------------------------------ projects inside a service workspace */
@@ -138,25 +126,23 @@ export function brandingOverview(vm) {
   return overview(vm, { key: "branding", rows: [...BRAND_ROWS.map(([title, h]) => ({ title, href: h })), projectsRow(vm, "branding"), requestsRow("branding")] });
 }
 
-export function branding(vm, pathId) {
+export function branding(vm, pathId, from = null) {
   const sel = BRAND_PATHS.find((p) => p.id === pathId);
-  const chooser = `<nav class="choices" aria-label="Branding path"><ul>${BRAND_PATHS.map((p) => `<li><a href="${e(href(vm, `/branding/${p.id}`))}"${p === sel ? ' aria-current="true"' : ""}><span class="choices__t">${e(p.title)}</span><span class="choices__d">${e(p.blurb)}</span></a></li>`).join("")}</ul></nav>`;
+  const chooser = `<nav class="choices" aria-label="Branding path"><ul>${BRAND_PATHS.map((p) => `<li><a href="${e(href(vm, `/branding/${p.id}${q(from)}`))}"${p === sel ? ' aria-current="true"' : ""}><span class="choices__t">${e(p.title)}</span><span class="choices__d">${e(p.blurb)}</span></a></li>`).join("")}</ul></nav>`;
   let body;
   if (sel.id === "existing") {
-    body = `<section class="section" aria-labelledby="h-up">${head("Share your brand assets")}<h2 id="h-up" class="visually-hidden">Share your brand assets</h2>${note("Demonstration only. No files can be uploaded, and nothing is stored.")}<ul class="uploads">${UPLOAD_SLOTS.map((u) => `<li class="upload"><span><strong class="row__name">${e(u.title)}</strong><span class="row__meta">${e(u.hint)}</span></span>${inert("Choose files (not available in the demo)")}</li>`).join("")}</ul></section>
-<section class="section" aria-labelledby="h-need">${head("What you need first")}<h2 id="h-need" class="visually-hidden">What you need first</h2><p>Nothing. You can share existing brand assets without completing your Business Profile.</p><p class="muted">Not sure the assets are enough? You can also <a class="text-link" href="${e(href(vm, "/branding/guidelines"))}">ask for brand guidelines</a>.</p></section>`;
+    body = `<section class="section" aria-labelledby="h-up">${head("Share your brand assets")}<h2 id="h-up" class="visually-hidden">Share your brand assets</h2>${note("Demonstration only. No files can be uploaded, and nothing is stored.")}<ul class="uploads">${UPLOAD_SLOTS.map((u) => `<li class="upload"><span><strong class="row__name">${e(u.title)}</strong><span class="row__meta">${e(u.hint)}</span></span>${inert("Choose files (not available in the demo)")}</li>`).join("")}</ul></section>`;
   } else {
     const svc = serviceById(sel.service);
     body = `<section class="section" aria-labelledby="h-disc">${head("What we will ask you for")}<h2 id="h-disc" class="visually-hidden">What we will ask you for</h2><p class="muted">Brand discovery helps Framework understand the business before any design starts.</p><ul class="bullets">${DISCOVERY.map((d) => `<li>${e(d)}</li>`).join("")}</ul></section>
-<section class="section" aria-labelledby="h-pre">${head("Requirements")}<h2 id="h-pre" class="visually-hidden">Requirements</h2>${prereqPanel(vm, svc)}</section>
 <section class="section" aria-labelledby="h-go">${head("Next step")}<h2 id="h-go" class="visually-hidden">Next step</h2><p class="muted">${e(COMMERCIAL)}</p><p><a class="btn btn--primary" href="${e(href(vm, `/requests/${svc.id}`))}">Preview the request <span aria-hidden="true">→</span></a></p></section>`;
   }
-  return `${detailHead(vm, "branding", sel.id === "existing" ? "Existing brand assets" : sel.id === "logo" ? "Logo and identity" : sel.id === "guidelines" ? "Brand guidelines" : "Complete brand identity")}${chooser}${body}`;
+  return `${detailHead(vm, "branding", sel.id === "existing" ? "Existing brand assets" : sel.id === "logo" ? "Logo and identity" : sel.id === "guidelines" ? "Brand guidelines" : "Complete brand identity")}${backLink(vm, from)}${chooser}${body}`;
 }
 
 /** Brand discovery: the information Framework asks for before any new brand work. Fields are inert. */
-export function brandDiscovery(vm) {
-  return `${detailHead(vm, "branding", "Brand discovery")}${note()}<div class="questions">${DISCOVERY.map((d, i) => field("bd", { id: String(i), label: d, kind: "textarea", value: "" })).join("")}</div><div class="step-nav"><a class="btn" href="${e(href(vm, "/branding"))}"><span aria-hidden="true">←</span> Back to Branding</a>${inert("Save (not available in the demo)", false)}</div>`;
+export function brandDiscovery(vm, from = null) {
+  return `${detailHead(vm, "branding", "Brand discovery")}${backLink(vm, from)}${note()}<div class="questions">${DISCOVERY.map((d, i) => field("bd", { id: String(i), label: d, kind: "textarea", value: "" })).join("")}</div><div class="step-nav"><a class="btn" href="${e(href(vm, "/branding"))}"><span aria-hidden="true">←</span> Back to Branding</a>${inert("Save (not available in the demo)", false)}</div>`;
 }
 
 /* ------------------------------------------------------------------ website / marketing / content */
@@ -169,11 +155,11 @@ export function workspace(vm, key) {
 const who = (key, t) => `<fieldset class="field choice"><legend>Who will provide this?</legend><label class="choice__opt"><input type="radio" name="${e(`${key}-${t.id}-who`)}" value="client"${t.helpWith === "client" ? " checked" : ""}> <span>I will provide it</span></label><label class="choice__opt"><input type="radio" name="${e(`${key}-${t.id}-who`)}" value="framework"${t.helpWith === "framework" ? " checked" : ""}> <span>I would like Framework’s help</span></label></fieldset>`;
 
 /** One row of a workspace: its questions, with Previous / Next through the questionnaire rows. */
-export function workspaceRow(vm, key, row) {
+export function workspaceRow(vm, key, row, from = null) {
   const rows = WORKSPACE_ROWS[key], i = rows.indexOf(row), prev = rows[i - 1], next = rows[i + 1], topics = row.topics.map((id) => WORKSPACES[key].topics.find((t) => t.id === id));
   const body = topics.map((t) => `<section class="qgroup">${topics.length > 1 ? `<h2 class="qgroup__title">${e(t.title)}</h2>` : ""}<div class="questions">${t.fields.map((fd) => field(`${key}-${t.id}`, fd)).join("")}</div>${who(key, t)}</section>`).join("");
-  return `${detailHead(vm, key, row.title)}${note()}${body}
-<div class="step-nav">${prev ? `<a class="btn" href="${e(href(vm, `/${key}/${prev.id}`))}"><span aria-hidden="true">←</span> Previous</a>` : `<a class="btn" href="${e(href(vm, `/${key}`))}"><span aria-hidden="true">←</span> Back</a>`}${inert("Save (not available in the demo)", false)}${next ? `<a class="btn btn--primary" href="${e(href(vm, `/${key}/${next.id}`))}">Next <span aria-hidden="true">→</span></a>` : `<a class="btn btn--primary" href="${e(href(vm, `/${key}`))}">Back to ${e(area(key).title)}</a>`}</div>`;
+  return `${detailHead(vm, key, row.title)}${backLink(vm, from)}${note()}${body}
+<div class="step-nav">${prev ? `<a class="btn" href="${e(href(vm, `/${key}/${prev.id}${q(from)}`))}"><span aria-hidden="true">←</span> Previous</a>` : `<a class="btn" href="${e(href(vm, `/${key}`))}"><span aria-hidden="true">←</span> Back</a>`}${inert("Save (not available in the demo)", false)}${next ? `<a class="btn btn--primary" href="${e(href(vm, `/${key}/${next.id}${q(from)}`))}">Next <span aria-hidden="true">→</span></a>` : `<a class="btn btn--primary" href="${e(href(vm, `/${key}`))}">Back to ${e(area(key).title)}</a>`}</div>`;
 }
 
 /* ------------------------------------------------------------------ files & deliverables */
@@ -206,13 +192,32 @@ export function filesHistory(vm) { const r = historical(vm); return filesPage(vm
 
 /* ------------------------------------------------------------------ service request (preview) */
 
+const reqLink = (vm, r, service) => href(vm, `${r.href}?from=${service.id}`);
+
+/** One missing requirement: the section it belongs to, what is unanswered, and a direct link to the questionnaire. */
+function reqRow(vm, r, service, optional) {
+  const tone = optional ? "req--optional" : "req--missing";
+  if (r.anyOf) return `<li class="req ${tone}"><span class="req__mark" aria-hidden="true"></span><span class="req__body"><span class="req__title">${e(r.label)}</span><span class="req__detail">${e(r.detail)}: ${r.anyOf.map((o) => `<a class="text-link" href="${e(reqLink(vm, o, service))}">${e(o.label)}</a>`).join(" or ")}</span></span></li>`;
+  return `<li><a class="req ${tone}" href="${e(reqLink(vm, r, service))}"><span class="req__mark" aria-hidden="true"></span><span class="req__body"><span class="req__title">${e(r.label)}</span><span class="req__detail">${e(r.section)} · ${e(r.detail)}</span></span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`;
+}
+
+/**
+ * A service request preview. Required requirements that are not met are shown prominently and block the (disabled, demonstration-only) submit;
+ * optional ones never block. Met requirements are collapsed into one summary line.
+ */
 export function request(vm, service) {
-  const a = area(service.area), { missing } = serviceReadiness(service);
-  const nextMissing = missing[0];
-  return `<header class="page-head">${crumb(vm, [[a.title, a.path], ["Request a service", `/${service.area}/requests`], [service.title]])}${pageHead(`Service request · ${a.title}`, service.title, service.blurb)}</header>
+  const a = area(service.area), { reqs, missing, optional, optionalMissing } = serviceReadiness(service);
+  const met = [...reqs, ...optional].filter((r) => r.met);
+  const blocked = missing.length > 0;
+  const checklist = blocked
+    ? `<section class="section" aria-labelledby="h-miss">${head("Needed before you request", `${missing.length} of ${reqs.length}`)}<h2 id="h-miss" class="visually-hidden">Needed before you request</h2><ul class="reqs">${missing.map((r) => reqRow(vm, r, service, false)).join("")}</ul><p class="muted small">Only what this request needs is listed. ${e("Demonstration only: answers are not saved, so these stay open.")}</p></section>`
+    : `<p class="req-ok"><span class="rowstat">Complete</span> Everything this request needs is in place.</p>`;
+  const optionalHtml = optionalMissing.length ? `<section class="section" aria-labelledby="h-opt">${head("Helpful to add")}<h2 id="h-opt" class="visually-hidden">Helpful to add</h2><p class="muted small">Optional. These improve the brief but never block your request.</p><ul class="reqs">${optionalMissing.map((r) => reqRow(vm, r, service, true)).join("")}</ul></section>` : "";
+  const doneHtml = met.length ? `<details class="req-done"><summary>${e(plural(met.length, "item"))} already complete</summary><ul>${met.map((r) => `<li><span>${e(r.label)}</span><span class="rowstat">Complete</span></li>`).join("")}</ul></details>` : "";
+  const form = blocked ? "" : `<section class="section" aria-labelledby="h-det">${head("Your request")}<h2 id="h-det" class="visually-hidden">Your request</h2><div class="questions"><div class="field"><label for="rq-notes">Anything we should know?</label><textarea id="rq-notes" rows="4" placeholder="Context, deadlines, examples you like."></textarea></div><div class="field"><label for="rq-when">Preferred timing</label><select id="rq-when"><option value="">Choose…</option><option>As soon as possible</option><option>Within the next month</option><option>In two to three months</option><option>Flexible</option></select></div></div></section>`;
+  return `<header class="page-head page-head--compact">${crumb(vm, [[a.title, a.path], ["Request a service", `/${service.area}/requests`], [service.title]])}${pageHead(`Service request · ${a.title}`, service.title, service.blurb)}</header>
 <p class="notice-line">${e(COMMERCIAL)}</p>
 ${note("Demonstration only. Requests cannot be submitted yet.")}
-<div class="cols cols--even"><div>${prereqPanel(vm, service, "What this needs")}${nextMissing ? `<p><a class="btn btn--primary" href="${e(href(vm, (nextMissing.anyOf || [nextMissing])[0].href))}">${e(nextMissing.anyOf ? "Provide what is needed" : `Complete: ${nextMissing.label}`)} <span aria-hidden="true">→</span></a></p>` : ""}</div>
-<section aria-labelledby="h-det">${head("Your request")}<h2 id="h-det" class="visually-hidden">Your request</h2><div class="questions"><div class="field"><label for="rq-notes">Anything we should know?</label><textarea id="rq-notes" rows="4" placeholder="Context, deadlines, examples you like."></textarea></div><div class="field"><label for="rq-when">Preferred timing</label><select id="rq-when"><option value="">Choose…</option><option>As soon as possible</option><option>Within the next month</option><option>In two to three months</option><option>Flexible</option></select></div></div><p>${inert(missing.length ? "Submit request (complete the requirements first)" : "Submit request (not available in the demo)", false)}</p></section></div>
-<section class="section" aria-labelledby="h-next2">${head("What happens next")}<h2 id="h-next2" class="visually-hidden">What happens next</h2><ol class="bullets bullets--num"><li>Check what this request needs.</li><li>Add the details above.</li><li>Framework reviews the request and scopes the work.</li><li>You receive a quotation to approve or decline. No paid work begins before you approve it.</li></ol></section>`;
+${checklist}${form}${optionalHtml}${doneHtml}
+<p class="req-submit">${inert(blocked ? "Submit request (complete the required items first)" : "Submit request (not available in the demo)", false)}</p>`;
 }

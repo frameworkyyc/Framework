@@ -6,11 +6,12 @@
 const TYPES = new Set(["milestone", "update", "document", "review"]);
 const ID = /^[A-Za-z0-9-]{1,40}$/;
 
-/** @returns {{type: string|undefined, project: string|undefined}} */
+/** @returns {{type: string|undefined, project: string|undefined, from: string|undefined}} `from` is a service-request id the caller then checks against its own list */
 export function viewFilters(url) {
   const q = url && url.searchParams;
-  if (!q) return { type: undefined, project: undefined };
+  if (!q) return { type: undefined, project: undefined, from: undefined };
   const type = q.get("type");
   const project = q.get("project");
-  return { type: TYPES.has(type) ? type : undefined, project: typeof project === "string" && ID.test(project) ? project : undefined };
+  const from = q.get("from");
+  return { type: TYPES.has(type) ? type : undefined, project: typeof project === "string" && ID.test(project) ? project : undefined, from: typeof from === "string" && ID.test(from) ? from : undefined };
 }

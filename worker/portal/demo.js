@@ -37,6 +37,7 @@ export function handleDemo(ctx, path) {
 
   if (parts.length === 0) return page("home", "Home", guided.home(vm));
   const area = parts[0];
+  const from = SERVICES.find((x) => x.id === filters.from) || null; // the service request a questionnaire was opened from, if any
 
   if (SERVICE_AREAS.includes(area) && parts[1] === "projects") {
     if (parts.length === 2) return page("home", `${areaTitle(area)}: projects`, guided.projectsPage(vm, area));
@@ -49,14 +50,14 @@ export function handleDemo(ctx, path) {
   }
   if (SERVICE_AREAS.includes(area) && parts[1] === "requests" && parts.length === 2) return page("home", `${areaTitle(area)}: request a service`, guided.requestsPage(vm, area));
   if (area === "profile" && parts.length === 1) return page("home", "Business Profile", guided.profile(vm));
-  if (area === "profile" && parts.length === 2) { const s = PROFILE_STEPS.find((x) => x.id === parts[1]); return s ? page("home", `${s.title}: Business Profile`, guided.profileStep(vm, s)) : notFound(); }
+  if (area === "profile" && parts.length === 2) { const s = PROFILE_STEPS.find((x) => x.id === parts[1]); return s ? page("home", `${s.title}: Business Profile`, guided.profileStep(vm, s, from)) : notFound(); }
   if (area === "branding" && parts.length === 1) return page("home", "Branding", guided.brandingOverview(vm));
   if (area === "branding" && parts.length === 2) {
-    if (parts[1] === "discovery") return page("home", "Brand discovery", guided.brandDiscovery(vm));
-    return BRAND_PATHS.some((x) => x.id === parts[1]) ? page("home", "Branding", guided.branding(vm, parts[1])) : notFound();
+    if (parts[1] === "discovery") return page("home", "Brand discovery", guided.brandDiscovery(vm, from));
+    return BRAND_PATHS.some((x) => x.id === parts[1]) ? page("home", "Branding", guided.branding(vm, parts[1], from)) : notFound();
   }
   if ((area === "website" || area === "marketing" || area === "content") && parts.length === 1) return page("home", areaTitle(area), guided.workspace(vm, area));
-  if ((area === "website" || area === "marketing" || area === "content") && parts.length === 2) { const row = WORKSPACE_ROWS[area].find((x) => x.id === parts[1]); return row ? page("home", `${row.title}: ${areaTitle(area)}`, guided.workspaceRow(vm, area, row)) : notFound(); }
+  if ((area === "website" || area === "marketing" || area === "content") && parts.length === 2) { const row = WORKSPACE_ROWS[area].find((x) => x.id === parts[1]); return row ? page("home", `${row.title}: ${areaTitle(area)}`, guided.workspaceRow(vm, area, row, from)) : notFound(); }
   if (area === "files" && parts.length === 1) return page("home", "Files and deliverables", guided.filesOverview(vm));
   if (area === "files" && parts.length === 2) { const f = { review: guided.filesReview, completed: guided.filesCompleted, projects: guided.filesProjects, history: guided.filesHistory }[parts[1]]; return Object.hasOwn({ review: 1, completed: 1, projects: 1, history: 1 }, parts[1]) && f ? page("home", "Files and deliverables", f(vm)) : notFound(); }
   if (area === "requests" && parts.length === 2) { const s = SERVICES.find((x) => x.id === parts[1]); return s ? page("home", `${s.title}: service request`, guided.request(vm, s)) : notFound(); }

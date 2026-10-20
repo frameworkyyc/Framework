@@ -213,17 +213,68 @@ test("service requests state the review, scoping and quotation terms and never i
     assert.ok(!/<a[^>]*>\s*Submit/i.test(html));
   }
 });
-test("prerequisites are specific to each service, link to the exact missing step and do not lock sections", async () => {
-  const logo = await (await get("/portal/demo/requests/new-logo")).text();
-  assert.match(logo, /href="\/portal\/demo\/profile\/personality"/);
-  assert.ok(!/href="\/portal\/demo\/profile\/online"/.test(logo), "unrelated steps are not required");
-  const design = await (await get("/portal/demo/requests/website-design")).text();
-  assert.match(design, /One of these: Existing brand assets or an agreed branding direction/);
-  assert.match(design, /href="\/portal\/demo\/branding\/existing"/);
-  const photo = await (await get("/portal/demo/requests/photography-session")).text();
-  assert.match(photo, /Everything needed for this request is in place/);
+const reqPage = async (id, qs = "") => (await get(`/portal/demo/requests/${id}${qs}`)).text();
+const missingOf = (html) => { const sec = html.match(/Needed before you request[\s\S]*?<\/section>/); return sec ? [...sec[0].matchAll(/class="req__title">([^<]+)</g)].map((m) => m[1]) : []; };
+
+test("a request with everything in place shows the normal preview and no checklist of gaps", async () => {
+  const html = await reqPage("photography-session");
+  assert.match(html, /Everything this request needs is in place/); assert.ok(!/Needed before you request/.test(html));
+  assert.match(html, /Anything we should know\?/); assert.match(html, /<span class="btn" aria-disabled="true">Submit request \(not available in the demo\)/);
+});
+test("a request missing one requirement lists exactly that item, with what is unanswered and a direct link", async () => {
+  const html = await reqPage("new-logo");
+  assert.deepEqual(missingOf(html), ["Brand personality and positioning"]);
+  assert.match(html, /href="\/portal\/demo\/profile\/personality\?from=new-logo"/);
+  assert.match(html, /Still to answer: Three words that describe your brand; How should you sound and 1 more|Still to answer: Three words that describe your brand; How should you sound\b/);
+  assert.ok(!/Anything we should know/.test(html), "the request form waits for the required items");
+  assert.match(html, /<span class="btn" aria-disabled="true">Submit request \(complete the required items first\)/);
+  assert.ok(!/profile\/online|profile\/contact|profile\/location/.test(html), "unrelated questionnaires are never required");
+});
+test("a request missing several requirements, from several sections, lists each once with its own link", async () => {
+  assert.deepEqual(missingOf(await reqPage("brand-identity")), ["Brand personality and positioning", "Brand discovery"]);
+  const mk = await reqPage("marketing-campaign");
+  assert.deepEqual(missingOf(mk), ["Goals and competitors", "Marketing goals"]);
+  assert.match(mk, /href="\/portal\/demo\/profile\/goals\?from=marketing-campaign"/); assert.match(mk, /href="\/portal\/demo\/marketing\/goals\?from=marketing-campaign"/);
+  assert.match(mk, /Business Profile · Still to answer/); assert.match(mk, /Marketing · Still to answer/);
+  const design = await reqPage("website-design");
+  assert.deepEqual(missingOf(design), ["Pages and features", "Existing brand assets or an agreed branding direction"]);
+  assert.match(design, /Existing brand assets or an agreed branding direction/);
+  assert.match(design, /Provide one of these: <a class="text-link" href="\/portal\/demo\/branding\/existing\?from=website-design">Existing brand assets<\/a> or <a[^>]*href="\/portal\/demo\/branding\/identity\?from=website-design">Agreed branding direction/);
+});
+test("optional information is offered but never blocks; completed items are summarised", async () => {
+  const html = await reqPage("new-logo");
+  assert.match(html, /Helpful to add/); assert.match(html, /never block your request/);
+  const opt = html.slice(html.indexOf("Helpful to add"));
+  assert.match(opt, /Goals and competitors/); assert.match(opt, /Brand discovery/);
+  assert.ok(!/Needed before you request[\s\S]*Goals and competitors[\s\S]*<\/section>[\s\S]*Helpful to add/.test(html.replace(/Helpful to add[\s\S]*/, "Helpful to add")), "optional items are not in the required list");
+  assert.match(html, /class="req-done"><summary>2 items already complete/);
+  assert.equal(missingOf(await reqPage("website-development")).length, 1, "website development only needs the pages answers");
+});
+test("ordinary questionnaires carry no prerequisite or dependency information", async () => {
+  const pages = ["/profile", ...["business", "location", "offering", "goals", "online", "contact", "personality"].map((x) => "/profile/" + x), "/branding", "/branding/discovery", "/branding/existing", "/branding/logo", "/branding/guidelines", "/branding/identity",
+    ...["information", "goals", "pages", "content", "domain", "integrations"].map((x) => "/website/" + x), ...["goals", "audience", "channels", "campaigns", "assets"].map((x) => "/marketing/" + x), ...["needs", "direction", "media", "requirements"].map((x) => "/content/" + x)];
+  for (const p of pages) {
+    const html = await (await get("/portal/demo" + p)).text();
+    assert.ok(!/Needed for|class="prereq|class="reqs?"|Before you request|>Requirements<|What you need first|Needed before|prerequisite/i.test(html), p + " is free of prerequisite clutter");
+  }
+  assert.match(await (await get("/portal/demo/profile/goals")).text(), /Who are your main competitors\?/, "questions are preserved");
+});
+test("following a requirement link keeps the way back to the request, across steps and pages", async () => {
+  const html = await (await get("/portal/demo/profile/personality?from=new-logo")).text();
+  assert.match(html, /class="backlink"><a class="text-link" href="\/portal\/demo\/requests\/new-logo">[^<]*<span aria-hidden="true">←<\/span> Back to request: New logo/);
+  const mid = await (await get("/portal/demo/profile/goals?from=marketing-campaign")).text();
+  assert.match(mid, /href="\/portal\/demo\/profile\/offering\?from=marketing-campaign"/); assert.match(mid, /href="\/portal\/demo\/profile\/online\?from=marketing-campaign"/);
+  assert.match(await (await get("/portal/demo/marketing/goals?from=marketing-campaign")).text(), /Back to request: Marketing campaign/);
+  assert.match(await (await get("/portal/demo/branding/discovery?from=brand-identity")).text(), /Back to request: Complete brand identity/);
+  assert.match(await (await get("/portal/demo/branding/existing?from=website-design")).text(), /Back to request: Website design/);
+  for (const bad of ["?from=nope", "?from=__proto__", "?from=%3Cscript%3E", "?from="]) { const h = await (await get("/portal/demo/profile/goals" + bad)).text(); assert.ok(!/class="backlink"/.test(h) && !h.includes("<script"), bad); }
+  assert.equal((await get("/portal/demo/profile/goals")).status, 200, "direct links without context still work");
+  assert.ok(!/class="backlink"/.test(await (await get("/portal/demo/profile/goals")).text()));
+  assert.match(await reqPage("new-logo"), /Demonstration only: answers are not saved, so these stay open/);
+  assert.equal((await get("/portal/demo/requests/new-logo?from=whatever")).status, 200, "a request page ignores context");
+});
+test("branding assets and workspaces stay explorable and uploads stay inert", async () => {
   const existing = await (await get("/portal/demo/branding/existing")).text();
-  assert.match(existing, /without completing your Business Profile/);
   assert.equal([...existing.matchAll(/class="upload"/g)].length, 4);
   for (const p of ["/portal/demo/branding", "/portal/demo/website", "/portal/demo/marketing", "/portal/demo/content", "/portal/demo/files"]) assert.equal((await get(p)).status, 200, p + " is always explorable");
 });

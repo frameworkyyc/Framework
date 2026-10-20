@@ -102,36 +102,50 @@ export const DISCOVERY = Object.freeze([
 /** What the demo client has so far (used to evaluate prerequisites). */
 export const BRAND_STATE = Object.freeze({ assets: false, direction: false, discovery: false });
 
+const P = (id) => ["profile", id], T = (area, id) => ["topic", area, id], B = (id) => ["brand", id];
+// needs: required for the request to be reviewed. wants: optional, improves the brief and never blocks the request.
 const SERVICE_LIST = [
-  { id: "new-logo", area: "branding", title: "New logo", blurb: "A primary logo and secondary marks designed for your business.", needs: [["profile", "business"], ["profile", "offering"], ["profile", "personality"]] },
-  { id: "brand-guidelines", area: "branding", title: "Brand guidelines", blurb: "A guide to your logo, colour, typography and tone of voice.", needs: [["profile", "business"], ["profile", "personality"], ["brand", "discovery"]] },
-  { id: "brand-identity", area: "branding", title: "Complete brand identity", blurb: "Strategy, logo, typography, colour and guidelines, developed together.", needs: [["profile", "business"], ["profile", "offering"], ["profile", "personality"], ["brand", "discovery"]] },
-  { id: "website-development", area: "website", title: "Website development", blurb: "A new website, built and launched by Framework.", needs: [["profile", "business"], ["profile", "offering"], ["website", "brief"]] },
-  { id: "website-design", area: "website", title: "Website design", blurb: "Page and template design for your website.", needs: [["website", "brief"], ["any", "Existing brand assets or an agreed branding direction", [["brand", "assets"], ["brand", "direction"]]]] },
-  { id: "marketing-campaign", area: "marketing", title: "Marketing campaign", blurb: "A planned campaign across the channels that suit your goals.", needs: [["profile", "business"], ["profile", "offering"], ["profile", "goals"], ["marketing", "goals"]] },
-  { id: "photography-session", area: "content", title: "Photography session", blurb: "A planned shoot, with editing and retouching.", needs: [["profile", "business"], ["content", "photo"]] },
+  { id: "new-logo", area: "branding", title: "New logo", blurb: "A primary logo and secondary marks designed for your business.", needs: [P("business"), P("offering"), P("personality")], wants: [P("goals"), B("discovery")] },
+  { id: "brand-guidelines", area: "branding", title: "Brand guidelines", blurb: "A guide to your logo, colour, typography and tone of voice.", needs: [P("business"), P("personality"), B("discovery")], wants: [B("assets"), P("goals")] },
+  { id: "brand-identity", area: "branding", title: "Complete brand identity", blurb: "Strategy, logo, typography, colour and guidelines, developed together.", needs: [P("business"), P("offering"), P("personality"), B("discovery")], wants: [P("goals"), B("assets")] },
+  { id: "website-development", area: "website", title: "Website development", blurb: "A new website, built and launched by Framework.", needs: [P("business"), P("offering"), T("website", "type"), T("website", "purpose"), T("website", "pages")], wants: [T("website", "content"), T("website", "domain"), P("online")] },
+  { id: "website-design", area: "website", title: "Website design", blurb: "Page and template design for your website.", needs: [T("website", "type"), T("website", "purpose"), T("website", "pages"), ["any", "Existing brand assets or an agreed branding direction", [B("assets"), B("direction")]]], wants: [T("website", "brand"), P("online")] },
+  { id: "marketing-campaign", area: "marketing", title: "Marketing campaign", blurb: "A planned campaign across the channels that suit your goals.", needs: [P("business"), P("offering"), P("goals"), T("marketing", "goals")], wants: [T("marketing", "audience"), T("marketing", "channels"), T("marketing", "budget")] },
+  { id: "photography-session", area: "content", title: "Photography session", blurb: "A planned shoot, with editing and retouching.", needs: [P("business"), T("content", "photo")], wants: [T("content", "references"), T("content", "media")] },
 ];
 export const SERVICES = Object.freeze(SERVICE_LIST.map((s) => Object.freeze(s)));
 
-const topicDone = (area, ids) => ids.every((id) => WORKSPACES[area].topics.find((t) => t.id === id)?.state === "done");
+/** "Still to answer: A; B and 1 more", from the unanswered questions of a section. */
+function stillToAnswer(fields) {
+  const open = fields.filter((f) => !f.value);
+  if (!open.length) return "Review and complete this section.";
+  const names = open.slice(0, 2).map((f) => f.label.replace(/[?:.]$/, ""));
+  return `Still to answer: ${names.join("; ")}${open.length > 2 ? ` and ${open.length - 2} more` : ""}`;
+}
 
-/** Is one prerequisite met, where does it lead, and what is it called? @returns {{label, met, href}} (href relative to the demo base) */
-export function requirement([kind, id, group]) {
-  if (kind === "profile") { const s = PROFILE_STEPS.find((x) => x.id === id); return { label: `Business Profile: ${s.title}`, met: s.state === "done", href: `/profile/${id}` }; }
-  if (kind === "website") return { label: "Website brief (type, purpose, pages and features)", met: topicDone("website", ["type", "purpose", "pages"]), href: "/website" };
-  if (kind === "marketing") return { label: "Marketing goals", met: topicDone("marketing", ["goals"]), href: "/marketing" };
-  if (kind === "content") return { label: "Photography requirements", met: topicDone("content", ["photo"]), href: "/content" };
-  if (kind === "brand" && id === "discovery") return { label: "Brand discovery", met: BRAND_STATE.discovery, href: "/branding/identity" };
-  if (kind === "brand" && id === "assets") return { label: "Existing brand assets provided", met: BRAND_STATE.assets, href: "/branding/existing" };
-  if (kind === "brand" && id === "direction") return { label: "Agreed branding direction", met: BRAND_STATE.direction, href: "/branding/identity" };
-  if (kind === "any") { const opts = group.map(requirement); return { label: id, met: opts.some((o) => o.met), href: opts[0].href, anyOf: opts }; }
+/**
+ * One prerequisite, evaluated against the demo completion states: the section it points to, what is missing in it, and the questionnaire page
+ * that fixes it (href relative to the demo base). A requirement is met when its section is complete; nothing here changes when a field is edited.
+ * @returns {{label, met, href, detail, anyOf?}}
+ */
+export function requirement([kind, a, b]) {
+  if (kind === "profile") { const s = PROFILE_STEPS.find((x) => x.id === a); return { label: s.title, section: "Business Profile", met: s.state === "done", href: `/profile/${a}`, detail: stillToAnswer(s.fields) }; }
+  if (kind === "topic") {
+    const topic = WORKSPACES[a].topics.find((t) => t.id === b), row = WORKSPACE_ROWS[a].find((r) => r.topics.includes(b));
+    return { label: row.title, section: WORKSPACES[a].title, met: topic.state === "done", href: `/${a}/${row.id}`, detail: stillToAnswer(topic.fields) };
+  }
+  if (kind === "brand" && a === "discovery") return { label: "Brand discovery", section: "Branding", met: BRAND_STATE.discovery, href: "/branding/discovery", detail: `${DISCOVERY.length} short questions about your brand` };
+  if (kind === "brand" && a === "assets") return { label: "Existing brand assets", section: "Branding", met: BRAND_STATE.assets, href: "/branding/existing", detail: "Share a logo, fonts, colours or guidelines" };
+  if (kind === "brand" && a === "direction") return { label: "Agreed branding direction", section: "Branding", met: BRAND_STATE.direction, href: "/branding/identity", detail: "Agreed with Framework through a brand identity request" };
+  if (kind === "any") { const opts = b.map(requirement); return { label: a, section: "Branding", met: opts.some((o) => o.met), href: opts[0].href, detail: "Provide one of these", anyOf: opts }; }
   throw new Error("unknown requirement");
 }
 
 export const serviceById = (id) => SERVICES.find((s) => s.id === id);
+/** Required items (blocking) and optional items (never blocking) for one service request. */
 export function serviceReadiness(service) {
-  const reqs = service.needs.map(requirement);
-  return { reqs, missing: reqs.filter((r) => !r.met) };
+  const reqs = service.needs.map(requirement), optional = (service.wants || []).map(requirement);
+  return { reqs, missing: reqs.filter((r) => !r.met), optional, optionalMissing: optional.filter((r) => !r.met) };
 }
 
 /** Counts used for the onboarding progress indicator. */
