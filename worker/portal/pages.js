@@ -12,6 +12,8 @@ import * as guided from "./guided.js";
 import * as live from "./profile-live.js";
 import { LIVE_AREAS } from "./guided-data.js";
 
+/** The one portal script: tidies website fields and warns about unsaved Business Profile changes, and moves keyboard focus to a form's error summary after a refused save. Loaded only where it has a job. */
+const FOCUS_SCRIPT = "/assets/js/portal-profile.js";
 const OFF = Object.freeze({ progress: false, milestones: false, deliverables: false, documents: false, updates: false, actions: false, settings: false });
 
 async function signOutForm(ctx, session) {
@@ -87,7 +89,7 @@ export async function profileOverviewPage(ctx, a, saved) {
 export async function profileStepPage(ctx, a, step, saved, o = {}) {
   const vm = liveModel(ctx, a, {});
   const csrf = await csrfFor(ctx.cfg, a.session);
-  return shell(ctx, a, { title: `${step.title}: Business Profile`, active: "home", body: live.profileStep(vm, step, saved, { ...o, csrf }), vm, status: o.status || 200, script: "/assets/js/portal-profile.js", ref: `profile-${step.id}` });
+  return shell(ctx, a, { title: `${step.title}: Business Profile`, active: "home", body: live.profileStep(vm, step, saved, { ...o, csrf }), vm, status: o.status || 200, script: FOCUS_SCRIPT, ref: `profile-${step.id}` });
 }
 export async function comingSoonPage(ctx, a, key) {
   const vm = liveModel(ctx, a, {});
@@ -115,7 +117,7 @@ export async function accountPage(ctx, a, o = {}) {
   // `derived`: the shown name came from the Business Profile contact (same verified email), not from the account; it is saved only if the person confirms it.
   const value = o.value !== undefined ? o.value : a.session.name || "";
   const nameForm = { action: `${vm.base}/account`, csrf, value, error: o.error || "", saved: Boolean(o.saved), suggested: Boolean(o.derived) && o.value === undefined };
-  return shell(ctx, a, { title: "Account", active: "account", body: views.account(vm, { signOut: await signOutForm(ctx, a.session), nameForm }), vm, ref: "account", status: o.status });
+  return shell(ctx, a, { title: "Account", active: "account", body: views.account(vm, { signOut: await signOutForm(ctx, a.session), nameForm }), vm, ref: "account", status: o.status, script: o.error ? FOCUS_SCRIPT : null });
 }
 export async function membersPage(ctx, a, members) {
   const vm = liveModel(ctx, a, { team: members.map((u) => ({ name: u.name, email: u.email, role: u.role })) });
@@ -126,5 +128,5 @@ export async function membersPage(ctx, a, members) {
 export async function feedbackPage(ctx, a, o = {}) {
   const vm = liveModel(ctx, a, {});
   const csrf = await csrfFor(ctx.cfg, a.session);
-  return shell(ctx, a, { title: "Send feedback", active: "home", body: live.feedbackForm(vm, { ...o, csrf }), vm, status: o.status || 200 });
+  return shell(ctx, a, { title: "Send feedback", active: "home", body: live.feedbackForm(vm, { ...o, csrf }), vm, status: o.status || 200, script: o.errors && Object.keys(o.errors).length ? FOCUS_SCRIPT : null });
 }

@@ -89,6 +89,12 @@ export const meter = (pct, label = "Progress") => {
 
 /** A section/feature that has no backend yet, shown honestly in the live portal. */
 export const notConnected = (title, text) => `<div class="empty"><strong>${e(title)}</strong>${e(text)}<div class="not-connected"><span class="tag">Not connected yet</span></div></div>`;
+/**
+ * The error summary of a form that was refused: a heading and one link per invalid field, each pointing at that field's id. It is focusable
+ * (tabindex -1) and carries data-error-summary so /assets/js/portal-profile.js can move keyboard focus to it (which also scrolls it into view
+ * on a phone). Without script it is still the first thing in the form and announced as an alert. items: [{ id, label, message }].
+ */
+export const errorSummary = (items, intro = "") => `<div class="error-summary" role="alert" tabindex="-1" data-error-summary aria-labelledby="error-summary-title"><h2 id="error-summary-title" class="error-summary__title">${intro ? e(intro) : items.length === 1 ? "There is a problem" : `There are ${items.length} problems`}</h2><ul>${items.map((i) => `<li><a href="#${e(i.id)}">${i.label ? `${e(i.label)}: ` : ""}${e(i.message)}</a></li>`).join("")}</ul></div>`;
 export const empty = (title, text) => `<div class="empty"><strong>${e(title)}</strong>${e(text)}</div>`;
 
 /* ------------------------------------------------------------------ shell */

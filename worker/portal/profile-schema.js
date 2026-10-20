@@ -20,7 +20,7 @@ export const MAX_LONG = 2000;
 
 export const PROFILE_STEPS = Object.freeze([
   step("business", "Your business", "The basics, as they should appear in contracts and in public.", [
-    f("legal", "Legal business name", "text", { required: true }),
+    f("legal", "Legal business name", "text", { required: true, autocomplete: "organization" }),
     f("operating", "Operating name", "text", { hint: "The name customers know you by, if different." }),
     f("industry", "Industry", "select", { required: true, options: INDUSTRIES }),
     f("about", "What does your business do?", "textarea", { required: true }),
@@ -39,14 +39,14 @@ export const PROFILE_STEPS = Object.freeze([
     f("competitors", "Who are your main competitors?", "textarea", { placeholder: "Names or websites, one per line. Include businesses you admire, too." }),
   ]),
   step("online", "Online presence", "Where customers can find you today.", [
-    f("site", "Existing website", "website", { placeholder: "yourbusiness.ca" }),
+    f("site", "Existing website", "website", { placeholder: "yourbusiness.ca", autocomplete: "url" }),
     f("social", "Social platforms you use", "textarea", { placeholder: "Links or handles, one per line." }),
   ]),
   step("contact", "Primary contact", "Who Framework should work with day to day.", [
-    f("cname", "Name", "text", { required: true }),
-    f("crole", "Role", "text"),
-    f("cemail", "Email", "email", { required: true }),
-    f("cphone", "Phone", "tel"),
+    f("cname", "Name", "text", { required: true, autocomplete: "name" }),
+    f("crole", "Role", "text", { autocomplete: "organization-title" }),
+    f("cemail", "Email", "email", { required: true, autocomplete: "email" }),
+    f("cphone", "Phone", "tel", { autocomplete: "tel" }),
   ]),
   step("personality", "Brand personality and positioning", "How the business should feel, and where it sits in its market.", [
     f("words", "Three words that describe your brand", "text", { required: true, placeholder: "For example: warm, honest, crafted" }),

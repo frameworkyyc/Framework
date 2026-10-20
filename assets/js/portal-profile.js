@@ -1,6 +1,7 @@
 /* Business Profile form enhancement. Optional: the form works without it, and the server always normalizes and validates.
    1. Website fields: tidies what was typed the same way the server will (trim, add https:// when there is no http:// or https://). Cosmetic only.
-   2. Warns before leaving with unsaved changes and shows a Saving state. */
+   2. Warns before leaving with unsaved changes and shows a Saving state.
+   3. After a refused save (Business Profile, Account name, Feedback), moves keyboard focus to the error summary. */
 (function (root) {
   "use strict";
   /** Same rule as withProtocol() in worker/portal/profile-schema.js. */
@@ -10,6 +11,14 @@
     return /^https?:\/\//i.test(v) ? v.replace(/^https?:\/\//i, function (m) { return m.toLowerCase(); }) : "https://" + v;
   }
   if (root) root.FrameworkWebsite = { withProtocol: withProtocol };
+
+  /* 3. After a refused save the page reloads at the top. Move focus to the error summary: that announces the problems, scrolls the summary into
+        view (also on a phone, where the invalid field may be far below) and leaves the keyboard on its links, one Tab from each invalid field. */
+  var summary = typeof document !== "undefined" && document.querySelector("[data-error-summary]");
+  if (summary) {
+    try { summary.focus(); } catch (err) { /* focus is a convenience: the summary is still the first thing in the form */ }
+    if (typeof summary.scrollIntoView === "function") summary.scrollIntoView({ block: "start" });
+  }
 
   var form = typeof document !== "undefined" && document.querySelector("form[data-guard]");
   if (!form) return;

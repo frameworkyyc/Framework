@@ -12,6 +12,7 @@
   --stone: #A3A3A3;      /* decoration only, never text */
   --hairline: #E0E0E0;
   --mist: #F5F5F5;
+  --field-edge: #767676;  /* form control borders: 4.5:1 on paper (WCAG 1.4.11 asks for 3:1); stone is 2.5:1 and stays decoration */
   --signal: #B3261E;     /* the one functional colour: "this needs you" */
 
   --font-display: "Switzer", "Helvetica Neue", Arial, sans-serif;
@@ -82,7 +83,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; margin: 0; 
 .demo-banner a { color: var(--paper); }
 .bar { position: sticky; top: 0; z-index: 40; background: var(--paper); border-bottom: 1px solid var(--hairline); }
 .bar__in { display: flex; align-items: center; gap: var(--space-3); min-height: var(--bar-h); }
-.brand { display: inline-flex; align-items: center; gap: 14px; text-decoration: none; flex: none; }
+.brand { display: inline-flex; align-items: center; gap: 14px; text-decoration: none; flex: none; min-height: 44px; }
 .brand__mark { width: 32px; height: 32px; flex: none; }
 .brand__word { font-weight: 600; font-size: 13px; letter-spacing: 0.26em; text-transform: uppercase; }
 .primary { margin-left: var(--space-3); min-width: 0; flex: 1 1 auto; }
@@ -217,7 +218,7 @@ a.tile:hover { background: var(--mist); }
 .field { display: grid; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .field label, .field legend { font-weight: 600; font-size: 15px; padding: 0; }
 .field__hint { font-size: 14px; color: var(--slate); }
-.field input[type="text"], .field input[type="email"], .field input[type="tel"], .field input[type="url"], .field textarea, .field select { width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid var(--stone); border-radius: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.4 var(--font-body); }
+.field input[type="text"], .field input[type="email"], .field input[type="tel"], .field input[type="url"], .field textarea, .field select { width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid var(--field-edge); border-radius: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.4 var(--font-body); }
 .field textarea { resize: vertical; }
 .field input:focus, .field textarea:focus, .field select:focus { outline: 2px solid var(--ink); outline-offset: 2px; border-color: var(--ink); }
 .field ::placeholder { color: var(--slate); opacity: .8; }
@@ -422,6 +423,22 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 
 /* ---------- connected Business Profile ---------- */
 .field__error { color: var(--signal); font-size: 14px; font-weight: 500; }
+.field input[aria-invalid="true"], .field textarea[aria-invalid="true"], .field select[aria-invalid="true"] { border-color: var(--signal); }
+
+/* ---------- error summary: where a refused form tells you what to fix (focus is moved here by /assets/js/portal-profile.js) ---------- */
+.error-summary { margin: 0 0 var(--space-3); padding: 0 0 0 16px; border-left: 3px solid var(--signal); max-width: 40em; scroll-margin-top: calc(var(--bar-h) + 24px); }
+.error-summary:focus { outline: 2px solid var(--ink); outline-offset: 6px; }
+.error-summary__title { font-family: var(--font-display); font-size: 18px; line-height: 1.3; color: var(--signal); margin: 0 0 8px; }
+.error-summary ul { display: grid; gap: 2px; }
+.error-summary a { display: inline-block; padding: 8px 0; color: var(--signal); font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 880px) { .error-summary { scroll-margin-top: 130px; } }
+
+/* ---------- touch targets: a 44px hit area for small links and buttons without changing how they look (the area is an invisible ::after) ---------- */
+.foot a, .crumb a, .text-link { position: relative; }
+.foot a::after, .crumb a::after, .text-link::after { content: ""; position: absolute; inset: -15px -6px; }
+.signout .btn { position: relative; } .signout .btn::after { content: ""; position: absolute; inset: -4px; }
+.primary a { min-width: 44px; justify-content: center; }
+@media (max-width: 880px), (pointer: coarse) { .signout .btn, .who__act .btn--small, .who__act .signout .btn { min-height: 44px; } }
 .field__opt { font-weight: 400; font-size: 13px; color: var(--slate); margin-left: 6px; }
 .field [aria-invalid="true"] { border-color: var(--signal) !important; }
 .form-banner { margin: 0 0 var(--space-3); padding-left: 14px; border-left: 2px solid var(--ink); font-size: 15px; max-width: 40em; }
@@ -440,7 +457,7 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 
 /* ---------- sections that are not available yet: plain, muted, not interactive ---------- */
 .tile--soon { cursor: default; }
-.tile--soon .tile__n { color: var(--stone); }
+.tile--soon .tile__n { color: var(--slate); }
 .tile--soon .tile__title { color: var(--slate); font-weight: 500; }
 .tile--soon .tile__desc { color: var(--slate); opacity: .85; }
 .tile__soon { align-self: end; font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; line-height: 1.3; color: var(--slate); }

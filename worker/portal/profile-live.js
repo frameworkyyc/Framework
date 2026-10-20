@@ -3,7 +3,7 @@
  * never use the fictional demonstration data. The questionnaire is a real form (POST, session-bound CSRF token); /assets/js/portal-profile.js only
  * adds the unsaved-changes warning and a Saving state, and the form works without it.
  */
-import { e } from "./ui.js";
+import { e, errorSummary } from "./ui.js";
 import { overview, crumb } from "./guided.js";
 import { PROFILE_STEPS, profileProgress, stepStatus } from "./profile-schema.js";
 import { AREAS } from "./guided-data.js";
@@ -38,13 +38,16 @@ function field(scope, def, value, error) {
   const id = `${scope}-${def.id}`, hint = def.hint ? `<span class="field__hint" id="${id}-h">${e(def.hint)}</span>` : "", err = error ? `<span class="field__error" id="${id}-e">${e(error)}</span>` : "";
   const desc = [def.hint ? `${id}-h` : "", error ? `${id}-e` : ""].filter(Boolean).join(" "), aria = (desc ? ` aria-describedby="${desc}"` : "") + (error ? ' aria-invalid="true"' : "");
   const optional = def.required ? "" : ' <span class="field__opt">Optional</span>';
-  if (def.kind === "choice") return `<fieldset class="field choice"><legend>${e(def.label)}${optional}</legend>${def.options.map((o) => `<label class="choice__opt"><input type="radio" name="${e(def.id)}" value="${e(o)}"${o === value ? " checked" : ""}> <span>${e(o)}</span></label>`).join("")}${err}</fieldset>`;
+  // Required questions are announced as required, but NEVER with the native `required` attribute: a partial save must stay possible.
+  const req = def.required ? ' aria-required="true"' : "";
+  const ac = e(def.autocomplete || "off");
+  if (def.kind === "choice") return `<fieldset class="field choice" id="${id}" tabindex="-1"${def.required ? ' role="radiogroup" aria-required="true"' : ""}><legend>${e(def.label)}${optional}</legend>${def.options.map((o) => `<label class="choice__opt"><input type="radio" name="${e(def.id)}" value="${e(o)}"${o === value ? " checked" : ""}> <span>${e(o)}</span></label>`).join("")}${err}</fieldset>`;
   const label = `<label for="${id}">${e(def.label)}${optional}</label>${hint}`;
-  if (def.kind === "textarea") return `<div class="field">${label}<textarea id="${id}" name="${e(def.id)}" rows="4" maxlength="2000"${aria} placeholder="${e(def.placeholder || "")}">${e(value)}</textarea>${err}</div>`;
-  if (def.kind === "select") return `<div class="field">${label}<select id="${id}" name="${e(def.id)}"${aria}><option value="">Choose…</option>${def.options.map((o) => `<option${o === value ? " selected" : ""}>${e(o)}</option>`).join("")}</select>${err}</div>`;
+  if (def.kind === "textarea") return `<div class="field">${label}<textarea id="${id}" name="${e(def.id)}" rows="4" maxlength="2000"${aria}${req} placeholder="${e(def.placeholder || "")}">${e(value)}</textarea>${err}</div>`;
+  if (def.kind === "select") return `<div class="field">${label}<select id="${id}" name="${e(def.id)}"${aria}${req}><option value="">Choose…</option>${def.options.map((o) => `<option${o === value ? " selected" : ""}>${e(o)}</option>`).join("")}</select>${err}</div>`;
   // a website is a plain text box (so "yourbusiness.ca" is accepted) with the URL keyboard on phones; the server adds https:// and validates
-  if (def.kind === "website") return `<div class="field">${label}<input id="${id}" name="${e(def.id)}" type="text" inputmode="url" autocapitalize="none" autocorrect="off" spellcheck="false" value="${e(value)}" maxlength="300" placeholder="${e(def.placeholder || "")}"${aria} autocomplete="url" data-website>${err}</div>`;
-  return `<div class="field">${label}<input id="${id}" name="${e(def.id)}" type="${e(def.kind)}" value="${e(value)}" maxlength="${def.kind === "email" ? 254 : def.kind === "tel" ? 40 : 200}" placeholder="${e(def.placeholder || "")}"${aria} autocomplete="off">${err}</div>`;
+  if (def.kind === "website") return `<div class="field">${label}<input id="${id}" name="${e(def.id)}" type="text" inputmode="url" autocapitalize="none" autocorrect="off" spellcheck="false" value="${e(value)}" maxlength="300" placeholder="${e(def.placeholder || "")}"${aria}${req} autocomplete="${ac}" data-website>${err}</div>`;
+  return `<div class="field">${label}<input id="${id}" name="${e(def.id)}" type="${e(def.kind)}" value="${e(value)}" maxlength="${def.kind === "email" ? 254 : def.kind === "tel" ? 40 : 200}" placeholder="${e(def.placeholder || "")}"${aria}${req} autocomplete="${ac}">${err}</div>`;
 }
 
 /**
@@ -59,7 +62,7 @@ export function profileStep(vm, step, saved, { values = saved, errors = {}, csrf
   const banner = failed
     ? `<p class="form-banner form-banner--error" role="alert">We couldn’t save your answers just now. Nothing was lost on this page. Please try again in a moment.</p>`
     : nErr
-      ? `<p class="form-banner form-banner--error" role="alert">Some answers need attention before they can be saved. Nothing was saved.</p>`
+      ? errorSummary(step.fields.filter((d) => errors[d.id]).map((d) => ({ id: `p-${step.id}-${d.id}`, label: d.label, message: errors[d.id] })), "Some answers need attention. Nothing was saved.")
       : savedNote
         ? `<p class="form-banner" role="status">Saved.${st.missingRequired.length ? ` ${st.missingRequired.length} required ${st.missingRequired.length === 1 ? "answer is" : "answers are"} still needed to complete this step.` : " This step is complete."}</p>`
         : "";
@@ -89,11 +92,11 @@ export function feedbackForm(vm, { values = {}, errors = {}, csrf, sent = false,
   const banner = sent ? `<p class="form-banner" role="status">Thank you. Your feedback has been sent to Framework.</p>`
     : failed ? `<p class="form-banner form-banner--error" role="alert">We couldn’t send your feedback just now. Your message is still here. Please try again in a moment.</p>`
     : tooMany ? `<p class="form-banner form-banner--error" role="alert">You’ve sent several messages recently. Please try again a little later.</p>`
-    : nErr ? `<p class="form-banner form-banner--error" role="alert">Please check the highlighted parts. Nothing was sent.</p>` : "";
+    : nErr ? errorSummary([["kind", "fb-kind", "What kind of feedback is this?"], ["message", "fb-message", "Your message"], ["page", "fb-page", "About"]].filter(([k]) => errors[k]).map(([k, id, label]) => ({ id, label, message: errors[k] })), "Please check these parts. Nothing was sent.") : "";
   const head = `<header class="page-head page-head--compact">${crumb(vm, [["Send feedback"]])}<h1 class="h1 h1--section">Send feedback</h1>${sent ? "" : `<p class="lead">Tell us what isn’t working, or what would help. Framework staff will read it.</p>`}</header>`;
   if (sent) return `${head}${banner}<p><a class="btn btn--primary" href="${e(vm.base)}">Back to Home</a> <a class="btn" href="${e(vm.base)}/feedback">Send more feedback</a></p>`;
   const err = (k) => (errors[k] ? `<span class="field__error" id="fb-${k}-e">${e(errors[k])}</span>` : "");
-  const kinds = `<fieldset class="field choice"><legend>What kind of feedback is this?</legend>${FEEDBACK_KINDS.map(([k, label]) => `<label class="choice__opt"><input type="radio" name="kind" value="${k}"${values.kind === k ? " checked" : ""}> <span>${e(label)}</span></label>`).join("")}${err("kind")}</fieldset>`;
+  const kinds = `<fieldset class="field choice"${errors.kind ? ' id="fb-kind" tabindex="-1"' : ""}><legend>What kind of feedback is this?</legend>${FEEDBACK_KINDS.map(([k, label]) => `<label class="choice__opt"><input type="radio" name="kind" value="${k}"${values.kind === k ? " checked" : ""}> <span>${e(label)}</span></label>`).join("")}${err("kind")}</fieldset>`;
   const message = `<div class="field"><label for="fb-message">Your message</label><textarea id="fb-message" name="message" rows="6" maxlength="${MAX_MESSAGE}"${errors.message ? ' aria-invalid="true" aria-describedby="fb-message-e"' : ""}>${e(values.message || "")}</textarea>${err("message")}</div>`;
   const about = `<div class="field"><label for="fb-page">About <span class="field__opt">Optional</span></label><select id="fb-page" name="page"${errors.page ? ' aria-invalid="true" aria-describedby="fb-page-e"' : ""}><option value="">Not about a specific page</option>${FEEDBACK_PAGES.map(([k, label]) => `<option value="${k}"${k === page ? " selected" : ""}>${e(label)}</option>`).join("")}</select>${err("page")}</div>`;
   return `${head}${banner}<form method="post" action="${e(vm.base)}/feedback" novalidate><input type="hidden" name="csrf" value="${e(csrf)}"><div class="questions">${kinds}${message}${about}</div><div class="step-nav"><button class="btn btn--primary" type="submit">Send feedback</button></div></form>`;
