@@ -197,3 +197,12 @@ test("the changes keep CSRF, the CSP and tenant isolation: a bad token is refuse
   assert.equal((await bob.get("/portal/o/alpha/profile/contact")).status, 404);
   assert.equal((await post(w, bob, "/portal/o/beta/profile/contact", { cname: "Bob", cemail: "bad" })).status, 422);
 });
+
+test("sign-in and system pages keep every part of the page inside a landmark: banner, main and contentinfo (axe 'region')", () => {
+  const frame = readFileSync(new URL("../portal/frame.js", import.meta.url), "utf8");
+  const auth = frame.slice(frame.indexOf("export function authFrame"));
+  assert.match(auth, /<header class="auth__top">/);
+  assert.match(auth, /<main id="main"/);
+  assert.match(auth, /\$\{footer\}/);
+  assert.doesNotMatch(auth, /<div class="auth__top">/);
+});
