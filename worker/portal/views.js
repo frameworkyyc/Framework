@@ -18,12 +18,9 @@
  *   team      [{ name, email, role }]
  *   has       { progress, milestones, deliverables, documents, updates, actions, settings }
  */
+import { welcomeFor } from "./welcome.js";
 import { e, errorSummary, status, statusLabel, stageTrack, meter, humanize, safeHttps, relative, fmtDay, fmtTime, dayHeading, dayKey, notConnected, empty } from "./ui.js";
 
-const first = (user) => {
-  const n = (user.name || "").trim().split(/\s+/)[0];
-  return n || String(user.email || "").split("@")[0] || "there";
-};
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const projectHref = (vm, id) => `${vm.projectBase || `${vm.base}/projects`}/${id}`;
 /** Breadcrumb trail down to (not including) the current page. The demo sets vm.crumbs so a project keeps the service it was opened from. */
@@ -108,7 +105,7 @@ export function dashboard(vm) {
     ? `<div>${vm.actions.map((a) => `<div class="todo"><span class="todo__box${a.who === "Framework" ? " todo__box--framework" : ""}" aria-hidden="true"></span><span class="todo__text">${a.projectId ? `<a href="${e(projectHref(vm, a.projectId))}">${e(a.text)}</a>` : e(a.text)}</span><span class="todo__due">${e(relative(a.due, vm.now))}</span><span class="todo__who">${a.who === "Framework" ? "Framework is doing this" : "Waiting on you"}</span></div>`).join("")}</div>`
     : notConnected("Next actions", "A short list of what is needed from you, and from Framework, will live here.");
 
-  return `<header class="page-head"><span class="eyebrow">${e(vm.org.name)}</span><h1 class="h1">Welcome back, ${e(first(vm.user))}.</h1><p class="lead">${e(line)}</p></header>
+  return `<header class="page-head"><span class="eyebrow">${e(vm.org.name)}</span><h1 class="h1">${e(welcomeFor(vm))}</h1><p class="lead">${e(line)}</p></header>
 <div class="dash">
 <section class="section dash__updates" aria-labelledby="h-updates">${sectionHead("Needs your attention")}<h2 id="h-updates" class="visually-hidden">Needs your attention</h2>${updates}</section>
 <section class="section dash__projects" aria-labelledby="h-projects">${sectionHead("Active projects", `<a class="text-link" href="${e(vm.base)}/projects">All projects</a>`)}<h2 id="h-projects" class="visually-hidden">Active projects</h2>${projectList(vm, active.length ? active : vm.projects, { summaries: false })}</section>

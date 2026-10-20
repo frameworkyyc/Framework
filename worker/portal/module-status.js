@@ -11,7 +11,7 @@
  * Note for reviewers: the existing rule counts a step with no required questions (Online presence) as done only once something is saved in it, so a profile can
  * sit at 86% with nothing required outstanding. That is reported as it is: 86% complete, no red indicator, "Optional details remain".
  */
-import { profileProgress } from "./profile-schema.js";
+import { profileProgress, PROFILE_STEPS } from "./profile-schema.js";
 
 const validPercent = (n) => Number.isInteger(n) && n >= 0 && n <= 100;
 
@@ -37,5 +37,30 @@ export function moduleStatuses(liveKeys, data = {}) {
     const calc = Object.prototype.hasOwnProperty.call(MODULE_STATUS, key) ? MODULE_STATUS[key] : null;
     if (calc) out[key] = calc(data[key]);
   }
+  return out;
+}
+
+/**
+ * The ONE next step a module asks of the client, derived from the same data (and the same profileProgress()) as the status above. Contract:
+ *   { state: "start" | "continue", path, stepTitle, requiredRemaining }   REQUIRED answers are still missing; path is relative to the organization's base
+ *   { state: "complete", optionalRemain }                                every required answer is in; optionalRemain says only that optional steps are unfinished
+ *   { state: "unavailable" }                                             the data could not be read: no claim is made about what is next
+ * "start" means nothing has been answered anywhere; "continue" means some work exists. Optional questions never produce a next step.
+ */
+export const NEXT_ACTION = Object.freeze({
+  profile(saved) {
+    if (!saved || typeof saved !== "object") return { state: "unavailable" };
+    const prog = profileProgress(saved);
+    const open = prog.steps.findIndex((s) => s.missingRequired.length > 0);
+    if (open < 0) return { state: "complete", optionalRemain: prog.percent < 100 };
+    const started = prog.steps.some((s) => s.answered > 0);
+    return { state: started ? "continue" : "start", path: `/profile/${PROFILE_STEPS[open].id}`, stepTitle: PROFILE_STEPS[open].title, requiredRemaining: prog.steps.reduce((n, s) => n + s.missingRequired.length, 0) };
+  },
+});
+
+/** @returns {{ [moduleKey]: next action }} for live modules that have one */
+export function nextActions(liveKeys, data = {}) {
+  const out = {};
+  for (const key of liveKeys || []) if (Object.prototype.hasOwnProperty.call(NEXT_ACTION, key)) out[key] = NEXT_ACTION[key](data[key]);
   return out;
 }

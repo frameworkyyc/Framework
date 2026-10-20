@@ -144,23 +144,19 @@ test("repository: organization ids must be real UUIDs and every query is scoped 
 
 /* ------------------------------------------------------------------ routes: home, overview, steps */
 
-test("signed-in Home keeps six blocks: only Business Profile is a link; the other five are muted, non-interactive 'Coming soon' items", async () => {
+test("signed-in Home: Business Profile is the one link and the clear focus; the five unavailable sections are a quiet, non-interactive 'Coming soon' list", async () => {
   const { ann } = await setup();
   const res = await ann.get("/portal/o/alpha");
   assert.equal(res.status, 200);
   const html = await res.text();
-  const list = html.slice(html.indexOf('<ul class="tiles">'), html.indexOf("</ul>", html.indexOf('<ul class="tiles">')));
-  assert.equal([...list.matchAll(/<li>/g)].length, 6, "all six blocks remain, in the same order");
-  assert.deepEqual([...list.matchAll(/<span class="tile__title">([^<]+)</g)].map((m) => m[1].replace(/&amp;/g, "&")), ["Business Profile", "Branding", "Website", "Marketing", "Content & Photography", "Files & Deliverables"]);
-  assert.deepEqual([...list.matchAll(/class="tile(?: tile--status)?" href="([^"]+)"/g)].map((m) => m[1]), ["/portal/o/alpha/profile"], "Business Profile is the only link");
-  assert.equal([...list.matchAll(/<div class="tile tile--soon">/g)].length, 5);
-  assert.equal([...list.matchAll(/<span class="tile__soon">Coming soon<\/span>/g)].length, 5, "the label is visible on each card without clicking");
-  const soon = [...list.matchAll(/<li><div class="tile tile--soon">[\s\S]*?<\/div><\/li>/g)].map((m) => m[0]);
-  for (const t of soon) assert.ok(!/<a |href=|tabindex|role="link"|role="button"|onclick|tile__arrow/.test(t), "no link, no focus stop, no arrow, no handler");
-  assert.equal([...list.matchAll(/tile__arrow/g)].length, 1, "only the active block has an arrow");
-  assert.match(list, /<a class="tile(?: tile--status)?" href="\/portal\/o\/alpha\/profile">[\s\S]*Business Profile[\s\S]*tile__arrow/);
-  assert.ok(!/tile--soon[^>]*>[\s\S]*?Business Profile/.test(list.slice(0, list.indexOf("Branding"))), "Business Profile is not marked as coming soon");
-  assert.match(html, /What would you like to work on\?/);
+  const focus = html.slice(html.indexOf('<ul class="focus-list">'), html.indexOf("</ul>", html.indexOf('<ul class="focus-list">')));
+  assert.deepEqual([...focus.matchAll(/<span class="focus__title">([^<]+)</g)].map((m) => m[1]), ["Business Profile"], "only the available module is a focus block");
+  assert.deepEqual([...focus.matchAll(/<a class="focus" href="([^"]+)"/g)].map((m) => m[1]), ["/portal/o/alpha/profile"]);
+  const soon = html.slice(html.indexOf('<section class="soon-list"'), html.indexOf("</section>", html.indexOf('<section class="soon-list"')));
+  assert.deepEqual([...soon.matchAll(/<span class="soon-list__name">([^<]+)</g)].map((m) => m[1].replace(/&amp;/g, "&")), ["Branding", "Website", "Marketing", "Content & Photography", "Files & Deliverables"], "same five, same order");
+  assert.equal([...soon.matchAll(/Coming soon/g)].length, 1, "one quiet heading, not a badge on every item");
+  assert.ok(!/<a |href=|tabindex|role="link"|role="button"|onclick|tile__arrow|<progress|dot/.test(soon), "no link, no focus stop, no arrow, no status");
+  assert.ok(!/class="tile\b/.test(html), "no card grid on the signed-in Home");
   for (const fake of ["Harbour", "Brand identity", "Launch photography", "Sam Rivera", "Fictional", "DEMO MODE"]) assert.ok(!html.includes(fake), fake);
   const nav = html.slice(html.indexOf('<nav class="primary"'), html.indexOf("</nav>", html.indexOf('<nav class="primary"')));
   assert.deepEqual([...nav.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]), ["Home", "Account", "Team"], "owner: Home, Account, Team");
@@ -172,10 +168,10 @@ test("availability is one list: activating a section turns its block into a link
   assert.deepEqual(d.comingSoonKeys(), ["branding", "website", "marketing", "content", "files"]);
   assert.deepEqual(d.comingSoonKeys(["profile", "website"]), ["branding", "marketing", "content", "files"]);
   const vm = (liveAreas) => ({ base: "/portal/o/x", user: { name: "Ann" }, ...(liveAreas ? { liveAreas } : {}) });
-  const links = (h) => [...h.matchAll(/class="tile(?: tile--status)?" href="([^"]+)"/g)].map((m) => m[1].split("/").pop());
+  const links = (h) => [...h.matchAll(/class="(?:tile(?: tile--status)?|focus)" href="([^"]+)"/g)].map((m) => m[1].split("/").pop());
   assert.deepEqual(links(g.home(vm(["profile"]))), ["profile"]);
   assert.deepEqual(links(g.home(vm(["profile", "website"]))), ["profile", "website"], "one more section released: nothing else changes");
-  assert.equal([...g.home(vm(["profile", "website"])).matchAll(/Coming soon/g)].length, 4);
+  assert.equal([...g.home(vm(["profile", "website"])).matchAll(/class="soon-list__name"/g)].length, 4);
   assert.deepEqual(links(g.home(vm(null))), ["profile", "branding", "website", "marketing", "content", "files"], "the demo is unaffected");
   assert.ok(!/Coming soon/.test(g.home(vm(null))));
   assert.match(read("worker/portal/router.js"), /const SOON = comingSoonKeys\(\)\.join\("\|"\);/);

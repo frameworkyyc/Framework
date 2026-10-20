@@ -55,5 +55,5 @@ test("portal modules do no work at import time, read no environment, and make no
   }
 });
 test("only the reviewed set of modules exists under worker/portal", () => {
-  assert.deepEqual(readdirSync(new URL("worker/portal/", root)).filter((f) => f.endsWith(".js")).sort(), ["admin-access.js", "admin-clients.js", "admin-feedback.js", "auth.js", "claims.js", "config.js", "crypto.js", "demo-data.js", "demo.js", "filters.js", "form.js", "frame.js", "guard.js", "guided-data.js", "guided.js", "http.js", "invite-delivery.js", "invite-recipients.js", "jwt.js", "log.js", "module-status.js", "pages.js", "policy.js", "profile-live.js", "profile-schema.js", "ratelimit.js", "router.js", "sessions.js", "ui.js", "views.js", "workos-admin.js", "workos.js"]);
+  assert.deepEqual(readdirSync(new URL("worker/portal/", root)).filter((f) => f.endsWith(".js")).sort(), ["admin-access.js", "admin-clients.js", "admin-feedback.js", "auth.js", "claims.js", "config.js", "crypto.js", "demo-data.js", "demo.js", "filters.js", "form.js", "frame.js", "guard.js", "guided-data.js", "guided.js", "http.js", "invite-delivery.js", "invite-recipients.js", "jwt.js", "log.js", "module-status.js", "pages.js", "policy.js", "profile-live.js", "profile-schema.js", "ratelimit.js", "router.js", "sessions.js", "ui.js", "views.js", "welcome.js", "workos-admin.js", "workos.js"]);
 });

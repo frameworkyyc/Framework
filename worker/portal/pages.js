@@ -22,7 +22,7 @@ async function signOutForm(ctx, session) {
 }
 
 /** The view-model of the connected portal: only what the database holds for the member's own organization. */
-function liveModel(ctx, { session, membership: m }, data = {}) {
+function liveModel(ctx, { session, membership: m, returning }, data = {}) {
   const projects = (data.projects || []).map((p) => ({ id: p.id, name: p.name, kind: p.kind, status: p.status, summary: p.summary || "", liveUrl: p.live_url, updatedAt: p.updated_at }));
   const activity = (data.activity || []).map((a) => {
     let detail = "";
@@ -34,7 +34,7 @@ function liveModel(ctx, { session, membership: m }, data = {}) {
     return { type: views.activityType(a.action), title: views.actionTitle(a.action), detail, at: a.created_at, projectId: a.entity_type === "project" ? a.entity_id : undefined };
   });
   return {
-    mode: "live", base: `/portal/o/${m.slug}`, now: ctx.now, liveAreas: LIVE_AREAS,
+    mode: "live", base: `/portal/o/${m.slug}`, now: ctx.now, liveAreas: LIVE_AREAS, returning: Boolean(returning),
     org: { name: m.name, website: m.websiteUrl, role: m.role },
     user: { name: session.name || "", email: session.email },
     projects, activity, updates: [], actions: [], documents: [], team: data.team || [], has: OFF,
@@ -73,8 +73,8 @@ export async function pickerPage(ctx, session, memberships) {
 }
 
 /** The home of the connected portal: the six workspace blocks. Nothing from the demonstration is shown. */
-export async function homePage(ctx, a, moduleStatus = {}) {
-  const vm = { ...liveModel(ctx, a, {}), moduleStatus };
+export async function homePage(ctx, a, moduleStatus = {}, nextAction = {}) {
+  const vm = { ...liveModel(ctx, a, {}), moduleStatus, nextAction };
   return shell(ctx, a, { title: "Home", active: "home", body: guided.home(vm), vm, ref: "home" });
 }
 export async function overviewPage(ctx, a, data) {

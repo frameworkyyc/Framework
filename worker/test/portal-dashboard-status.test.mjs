@@ -35,7 +35,7 @@ test("module status IS profileProgress: the percentage, steps done and total alw
     if (s.complete) assert.equal(missing, 0, "100% can never coexist with a missing required answer");
   }
   const src = strip(read("worker/portal/module-status.js"));
-  assert.match(src, /import \{ profileProgress \} from "\.\/profile-schema\.js"/);
+  assert.match(src, /import \{ profileProgress, PROFILE_STEPS \} from "\.\/profile-schema\.js"/);
   assert.ok(!/Math\.(round|floor|ceil|trunc)\(|\*\s*100|\/\s*(total|PROFILE_STEPS|steps\.length)/.test(src), "no percentage arithmetic of its own");
 });
 
@@ -85,50 +85,49 @@ test("tile status markup: the bar is thin and hidden from assistive technology, 
   const html = tileStatus(s);
   assert.match(html, /<progress class="meter" max="100" value="57" aria-hidden="true">57%<\/progress>/);
   assert.match(html, /<p class="tile__pct">57% complete<\/p>/);
-  assert.match(html, /<p class="tile__action"><span class="dot dot--attention" aria-hidden="true"><\/span>Action required<\/p>/);
+  assert.match(html, /<p class="tile__action"><span class="dot dot--attention" aria-hidden="true"><\/span>\d+ required answers? left<\/p>/);
   assert.ok(!/style=|<script|onclick|color/i.test(html), "no inline style, script or handler: colour comes only from the stylesheet");
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   assert.match(text, /57% complete/);
-  assert.match(text, /Action required/);
+  assert.match(text, /\d+ required answers? left/);
 });
 
 test("states: complete shows '100% complete' with no indicator; optional-only remaining is quiet; unavailable shows no percentage and no indicator", () => {
   const complete = tileStatus({ state: "ready", percent: 100, done: 7, total: 7, requiredRemaining: 0, actionRequired: false, complete: true });
   assert.match(complete, /100% complete/);
-  assert.ok(!/Action required|dot|Optional details/.test(complete));
+  assert.ok(!/required answers? left|dot|Optional details/.test(complete));
   const optional = tileStatus(MODULE_STATUS.profile(answers(REQUIRED)));
   assert.match(optional, /86% complete/);
-  assert.match(optional, /Optional details remain/);
-  assert.ok(!/Action required|dot/.test(optional), "missing optional information alone never raises the red indicator");
+  assert.match(optional, /All required answers are complete/);
+  assert.ok(!/required answers? left|dot/.test(optional), "missing optional information alone never raises the red indicator");
   const zero = tileStatus(MODULE_STATUS.profile({}));
   assert.match(zero, /0% complete/);
-  assert.match(zero, /Action required/);
+  assert.match(zero, /\d+ required answers? left/);
   const unavailable = tileStatus({ state: "unavailable" });
   assert.match(unavailable, /Progress unavailable right now/);
-  assert.ok(!/% complete|<progress|dot|Action required/.test(unavailable), "an unreadable value is never 0%");
+  assert.ok(!/% complete|<progress|dot|required answers? left/.test(unavailable), "an unreadable value is never 0%");
   for (const bad of [undefined, null, "x", {}, { state: "ready" }, { state: "ready", percent: 101 }, { state: "ready", percent: -1 }, { state: "ready", percent: 50.5 }, { state: "ready", percent: "50% <script>" }, { state: "loading" }]) {
     assert.equal(tileStatus(bad), "", JSON.stringify(bad));
   }
 });
 
-test("Home grid: six cards, only the live module carries status, the five Coming soon cards stay muted and bare (even if a status is supplied for them); the demo is unchanged", () => {
+test("signed-in Home: only the live module carries status, the five unavailable ones are a bare text list (even if a status is supplied for them); the demo is unchanged", () => {
   const html = home(vmFor({ profile: MODULE_STATUS.profile({}), branding: MODULE_STATUS.profile(answers(ALL)), website: { state: "ready", percent: 40, actionRequired: true } }));
-  const cards = tiles(html);
-  assert.equal(cards.length, 6);
-  assert.deepEqual(cards.map((c) => /Business Profile|Branding|Website|Marketing|Content &amp; Photography|Files &amp; Deliverables/.exec(c)[0]), ["Business Profile", "Branding", "Website", "Marketing", "Content &amp; Photography", "Files &amp; Deliverables"]);
+  const focus = (html.match(/<a class="focus"[\s\S]*?<\/a>/g) || []);
+  assert.equal(focus.length, 1);
+  assert.match(focus[0], /Business Profile/);
   assert.equal((html.match(/class="tile__status"/g) || []).length, 1, "one status block: the live module's");
-  assert.equal((html.match(/tile--soon/g) || []).length, 5);
-  for (const c of cards.slice(1)) {
-    assert.ok(c.includes("Coming soon") && !/<progress|% complete|Action required|dot|tile__status/.test(c), "Coming soon cards show no progress and no required action");
-  }
-  assert.ok(cards[0].includes('class="tile tile--status"'));
+  const soon = html.slice(html.indexOf('<section class="soon-list"'));
+  assert.deepEqual([...soon.matchAll(/<span class="soon-list__name">([^<]+)</g)].map((m) => m[1].replace(/&amp;/g, "&")), ["Branding", "Website", "Marketing", "Content & Photography", "Files & Deliverables"]);
+  assert.ok(!/<progress|% complete|required answers? left|dot|tile__status|<a /.test(soon), "unavailable modules show no progress and no required action");
   // the demo (no liveAreas, no statuses) renders exactly as before
   const demo = home({ base: "/portal/demo", user: { name: "Sam" } });
   assert.ok(!/tile__status|<progress|Action required/.test(demo));
   assert.equal(tiles(demo).length, 6);
-  // a live module with no calculator keeps the plain tile
+  // a live module with no calculator keeps a plain focus block: nothing is invented
   const plain = home({ base: "/portal/o/x", user: { name: "Ann" }, liveAreas: ["profile", "website"], moduleStatus: { profile: MODULE_STATUS.profile({}) } });
-  assert.ok(tiles(plain)[2].includes('class="tile" href='), "Website is live but has no status: nothing is invented");
+  assert.equal((plain.match(/<a class="focus"/g) || []).length, 2);
+  assert.equal((plain.match(/class="tile__status"/g) || []).length, 1, "Website is live but has no status");
 });
 
 /* ------------------------------------------------------------------ through the real router: isolation, reality, failure */
@@ -154,26 +153,26 @@ test("the dashboard shows the signed-in organization's own progress, never anoth
   await save(B, "bob@b.test", ALL.filter((f) => f.step === "business"));         // bravo: one step -> 14%, required answers missing
   const [ha, hb, hc] = [await homeHtml(br.ann, "alpha"), await homeHtml(br.bob, "bravo"), await homeHtml(br.cat, "charlie")];
   assert.match(block(ha), /86% complete/);
-  assert.match(block(ha), /Optional details remain/);
-  assert.ok(!/Action required/.test(ha), "alpha has no required information missing");
+  assert.match(block(ha), /All required answers are complete/);
+  assert.ok(!/\d+ required answers? left/.test(ha), "alpha has no required information missing");
   assert.match(block(hb), /14% complete/);
-  assert.match(block(hb), /Action required/);
+  assert.match(block(hb), /\d+ required answers? left/);
   assert.match(block(hc), /0% complete/);
-  assert.match(block(hc), /Action required/);
+  assert.match(block(hc), /\d+ required answers? left/);
   assert.ok(!/86%|14%/.test(block(hc)) && !/14%|0% complete/.test(block(ha)) && !/86%/.test(block(hb)), "no organization's number appears on another's page");
   // bravo makes progress; alpha's dashboard is byte-for-byte the same progress block
   const before = block(ha);
   await save(B, "bob@b.test", ALL);
   assert.equal(block(await homeHtml(br.ann, "alpha")), before);
   assert.match(block(await homeHtml(br.bob, "bravo")), /100% complete/);
-  assert.ok(!/Action required|dot/.test(block(await homeHtml(br.bob, "bravo"))), "complete: no indicator");
+  assert.ok(!/required answers? left|dot/.test(block(await homeHtml(br.bob, "bravo"))), "complete: no indicator");
   // a person in two organizations sees each organization's own progress under its own URL
   assert.match(block(await homeHtml(br.carol, "alpha")), /86% complete/);
   assert.match(block(await homeHtml(br.carol, "bravo")), /100% complete/);
   // another organization's dashboard is not reachable, and says nothing about it
   const denied = await br.ann.get("/portal/o/bravo");
   assert.equal(denied.status, 404);
-  assert.ok(!/% complete|Action required/.test(await denied.text()));
+  assert.ok(!/% complete|required answers? left/.test(await denied.text()));
   const cross = await br.cat.get("/portal/o/alpha");
   assert.equal(cross.status, 404);
 });
@@ -189,10 +188,11 @@ test("unreadable data never shows 0%: a failing or missing profile table gives '
   let html = await res.text();
   assert.equal(res.status, 200, "Home still renders");
   assert.match(html, /Progress unavailable right now/);
-  assert.ok(!/% complete|Action required|class="dot|<progress/.test(html), "no percentage, no bar, no red indicator");
+  assert.ok(!/% complete|required answers? left|class="dot|<progress/.test(html), "no percentage, no bar, no red indicator");
   assert.ok(!/SECRET|D1_ERROR/.test(html), "no internals");
-  assert.match(html, /Welcome back/);
-  assert.equal(tiles(html).length, 6);
+  assert.match(html, /<h1 class="h1 h1--home">Welcome/);
+  assert.equal((html.match(/class="soon-list__name"/g) || []).length, 5);
+  assert.equal((html.match(/<a class="focus"/g) || []).length, 1);
   w.env.PORTAL_DB = real;
   // the profile table does not exist (database without that migration)
   w.db.raw.exec("DROP TABLE business_profile_answers");
@@ -200,7 +200,7 @@ test("unreadable data never shows 0%: a failing or missing profile table gives '
   html = await res.text();
   assert.equal(res.status, 200);
   assert.match(html, /Progress unavailable right now/);
-  assert.ok(!/% complete|Action required/.test(html));
+  assert.ok(!/% complete|required answers? left/.test(html));
 });
 
 /* ------------------------------------------------------------------ design and accessibility guards */
@@ -210,13 +210,13 @@ test("the page carries no script or inline style, the link's accessible text inc
   await save(A, "ann@a.test", ALL.filter((f) => f.step === "business"));
   const html = await homeHtml(br.ann, "alpha");
   assert.ok(!/<script|style="/.test(html.replace(/<style[\s\S]*?<\/style>/g, "")));
-  const link = /<a class="tile tile--status"[\s\S]*?<\/a>/.exec(html)[0];
+  const link = /<a class="focus"[\s\S]*?<\/a>/.exec(html)[0];
   const name = link.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   assert.match(name, /Business Profile/);
   assert.match(name, /14% complete/);
-  assert.match(name, /Action required/);
-  assert.match(link, /aria-hidden="true"><\/span>Action required/, "the dot is decorative; the words remain");
-  assert.equal(tiles(html).length, 6);
+  assert.match(name, /\d+ required answers? left/);
+  assert.match(link, /aria-hidden="true"><\/span>\d+ required answers? left/, "the dot is decorative; the words remain");
+  assert.equal((html.match(/<a class="focus"/g) || []).length + (html.match(/class="soon-list__name"/g) || []).length, 6, "all six areas are still accounted for");
   assert.equal(AREAS.length, 6);
 });
 

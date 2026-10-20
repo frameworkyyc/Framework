@@ -21,9 +21,10 @@ import { listActivity } from "./repo/activity.js";
 import { validateSlug, validateName } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
 import { getProfileAnswers, saveProfileStep } from "./repo/business-profile.js";
+import { hasPriorVisit } from "./repo/visits.js";
 import { stepById, PROFILE_STEPS } from "./profile-schema.js";
 import { comingSoonKeys, LIVE_AREAS } from "./guided-data.js";
-import { moduleStatuses } from "./module-status.js";
+import { moduleStatuses, nextActions } from "./module-status.js";
 import { readForm, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES } from "./form.js";
 import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
 import { checkCsrf } from "./sessions.js";
@@ -143,6 +144,15 @@ function contactNameFrom(answers, a) {
   const same = String(answers.cemail || "").trim().toLowerCase() === String(a.session.email || "").trim().toLowerCase();
   return same && validateName(answers.cname) ? validateName(answers.cname) : "";
 }
+/** Whether this person has reliable evidence of an earlier visit (repo/visits.js). A read that cannot be made means "unknown", which words the greeting neutrally. */
+async function returningVisitor(ctx, a) {
+  try {
+    return await dbCall(() => hasPriorVisit(ctx.db, { userId: a.session.userId, organizationId: a.membership.organizationId, sessionId: a.session.id }));
+  } catch (err) {
+    if (err instanceof Unavailable) return false;
+    throw err;
+  }
+}
 function withDisplayName(a, answers) {
   if (a.session.name) return a;
   const name = contactNameFrom(answers, a);
@@ -202,10 +212,11 @@ const ORG_ROUTES = [
   { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => {
       // One read serves both the greeting's name fallback and the module progress. null (unreadable) shows "Progress unavailable", never 0%.
       const answers = await readAnswers(ctx, a);
-      return pages.homePage(ctx, withDisplayName(a, answers), moduleStatuses(LIVE_AREAS, { profile: answers }));
+      const shown = { ...withDisplayName(a, answers), returning: await returningVisitor(ctx, a) };
+      return pages.homePage(ctx, shown, moduleStatuses(LIVE_AREAS, { profile: answers }), nextActions(LIVE_AREAS, { profile: answers }));
     },
   },
-  { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, a, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },
+  { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, { ...a, returning: await returningVisitor(ctx, a) }, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },
   { re: /^\/portal\/o\/([^/]+)\/profile$/, action: "profile.view", run: async (ctx, a) => pages.profileOverviewPage(ctx, a, await getProfileAnswers(ctx.db, a.membership.organizationId)) },
   {
     re: /^\/portal\/o\/([^/]+)\/profile\/([^/]+)$/,

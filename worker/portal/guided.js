@@ -4,6 +4,7 @@
  * is NOT inside a form, so nothing can be submitted, and every page says so. There is no script and no inline style (the portal CSP forbids both).
  */
 import { e, status, meter, fmtDay, relative } from "./ui.js";
+import { welcomeFor } from "./welcome.js";
 import { WORKSPACE_ROWS, rowState, rowProgress, AREAS, SERVICE_AREAS, projectsFor, categoriesOf, PROFILE_STEPS, WORKSPACES, BRAND_PATHS, UPLOAD_SLOTS, DISCOVERY, SERVICES, serviceById, serviceReadiness, progressSummary, profileDone, workspaceDone } from "./guided-data.js";
 
 const NOTE = "Demonstration only. Nothing you type or choose here is saved, uploaded or sent.";
@@ -12,7 +13,6 @@ const COMMERCIAL = "Requests are subject to Framework’s review, scoping and qu
 const href = (vm, path) => `${vm.base}${path}`;
 const area = (key) => AREAS.find((a) => a.key === key);
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
-const first = (user) => (user.name || "").trim().split(/\s+/)[0] || "there";
 
 const STATE = { done: ["done", "Complete"], current: ["active", "In progress"], todo: ["idle", "Not started"] };
 const chip = (state) => `<span class="status status--${STATE[state][0]}">${STATE[state][1]}</span>`;
@@ -58,26 +58,49 @@ export function tileStatus(s) {
   if (!s || typeof s !== "object") return "";
   if (s.state === "unavailable") return `<div class="tile__status"><p class="tile__pct tile__pct--muted">Progress unavailable right now</p></div>`;
   if (s.state !== "ready" || !Number.isInteger(s.percent) || s.percent < 0 || s.percent > 100) return "";
+  // The same words as the Business Profile overview: REQUIRED work is counted ("3 required answers left"); once it is done the tile says so and
+  // optional questions are never described as outstanding work.
+  const left = Number.isInteger(s.requiredRemaining) ? s.requiredRemaining : 0;
   const note = s.actionRequired
-    ? `<p class="tile__action"><span class="dot dot--attention" aria-hidden="true"></span>Action required</p>`
+    ? `<p class="tile__action"><span class="dot dot--attention" aria-hidden="true"></span>${left > 0 ? `${left} required ${left === 1 ? "answer" : "answers"} left` : "Required answers left"}</p>`
     : s.complete
       ? ""
-      : `<p class="tile__note">Optional details remain</p>`;
+      : `<p class="tile__note">All required answers are complete</p>`;
   return `<div class="tile__status"><progress class="meter" max="100" value="${s.percent}" aria-hidden="true">${s.percent}%</progress><p class="tile__pct">${s.percent}% complete</p>${note}</div>`;
+}
+
+/** The lead line and the one next action under the greeting. Only what the data supports; no time estimates and nothing optional presented as required. */
+function homeNext(vm) {
+  const n = vm.nextAction && vm.nextAction.profile;
+  const link = (label, path, cls) => `<p class="home-action"><a class="${cls}" href="${e(href(vm, path))}">${e(label)} <span aria-hidden="true">→</span></a></p>`;
+  if (!n || n.state === "unavailable") return { lead: "What would you like to work on?", action: "" };
+  if (n.state === "start") return { lead: "Start with your Business Profile. It helps Framework understand your business.", action: link("Start your Business Profile", n.path, "btn btn--primary") };
+  if (n.state === "continue") return { lead: "Pick up where you left off.", action: link("Continue your Business Profile", n.path, "btn btn--primary") };
+  return {
+    lead: n.optionalRemain ? "All required answers in your Business Profile are complete. Optional details can be added any time." : "Your Business Profile is complete. You can change your answers any time.",
+    action: link("Review your Business Profile", "/profile", "text-link"),
+  };
 }
 
 export function home(vm) {
   const isLive = (key) => !vm.liveAreas || vm.liveAreas.includes(key);
-  const tiles = AREAS.map((a) => {
-    const inner = `<span class="tile__n" aria-hidden="true">${e(a.n)}</span><span class="tile__title">${e(a.title)}</span><span class="tile__desc">${e(HOME_BLURB[a.key])}</span>`;
-    if (!isLive(a.key)) return `<li><div class="tile tile--soon">${inner}<span class="tile__soon">Coming soon</span></div></li>`;
-    const st = vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : ""; // only signed-in, live modules have one; the demo and Coming soon blocks never do
-    return st
-      ? `<li><a class="tile tile--status" href="${e(href(vm, a.path))}">${inner}<span class="tile__foot">${st}<span class="tile__arrow" aria-hidden="true">→</span></span></a></li>`
-      : `<li><a class="tile" href="${e(href(vm, a.path))}">${inner}<span class="tile__arrow" aria-hidden="true">→</span></a></li>`;
-  }).join("");
-  return `<header class="page-head page-head--home"><h1 class="h1 h1--home">Welcome back, ${e(first(vm.user))}.</h1><p class="lead">What would you like to work on?</p></header>
+  if (!vm.liveAreas) {
+    // the demonstration: every section is a link, as before
+    const tiles = AREAS.map((a) => `<li><a class="tile" href="${e(href(vm, a.path))}"><span class="tile__n" aria-hidden="true">${e(a.n)}</span><span class="tile__title">${e(a.title)}</span><span class="tile__desc">${e(HOME_BLURB[a.key])}</span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`).join("");
+    return `<header class="page-head page-head--home"><h1 class="h1 h1--home">${e(welcomeFor(vm))}</h1><p class="lead">What would you like to work on?</p></header>
 <nav aria-label="Your workspace"><ul class="tiles">${tiles}</ul></nav>`;
+  }
+  // The signed-in home: one greeting, one next action, the available module(s) as the clear focus, and the unfinished ones as a quiet list.
+  // The unavailable modules are plain text (no link, no card, no badge) so nothing suggests they can be opened.
+  const { lead, action } = homeNext(vm);
+  const active = AREAS.filter((a) => isLive(a.key)).map((a) => {
+    const st = vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : "";
+    return `<li><a class="focus" href="${e(href(vm, a.path))}"><span class="focus__title">${e(a.title)}</span><span class="focus__desc">${e(HOME_BLURB[a.key])}</span>${st}<span class="tile__arrow focus__arrow" aria-hidden="true">→</span></a></li>`;
+  }).join("");
+  const soon = AREAS.filter((a) => !isLive(a.key));
+  return `<header class="page-head page-head--home"><h1 class="h1 h1--home">${e(welcomeFor(vm))}</h1><p class="lead">${e(lead)}</p>${action}</header>
+<nav aria-label="Your workspace"><ul class="focus-list">${active}</ul></nav>
+${soon.length ? `<section class="soon-list" aria-labelledby="h-soon"><h2 id="h-soon" class="soon-list__title">Coming soon</h2><ul>${soon.map((a) => `<li><span class="soon-list__name">${e(a.title)}</span><span class="soon-list__desc">${e(HOME_BLURB[a.key])}</span></li>`).join("")}</ul></section>` : ""}`;
 }
 
 /* ------------------------------------------------------------------ standard workspace overview (shared) */
