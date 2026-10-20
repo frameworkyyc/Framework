@@ -234,7 +234,13 @@ ${notConnected("Document library", "Sharing files through the portal isn’t swi
 
 /* ------------------------------------------------------------------ account */
 
-export function account(vm, { signOut = "" } = {}) {
+function nameFormHtml(f) {
+  const hint = f.suggested ? `<span class="field__hint" id="an-h">Suggested from your Business Profile. Change it if it isn’t right.</span>` : "";
+  const err = f.error ? `<span class="field__error" id="an-e">${e(f.error)}</span>` : "";
+  const note = f.saved ? `<p class="muted small" role="status">Name saved.</p>` : "";
+  return `<form method="post" action="${e(f.action)}" class="form name-form" novalidate><input type="hidden" name="csrf" value="${e(f.csrf)}"><div class="field"><label for="an">Your name</label>${hint}<input id="an" name="name" type="text" value="${e(f.value)}" maxlength="120" autocomplete="name"${f.error ? ' aria-invalid="true" aria-describedby="an-e"' : f.suggested ? ' aria-describedby="an-h"' : ""}>${err}</div><button class="btn" type="submit">Save name</button>${note}</form>`;
+}
+export function account(vm, { signOut = "", nameForm = null } = {}) {
   const site = safeHttps(vm.org.website);
   const settings = vm.has.settings
     ? `<ul class="prefs"><li><label for="p1">Weekly project summary<span class="small">One email every Monday with what changed.</span></label><input class="switch" id="p1" type="checkbox" checked disabled></li><li><label for="p2">Review requests<span class="small">An email when something needs your feedback.</span></label><input class="switch" id="p2" type="checkbox" checked disabled></li><li><label for="p3">New documents<span class="small">An email when a file is shared with you.</span></label><input class="switch" id="p3" type="checkbox" disabled></li></ul><p class="muted small">Preview only: these switches are not connected to anything.</p>`
@@ -242,9 +248,9 @@ export function account(vm, { signOut = "" } = {}) {
   return `<header class="page-head"><span class="eyebrow">${e(vm.org.name)}</span><h1 class="h1">Account</h1><p class="lead">Your details and your organization’s.</p></header>
 <div class="cols cols--even">
 <section class="section" aria-labelledby="h-org">${sectionHead("Organization")}<h2 id="h-org" class="visually-hidden">Organization</h2><dl class="kv"><dt>Name</dt><dd>${e(vm.org.name)}</dd>${site ? `<dt>Website</dt><dd><a class="text-link" href="${e(site)}" rel="noopener noreferrer">${e(site.replace(/^https:\/\//, ""))}</a></dd>` : ""}<dt>Your role</dt><dd>${e(humanize(vm.org.role))}</dd>${vm.org.people ? `<dt>People</dt><dd>${e(String(vm.org.people))}</dd>` : ""}</dl></section>
-<section class="section" aria-labelledby="h-you">${sectionHead("You")}<h2 id="h-you" class="visually-hidden">You</h2><dl class="kv"><dt>Name</dt><dd>${e(vm.user.name || "Not set")}</dd><dt>Email</dt><dd>${e(vm.user.email)}</dd><dt>Sign-in</dt><dd>One-time code sent to your email</dd><dt>Session</dt><dd>Ends after 12 hours of inactivity</dd></dl></section>
+<section class="section" aria-labelledby="h-you">${sectionHead("You")}<h2 id="h-you" class="visually-hidden">You</h2><dl class="kv"><dt>Name</dt><dd>${e(vm.user.name || "Not set")}</dd><dt>Email</dt><dd>${e(vm.user.email)}</dd><dt>Sign-in</dt><dd>One-time code sent to your email</dd><dt>Session</dt><dd>Ends after 12 hours of inactivity</dd></dl>${nameForm ? nameFormHtml(nameForm) : ""}</section>
 <section class="section" aria-labelledby="h-set">${sectionHead("Notifications")}<h2 id="h-set" class="visually-hidden">Notifications</h2>${settings}</section>
-<section class="section" aria-labelledby="h-help">${sectionHead("Help and privacy")}<h2 id="h-help" class="visually-hidden">Help and privacy</h2><p>To change your name or email, add or remove a teammate, or ask about your information, contact your Framework lead or <a class="text-link" href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a>.</p><p><a class="text-link" href="/privacy.html">Privacy notice</a></p>${signOut ? `<div class="section">${signOut}</div>` : ""}</section>
+<section class="section" aria-labelledby="h-help">${sectionHead("Help and privacy")}<h2 id="h-help" class="visually-hidden">Help and privacy</h2><p>To change your email, add or remove a teammate, or ask about your information, contact your Framework lead or <a class="text-link" href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a>.</p><p><a class="text-link" href="/privacy.html">Privacy notice</a></p>${signOut ? `<div class="section">${signOut}</div>` : ""}</section>
 </div>`;
 }
 

@@ -109,9 +109,13 @@ export async function documentsPage(ctx, a, filters = {}) {
   const vm = liveModel(ctx, a, {});
   return shell(ctx, a, { title: "Documents", active: "documents", body: views.documents(vm, filters), vm, ref: "documents" });
 }
-export async function accountPage(ctx, a) {
+export async function accountPage(ctx, a, o = {}) {
   const vm = liveModel(ctx, a, {});
-  return shell(ctx, a, { title: "Account", active: "account", body: views.account(vm, { signOut: await signOutForm(ctx, a.session) }), vm, ref: "account" });
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  // `derived`: the shown name came from the Business Profile contact (same verified email), not from the account; it is saved only if the person confirms it.
+  const value = o.value !== undefined ? o.value : a.session.name || "";
+  const nameForm = { action: `${vm.base}/account`, csrf, value, error: o.error || "", saved: Boolean(o.saved), suggested: Boolean(o.derived) && o.value === undefined };
+  return shell(ctx, a, { title: "Account", active: "account", body: views.account(vm, { signOut: await signOutForm(ctx, a.session), nameForm }), vm, ref: "account", status: o.status });
 }
 export async function membersPage(ctx, a, members) {
   const vm = liveModel(ctx, a, { team: members.map((u) => ({ name: u.name, email: u.email, role: u.role })) });

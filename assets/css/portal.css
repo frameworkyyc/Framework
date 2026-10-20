@@ -443,3 +443,8 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .tile--soon .tile__desc { color: var(--slate); opacity: .85; }
 .tile__soon { align-self: end; font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; line-height: 1.3; color: var(--slate); }
 @media (max-width: 560px) { .tile--soon { grid-template-areas: "n title" ". desc" ". soon"; grid-template-columns: 32px minmax(0, 1fr); row-gap: 2px; } .tile--soon .tile__soon { grid-area: soon; margin-top: 6px; } }
+
+/* Account: the signed-in person's own name */
+.name-form { margin-top: 24px; }
+.name-form .field { margin-bottom: 12px; }
+.name-form .field__hint { display: block; margin: 2px 0 8px; }

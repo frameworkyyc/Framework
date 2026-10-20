@@ -15,9 +15,10 @@ import * as pages from "./pages.js";
 import { handleDemo, isDemoPath } from "./demo.js";
 import { viewFilters } from "./filters.js";
 import { listActiveMembershipsForUser, listMembers } from "./repo/memberships.js";
+import { setUserName } from "./repo/users.js";
 import { listProjects, getProject } from "./repo/projects.js";
 import { listActivity } from "./repo/activity.js";
-import { validateSlug } from "./repo/validate.js";
+import { validateSlug, validateName } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
 import { getProfileAnswers, saveProfileStep } from "./repo/business-profile.js";
 import { stepById } from "./profile-schema.js";
@@ -115,6 +116,49 @@ async function saveProfile(ctx, a, stepId) {
 }
 
 /** Send feedback. Organization and person come from the membership and session; the form supplies only the kind, the message and an optional section. */
+/**
+ * The Business Profile's "Primary contact" is the business's day-to-day contact, which is not necessarily the person signed in. It is therefore
+ * only ever a DISPLAY fallback, and only when its contact email is the signed-in (verified) email, i.e. provably the same person. It is never
+ * written to the account and never used for anyone else's account.
+ */
+async function contactNameFor(ctx, a) {
+  let answers;
+  try {
+    answers = await dbCall(() => getProfileAnswers(ctx.db, a.membership.organizationId));
+  } catch (err) {
+    if (err instanceof Unavailable) return "";
+    throw err;
+  }
+  const same = String(answers.cemail || "").trim().toLowerCase() === String(a.session.email || "").trim().toLowerCase();
+  return same && validateName(answers.cname) ? validateName(answers.cname) : "";
+}
+async function withDisplayName(ctx, a) {
+  if (a.session.name) return a;
+  const name = await contactNameFor(ctx, a);
+  return name ? { ...a, session: { ...a.session, name } } : a;
+}
+
+async function saveAccountName(ctx, a) {
+  const read = await readForm(ctx.request, MAX_FEEDBACK_FORM_BYTES);
+  if (read.error) return errorPage(read.error, { ref: ctx.ref });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) {
+    logEvent({ evt: "account.name", outcome: "rejected", reason: "csrf", status: 403, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return errorPage(403, { ref: ctx.ref });
+  }
+  const value = read.fields.get("name") || "";
+  if (!validateName(value)) return pages.accountPage(ctx, a, { value, error: "Enter your name (up to 120 characters).", status: 422 });
+  let result;
+  try {
+    result = await dbCall(() => setUserName(ctx.db, a.session.userId, value)); // always the signed-in user's own row, never an id from the request
+  } catch (err) {
+    if (!(err instanceof Unavailable)) throw err;
+    return unavailablePage(ctx);
+  }
+  if (!result.ok) return pages.accountPage(ctx, a, { value, error: "We couldn’t save that. Please try again.", status: 422 });
+  logEvent({ evt: "account.name", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  return redirect(`/portal/o/${a.membership.slug}/account?saved=1`);
+}
+
 async function saveFeedback(ctx, a) {
   const read = await readForm(ctx.request, MAX_FEEDBACK_FORM_BYTES);
   if (read.error) return errorPage(read.error, { ref: ctx.ref });
@@ -144,7 +188,7 @@ async function saveFeedback(ctx, a) {
 }
 
 const ORG_ROUTES = [
-  { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => pages.homePage(ctx, a) },
+  { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => pages.homePage(ctx, await withDisplayName(ctx, a)) },
   { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, a, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },
   { re: /^\/portal\/o\/([^/]+)\/profile$/, action: "profile.view", run: async (ctx, a) => pages.profileOverviewPage(ctx, a, await getProfileAnswers(ctx.db, a.membership.organizationId)) },
   {
@@ -182,7 +226,17 @@ const ORG_ROUTES = [
   },
   { re: /^\/portal\/o\/([^/]+)\/activity$/, action: "activity.view", run: async (ctx, a) => pages.activityPage(ctx, a, await listActivity(ctx.db, a.membership.organizationId, { limit: 50 }), viewFilters(ctx.url)) },
   { re: /^\/portal\/o\/([^/]+)\/documents$/, action: "documents.view", run: async (ctx, a) => pages.documentsPage(ctx, a, viewFilters(ctx.url)) },
-  { re: /^\/portal\/o\/([^/]+)\/account$/, action: "account.view", run: async (ctx, a) => pages.accountPage(ctx, a) },
+    {
+    re: /^\/portal\/o\/([^/]+)\/account$/,
+    action: "account.view",
+    postAction: "account.view", // everyone may edit only their own name; the target row comes from the session, never the request
+    bucket: "profile",
+    run: async (ctx, a) => {
+      const shown = await withDisplayName(ctx, a);
+      return pages.accountPage(ctx, shown, { saved: viewFilters(ctx.url).saved, derived: !a.session.name && Boolean(shown.session.name) });
+    },
+    post: (ctx, a) => saveAccountName(ctx, a),
+  },
   {
     re: /^\/portal\/o\/([^/]+)\/members$/,
     action: "members.view",
