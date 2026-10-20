@@ -20,8 +20,10 @@ async function setup() {
   await bob.signIn(nameless(w.user(3, "bob@beta.test")));
   return { w, alpha, beta, jj, mia, bob };
 }
-const contact = async (org, w, cname, cemail) => {
-  const uid = w.db.raw.prepare("SELECT user_id FROM memberships WHERE organization_id = ?").get(org.id).user_id;
+// `by` is who saves the answers. It used to be "whichever membership row SQLite returned first", which is random (user ids are random UUIDs), so the
+// greeting ("Welcome back" only with the person's own saved work) passed or failed by chance. It is explicit now.
+const contact = async (org, w, cname, cemail, by = "jj@alpha.test") => {
+  const uid = w.db.raw.prepare("SELECT id FROM portal_users WHERE email = ?").get(by).id;
   return saveProfileStep(w.db, org.id, uid, "contact", { cname, cemail }, { now: w.clock.now() });
 };
 const text = async (b, path) => (await b.get(path)).text();
@@ -42,8 +44,15 @@ test("when the profile's contact email is the signed-in email, its name is shown
   assert.match(html, /<dt>Name<\/dt><dd>JJ<\/dd>/);
   assert.match(html, /value="JJ"/);
   assert.match(html, /Suggested from your Business Profile/);
-  assert.match(await text(jj, "/portal/o/alpha"), /Welcome back, JJ\./);
+  assert.match(await text(jj, "/portal/o/alpha"), /Welcome back, JJ\./, "JJ saved these answers, which is evidence of earlier work");
   assert.deepEqual(rows(w, "jj@alpha.test"), [{ name: null }], "display only: the account is untouched until the person confirms");
+});
+
+test("the same suggested name when a colleague saved the contact: the greeting uses the name but does not claim JJ has been here before", async () => {
+  const { w, alpha, jj } = await setup();
+  await contact(alpha, w, "JJ", "JJ@Alpha.test", "mia@alpha.test");
+  assert.match(await text(jj, "/portal/o/alpha/account"), /<dt>Name<\/dt><dd>JJ<\/dd>/);
+  assert.match(await text(jj, "/portal/o/alpha"), /<h1[^>]*>Welcome, JJ\.<\/h1>/, "a colleague's work is not JJ's earlier visit");
 });
 
 test("a primary contact with a different email is a different person: never shown as the account holder's name", async () => {
@@ -63,7 +72,7 @@ test("a name from the sign-in provider is never replaced by the profile contact"
   await w.invite(alpha, "ann@alpha.test", "owner");
   const ann = w.browser();
   await ann.signIn(w.user(1, "ann@alpha.test")); // Test User1
-  await contact(alpha, w, "Somebody Else", "ann@alpha.test");
+  await contact(alpha, w, "Somebody Else", "ann@alpha.test", "ann@alpha.test");
   const html = await text(ann, "/portal/o/alpha/account");
   assert.match(html, /<dt>Name<\/dt><dd>Test User1<\/dd>/);
   assert.ok(!html.includes("Suggested from"));
