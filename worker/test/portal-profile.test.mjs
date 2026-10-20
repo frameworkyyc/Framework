@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { makeWorld, csrfOf, ORIGIN } from "./helpers/portal-e2e.mjs";
+import { makeWorld, csrfOf, revOf, ORIGIN } from "./helpers/portal-e2e.mjs";
 import { handlePortal } from "../portal/router.js";
 import { PROFILE_STEPS, PROFILE_SCHEMA_VERSION, validateAnswer, validateStep, stepStatus, profileProgress, stepById, FIELD_IDS } from "../portal/profile-schema.js";
 import { getProfileAnswers, saveProfileStep } from "../portal/repo/business-profile.js";
@@ -39,7 +39,7 @@ async function save(world, who, slug, step, fields, { csrf, headers = {} } = {})
   const page = await (await who.get(`/portal/o/${slug}/profile/${step}`)).text();
   const token = csrf ?? csrfOf(page);
   return handlePortal(new Request(`https://staging.frameworkco.ca/portal/o/${slug}/profile/${step}`, {
-    method: "POST", body: form({ csrf: token, ...fields }),
+    method: "POST", body: form({ csrf: token, rev: revOf(page), ...fields }),
     headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: who.cookieHeader(), Origin: "https://staging.frameworkco.ca", ...headers },
   }), world.env, { now: world.clock.now() });
 }
@@ -230,7 +230,7 @@ test("a store failure on save is reported on the page with the answers kept; the
   const { w, ann } = await setup();
   const real = w.env.PORTAL_DB, failing = { ...real, prepare: real.prepare, exec: real.exec, batch: async () => { throw new Error("D1_ERROR secret detail"); } };
   const page = await (await ann.get("/portal/o/alpha/profile/offering")).text();
-  const res = await handlePortal(new Request("https://staging.frameworkco.ca/portal/o/alpha/profile/offering", { method: "POST", body: form({ csrf: csrfOf(page), offer: "Widgets", customers: "Everyone" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: "https://staging.frameworkco.ca" } }), { ...w.env, PORTAL_DB: failing }, { now: w.clock.now() });
+  const res = await handlePortal(new Request("https://staging.frameworkco.ca/portal/o/alpha/profile/offering", { method: "POST", body: form({ csrf: csrfOf(page), rev: revOf(page), offer: "Widgets", customers: "Everyone" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: "https://staging.frameworkco.ca" } }), { ...w.env, PORTAL_DB: failing }, { now: w.clock.now() });
   assert.equal(res.status, 503);
   const html = await res.text();
   assert.match(html, /couldn’t save your answers just now/); assert.match(html, />Widgets</); assert.ok(!/secret detail|D1_ERROR/.test(html));
@@ -246,7 +246,7 @@ test("tenant isolation: another organization's member gets 404 for every profile
   for (const p of ["profile", "profile/business", "branding", ""]) assert.equal((await bob.get(`/portal/o/alpha/${p}`)).status, 404, p);
   // bob signs in to beta; he forges a POST to alpha's step with his own valid session and CSRF token
   const page = await (await bob.get("/portal/o/beta/profile/business")).text();
-  const forged = await handlePortal(new Request("https://staging.frameworkco.ca/portal/o/alpha/profile/business", { method: "POST", body: form({ csrf: csrfOf(page), legal: "HACKED", industry: "Retail", about: "x" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: bob.cookieHeader(), Origin: "https://staging.frameworkco.ca" } }), w.env, { now: w.clock.now() });
+  const forged = await handlePortal(new Request("https://staging.frameworkco.ca/portal/o/alpha/profile/business", { method: "POST", body: form({ csrf: csrfOf(page), rev: revOf(page), legal: "HACKED", industry: "Retail", about: "x" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: bob.cookieHeader(), Origin: "https://staging.frameworkco.ca" } }), w.env, { now: w.clock.now() });
   assert.equal(forged.status, 404);
   assert.equal((await getProfileAnswers(w.db, (await w.db.prepare("SELECT id FROM organizations WHERE slug='alpha'").first()).id)).legal, "Acme Co. Ltd.");
   // an organization id supplied in the form is ignored: the write goes to the membership's organization
@@ -281,16 +281,16 @@ test("CSRF, same-site, content type, size and duplicate-field protections on eve
   assert.equal((await base(form({ ...good }))).status, 403, "no token");
   assert.equal((await base(form({ csrf: "wrong", ...good }))).status, 403, "wrong token");
   assert.equal((await base(form({ csrf: token.slice(0, -2) + "xx", ...good }))).status, 403, "tampered token");
-  assert.equal((await base(form({ csrf: token, ...good }), { Origin: "https://evil.example" })).status, 403, "foreign origin");
-  assert.equal((await base(form({ csrf: token, ...good }), { "Sec-Fetch-Site": "cross-site" })).status, 403, "cross-site");
+  assert.equal((await base(form({ csrf: token, rev: revOf(page), ...good }), { Origin: "https://evil.example" })).status, 403, "foreign origin");
+  assert.equal((await base(form({ csrf: token, rev: revOf(page), ...good }), { "Sec-Fetch-Site": "cross-site" })).status, 403, "cross-site");
   assert.equal((await base(JSON.stringify({ csrf: token, ...good }), { "Content-Type": "application/json" })).status, 400, "only urlencoded forms");
-  assert.equal((await base(form({ csrf: token, legal: "x".repeat(MAX_PROFILE_FORM_BYTES + 10) }))).status, 413, "oversized body");
+  assert.equal((await base(form({ csrf: token, rev: revOf(page), legal: "x".repeat(MAX_PROFILE_FORM_BYTES + 10) }))).status, 413, "oversized body");
   assert.equal((await base(`csrf=${token}&legal=a&legal=b`)).status, 400, "duplicate field names");
-  assert.equal((await base(form({ csrf: token, ...good }), { "Content-Length": "abc" })).status, 400);
+  assert.equal((await base(form({ csrf: token, rev: revOf(page), ...good }), { "Content-Length": "abc" })).status, 400);
   const otherSessionToken = csrfOf(await (await (await setup()).ann.get("/portal/o/alpha/profile/business")).text());
   assert.equal((await base(form({ csrf: otherSessionToken, ...good }))).status, 403, "a token from another session is useless");
   assert.deepEqual(sql(w.db, "SELECT * FROM business_profile_answers"), []);
-  assert.equal((await base(form({ csrf: token, ...good }))).status, 303, "the genuine request still works");
+  assert.equal((await base(form({ csrf: token, rev: revOf(page), ...good }))).status, 303, "the genuine request still works");
   for (const m of ["PUT", "PATCH", "DELETE"]) assert.equal((await handlePortal(new Request("https://staging.frameworkco.ca/portal/o/alpha/profile/business", { method: m, headers: { Cookie: ann.cookieHeader() } }), w.env, { now: w.clock.now() })).status, 405, m);
   assert.equal((await handlePortal(new Request("https://staging.frameworkco.ca/portal/o/alpha/website", { method: "POST", body: "x", headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: "https://staging.frameworkco.ca" } }), w.env, { now: w.clock.now() })).status, 405, "only the profile step accepts POST");
 });
@@ -298,7 +298,7 @@ test("rate limiting applies to saves and a limited request does no database work
   const { w, ann } = await setup();
   const page = await (await ann.get("/portal/o/alpha/profile/business")).text();
   const env = { ...w.env, PORTAL_RATE_LIMITER: { limit: async () => ({ success: false }) }, PORTAL_DB: { prepare() { throw new Error("database touched"); }, batch() { throw new Error("database touched"); }, exec() {} } };
-  const r = await handlePortal(new Request("https://staging.frameworkco.ca/portal/o/alpha/profile/business", { method: "POST", body: form({ csrf: csrfOf(page), legal: "x" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: "https://staging.frameworkco.ca", "CF-Connecting-IP": "203.0.113.9" } }), env, { now: w.clock.now() });
+  const r = await handlePortal(new Request("https://staging.frameworkco.ca/portal/o/alpha/profile/business", { method: "POST", body: form({ csrf: csrfOf(page), rev: revOf(page), legal: "x" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: "https://staging.frameworkco.ca", "CF-Connecting-IP": "203.0.113.9" } }), env, { now: w.clock.now() });
   assert.equal(r.status, 429); assert.equal(r.headers.get("Retry-After"), "60");
 });
 
@@ -383,7 +383,7 @@ test("revoked membership: read and write are refused at once and nothing is writ
   const token = csrfOf(page);
   w.db.raw.exec("UPDATE memberships SET status='revoked', revoked_at='2026-03-10T00:00:00.000Z' WHERE user_id IN (SELECT id FROM portal_users WHERE email='mia@alpha.test')");
   const before = sql(w.db, "SELECT field_id, value, updated_at FROM business_profile_answers ORDER BY field_id");
-  const write = await handlePortal(new Request(ORIGIN + "/portal/o/alpha/profile/location", { method: "POST", body: form({ csrf: token, city: "HACKED", size: "Just me" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: mia.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() });
+  const write = await handlePortal(new Request(ORIGIN + "/portal/o/alpha/profile/location", { method: "POST", body: form({ csrf: token, rev: revOf(page), city: "HACKED", size: "Just me" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: mia.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() });
   assert.equal(write.status, 404);
   for (const p of ["profile", "profile/location", ""]) assert.equal((await mia.get(`/portal/o/alpha/${p}`)).status, 404, p);
   assert.deepEqual(sql(w.db, "SELECT field_id, value, updated_at FROM business_profile_answers ORDER BY field_id"), before);
@@ -398,7 +398,7 @@ test("forged organization identifiers grant nothing: another organization's id o
     if (!p.includes("?organization_id")) assert.ok([404, 400].includes(r.status), p + " " + r.status);
   }
   const page = await (await ann.get("/portal/o/alpha/profile/business")).text();
-  const r = await handlePortal(new Request(ORIGIN + "/portal/o/alpha/profile/business", { method: "POST", body: form({ csrf: csrfOf(page), legal: "Alpha Ltd", industry: "Retail", about: "x", organization_id: beta.id, organizationId: beta.id, slug: "beta" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() });
+  const r = await handlePortal(new Request(ORIGIN + "/portal/o/alpha/profile/business", { method: "POST", body: form({ csrf: csrfOf(page), rev: revOf(page), legal: "Alpha Ltd", industry: "Retail", about: "x", organization_id: beta.id, organizationId: beta.id, slug: "beta" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() });
   assert.equal(r.status, 303);
   assert.deepEqual(sql(w.db, "SELECT organization_id AS o, value FROM business_profile_answers WHERE field_id='legal' ORDER BY value").map((x) => ({ ...x })), [{ o: alpha.id, value: "Alpha Ltd" }, { o: beta.id, value: "Beta Secret Ltd" }]);
 });
@@ -432,7 +432,7 @@ test("save rate limit: after the allowance is used, further saves are refused wi
   const env = { ...w.env, PORTAL_RATE_LIMITER: { limit: async ({ key }) => ({ success: (counts[key] = (counts[key] || 0) + 1) <= 3 }) } };
   const page = await (await ann.get("/portal/o/alpha/profile/offering")).text();
   const token = csrfOf(page), statuses = [];
-  for (let i = 0; i < 6; i++) statuses.push((await handlePortal(new Request(ORIGIN + "/portal/o/alpha/profile/offering", { method: "POST", body: form({ csrf: token, offer: "o" + i, customers: "c" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: ORIGIN, "CF-Connecting-IP": "203.0.113.50" } }), env, { now: w.clock.now() })).status);
+  for (let i = 0; i < 6; i++) statuses.push((await handlePortal(new Request(ORIGIN + "/portal/o/alpha/profile/offering", { method: "POST", body: form({ csrf: token, rev: revOf(await (await ann.get("/portal/o/alpha/profile/offering")).text()), offer: "o" + i, customers: "c" }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: ann.cookieHeader(), Origin: ORIGIN, "CF-Connecting-IP": "203.0.113.50" } }), env, { now: w.clock.now() })).status);
   assert.deepEqual(statuses, [303, 303, 303, 429, 429, 429]);
   assert.equal(sql(w.db, "SELECT value FROM business_profile_answers WHERE field_id='offer'")[0].value, "o2", "limited saves never reached the database");
   const keys = Object.keys(counts); assert.equal(keys.length, 1); assert.match(keys[0], /^profile:[0-9a-f]{32}$/, "a hashed per-network key, never the address");

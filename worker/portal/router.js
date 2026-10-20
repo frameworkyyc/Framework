@@ -20,7 +20,7 @@ import { listProjects, getProject } from "./repo/projects.js";
 import { listActivity } from "./repo/activity.js";
 import { validateSlug, validateName } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
-import { getProfileAnswers, saveProfileStep } from "./repo/business-profile.js";
+import { getProfileAnswers, saveProfileStep, getStepRevision } from "./repo/business-profile.js";
 import { hasPriorVisit } from "./repo/visits.js";
 import { stepById, PROFILE_STEPS } from "./profile-schema.js";
 import { comingSoonKeys, LIVE_AREAS } from "./guided-data.js";
@@ -93,6 +93,9 @@ async function saveProfile(ctx, a, stepId) {
   }
   const input = {};
   for (const d of step.fields) if (read.fields.has(d.id)) input[d.id] = read.fields.get(d.id);
+  // The revision the form was loaded with (see repo/business-profile.js). Missing or malformed counts as "unknown": it can never match, so such a save is a conflict.
+  const posted = read.fields.has("rev") ? read.fields.get("rev") : null;
+  const rev = typeof posted === "string" && /^(?:[0-9a-f-]{36})?$/.test(posted) ? posted : null;
   let saved;
   try {
     saved = await dbCall(() => getProfileAnswers(ctx.db, a.membership.organizationId));
@@ -102,16 +105,23 @@ async function saveProfile(ctx, a, stepId) {
   }
   let result;
   try {
-    result = await dbCall(() => saveProfileStep(ctx.db, a.membership.organizationId, a.session.userId, stepId, input, { now: ctx.now }));
+    result = await dbCall(() => saveProfileStep(ctx.db, a.membership.organizationId, a.session.userId, stepId, input, { now: ctx.now, expectedRevision: rev }));
   } catch (err) {
     if (!(err instanceof Unavailable)) throw err;
     logEvent({ evt: "profile.save", outcome: "store_unavailable", status: 503, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
     // keep what the person typed on the page and say plainly that it was not stored
-    return pages.profileStepPage(ctx, a, step, saved, { values: Object.fromEntries(step.fields.map((d) => [d.id, input[d.id] || ""])), failed: true, status: 503 });
+    return pages.profileStepPage(ctx, a, step, saved, { values: Object.fromEntries(step.fields.map((d) => [d.id, input[d.id] || ""])), failed: true, status: 503, revision: rev ?? "" });
+  }
+  if (!result.ok && result.error === "conflict") {
+    // The step changed since this form was loaded (another window, device or member). NOTHING was written. Show the person's own input again, say what is
+    // saved now, and carry the latest revision so that saving again is a deliberate, informed choice.
+    logEvent({ evt: "profile.save", outcome: "conflict", status: 409, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+    const latest = await dbCall(() => getProfileAnswers(ctx.db, a.membership.organizationId));
+    return pages.profileStepPage(ctx, a, step, latest, { values: Object.fromEntries(step.fields.map((d) => [d.id, input[d.id] || ""])), conflict: result.currentValues, revision: result.revision, status: 409 });
   }
   if (!result.ok) {
     logEvent({ evt: "profile.save", outcome: "invalid", status: 422, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, count: Object.keys(result.errors || {}).length });
-    return pages.profileStepPage(ctx, a, step, saved, { values: result.values || {}, errors: result.errors || {}, status: 422 });
+    return pages.profileStepPage(ctx, a, step, saved, { values: result.values || {}, errors: result.errors || {}, status: 422, revision: rev ?? "" });
   }
   const changed = result.changed || [];
   logEvent({ evt: "profile.save", outcome: changed.length ? "saved" : "unchanged", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
@@ -225,7 +235,9 @@ const ORG_ROUTES = [
     bucket: "profile",
     run: async (ctx, a, id) => {
       const step = stepById(id);
-      return step ? pages.profileStepPage(ctx, a, step, await getProfileAnswers(ctx.db, a.membership.organizationId), { savedNote: viewFilters(ctx.url).saved, unchanged: viewFilters(ctx.url).nochange }) : notFoundPage(ctx);
+      if (!step) return notFoundPage(ctx);
+      const revision = await getStepRevision(ctx.db, a.membership.organizationId, step.id); // BEFORE the answers: a save in between can only make this form look older, never newer
+      return pages.profileStepPage(ctx, a, step, await getProfileAnswers(ctx.db, a.membership.organizationId), { savedNote: viewFilters(ctx.url).saved, unchanged: viewFilters(ctx.url).nochange, revision });
     },
     post: (ctx, a, id) => saveProfile(ctx, a, id),
   },

@@ -187,6 +187,7 @@ test("SQL scan: values are always bound; the only interpolations into SQL are th
     // Access-management statements (memberships.js, invitations.js): module-level string constants, never built from input. They are the audit INSERT header,
     // the shared guard predicates ("another active owner remains", "already an active member") and the per-operation guard that the audit entry and the change share.
     "AUDIT", "ACTIVE_MEMBER", "ACTIVE_MEMBER_OF_OLD", "OTHER_ACTIVE_OWNER", "cond",
+    "REVISION", // business-profile.js: the module-level, organization-scoped "newest profile.updated entry of this step" subquery (a fixed constant; every value in it is bound)
   ]);
   const used = new Set();
   for (const { file, sql } of sqlStrings()) for (const m of sql.matchAll(/\$\{([^}]*)\}/g)) {

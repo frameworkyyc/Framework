@@ -3,7 +3,7 @@
  * never use the fictional demonstration data. The questionnaire is a real form (POST, session-bound CSRF token); /assets/js/portal-profile.js only
  * adds the unsaved-changes warning and a Saving state, and the form works without it.
  */
-import { e, errorSummary } from "./ui.js";
+import { e, errorSummary, conflictSummary } from "./ui.js";
 import { overview, crumb } from "./guided.js";
 import { PROFILE_STEPS, profileProgress, stepStatus } from "./profile-schema.js";
 import { AREAS } from "./guided-data.js";
@@ -38,7 +38,7 @@ export function privacyNotice() {
 <div><dt>Who can see it</dt><dd>It is saved against your organization. People in your organization who use the portal can see and edit it, and authorized Framework staff may review it to provide services to you.</dd></div>
 <div><dt>Corrections and deletion</dt><dd>You can change your answers here at any time. To ask for something to be corrected or deleted, email <a class="text-link" href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a>.</dd></div>
 </dl>
-<p class="muted small">Our <a class="text-link" href="/privacy.html">website privacy policy</a> describes how we handle information on our website.</p></section>`;
+<p class="muted small">Our <a class="text-link" href="/privacy.html#portal">privacy policy</a> describes how we handle personal information, including in the client portal.</p></section>`;
 }
 
 function field(scope, def, value, error) {
@@ -62,11 +62,14 @@ function field(scope, def, value, error) {
  * @param o {values, errors, csrf, saved, failed}  values: what to show (saved answers, or the rejected submission); errors: per-question messages;
  *   saved: show the "Saved" note; failed: the save could not be stored (values are kept on the page)
  */
-export function profileStep(vm, step, saved, { values = saved, errors = {}, csrf, savedNote = false, unchanged = false, failed = false } = {}) {
+export function profileStep(vm, step, saved, { values = saved, errors = {}, csrf, savedNote = false, unchanged = false, failed = false, conflict = null, revision = "" } = {}) {
   const i = PROFILE_STEPS.indexOf(step), prev = PROFILE_STEPS[i - 1], next = PROFILE_STEPS[i + 1];
   const st = stepStatus(step, saved);
   const nErr = Object.keys(errors).length;
-  const banner = failed
+  const differing = conflict ? step.fields.filter((d) => (values[d.id] || "").trim() !== (conflict[d.id] || "")) : [];
+  const banner = conflict
+    ? conflictSummary(differing.map((d) => ({ id: `p-${step.id}-${d.id}`, label: d.label, saved: conflict[d.id] || "" })), href(vm, `/profile/${step.id}`))
+    : failed
     ? `<p class="form-banner form-banner--error" role="alert">We couldn’t save your answers just now. Nothing was lost on this page. Please try again in a moment.</p>`
     : nErr
       ? errorSummary(step.fields.filter((d) => errors[d.id]).map((d) => ({ id: `p-${step.id}-${d.id}`, label: d.label, message: errors[d.id] })), "Some answers need attention. Nothing was saved.")
@@ -76,7 +79,7 @@ export function profileStep(vm, step, saved, { values = saved, errors = {}, csrf
   const stepper = `<nav class="stepper" aria-label="Business Profile steps"><ol>${PROFILE_STEPS.map((s, n) => { const ss = stepStatus(s, saved).state; return `<li class="is-${ss}"><a href="${e(href(vm, `/profile/${s.id}`))}"${s === step ? ' aria-current="step"' : ""}><span class="visually-hidden">Step ${n + 1}: ${e(s.title)}, ${ss === "done" ? "complete" : ss === "current" ? "in progress" : "not started"}</span><span aria-hidden="true">${n + 1}</span></a></li>`; }).join("")}</ol></nav>`;
   return `<header class="page-head">${crumb(vm, [["Business Profile", "/profile"], [step.title]])}<span class="eyebrow">Step ${i + 1} of ${PROFILE_STEPS.length}</span><h1 class="h1">${e(step.title)}</h1><p class="lead">${e(step.intro)}</p></header>
 ${stepper}${banner}
-<form method="post" action="${e(href(vm, `/profile/${step.id}`))}" data-guard novalidate><input type="hidden" name="csrf" value="${e(csrf)}">
+<form method="post" action="${e(href(vm, `/profile/${step.id}`))}" data-guard novalidate><input type="hidden" name="csrf" value="${e(csrf)}"><input type="hidden" name="rev" value="${e(revision)}">
 <div class="questions">${step.fields.map((d) => field(`p-${step.id}`, d, values[d.id] || "", errors[d.id])).join("")}</div>
 <p class="form-status muted small" data-status role="status" aria-live="polite"></p>
 <div class="step-nav"><button class="btn btn--primary" type="submit" name="intent" value="continue" data-save>${next ? "Save and continue" : "Save and finish"}</button><button class="btn" type="submit" name="intent" value="save" data-save>Save changes</button><a class="step-nav__back text-link" href="${e(prev ? href(vm, `/profile/${prev.id}`) : href(vm, "/profile"))}"><span aria-hidden="true">←</span> ${prev ? "Previous" : "All steps"}</a></div></form>

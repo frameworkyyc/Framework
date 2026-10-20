@@ -95,6 +95,12 @@ export const notConnected = (title, text) => `<div class="empty"><strong>${e(tit
  * on a phone). Without script it is still the first thing in the form and announced as an alert. items: [{ id, label, message }].
  */
 export const errorSummary = (items, intro = "") => `<div class="error-summary" role="alert" tabindex="-1" data-error-summary aria-labelledby="error-summary-title"><h2 id="error-summary-title" class="error-summary__title">${intro ? e(intro) : items.length === 1 ? "There is a problem" : `There are ${items.length} problems`}</h2><ul>${items.map((i) => `<li><a href="#${e(i.id)}">${i.label ? `${e(i.label)}: ` : ""}${e(i.message)}</a></li>`).join("")}</ul></div>`;
+/**
+ * The notice shown when a save was refused because the section changed after the form was opened. Same focusable summary as errorSummary (so the focus
+ * script moves keyboard focus here and scrolls it into view), with a plain explanation and one link per answer whose saved value now differs from what
+ * the person typed. items: [{ id, label, saved }]; reloadHref discards the person's input and shows the latest answers.
+ */
+export const conflictSummary = (items, reloadHref) => `<div class="error-summary" role="alert" tabindex="-1" data-error-summary aria-labelledby="error-summary-title"><h2 id="error-summary-title" class="error-summary__title">This section changed while you were editing. Nothing was saved.</h2><p>Someone else, or another window or device, saved changes to this section after you opened it. Your answers are still in the form below. Review what is saved now${items.length ? ", listed here" : ""}, then choose Save changes to replace it with your answers, or reload to start from what is saved.</p>${items.length ? `<ul>${items.map((i) => `<li><a href="#${e(i.id)}">${e(i.label)}: ${i.saved ? `currently saved as “${e(i.saved.length > 160 ? i.saved.slice(0, 160) + "…" : i.saved)}”` : "currently empty"}</a></li>`).join("")}</ul>` : ""}<p><a class="text-link" href="${e(reloadHref)}">Reload the latest saved answers (discard my changes)</a></p></div>`;
 export const empty = (title, text) => `<div class="empty"><strong>${e(title)}</strong>${e(text)}</div>`;
 
 /* ------------------------------------------------------------------ shell */

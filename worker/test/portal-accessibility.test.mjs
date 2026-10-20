@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { makeWorld, csrfOf, ORIGIN } from "./helpers/portal-e2e.mjs";
+import { makeWorld, csrfOf, revOf, ORIGIN } from "./helpers/portal-e2e.mjs";
 import { handlePortal } from "../portal/router.js";
 import { PROFILE_STEPS } from "../portal/profile-schema.js";
 import { PORTAL_CSP, PORTAL_CSP_WITH_SCRIPT } from "../portal/http.js";
@@ -27,7 +27,7 @@ async function setup() {
 }
 async function post(w, who, path, fields, { csrf } = {}) {
   const page = await (await who.get(path)).text();
-  return handlePortal(new Request(ORIGIN + path, { method: "POST", body: form({ csrf: csrf ?? csrfOf(page), ...fields }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: who.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() });
+  return handlePortal(new Request(ORIGIN + path, { method: "POST", body: form({ csrf: csrf ?? csrfOf(page), rev: revOf(page), ...fields }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: who.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() });
 }
 const ids = (html) => new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
 const summaryLinks = (html) => [...(html.match(/data-error-summary[\s\S]*?<\/ul><\/div>/) || [""])[0].matchAll(/<a href="#([^"]+)">/g)].map((m) => m[1]);
@@ -81,7 +81,7 @@ test("contact and organization fields carry the right autocomplete tokens; other
   const seen = {};
   for (const step of PROFILE_STEPS) {
     const html = await (await ann.get(`/portal/o/alpha/profile/${step.id}`)).text();
-    for (const m of html.matchAll(/<input\b[^>]*name="([a-z]+)"[^>]*>/g)) if (m[1] !== "csrf" && !/type="radio"/.test(m[0])) seen[m[1]] = (m[0].match(/autocomplete="([^"]*)"/) || [])[1];
+    for (const m of html.matchAll(/<input\b[^>]*name="([a-z]+)"[^>]*>/g)) if (m[1] !== "csrf" && m[1] !== "rev" && !/type="radio"/.test(m[0])) seen[m[1]] = (m[0].match(/autocomplete="([^"]*)"/) || [])[1];
   }
   for (const [id, token] of Object.entries(want)) assert.equal(seen[id], token, id);
   for (const [id, token] of Object.entries(seen)) if (!(id in want)) assert.equal(token, "off", id);

@@ -237,11 +237,12 @@ test("Business Profile carries a short plain-language notice, links it from each
   assert.match(step, /href="\/portal\/o\/alpha\/profile#privacy">How we use this information/); assert.match(step, /may be reviewed by authorized Framework staff/);
   assert.ok(!/id="privacy"/.test(step));
 });
-test("the published privacy policy does not yet cover the portal: the gaps are written down for review, not papered over", () => {
+test("the privacy policy covers the portal, Business Profile and portal feedback, and the draft records what still needs owner or legal review", () => {
   const policy = read("privacy.html");
-  assert.ok(!/Business Profile|client portal/.test(policy), "the website policy says nothing about the portal or Business Profile yet");
+  assert.match(policy, /<h2 id="portal">The client portal<\/h2>/);
+  assert.match(policy, /Business Profile/); assert.match(policy, /Portal feedback/); assert.match(policy, /WorkOS/);
   const draft = read("worker/portal/PRIVACY-DRAFT.md");
-  assert.match(draft, /Business Profile/); assert.match(draft, /portal feedback/i); assert.match(draft, /\[DECISION\]/);
+  assert.match(draft, /Business Profile/); assert.match(draft, /portal feedback/i); assert.match(draft, /\[OWNER CONFIRMATION\]/);
 });
 test("the plan for applying migration 0003 without fabricating history is documented, and 0003 is not applied by the code", () => {
   const doc = read("worker/portal/BETA-READINESS.md");

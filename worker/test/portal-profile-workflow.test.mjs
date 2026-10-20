@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { makeWorld, csrfOf, ORIGIN } from "./helpers/portal-e2e.mjs";
+import { makeWorld, csrfOf, revOf, ORIGIN } from "./helpers/portal-e2e.mjs";
 import { handlePortal } from "../portal/router.js";
 import { PROFILE_STEPS } from "../portal/profile-schema.js";
 import { PORTAL_CSP_WITH_SCRIPT } from "../portal/http.js";
@@ -25,7 +25,7 @@ async function setup() {
 async function post(w, who, slug, step, fields, { csrf } = {}) {
   const path = `/portal/o/${slug}/profile/${step}`;
   const page = await (await who.get(path)).text();
-  return handlePortal(new Request(ORIGIN + path, { method: "POST", body: form({ csrf: csrf ?? csrfOf(page), ...fields }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: who.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() });
+  return handlePortal(new Request(ORIGIN + path, { method: "POST", body: form({ csrf: csrf ?? csrfOf(page), rev: revOf(page), ...fields }), headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: who.cookieHeader(), Origin: ORIGIN } }), w.env, { now: w.clock.now() });
 }
 const answers = (w, orgId) => Object.fromEntries(sql(w.db, "SELECT field_id, value FROM business_profile_answers WHERE organization_id = ?", orgId).map((r) => [r.field_id, r.value]));
 const audits = (w, orgId) => sql(w.db, "SELECT detail FROM activity_log WHERE organization_id = ? AND action = 'profile.updated'", orgId).length;
