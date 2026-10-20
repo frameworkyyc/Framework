@@ -95,7 +95,7 @@ export function home(vm) {
   const { lead, action } = homeNext(vm);
   const active = AREAS.filter((a) => isLive(a.key)).map((a) => {
     const st = vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : "";
-    return `<li><a class="focus" href="${e(href(vm, a.path))}"><span class="focus__title">${e(a.title)}</span><span class="focus__desc">${e(HOME_BLURB[a.key])}</span>${st}<span class="tile__arrow focus__arrow" aria-hidden="true">→</span></a></li>`;
+    return `<li><a class="focus" href="${e(href(vm, a.path))}"><span class="focus__title">${e(a.title)}</span><span class="focus__desc">${e(HOME_BLURB[a.key])}</span>${st}</a></li>`;
   }).join("");
   const soon = AREAS.filter((a) => !isLive(a.key));
   return `<header class="page-head page-head--home"><h1 class="h1 h1--home">${e(welcomeFor(vm))}</h1><p class="lead">${e(lead)}</p>${action}</header>

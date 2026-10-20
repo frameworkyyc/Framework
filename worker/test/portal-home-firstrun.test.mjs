@@ -242,6 +242,7 @@ test("unavailable modules are plain text under one quiet heading: no link, no fo
   assert.equal([...soon.matchAll(/<li>/g)].length, 5);
   assert.ok(!/<a |href|tabindex|role=|tile|tag|<progress|dot|\b0[1-6]\b/.test(soon));
   assert.equal([...html.matchAll(/<a class="focus"/g)].length, 1, "one module link");
+  assert.ok(!/focus__arrow|tile__arrow|→<\/span><\/a><\/li>/.test(html.slice(html.indexOf('<ul class="focus-list">'), html.indexOf("</ul>", html.indexOf('<ul class="focus-list">')))), "the module block has no standalone arrow; the whole block is the link");
   // keyboard: header links, the one action, the module, then the footer; nothing from the unavailable list
   const body = html.slice(html.indexOf('<main'), html.indexOf("</main>"));
   assert.equal([...body.matchAll(/<a [^>]*href=/g)].length, 2, "the next action and the Business Profile block are the only links in the page body");
