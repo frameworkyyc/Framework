@@ -76,7 +76,7 @@ async function setup(over = {}) {
 
 /* ------------------------------------------------------------------ the two switches */
 
-test("sending needs its OWN switch: with writes on but PORTAL_INVITE_SENDING unset, send and resend answer 403 sending_disabled and no provider is contacted; the switch is in no checked-in configuration", async () => {
+test("sending needs its OWN switch: with writes on but PORTAL_INVITE_SENDING unset, send and resend answer 403 sending_disabled and no provider is contacted; the switch is only in the Staging preview configuration", async () => {
   const s = await setup({ PORTAL_INVITE_SENDING: undefined });
   const inv = await s.invite(s.alpha, "sam@example.com");
   const before = s.snap();
@@ -90,7 +90,10 @@ test("sending needs its OWN switch: with writes on but PORTAL_INVITE_SENDING uns
   const off = await setup({ PORTAL_ADMIN_WRITES: undefined });
   assert.equal((await off.call(`/api/admin/clients/${off.alpha.id}/invitations/${crypto.randomUUID()}/send`)).status, 403);
   assert.equal(off.pv.calls.length, 0);
-  for (const f of ["wrangler.jsonc", ".github/workflows/ci.yml", "migrations/portal/wrangler.migrate.staging.jsonc"]) assert.ok(!/PORTAL_INVITE_SENDING|PORTAL_ADMIN_WRITES/.test(read(f).replace(/^\s*\/\/.*$/gm, "")), f + " (comments aside)");
+  for (const f of [".github/workflows/ci.yml", "migrations/portal/wrangler.migrate.staging.jsonc", "migrations/portal/wrangler.migrate.production.jsonc"]) assert.ok(!/PORTAL_INVITE_SENDING|PORTAL_ADMIN_WRITES/.test(read(f).replace(/^\s*\/\/.*$/gm, "")), f);
+  const cfg = JSON.parse(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, ""));
+  assert.equal(cfg.vars.PORTAL_INVITE_SENDING, undefined, "never in the top-level (Production) vars");
+  assert.equal(cfg.previews.vars.PORTAL_INVITE_SENDING, "1", "the controlled Staging test: previews.vars only");
 });
 
 /* ------------------------------------------------------------------ sending */

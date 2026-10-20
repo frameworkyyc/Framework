@@ -275,14 +275,20 @@ test("defence in depth: the delivery code itself refuses to contact a provider w
 
 /* ------------------------------------------------------------------ configuration and code paths */
 
-test("configuration: the allowlist is Staging-only (previews.vars) and is exactly the approved address; neither administrative switch is set anywhere; Production is untouched", () => {
+test("configuration: the allowlist and the two switches are Staging-only (previews.vars); the allowlist is exactly the approved address; Production is untouched", () => {
   const raw = read("wrangler.jsonc");
   const config = JSON.parse(strip(raw));
   assert.equal(config.previews.vars.PORTAL_INVITE_ALLOWED_EMAILS, APPROVED);
   assert.deepEqual([...parseAllowlist(config.previews.vars.PORTAL_INVITE_ALLOWED_EMAILS)], [APPROVED], "exactly one usable address");
   assert.equal(config.vars.PORTAL_INVITE_ALLOWED_EMAILS, undefined, "never in the top-level (Production) vars");
   const code = strip(raw);
-  assert.ok(!/PORTAL_ADMIN_WRITES|PORTAL_INVITE_SENDING/.test(code), "both switches stay off");
+  // the two switches (authorized for the controlled live test) exist ONLY in previews.vars, exactly once each, and the allowlist still guards them
+  for (const name of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) {
+    assert.equal(config.previews.vars[name], "1", name);
+    assert.equal(config.vars[name], undefined, name + " is not a Production setting");
+    assert.equal(code.match(new RegExp(name, "g")).length, 1, name + " appears exactly once in the file");
+  }
+  assert.equal(code.indexOf("PORTAL_ADMIN_WRITES") > code.indexOf('"previews"'), true, "and it is inside the previews block");
   assert.ok(!/PORTAL_ADMIN_WRITES|PORTAL_INVITE_SENDING|PORTAL_INVITE_ALLOWED_EMAILS/.test(read("migrations/portal/wrangler.migrate.production.jsonc") + read(".github/workflows/ci.yml")));
   assert.equal(config.previews.vars.PORTAL_BASE_URL, "https://staging.frameworkco.ca");
   assert.equal(config.vars.PORTAL_ENABLED, undefined, "Production's portal stays disabled");
@@ -306,4 +312,25 @@ test("every path that can email an invitation is behind the check: only admin-ac
   for (const f of ["router.js", "auth.js", "pages.js", "guard.js"]) assert.ok(!/createInvitation|replaceInvitation|deliverInvitation|sendEmail/.test(strip(read("worker/portal/" + f))), f);
   // the separate, existing admin FEEDBACK-request email is a different feature (a link to the public feedback form) and is not a portal invitation
   assert.ok(!/invitations|portal/i.test(strip(read("worker/feedback-invite.js")).replace(/Feedback invitations|feedback invitation/gi, "")), "the feedback-request email code has no portal invitation code in it");
+});
+
+test("STAGING exactly as wrangler.jsonc defines it (previews.vars + fake secrets + mocked providers): both switches are on, and the allowlist still decides who can be invited", async () => {
+  const config = JSON.parse(strip(read("wrangler.jsonc")));
+  const s = await setup();
+  const env = { ...s.env, ...config.previews.vars }; // the real Staging configuration on top of the test secrets and database
+  for (const k of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_INVITE_ALLOWED_EMAILS"]) assert.ok(config.previews.vars[k], k);
+  const access = await body(await s.call(`/api/admin/clients/${s.org.id}/access`, { method: "GET", e: env }));
+  assert.deepEqual(access.capabilities, { writes: true, sending: true, recipients: "configured" });
+  const before = s.snap();
+  for (const email of ["someone@example.com", "lanoirbadasswitchery+1@gmail.com", "sentbyjj@gmail.com"]) {
+    const r = await s.invite(email, "owner", s.org, { e: env });
+    assert.deepEqual([r.status, (await body(r)).error], [403, "recipient_not_allowed"], email);
+  }
+  assert.equal(s.snap(), before);
+  assert.equal(s.pv.calls.length, 0);
+  const ok = await s.invite("lanoirbadasswitchery@gmail.com", "owner", s.org, { e: env });
+  assert.equal(ok.status, 201);
+  const inv = (await body(ok)).invitation;
+  assert.equal((await s.act(inv, "send", s.org, { e: env })).status, 200);
+  assert.deepEqual(s.pv.calls, ["GET api.workos.com/user_management/users", "POST api.workos.com/user_management/invitations"], "mocked providers only: the one approved invitation");
 });

@@ -53,7 +53,7 @@ const audit = (db, where = "1=1") => sql(db, `SELECT organization_id, actor_type
 
 /* ------------------------------------------------------------------ the switch and authorization */
 
-test("the write routes are OFF unless PORTAL_ADMIN_WRITES is exactly '1': 403 writes_disabled, nothing changes; reads still work; the switch is in no checked-in configuration", async () => {
+test("the write routes are OFF unless PORTAL_ADMIN_WRITES is exactly '1': 403 writes_disabled, nothing changes; reads still work; the switch is only in the Staging preview configuration", async () => {
   const off = await setup({ writes: false });
   await off.person(off.alpha, "ann@alpha.test", "owner", 1);
   const before = off.snap();
@@ -66,7 +66,12 @@ test("the write routes are OFF unless PORTAL_ADMIN_WRITES is exactly '1': 403 wr
   assert.equal(off.snap(), before);
   assert.equal((await off.call(`/api/admin/clients/${off.alpha.id}/access`)).status, 200);
   for (const v of ["0", "true", "yes", " 1", "1 "]) assert.equal((await off.post("/api/admin/clients", { name: "X" }, { e: { ...off.env, PORTAL_ADMIN_WRITES: v } })).status, 403, JSON.stringify(v));
-  for (const f of ["wrangler.jsonc", ".github/workflows/ci.yml"]) assert.ok(!/PORTAL_ADMIN_WRITES/.test(read(f).replace(/^\s*\/\/.*$/gm, "")), f + " does not enable the write routes (comments aside)");
+  const code = (f) => read(f).replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(!/PORTAL_ADMIN_WRITES/.test(code(".github/workflows/ci.yml")), "CI does not enable the write routes");
+  const cfg = JSON.parse(code("wrangler.jsonc"));
+  assert.equal(cfg.vars.PORTAL_ADMIN_WRITES, undefined, "never in the top-level (Production) vars");
+  assert.equal(cfg.previews.vars.PORTAL_ADMIN_WRITES, "1", "the controlled Staging test: set exactly once, in previews.vars only");
+  assert.equal(code("wrangler.jsonc").match(/PORTAL_ADMIN_WRITES/g).length, 1);
 });
 
 test("authorization is unchanged: no token, a forged token, an unlisted admin and a client's cookie get nothing, for reads and writes alike", async () => {
