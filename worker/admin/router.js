@@ -13,6 +13,7 @@ import { handleFeedbackApi } from "./feedback-api.js";
 import { handleAssessmentsApi } from "./assessments-api.js";
 import { handleDatabaseApi } from "./database-api.js";
 import { handleClientsApi } from "../portal/admin-clients.js";
+import { handleAccessApi } from "../portal/admin-access.js";
 import { handlePortalFeedbackApi } from "../portal/admin-feedback.js";
 import { json } from "../shared.js";
 
@@ -62,7 +63,7 @@ function deniedPage(status, code) {
 
 async function handleApi(request, env, principal, path, deps = {}) {
   // Modules register here. Each handler returns a Response, or null when the path isn't one of its routes.
-  const handlers = [handleClientsApi, handlePortalFeedbackApi, handleFeedbackApi, handleAssessmentsApi, handleDatabaseApi];
+  const handlers = [handleAccessApi, handleClientsApi, handlePortalFeedbackApi, handleFeedbackApi, handleAssessmentsApi, handleDatabaseApi];
   for (const handler of handlers) {
     const res = await handler(request, env, principal, path, deps);
     if (res) return res;

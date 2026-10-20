@@ -83,7 +83,7 @@ test("everything under /api/admin/clients is read-only: every other method is re
   const before = snap();
   for (const method of ["POST", "PUT", "PATCH", "DELETE"]) for (const path of ["/api/admin/clients", `/api/admin/clients/${alpha.id}`]) {
     const r = await call(path, { method, body: JSON.stringify({ name: "x" }) });
-    assert.ok([404, 405].includes(r.status), `${method} ${path} -> ${r.status}`);
+    assert.ok([403, 404, 405].includes(r.status), `${method} ${path} -> ${r.status}`); // 403: the access-management write routes exist but are switched off (PORTAL_ADMIN_WRITES unset)
   }
   assert.equal(snap(), before);
 });
