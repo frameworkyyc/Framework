@@ -32,11 +32,11 @@ async function invitation(db, o, email = "sam@example.com", role = "member", now
 const audit = (db, where = "1=1") => rows(db, `SELECT actor_ref, action, entity_id, detail FROM activity_log WHERE ${where} ORDER BY created_at, rowid`);
 
 /** Mock providers that record every call. */
-function mocks({ userExists = false, lookup, create, resend, email } = {}) {
+function mocks({ userExists = false, lookup, create, resend, email, createId = "invitation_01MOCKCREATED" } = {}) {
   const calls = { find: [], create: [], resend: [], email: [] };
   const workos = {
     async findUserByEmail(e) { calls.find.push(e); if (lookup) throw lookup; return { exists: userExists }; },
-    async createInvitation(a) { calls.create.push(a); if (create) throw create; return { id: "invitation_01MOCKCREATED" }; },
+    async createInvitation(a) { calls.create.push(a); if (create) throw create; return { id: createId }; },
     async resendInvitation(id) { calls.resend.push(id); if (resend) throw resend; return { id }; },
     async revokeInvitation() { throw new Error("not used"); },
   };
@@ -316,10 +316,29 @@ test("D1 stays the authority: delivery grants nothing, and the invitation still 
   assert.equal(rows(db, "SELECT delivery_status FROM invitations")[0].delivery_status, "submitted", "acceptance and delivery are separate fields");
 });
 
-test("the delivery code is NOT WIRED: no route, router or entry point imports it, and it contains no live endpoint other than WorkOS's API host", () => {
-  const importers = ["worker/index.js", "worker/admin/router.js", "worker/portal/router.js", "worker/portal/admin-access.js", "worker/portal/pages.js"];
+test("the delivery code is reachable only from the admin access API (behind its two switches), and contains no live endpoint other than WorkOS's API host", () => {
+  const importers = ["worker/index.js", "worker/admin/router.js", "worker/portal/router.js", "worker/portal/pages.js", "worker/portal/auth.js"];
   for (const f of importers) assert.ok(!/invite-delivery|workos-admin|invitation-delivery/.test(read(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")), f);
   const hosts = new Set();
   for (const f of ["worker/portal/workos-admin.js", "worker/portal/invite-delivery.js", "worker/portal/repo/invitation-delivery.js"]) for (const m of read(f).matchAll(/https?:\/\/[a-z0-9.-]+/gi)) hosts.add(m[0]);
   assert.deepEqual([...hosts].filter((h) => !/example|frameworkco/.test(h)), ["https://api.workos.com"]);
+});
+
+test("duplicate prevention at the data level: two simultaneous sends make ONE provider request (compare-and-swap claim), and a claim never gets stuck", async () => {
+  const db = openWithDelivery();
+  const o = await org(db);
+  const inv = await invitation(db, o);
+  const m = mocks();
+  const results = await Promise.all([send(m, db, o, inv), send(m, db, o, inv), send(m, db, o, inv)]);
+  assert.equal(results.filter((r) => r.ok).length, 1, JSON.stringify(results));
+  assert.ok(results.filter((r) => !r.ok).every((r) => ["send_in_progress", "already_submitted"].includes(r.error)));
+  assert.equal(m.calls.create.length, 1, "one provider invitation");
+  assert.equal(audit(db, "action = 'invitation.delivery_submitted'").length, 1);
+  // a worker that died after claiming leaves no lock: the next attempt reads the new value and proceeds
+  const inv2 = await invitation(db, o, "kim@example.com");
+  const { claimDeliveryAttempt } = await import("../portal/repo/invitation-delivery.js");
+  assert.equal((await claimDeliveryAttempt(db, o.id, inv2.id, null, { now: at(1) })).ok, true);
+  assert.equal((await claimDeliveryAttempt(db, o.id, inv2.id, null, { now: at(1) })).error, "send_in_progress", "a stale read cannot claim");
+  const later = await send(mocks({ createId: "invitation_01MOCKSECOND" }), db, o, inv2, { now: at(2) });
+  assert.equal(later.ok, true, JSON.stringify(later) + " the abandoned claim does not block a later attempt");
 });

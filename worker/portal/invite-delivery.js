@@ -17,7 +17,8 @@
  */
 import { getInvitation } from "./repo/invitations.js";
 import { getOrganizationById } from "./repo/orgs.js";
-import { recordDeliveryAttempt, getDelivery } from "./repo/invitation-delivery.js";
+import { recordDeliveryAttempt, getDelivery, claimDeliveryAttempt, recordWorkosRevocation, workosRevocationDone } from "./repo/invitation-delivery.js";
+import { revokeInvitation } from "./repo/invitations.js";
 
 const DAY = 86400000;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -56,6 +57,9 @@ export async function deliverInvitation(ctx, { organizationId, invitationId, act
   const org = await getOrganizationById(db, organizationId);
   if (!org || org.status !== "active") return refuse("organization_inactive", "This organization is not active.");
   const inv = await getInvitation(db, organizationId, invitationId);
+  // Only one request may talk to a provider for this invitation at a time (compare-and-swap on the last attempt time).
+  const claim = await claimDeliveryAttempt(db, organizationId, invitationId, d.delivery_attempted_at, { now });
+  if (!claim.ok) return refuse(claim.error, claim.message);
 
   const record = async (outcome, channel, errorCode, workosInvitationId) => {
     let r;
@@ -102,5 +106,51 @@ export async function deliverInvitation(ctx, { organizationId, invitationId, act
   } catch {
     sent = { ok: false, error: "network" };
   }
-  return sent && sent.ok === true ? record("submitted", "resend") : record("failed", "resend", "email_provider_failed");
+  if (sent && sent.ok === true) return record("submitted", "resend");
+  return record("failed", "resend", sent && typeof sent.error === "string" && sent.error.startsWith("config:") ? "email_not_configured" : "email_provider_failed");
+}
+
+/**
+ * Revoke an invitation in D1 FIRST (that is what ends the person's ability to gain access), then cancel the WorkOS invitation if one exists.
+ * Partial failure is explicit, never hidden and never a rollback of the revoke:
+ *   - D1 revoked, WorkOS revoked           -> { ok:true,  workos:{state:"revoked"} }
+ *   - D1 revoked, WorkOS request failed    -> { ok:true,  workos:{state:"revoke_failed", error} } plus an audit entry. Access is already closed;
+ *                                            calling revoke again retries ONLY the WorkOS cancellation (D1 is not changed twice)
+ *   - no WorkOS invitation to cancel       -> { ok:true,  workos:{state:"none"} }
+ *   - D1 refused (accepted, unknown, ...)   -> the data layer's structured error; WorkOS is not contacted
+ * A repeat on a revoked invitation whose WorkOS side is already cancelled is the usual already_revoked.
+ * @param ctx { db, workos (or null when WorkOS is not configured or sending is off), workosUnavailableCode, now }
+ */
+export async function revokeInvitationEverywhere(ctx, { organizationId, invitationId, actor }) {
+  const { db } = ctx;
+  const now = ctx.now || new Date();
+  const before = await getDelivery(db, organizationId, invitationId);
+  if (!before) return refuse("not_found", "No such invitation in this organization.");
+  let d1Changed = false;
+  if (before.status === "pending") {
+    const r = await revokeInvitation(db, organizationId, invitationId, actor, { now });
+    if (!r.ok) return r;
+    d1Changed = true;
+  } else if (!(before.status === "revoked" && before.workos_invitation_id && !(await workosRevocationDone(db, organizationId, invitationId)))) {
+    const r = await revokeInvitation(db, organizationId, invitationId, actor, { now }); // gives the precise refusal (already_revoked, already_accepted, already_expired)
+    return r.ok ? { ok: true, changed: false, workos: { state: "none" } } : r;
+  }
+  if (!before.workos_invitation_id) return { ok: true, changed: d1Changed, workos: { state: "none" } };
+  let code = null;
+  if (!ctx.workos) code = ctx.workosUnavailableCode || "workos_not_configured";
+  else {
+    try {
+      await ctx.workos.revokeInvitation(before.workos_invitation_id);
+    } catch (e) {
+      code = e && typeof e.code === "string" && /^[a-z0-9_]{1,40}$/.test(e.code) ? e.code : "provider_error";
+    }
+  }
+  let audited;
+  try {
+    audited = await recordWorkosRevocation(db, organizationId, invitationId, code ? { outcome: "failed", errorCode: code } : { outcome: "revoked" }, actor, { now });
+  } catch {
+    audited = { ok: false };
+  }
+  if (!audited.ok && !code) return { ok: false, error: "delivery_unrecorded", message: "WorkOS was asked to cancel the invitation, but the result could not be saved." };
+  return code ? { ok: true, changed: d1Changed, workos: { state: "revoke_failed", error: code } } : { ok: true, changed: d1Changed, workos: { state: "revoked" } };
 }

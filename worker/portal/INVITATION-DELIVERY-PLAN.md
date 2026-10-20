@@ -77,3 +77,33 @@ Four additive columns on `invitations`:
 | Whether WorkOS can invite an existing user (would replace the Resend path) | the same live test |
 | Staging email deliverability to arbitrary addresses (WorkOS sandbox sender) | a live test to a second inbox, or a custom email domain in WorkOS |
 | Enabling the write routes | `PORTAL_ADMIN_WRITES=1`, set by a separate approved config change; absent everywhere now |
+
+## Phase 3: wired behind two switches (both OFF everywhere)
+Migration 0004 is applied on Staging (confirmed by the owner: ids 1-4 recorded, four columns present, nothing pending). The delivery code is now reachable from
+the admin API, but nothing can send until **both** `PORTAL_ADMIN_WRITES` and `PORTAL_INVITE_SENDING` are exactly `"1"`; neither is in any checked-in configuration.
+
+| Route (under `/api/admin/clients/:org/invitations/:id/`) | Behaviour |
+| --- | --- |
+| `send` | first send, or retry after a failure. Read-only WorkOS lookup, then WorkOS invitation (new user) or Framework email (existing user). Needs delivery state `not_sent` or `failed`. |
+| `resend` | needs `submitted`; same channel; **expiry never changes**. |
+| `revoke` | D1 first (ends access), then cancel the WorkOS invitation. A WorkOS failure is reported (`workos: revoke_failed`, audited) and never undoes the revoke; repeating `revoke` retries only WorkOS. With sending off, D1 only and `revoke_failed: sending_disabled`. |
+| `replace` (unchanged) | an expired or revoked invitation becomes a fresh seven-day, `not_sent` invitation. |
+
+Safety properties (all tested with mocks): a provider failure of any kind is a recorded `failed` with a short code, never a success; provider text, addresses and keys
+never reach responses or the audit trail; simultaneous sends make ONE provider request (compare-and-swap claim on `delivery_attempted_at`); missing configuration
+(WorkOS key, portal address, migration 0004) answers 503 before anything is attempted; a database without 0004 (Production today) still lists invitations
+(`not_tracked`) and revokes in D1. Access is unchanged: D1 + a verified, matching email.
+
+### WorkOS behaviour that still needs ONE live Staging verification before sending is enabled
+1. `POST /user_management/invitations` accepts `{email, expires_in_days}` and returns an object with `id` (`invitation_...`). Any other shape is treated as failure by design.
+2. The `expires_in_days` we send (remaining days, rounded up, 1-30) matches the D1 expiry closely enough; WorkOS may count differently.
+3. What WorkOS answers for an **existing** user (documentation unconfirmed). The design never relies on it (a read-only lookup decides), but a 4xx there is recorded as failed.
+4. `GET /user_management/users?email=` returns `{data: [...]}` and matches case-insensitively.
+5. `POST .../{id}/resend` really re-sends without extending the WorkOS expiry, and returns the invitation object.
+6. `POST .../{id}/revoke` and what it answers for an already revoked, accepted or expired invitation (we treat any non-2xx as `revoke_failed`: harmless, because D1 already blocks access, but it means a cleanup retry would keep reporting failure).
+7. The invitation email link leads to `/portal/login?invitation_token=...` (the portal forwards the token) and the invitee can complete sign-up with `allowSignUp:false`.
+8. Staging email deliverability to a second, non-owner inbox (WorkOS sandbox sender), and Resend deliverability for the existing-user notice.
+9. The WorkOS API key in the Worker (`PORTAL_AUTH_CLIENT_SECRET`) is permitted to create, resend and revoke invitations (it is environment-wide, so expected).
+
+Enabling procedure (not done): set both switches in `previews.vars` through a reviewed change, run one invitation to an inbox you control, watch the WorkOS dashboard's
+sent-email events, then remove or keep the switches as decided.

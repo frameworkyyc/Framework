@@ -138,7 +138,7 @@ test("create invitation: pending for seven days, not sent, audited; no email and
   assert.equal(r.status, 201);
   const out = await r.json();
   assert.deepEqual([out.invitation.email, out.invitation.role, out.invitation.status, out.invitation.created_by, out.invitation.expires_at], ["new.person@example.com", "owner", "pending", ADMIN, at(7).toISOString()]);
-  assert.deepEqual(out.delivery, { state: "not_sent", sending: "not_enabled" });
+  assert.deepEqual(out.invitation.delivery, { state: "not_sent", channel: null, attempted_at: null, error: null });
   assert.ok(!("workos_invitation_id" in out.invitation));
   assert.equal(audit(s.w.db, "action = 'invitation.created'").length, 1);
   assert.equal(s.net.calls, 0, "no provider was contacted");
@@ -180,7 +180,7 @@ test("revoke and replace: revoke once (repeat is a clear 409), replace only an e
   const rep = await s.post(`/api/admin/clients/${s.alpha.id}/invitations/${inv.id}/replace`, { role: "owner" }, { now: at(2) });
   assert.equal(rep.status, 201);
   const repBody = await rep.json();
-  assert.deepEqual([repBody.invitation.status, repBody.invitation.role, repBody.invitation.expires_at, repBody.replaced, repBody.delivery.state], ["pending", "owner", at(9).toISOString(), inv.id, "not_sent"]);
+  assert.deepEqual([repBody.invitation.status, repBody.invitation.role, repBody.invitation.expires_at, repBody.replaced, repBody.invitation.delivery.state], ["pending", "owner", at(9).toISOString(), inv.id, "not_sent"]);
   assert.deepEqual(audit(s.w.db, "action = 'invitation.replaced'").map((x) => [x.actor_ref, JSON.parse(x.detail).replaces]), [[ADMIN, inv.id]]);
   const retry = await s.post(`/api/admin/clients/${s.alpha.id}/invitations/${inv.id}/replace`, {}, { now: at(2) });
   assert.deepEqual([retry.status, (await retry.json()).invitationId], [409, repBody.invitation.id], "a retry never creates a second invitation");
@@ -259,7 +259,8 @@ test("access listing: the organization's own members and invitations only, with 
   assert.deepEqual(out.members.map((m) => [m.user_id, m.email, m.role, m.status, m.last_active_owner]), [[ann, "ann@alpha.test", "owner", "active", true]]);
   assert.ok(out.invitations.every((i) => i.id && !("workos_invitation_id" in i)));
   assert.ok(out.invitations.some((i) => i.email === "old@example.com" && i.past_expiry === true), "a lapsed pending invitation is flagged");
-  assert.deepEqual(out.delivery, { state: "not_sent", sending: "not_enabled" });
+  assert.ok(out.invitations.every((i) => i.delivery.state === "not_sent"), "nothing has been sent");
+  assert.equal(out.delivery_tracking, true);
   const text = JSON.stringify(out);
   assert.ok(!/bob@beta|Beta Co/.test(text), "nothing from another organization");
   assert.equal((await s.call(`/api/admin/clients/${crypto.randomUUID()}/access`)).status, 404);
@@ -280,14 +281,14 @@ test("methods and paths: wrong methods get 405 with Allow; unknown paths are 404
   assert.equal((await s.call(`${base}/members/${ann}/remove`, { method: "DELETE" })).headers.get("Allow"), "POST");
   assert.equal((await s.call(`${base}/members/${ann}/remove`, { method: "PUT", json: {} })).status, 405);
   const before = s.snap();
-  for (const p of [`${base}/members/${ann}`, `${base}/members/${ann}/offboard`, `${base}/members/${ann}/disable`, `/api/admin/users/${ann}/offboard`, `/api/admin/users/${ann}/disable`, `${base}/delete`, `${base}/status`, `${base}/invitations/${crypto.randomUUID()}/send`, `${base}/invitations/${crypto.randomUUID()}/resend`]) {
+  for (const p of [`${base}/members/${ann}`, `${base}/members/${ann}/offboard`, `${base}/members/${ann}/disable`, `/api/admin/users/${ann}/offboard`, `/api/admin/users/${ann}/disable`, `${base}/delete`, `${base}/status`]) {
     const r = await s.post(p, {});
     assert.ok([404, 503].includes(r.status), `${p} -> ${r.status}`); // 503 = the feedback modules' own "no feedback database" answer in this harness; never a success
     assert.ok(r.status !== 200 && r.status !== 201);
   }
   assert.equal(s.snap(), before);
   const src = read("worker/portal/admin-access.js");
-  assert.ok(!/offboard|reenable|disableUser|setUserStatus|invite-delivery|workos-admin|sendEmail/i.test(src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")), "the module cannot offboard, send or call WorkOS");
+  assert.ok(!/offboard|reenable|disableUser|setUserStatus/i.test(src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")), "the module cannot offboard or disable a user");
   assert.equal(s.net.calls, 0);
 });
 
@@ -302,10 +303,10 @@ test("failures are safe: a database error answers 500 server_error with no SQL, 
   assert.equal((await s.post("/api/admin/clients", { name: "Acme" }, { e: { ...s.env, PORTAL_DB: undefined } })).status, 503);
 });
 
-test("the module is database-only: it imports no email, WorkOS or delivery module, and nothing else imports the delivery modules", () => {
+test("the module imports exactly the reviewed modules, and no other file imports the delivery code", () => {
   const src = read("worker/portal/admin-access.js");
   const imports = [...src.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(imports, ["./admin-clients.js", "./repo/orgs.js", "./repo/invitations.js", "./repo/memberships.js", "./repo/validate.js", "./repo/common.js"]);
+  assert.deepEqual(imports, ["./admin-clients.js", "./repo/orgs.js", "./repo/invitations.js", "./repo/memberships.js", "./repo/validate.js", "./repo/common.js", "./workos-admin.js", "./invite-delivery.js", "../assessment.js"]);
   for (const f of ["worker/index.js", "worker/admin/router.js", "worker/portal/router.js", "worker/portal/auth.js", "worker/portal/admin-clients.js", "worker/portal/admin-feedback.js"]) {
     assert.ok(!/invite-delivery|workos-admin|invitation-delivery/.test(read(f)), f + " does not import the unwired delivery code");
   }

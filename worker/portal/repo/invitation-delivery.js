@@ -56,3 +56,49 @@ export async function getDelivery(db, organizationId, id) {
   requireId(id, "invitation_id");
   return (await db.prepare("SELECT id, status, expires_at, workos_invitation_id, delivery_status, delivery_channel, delivery_attempted_at, delivery_error FROM invitations WHERE id = ? AND organization_id = ?").bind(id, organizationId).first()) || null;
 }
+
+/**
+ * Claim the right to make ONE provider request for this invitation, so two simultaneous sends cannot both reach a provider. It is a compare-and-swap on
+ * delivery_attempted_at: it succeeds only if the value is still what the caller read, and only for a pending invitation. It is not a lock that can
+ * get stuck: if the Worker dies after claiming, the next attempt simply reads the new value and claims again. No audit entry (nothing visible changed).
+ * @returns {{ok:true}|{ok:false, error:"send_in_progress"}}
+ */
+export async function claimDeliveryAttempt(db, organizationId, id, previousAttemptedAt, { now = new Date() } = {}) {
+  requireOrgId(organizationId);
+  requireId(id, "invitation_id");
+  const res = await db
+    .prepare("UPDATE invitations SET delivery_attempted_at = ? WHERE id = ? AND organization_id = ? AND status = 'pending' AND delivery_attempted_at IS ?")
+    .bind(isoTime(now), id, organizationId, previousAttemptedAt ?? null)
+    .run();
+  return res.meta.changes === 1 ? ok() : fail("send_in_progress", { message: "Another request is already working on this invitation. Check its status, then try again." });
+}
+
+/**
+ * Record what happened when the WORKOS side of a revoked invitation was cancelled. The invitation itself is already revoked in D1 (D1 decides access), so
+ * this is an audit entry only. outcome "revoked" means WorkOS accepted the revoke request; "failed" keeps a short code. Only for a revoked invitation that
+ * has a WorkOS invitation id, in its own organization.
+ */
+export async function recordWorkosRevocation(db, organizationId, id, { outcome, errorCode } = {}, actor, { now = new Date() } = {}) {
+  requireOrgId(organizationId);
+  requireId(id, "invitation_id");
+  if (!validActor(actor)) return fail("invalid_actor", { message: "An administrator must be named for this change." });
+  if (outcome !== "revoked" && outcome !== "failed") return fail("invalid_outcome");
+  if (outcome === "failed" && !(typeof errorCode === "string" && ERROR_CODE.test(errorCode))) return fail("invalid_error_code");
+  const res = await db
+    .prepare(
+      `INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, detail, visibility, created_at)
+       SELECT ?, organization_id, 'admin', ?, ?, 'invitation', id, json_object('channel', 'workos', 'error', ?), 'internal', ? FROM invitations
+        WHERE id = ? AND organization_id = ? AND status = 'revoked' AND workos_invitation_id IS NOT NULL`,
+    )
+    .bind(newId(), actor.trim(), outcome === "revoked" ? "invitation.workos_revoked" : "invitation.workos_revoke_failed", outcome === "failed" ? errorCode : null, isoTime(now), id, organizationId)
+    .run();
+  return res.meta.changes === 1 ? ok({ outcome }) : fail("not_found", { message: "No revoked invitation with a WorkOS invitation in this organization." });
+}
+
+/** Has the WorkOS side of this (revoked) invitation been cancelled successfully? Read from the audit trail. */
+export async function workosRevocationDone(db, organizationId, id) {
+  requireOrgId(organizationId);
+  requireId(id, "invitation_id");
+  const row = await db.prepare("SELECT 1 AS x FROM activity_log WHERE organization_id = ? AND entity_id = ? AND action = 'invitation.workos_revoked' LIMIT 1").bind(organizationId, id).first();
+  return Boolean(row);
+}
