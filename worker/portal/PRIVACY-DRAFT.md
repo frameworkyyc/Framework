@@ -56,3 +56,15 @@ The existing paragraph (processed outside Alberta and Canada, including the Unit
 * Deleting a person from the portal = `emergency-offboard.sql` (access) then, for erasure, a reviewed manual deletion of their portal user row only after the retention need has passed
   (foreign keys protect history); WorkOS erasure is done in the WorkOS dashboard.
 * Breach handling: write who decides and who notifies (Alberta's PIPA expects notice to the Commissioner and to affected individuals where there is a real risk of significant harm).
+
+
+## 10. Business Profile and portal feedback (added with the private-beta notice)
+The Business Profile notice in the portal says only what the portal does today; it does not describe encryption, retention periods, legal bases, regulatory compliance or data
+location. The published website policy (`privacy.html`) does not mention the client portal or the Business Profile at all, so it does not yet cover this processing. Gaps for review:
+* **Collection:** Business Profile answers (legal and operating name, industry, description, location, size, products, customers, goals, competitors, websites and social links, contact
+  name, role, email and phone, brand personality) saved per organization; and portal feedback messages (type, message text, the section the message is about, who sent it).
+* **Purpose and access:** to plan and deliver services; authorized Framework staff can read the answers and the feedback; every member of the organization can read and edit the answers. **[DECISION]** whether to describe a staff-access rule.
+* **Retention and deletion:** the website policy gives 24 months for assessment inquiries only. **[DECISION]** a retention period for Business Profile and portal feedback, and who performs deletion requests and how fast. Today deletion is handled by email to `hello@frameworkco.ca` and manual database work.
+* **Consent:** no consent checkbox is used. **[DECISION]** whether your adviser wants explicit consent or an acknowledgement for Business Profile information.
+* **Providers and location:** answers are stored in the Cloudflare D1 database used for the portal; WorkOS handles sign-in only. The existing wording about processing outside Canada should be confirmed to cover the portal.
+* **Sensitive content:** clients may type anything in free-text boxes, including personal information about others. **[DECISION]** whether to add a "don't include sensitive personal information" line.

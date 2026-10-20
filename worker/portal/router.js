@@ -21,7 +21,8 @@ import { validateSlug } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
 import { getProfileAnswers, saveProfileStep } from "./repo/business-profile.js";
 import { stepById } from "./profile-schema.js";
-import { readForm, declaredBodyProblem, MAX_PROFILE_FORM_BYTES } from "./form.js";
+import { readForm, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES } from "./form.js";
+import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
 import { checkCsrf } from "./sessions.js";
 
 /**
@@ -111,6 +112,35 @@ async function saveProfile(ctx, a, stepId) {
   return redirect(`/portal/o/${a.membership.slug}/profile/${stepId}?saved=1`);
 }
 
+/** Send feedback. Organization and person come from the membership and session; the form supplies only the kind, the message and an optional section. */
+async function saveFeedback(ctx, a) {
+  const read = await readForm(ctx.request, MAX_FEEDBACK_FORM_BYTES);
+  if (read.error) return errorPage(read.error, { ref: ctx.ref });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) {
+    logEvent({ evt: "feedback.submit", outcome: "rejected", reason: "csrf", status: 403, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return errorPage(403, { ref: ctx.ref });
+  }
+  const input = { kind: read.fields.get("kind") || "", message: read.fields.get("message") || "", page: read.fields.get("page") || "" };
+  let result;
+  try {
+    result = await dbCall(() => submitPortalFeedback(ctx.db, a.membership.organizationId, a.session.userId, input, { now: ctx.now }));
+  } catch (err) {
+    if (!(err instanceof Unavailable)) throw err;
+    logEvent({ evt: "feedback.submit", outcome: "store_unavailable", status: 503, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return pages.feedbackPage(ctx, a, { values: input, failed: true, status: 503 });
+  }
+  if (result.ok) {
+    logEvent({ evt: "feedback.submit", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+    return redirect(`/portal/o/${a.membership.slug}/feedback?sent=1`);
+  }
+  if (result.error === "too_many") {
+    logEvent({ evt: "feedback.submit", outcome: "too_many", status: 429, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return pages.feedbackPage(ctx, a, { values: input, tooMany: true, status: 429 });
+  }
+  logEvent({ evt: "feedback.submit", outcome: "invalid", status: 422, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, count: Object.keys(result.errors || {}).length });
+  return pages.feedbackPage(ctx, a, { values: result.values || input, errors: result.errors || {}, status: 422 });
+}
+
 const ORG_ROUTES = [
   { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => pages.homePage(ctx, a) },
   { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, a, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },
@@ -125,6 +155,17 @@ const ORG_ROUTES = [
       return step ? pages.profileStepPage(ctx, a, step, await getProfileAnswers(ctx.db, a.membership.organizationId), { savedNote: viewFilters(ctx.url).saved }) : notFoundPage(ctx);
     },
     post: (ctx, a, id) => saveProfile(ctx, a, id),
+  },
+  {
+    re: /^\/portal\/o\/([^/]+)\/feedback$/,
+    action: "feedback.submit",
+    postAction: "feedback.submit",
+    bucket: "feedback",
+    run: async (ctx, a) => {
+      const f = viewFilters(ctx.url);
+      return pages.feedbackPage(ctx, a, f.sent ? { sent: true } : { from: validPageKey(f.from) || "" });
+    },
+    post: (ctx, a) => saveFeedback(ctx, a),
   },
   { re: new RegExp(`^\\/portal\\/o\\/([^/]+)\\/(${SOON})$`), action: "workspace.view", run: async (ctx, a, key) => pages.comingSoonPage(ctx, a, key) },
   { re: /^\/portal\/o\/([^/]+)\/projects$/, action: "projects.view", run: async (ctx, a) => pages.projectsPage(ctx, a, await listProjects(ctx.db, a.membership.organizationId)) },
@@ -158,7 +199,7 @@ async function orgRoute(ctx, path) {
     if (!slug) return notFoundPage(ctx);
     if (isPost) {
       // cheap checks first: an oversized or cross-site request costs no database work and its body is never read
-      const declared = declaredBodyProblem(ctx.request, MAX_PROFILE_FORM_BYTES);
+      const declared = declaredBodyProblem(ctx.request, r.bucket === "feedback" ? MAX_FEEDBACK_FORM_BYTES : MAX_PROFILE_FORM_BYTES);
       if (declared) return errorPage(declared, { ref: ctx.ref });
       const same = checkSameSiteMutation(ctx.request, ctx.cfg.origin);
       if (!same.ok) {

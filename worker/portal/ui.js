@@ -4,7 +4,7 @@
  * inline style (the portal CSP forbids both), so all presentation is in /assets/css/portal.css.
  */
 import { securityHeaders } from "./http.js";
-import { escapeHtml as e, MARK, head, footer } from "./frame.js";
+import { escapeHtml as e, MARK, head, footer, footerWithFeedback } from "./frame.js";
 
 /* ------------------------------------------------------------------ dates (Alberta time) */
 
@@ -108,7 +108,7 @@ export const NAV = Object.freeze([
  * @param actions HTML for the right side of the bar (sign-out form, or the demo exit link) - already escaped by the caller
  * @param banner  HTML shown above the bar (the demo banner) - already escaped by the caller
  */
-export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions = "", banner = "", headers = {}, cookies = [], script = null }) {
+export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions = "", banner = "", headers = {}, cookies = [], script = null, feedbackHref = null }) {
   const items = nav.list || [...NAV, ...(nav.items || [])];
   const links = items.map((n) => `<li><a href="${e(nav.base + n.path)}"${n.key === nav.active ? ' aria-current="page"' : ""}>${e(n.label)}</a></li>`).join("");
   const html = `<!DOCTYPE html>
@@ -117,7 +117,7 @@ export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions
 <header class="bar"><div class="wrap bar__in"><a class="brand" href="${e(nav.base)}" aria-label="Framework client portal home">${MARK}<span class="brand__word">Framework</span></a>
 <nav class="primary" aria-label="Portal"><ul>${links}</ul></nav>
 <div class="who"><span class="who__org">${e(who.org)}</span><span class="who__user">${e(who.user)}</span><div class="who__act">${actions}</div></div></div></header>
-<main id="main" class="wrap page">${bodyHtml}</main>${footer}</body></html>`;
+<main id="main" class="wrap page">${bodyHtml}</main>${feedbackHref ? footerWithFeedback(feedbackHref) : footer}</body></html>`;
   return new Response(html, { status: code, headers: securityHeaders({ ...headers, "Content-Type": "text/html; charset=utf-8", "Set-Cookie": cookies }, { scripts: !!script }) });
 }
 

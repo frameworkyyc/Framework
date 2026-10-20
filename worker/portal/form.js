@@ -3,6 +3,7 @@
  * urlencoded only, and a repeated field name is refused instead of silently picking one.
  */
 export const MAX_PROFILE_FORM_BYTES = 24 * 1024;
+export const MAX_FEEDBACK_FORM_BYTES = 16 * 1024;
 
 /** Cheap pre-check from the headers alone, before anything is read: 400 for a malformed length, 413 for one over the limit, otherwise null. */
 export function declaredBodyProblem(request, max) {

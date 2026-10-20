@@ -38,11 +38,11 @@ function liveModel(ctx, { session, membership: m }, data = {}) {
   };
 }
 
-async function shell(ctx, a, { title, active, body, status = 200, vm, script = null }) {
+async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, ref = null }) {
   const { session, membership: m } = a;
   // Header navigation of the connected portal: Home and Account (and Team for owners). Every other page is reached from Home.
   const list = [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: active === "account" || active === "team" ? active : "home", list }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), script });
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: active === "account" || active === "team" ? active : "home", list }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), script, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}` });
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null }) {
@@ -72,47 +72,54 @@ export async function pickerPage(ctx, session, memberships) {
 /** The home of the connected portal: the six workspace blocks. Nothing from the demonstration is shown. */
 export async function homePage(ctx, a) {
   const vm = liveModel(ctx, a, {});
-  return shell(ctx, a, { title: "Home", active: "home", body: guided.home(vm), vm });
+  return shell(ctx, a, { title: "Home", active: "home", body: guided.home(vm), vm, ref: "home" });
 }
 export async function overviewPage(ctx, a, data) {
   const vm = liveModel(ctx, a, data);
-  return shell(ctx, a, { title: "Progress", active: "dashboard", body: views.dashboard(vm), vm });
+  return shell(ctx, a, { title: "Progress", active: "dashboard", body: views.dashboard(vm), vm, ref: "progress" });
 }
 export async function profileOverviewPage(ctx, a, saved) {
   const vm = liveModel(ctx, a, {});
-  return shell(ctx, a, { title: "Business Profile", active: "home", body: live.profileOverview(vm, saved), vm });
+  return shell(ctx, a, { title: "Business Profile", active: "home", body: live.profileOverview(vm, saved), vm, ref: "profile" });
 }
 /** @param o see profile-live.js profileStep; `status` is the HTTP status (422 for rejected answers, 503 when the save could not be stored) */
 export async function profileStepPage(ctx, a, step, saved, o = {}) {
   const vm = liveModel(ctx, a, {});
   const csrf = await csrfFor(ctx.cfg, a.session);
-  return shell(ctx, a, { title: `${step.title}: Business Profile`, active: "home", body: live.profileStep(vm, step, saved, { ...o, csrf }), vm, status: o.status || 200, script: "/assets/js/portal-profile.js" });
+  return shell(ctx, a, { title: `${step.title}: Business Profile`, active: "home", body: live.profileStep(vm, step, saved, { ...o, csrf }), vm, status: o.status || 200, script: "/assets/js/portal-profile.js", ref: `profile-${step.id}` });
 }
 export async function comingSoonPage(ctx, a, key) {
   const vm = liveModel(ctx, a, {});
-  return shell(ctx, a, { title: "Coming soon", active: "home", body: live.comingSoon(vm, key), vm });
+  return shell(ctx, a, { title: "Coming soon", active: "home", body: live.comingSoon(vm, key), vm, ref: key });
 }
 export async function projectsPage(ctx, a, projects) {
   const vm = liveModel(ctx, a, { projects });
-  return shell(ctx, a, { title: "Projects", active: "projects", body: views.projects(vm), vm });
+  return shell(ctx, a, { title: "Projects", active: "projects", body: views.projects(vm), vm, ref: "projects" });
 }
 export async function projectPage(ctx, a, p) {
   const vm = liveModel(ctx, a, { projects: [p] });
-  return shell(ctx, a, { title: p.name, active: "projects", body: views.project(vm, vm.projects[0]), vm });
+  return shell(ctx, a, { title: p.name, active: "projects", body: views.project(vm, vm.projects[0]), vm, ref: "projects" });
 }
 export async function activityPage(ctx, a, activity, filters = {}) {
   const vm = liveModel(ctx, a, { activity });
-  return shell(ctx, a, { title: "Activity", active: "activity", body: views.activity(vm, filters), vm });
+  return shell(ctx, a, { title: "Activity", active: "activity", body: views.activity(vm, filters), vm, ref: "activity" });
 }
 export async function documentsPage(ctx, a, filters = {}) {
   const vm = liveModel(ctx, a, {});
-  return shell(ctx, a, { title: "Documents", active: "documents", body: views.documents(vm, filters), vm });
+  return shell(ctx, a, { title: "Documents", active: "documents", body: views.documents(vm, filters), vm, ref: "documents" });
 }
 export async function accountPage(ctx, a) {
   const vm = liveModel(ctx, a, {});
-  return shell(ctx, a, { title: "Account", active: "account", body: views.account(vm, { signOut: await signOutForm(ctx, a.session) }), vm });
+  return shell(ctx, a, { title: "Account", active: "account", body: views.account(vm, { signOut: await signOutForm(ctx, a.session) }), vm, ref: "account" });
 }
 export async function membersPage(ctx, a, members) {
   const vm = liveModel(ctx, a, { team: members.map((u) => ({ name: u.name, email: u.email, role: u.role })) });
-  return shell(ctx, a, { title: "Team", active: "team", body: views.team(vm), vm });
+  return shell(ctx, a, { title: "Team", active: "team", body: views.team(vm), vm, ref: "team" });
+}
+
+/** The feedback form (and its sent / error states) for the signed-in member's own organization. */
+export async function feedbackPage(ctx, a, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  return shell(ctx, a, { title: "Send feedback", active: "home", body: live.feedbackForm(vm, { ...o, csrf }), vm, status: o.status || 200 });
 }

@@ -6,6 +6,7 @@
 export const MODULES = [
   { id: "overview", label: "Overview", path: "/admin", enabled: true, load: () => import("./overview.js") },
   { id: "feedback", label: "Client Feedback", path: "/admin/feedback", enabled: true, load: () => import("./feedback.js") },
+  { id: "portal-feedback", label: "Portal Feedback", path: "/admin/portal-feedback", enabled: true, load: () => import("./portal-feedback.js") },
   { id: "assessments", label: "Assessments", path: "/admin/assessments", enabled: true, load: () => import("./assessments.js") },
 
   { id: "clients", label: "Clients", path: "/admin/clients", enabled: true, load: () => import("./clients.js") },

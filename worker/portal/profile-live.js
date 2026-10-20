@@ -7,6 +7,7 @@ import { e } from "./ui.js";
 import { overview, crumb } from "./guided.js";
 import { PROFILE_STEPS, profileProgress, stepStatus } from "./profile-schema.js";
 import { AREAS } from "./guided-data.js";
+import { FEEDBACK_KINDS, FEEDBACK_PAGES, MAX_MESSAGE } from "./repo/portal-feedback.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const area = (key) => AREAS.find((a) => a.key === key);
@@ -14,7 +15,23 @@ const area = (key) => AREAS.find((a) => a.key === key);
 /** Overview: seven rows and one progress line, both calculated from saved answers. */
 export function profileOverview(vm, saved) {
   const prog = profileProgress(saved);
-  return overview(vm, { key: "profile", progress: { done: prog.done, total: prog.total, noun: "steps" }, rows: PROFILE_STEPS.map((s, i) => ({ title: s.title, href: `/profile/${s.id}`, state: prog.steps[i].state })) });
+  return overview(vm, { key: "profile", progress: { done: prog.done, total: prog.total, noun: "steps" }, rows: PROFILE_STEPS.map((s, i) => ({ title: s.title, href: `/profile/${s.id}`, state: prog.steps[i].state })) }) + privacyNotice();
+}
+
+/**
+ * How Business Profile information is used. Plain statements about what the portal does today; deliberately no claims about encryption,
+ * retention periods, regulatory compliance or where data is stored (those need the owner's and an adviser's review: see PRIVACY-DRAFT.md).
+ */
+export function privacyNotice() {
+  return `<section class="privacy" id="privacy" aria-labelledby="h-privacy"><h2 id="h-privacy" class="privacy__title">How we use your Business Profile</h2>
+<p class="muted">The client portal is in private beta, so this may change as we learn.</p>
+<dl class="privacy__list">
+<div><dt>What we collect</dt><dd>The answers you save here about your business, customers, goals, online presence, contact person and brand.</dd></div>
+<div><dt>Why</dt><dd>So Framework can understand your business and plan and deliver services for you.</dd></div>
+<div><dt>Who can see it</dt><dd>It is saved against your organization. People in your organization who use the portal can see and edit it, and authorized Framework staff may review it to provide services to you.</dd></div>
+<div><dt>Corrections and deletion</dt><dd>You can change your answers here at any time. To ask for something to be corrected or deleted, email <a class="text-link" href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a>.</dd></div>
+</dl>
+<p class="muted small">Our <a class="text-link" href="/privacy.html">website privacy policy</a> describes how we handle information on our website.</p></section>`;
 }
 
 function field(scope, def, value, error) {
@@ -50,7 +67,8 @@ ${stepper}${banner}
 <form method="post" action="${e(href(vm, `/profile/${step.id}`))}" data-guard novalidate><input type="hidden" name="csrf" value="${e(csrf)}">
 <div class="questions">${step.fields.map((d) => field(`p-${step.id}`, d, values[d.id] || "", errors[d.id])).join("")}</div>
 <p class="form-status muted small" data-status role="status" aria-live="polite"></p>
-<div class="step-nav">${prev ? `<a class="btn" href="${e(href(vm, `/profile/${prev.id}`))}"><span aria-hidden="true">←</span> Previous</a>` : `<a class="btn" href="${e(href(vm, "/profile"))}"><span aria-hidden="true">←</span> All steps</a>`}<button class="btn btn--primary" type="submit" data-save>Save</button>${next ? `<a class="btn" href="${e(href(vm, `/profile/${next.id}`))}">Next <span aria-hidden="true">→</span></a>` : `<a class="btn" href="${e(href(vm, "/profile"))}">Back to your steps</a>`}</div></form>`;
+<div class="step-nav">${prev ? `<a class="btn" href="${e(href(vm, `/profile/${prev.id}`))}"><span aria-hidden="true">←</span> Previous</a>` : `<a class="btn" href="${e(href(vm, "/profile"))}"><span aria-hidden="true">←</span> All steps</a>`}<button class="btn btn--primary" type="submit" data-save>Save</button>${next ? `<a class="btn" href="${e(href(vm, `/profile/${next.id}`))}">Next <span aria-hidden="true">→</span></a>` : `<a class="btn" href="${e(href(vm, "/profile"))}">Back to your steps</a>`}</div></form>
+<p class="muted small privacy__link">Your answers are saved for your organization and may be reviewed by authorized Framework staff. <a class="text-link" href="${e(href(vm, "/profile#privacy"))}">How we use this information</a></p>`;
 }
 
 /** A section that is not built yet. Authenticated clients never see demonstration content here. */
@@ -58,4 +76,23 @@ export function comingSoon(vm, key) {
   const a = area(key);
   return `<header class="page-head page-head--compact">${crumb(vm, [[a.title]])}<h1 class="h1 h1--section">${e(a.title)}</h1></header>
 <div class="soon"><span class="tag">Coming soon</span><p class="lead">We’re still building this part of your workspace.</p><p class="muted">We’ll let you know when it’s ready. Your Business Profile is the best place to start.</p><p><a class="btn btn--primary" href="${e(href(vm, "/profile"))}">Open your Business Profile <span aria-hidden="true">→</span></a></p></div>`;
+}
+
+/**
+ * The feedback form. o: {values, errors, csrf, sent, failed, tooMany, from}. Asks only for what the session does not already know.
+ */
+export function feedbackForm(vm, { values = {}, errors = {}, csrf, sent = false, failed = false, tooMany = false, from = "" } = {}) {
+  const page = values.page !== undefined ? values.page : from;
+  const nErr = Object.keys(errors).length;
+  const banner = sent ? `<p class="form-banner" role="status">Thank you. Your feedback has been sent to Framework.</p>`
+    : failed ? `<p class="form-banner form-banner--error" role="alert">We couldn’t send your feedback just now. Your message is still here. Please try again in a moment.</p>`
+    : tooMany ? `<p class="form-banner form-banner--error" role="alert">You’ve sent several messages recently. Please try again a little later.</p>`
+    : nErr ? `<p class="form-banner form-banner--error" role="alert">Please check the highlighted parts. Nothing was sent.</p>` : "";
+  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Send feedback"]])}<h1 class="h1 h1--section">Send feedback</h1>${sent ? "" : `<p class="lead">Tell us what isn’t working, or what would help. Framework staff will read it.</p>`}</header>`;
+  if (sent) return `${head}${banner}<p><a class="btn btn--primary" href="${e(vm.base)}">Back to Home</a> <a class="btn" href="${e(vm.base)}/feedback">Send more feedback</a></p>`;
+  const err = (k) => (errors[k] ? `<span class="field__error" id="fb-${k}-e">${e(errors[k])}</span>` : "");
+  const kinds = `<fieldset class="field choice"><legend>What kind of feedback is this?</legend>${FEEDBACK_KINDS.map(([k, label]) => `<label class="choice__opt"><input type="radio" name="kind" value="${k}"${values.kind === k ? " checked" : ""}> <span>${e(label)}</span></label>`).join("")}${err("kind")}</fieldset>`;
+  const message = `<div class="field"><label for="fb-message">Your message</label><textarea id="fb-message" name="message" rows="6" maxlength="${MAX_MESSAGE}"${errors.message ? ' aria-invalid="true" aria-describedby="fb-message-e"' : ""}>${e(values.message || "")}</textarea>${err("message")}</div>`;
+  const about = `<div class="field"><label for="fb-page">About <span class="field__opt">Optional</span></label><select id="fb-page" name="page"${errors.page ? ' aria-invalid="true" aria-describedby="fb-page-e"' : ""}><option value="">Not about a specific page</option>${FEEDBACK_PAGES.map(([k, label]) => `<option value="${k}"${k === page ? " selected" : ""}>${e(label)}</option>`).join("")}</select>${err("page")}</div>`;
+  return `${head}${banner}<form method="post" action="${e(vm.base)}/feedback" novalidate><input type="hidden" name="csrf" value="${e(csrf)}"><div class="questions">${kinds}${message}${about}</div><div class="step-nav"><button class="btn btn--primary" type="submit">Send feedback</button></div></form>`;
 }

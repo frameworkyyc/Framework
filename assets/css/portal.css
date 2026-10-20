@@ -427,3 +427,11 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .form-status { min-height: 20px; margin: 0 0 var(--space-2); }
 .soon { max-width: 36em; display: grid; gap: var(--space-2); justify-items: start; } .soon .lead { margin: 0; }
 .btn[type="submit"] { font-family: inherit; }
+
+/* ---------- privacy notice and feedback ---------- */
+.privacy { margin-top: var(--space-5); padding-top: 14px; border-top: 1px solid var(--ink); max-width: 44em; }
+.privacy__title { font-family: var(--font-display); font-weight: 600; font-size: 20px; margin: 0 0 6px; }
+.privacy__list { margin: var(--space-2) 0; } .privacy__list > div { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 3fr); gap: 4px var(--space-3); padding: 10px 0; border-top: 1px solid var(--hairline); }
+.privacy__list dt { font-size: 14px; font-weight: 600; } .privacy__list dd { font-size: 15px; color: var(--slate); }
+@media (max-width: 640px) { .privacy__list > div { grid-template-columns: minmax(0, 1fr); } }
+.privacy__link { margin-top: var(--space-3); max-width: 44em; }

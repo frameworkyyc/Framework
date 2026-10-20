@@ -296,3 +296,5 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-answer { white-space: pre-wrap; overflow-wrap: anywhere; }
 .adm-meter { width: 100%; max-width: 420px; height: 4px; margin: 4px 0 20px; appearance: none; border: 0; background: var(--hairline); border-radius: 0; display: block; }
 .adm-meter::-webkit-progress-bar { background: var(--hairline); } .adm-meter::-webkit-progress-value { background: var(--ink); } .adm-meter::-moz-progress-bar { background: var(--ink); }
+.adm-feedback-msg { max-width: 560px; }
+.adm-table--left td:last-child, .adm-table--left th:last-child { text-align: left; white-space: normal; padding-right: 0; }

@@ -17,6 +17,7 @@ const GRANTS = Object.freeze({
   "profile.view": Object.freeze(["owner", "member"]),
   "profile.edit": Object.freeze(["owner", "member"]),
   "workspace.view": Object.freeze(["owner", "member"]),
+  "feedback.submit": Object.freeze(["owner", "member"]),
 });
 
 export const ACTIONS = Object.freeze(Object.keys(GRANTS));

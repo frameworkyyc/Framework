@@ -16,6 +16,9 @@ export const head = (title, { script = null } = {}) => `<meta charset="utf-8"><m
 
 export const footer = `<footer class="foot"><div class="wrap"><span>Framework · Calgary, Alberta</span><span><a href="/privacy.html">Privacy</a> · <a href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a></span></div></footer>`;
 
+/** The signed-in footer: the same, plus a quiet "Send feedback" link (a path inside the portal, already escaped by the caller). */
+export const footerWithFeedback = (feedbackHref) => `<footer class="foot"><div class="wrap"><span>Framework · Calgary, Alberta</span><span><a href="${e(feedbackHref)}">Send feedback</a> · <a href="/privacy.html">Privacy</a> · <a href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a></span></div></footer>`;
+
 /** The sign-in / system page frame: brand, one column of content. `bodyHtml` must already be escaped by the caller; `title` is escaped here. */
 export function authFrame({ title, bodyHtml = "", ref = null }) {
   const refLine = ref ? `<p class="muted small">Reference: <strong>${e(ref)}</strong></p>` : "";

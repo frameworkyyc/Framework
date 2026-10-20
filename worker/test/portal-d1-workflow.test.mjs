@@ -159,5 +159,5 @@ test("script: the expected tables, indexes and migration name are exactly what 0
   assert.deepEqual([...sql.matchAll(/CREATE (?:UNIQUE )?INDEX IF NOT EXISTS (\w+)/g)].map((m) => m[1]).sort(), [...EXPECTED.indexes].sort());
   assert.ok(readdirSync(new URL("migrations/portal/", root)).includes(EXPECTED.migration));
   // 0002 (Business Profile) is Staging-only for now. The Production check expects exactly 0001, so a pending 0002 makes it fail closed (see the next test).
-  assert.deepEqual(readdirSync(new URL("migrations/portal/", root)).filter((f) => /^\d{4}_.*\.sql$/.test(f)), [EXPECTED.migration, "0002_business_profile.sql"]);
+  assert.deepEqual(readdirSync(new URL("migrations/portal/", root)).filter((f) => /^\d{4}_.*\.sql$/.test(f)), [EXPECTED.migration, "0002_business_profile.sql", "0003_portal_feedback.sql"]);
 });
