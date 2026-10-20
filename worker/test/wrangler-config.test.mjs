@@ -60,7 +60,7 @@ test("the Production ID appears exactly once in the file (never inside the previ
 test("Production (top-level vars) and Staging (previews.vars) each carry the sender, the same public Turnstile site key and their OWN WorkOS settings; only Staging enables the portal", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
   assert.deepEqual(config.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_BASE_URL: "https://frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691" });
-  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1", PORTAL_DEMO: "1", PORTAL_INVITE_ALLOWED_EMAILS: "lanoirbadasswitchery@gmail.com", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1" });
+  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1", PORTAL_DEMO: "1", PORTAL_INVITE_ALLOWED_EMAILS: "framework.yyc@gmail.com,sentbyjj@gmail.com", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1" });
 });
 
 test("the verified WorkOS issuer is pinned and belongs to the configured client id (not the bare api.workos.com base)", () => {

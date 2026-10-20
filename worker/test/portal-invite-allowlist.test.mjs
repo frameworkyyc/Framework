@@ -12,7 +12,7 @@ import * as repo from "../portal/repo/index.js";
 import { parseAllowlist, recipientPolicy, checkRecipient, allowlistStatus } from "../portal/invite-recipients.js";
 import { deliverInvitation } from "../portal/invite-delivery.js";
 
-const APPROVED = "lanoirbadasswitchery@gmail.com";
+const APPROVED = "framework.yyc@gmail.com";
 const TEAM = "framework.cloudflareaccess.com", AUD = "a".repeat(64), ORIGIN = "https://staging.frameworkco.ca", ADMIN = "owner@frameworkco.ca";
 const pair = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const b64u = (b) => Buffer.from(b).toString("base64url");
@@ -28,7 +28,7 @@ const sql = (db, q, ...p) => db.raw.prepare(q).all(...p).map((r) => ({ ...r }));
 
 test("parsing: exact addresses only, normalized the same way as every other portal email; patterns, domains and junk are discarded", () => {
   assert.deepEqual([...parseAllowlist(APPROVED)], [APPROVED]);
-  assert.deepEqual([...parseAllowlist("  LanoirBadassWitchery@Gmail.COM ")], [APPROVED], "trimmed and lower-cased");
+  assert.deepEqual([...parseAllowlist("  Framework.YYC@Gmail.COM ")], [APPROVED], "trimmed and lower-cased");
   assert.deepEqual([...parseAllowlist("a@x.co, B@X.co;c@x.co\n d@x.co\t\te@x.co")].sort(), ["a@x.co", "b@x.co", "c@x.co", "d@x.co", "e@x.co"], "commas, semicolons, spaces and newlines separate entries");
   assert.deepEqual([...parseAllowlist("a@x.co a@x.co A@X.CO")], ["a@x.co"], "duplicates collapse");
   for (const junk of ["", "   ", ",,;", "*", "*@gmail.com", "@gmail.com", "gmail.com", "gmail.*", "%@gmail.com", "<a@x.co>", "Name <a@x.co>", "\"a\"@x.co", "a@x.co?cc=b@y.co", "a(b)@x.co", "a@@x.co", ".a@x.co.", "a..b@x.co", "a@.x.co", "a b", "not-an-email", "a@x"]) {
@@ -41,20 +41,20 @@ test("parsing: exact addresses only, normalized the same way as every other port
 
 test("matching: approved address passes however it is typed; every other form fails (no plus, dot, domain, suffix, prefix, list, display-name or lookalike matching)", () => {
   const env = { PORTAL_INVITE_ALLOWED_EMAILS: APPROVED };
-  for (const ok of [APPROVED, APPROVED.toUpperCase(), "  LanoirBadassWitchery@Gmail.com  ", `\t${APPROVED}\n`]) assert.deepEqual(checkRecipient(env, ok), { ok: true, email: APPROVED }, JSON.stringify(ok));
+  for (const ok of [APPROVED, APPROVED.toUpperCase(), "  Framework.YYC@Gmail.com  ", `\t${APPROVED}\n`]) assert.deepEqual(checkRecipient(env, ok), { ok: true, email: APPROVED }, JSON.stringify(ok));
   const bad = [
-    "someone.else@gmail.com", "lanoirbadasswitchery+test@gmail.com", "lanoir.badasswitchery@gmail.com", "lanoirbadasswitchery@googlemail.com", "lanoirbadasswitchery@gmail.co",
-    "lanoirbadasswitchery@gmail.com.evil.example", "x.lanoirbadasswitchery@gmail.com", "xlanoirbadasswitchery@gmail.com", "lanoirbadasswitchery@mail.gmail.com", "lanoirbadasswitchery@gmail.com.",
-    `evil@x.co,${APPROVED}`, `${APPROVED},evil@x.co`, `${APPROVED};evil@x.co`, `evil@x.co ${APPROVED}`, `Lanoir <${APPROVED}>`, `<${APPROVED}>`, `"${APPROVED}"`,
+    "someone.else@gmail.com", "framework.yyc+test@gmail.com", "frameworkyyc@gmail.com", "framework.yyc@googlemail.com", "framework.yyc@gmail.co",
+    "framework.yyc@gmail.com.evil.example", "x.framework.yyc@gmail.com", "xframework.yyc@gmail.com", "framework.yyc@mail.gmail.com", "framework.yyc@gmail.com.",
+    `evil@x.co,${APPROVED}`, `${APPROVED},evil@x.co`, `${APPROVED};evil@x.co`, `evil@x.co ${APPROVED}`, `Framework <${APPROVED}>`, `<${APPROVED}>`, `"${APPROVED}"`,
     `${APPROVED}\r\nBcc: evil@x.co`, `${APPROVED}\u0000@evil.example`, `${APPROVED}%0aBcc:evil@x.co`, `evil@x.co\n${APPROVED}`,
-    "lаnoirbadasswitchery@gmail.com" /* Cyrillic a */, "ｌａｎｏｉｒbadasswitchery@gmail.com" /* full-width */, "lanoirbadasswitchery@gmaıl.com" /* dotless i */,
+    "frаmework.yyc@gmail.com" /* Cyrillic a */, "ｆｒａｍｅｗｏｒｋ.yyc@gmail.com" /* full-width */, "framework.yyc@gmaıl.com" /* dotless i */,
     "", "   ", null, undefined, 5, {}, [], [APPROVED], "@gmail.com", "gmail.com", "*", "*@gmail.com",
   ];
   for (const b of bad) {
     const r = checkRecipient(env, b);
     assert.deepEqual([r.ok, r.error], [false, "recipient_not_allowed"], JSON.stringify(b));
   }
-  assert.ok(!JSON.stringify(checkRecipient(env, "x@y.co")).includes("lanoir"), "the refusal never reveals what is allowed");
+  assert.ok(!JSON.stringify(checkRecipient(env, "x@y.co")).includes("framework.yyc"), "the refusal never reveals what is allowed");
 });
 
 test("fail closed: a missing, empty or unusable allowlist locks every recipient, including the usual test address", () => {
@@ -75,12 +75,12 @@ test("fail closed: a missing, empty or unusable allowlist locks every recipient,
 /* ------------------------------------------------------------------ the admin API, with mocked providers */
 
 function providers() {
-  const p = { calls: [], created: 0 };
+  const p = { calls: [], created: 0, existing: new Set() };
   p.fetch = async (url, init = {}) => {
     const u = new URL(url), method = init.method || "GET";
     p.calls.push(`${method} ${u.host}${u.pathname}`);
     const J = (s, b) => new Response(JSON.stringify(b), { status: s, headers: { "Content-Type": "application/json" } });
-    if (u.host === "api.workos.com" && method === "GET") return J(200, { data: [] });
+    if (u.host === "api.workos.com" && method === "GET") { const e = u.searchParams.get("email"); return J(200, { data: p.existing.has(e) ? [{ email: e }] : [] }); }
     if (u.host === "api.workos.com" && method === "POST" && u.pathname === "/user_management/invitations") return J(201, { id: "invitation_01ALLOW" + ++p.created });
     if (u.host === "api.workos.com" && /\/resend$|\/revoke$/.test(u.pathname)) return J(200, { id: u.pathname.split("/")[3] });
     if (u.host === "api.resend.com") return J(200, { id: "e1" });
@@ -118,7 +118,7 @@ const body = async (r) => r.json();
 
 test("an APPROVED recipient works end to end: create, send, resend and replace, with the usual audit trail and provider calls", async () => {
   const s = await setup();
-  const r1 = await s.invite("  LanoirBadassWitchery@Gmail.com ");
+  const r1 = await s.invite("  Framework.YYC@Gmail.com ");
   assert.equal(r1.status, 201);
   const inv = (await body(r1)).invitation;
   assert.equal(inv.email, APPROVED, "stored normalized");
@@ -131,19 +131,19 @@ test("an APPROVED recipient works end to end: create, send, resend and replace, 
   assert.deepEqual(sql(s.w.db, "SELECT action FROM activity_log ORDER BY created_at, rowid").map((a) => a.action), ["invitation.created", "invitation.delivery_submitted", "invitation.delivery_submitted", "invitation.revoked", "invitation.workos_revoked", "invitation.replaced"]);
   const access = await body(await s.call(`/api/admin/clients/${s.org.id}/access`, { method: "GET" }));
   assert.deepEqual(access.capabilities, { writes: true, sending: true, recipients: "configured" });
-  assert.ok(!JSON.stringify(access).includes("lanoirbadass") || access.invitations.every((i) => i.email === APPROVED), "the list holds only the approved address, and the setting itself is never returned");
+  assert.ok(!JSON.stringify(access).includes("framework.yyc") || access.invitations.every((i) => i.email === APPROVED), "the list holds only the approved address, and the setting itself is never returned");
 });
 
 test("a REJECTED recipient on creation: 403 recipient_not_allowed, no database change, no audit entry, no provider call, and no hint of what is allowed", async () => {
   const s = await setup();
   const before = s.snap();
-  const attempts = ["someone@example.com", "lanoirbadasswitchery+x@gmail.com", "lanoir.badasswitchery@gmail.com", "lanoirbadasswitchery@gmail.com.evil.example", "LANOIRBADASSWITCHERY@gmail.co", "pending@example.com"];
+  const attempts = ["someone@example.com", "framework.yyc+x@gmail.com", "frameworkyyc@gmail.com", "framework.yyc@gmail.com.evil.example", "FRAMEWORK.YYC@gmail.co", "pending@example.com"];
   for (const email of attempts) {
     const r = await s.invite(email);
     const text = await r.text();
     assert.equal(r.status, 403, email);
     assert.deepEqual([JSON.parse(text).error], ["recipient_not_allowed"], email);
-    assert.ok(!/lanoir|gmail/i.test(text), "the refusal never names an allowed address");
+    assert.ok(!/framework\.yyc|sentbyjj|gmail/i.test(text), "the refusal never names an allowed address");
     assert.match(JSON.parse(text).message, /Nothing|no invitation was created or sent/i);
   }
   assert.equal(s.snap(), before, "byte-for-byte unchanged, including the audit log");
@@ -153,7 +153,7 @@ test("a REJECTED recipient on creation: 403 recipient_not_allowed, no database c
 test("bypass attempts on creation are refused or rejected, never created: extra recipient fields, address lists, display names, header injection, lookalikes", async () => {
   const s = await setup();
   const before = s.snap();
-  const forms = [`evil@example.com,${APPROVED}`, `${APPROVED},evil@example.com`, `${APPROVED};evil@example.com`, `Name <${APPROVED}>`, `${APPROVED}\r\nBcc: evil@example.com`, `${APPROVED}\u0000evil@example.com`, "lаnoirbadasswitchery@gmail.com", `${APPROVED} evil@example.com`];
+  const forms = [`evil@example.com,${APPROVED}`, `${APPROVED},evil@example.com`, `${APPROVED};evil@example.com`, `Name <${APPROVED}>`, `${APPROVED}\r\nBcc: evil@example.com`, `${APPROVED}\u0000evil@example.com`, "frаmework.yyc@gmail.com", `${APPROVED} evil@example.com`];
   for (const email of forms) {
     const r = await s.invite(email);
     assert.ok([403, 422].includes(r.status), `${JSON.stringify(email)} -> ${r.status}`);
@@ -275,11 +275,13 @@ test("defence in depth: the delivery code itself refuses to contact a provider w
 
 /* ------------------------------------------------------------------ configuration and code paths */
 
-test("configuration: the allowlist and the two switches are Staging-only (previews.vars); the allowlist is exactly the approved address; Production is untouched", () => {
+test("configuration: the allowlist and the two switches are Staging-only (previews.vars); the allowlist is exactly the two approved addresses; Production is untouched", () => {
   const raw = read("wrangler.jsonc");
   const config = JSON.parse(strip(raw));
-  assert.equal(config.previews.vars.PORTAL_INVITE_ALLOWED_EMAILS, APPROVED);
-  assert.deepEqual([...parseAllowlist(config.previews.vars.PORTAL_INVITE_ALLOWED_EMAILS)], [APPROVED], "exactly one usable address");
+  const LIST = config.previews.vars.PORTAL_INVITE_ALLOWED_EMAILS;
+  assert.equal(LIST, "framework.yyc@gmail.com,sentbyjj@gmail.com");
+  assert.deepEqual([...parseAllowlist(LIST)].sort(), ["framework.yyc@gmail.com", "sentbyjj@gmail.com"], "exactly two usable addresses");
+  assert.ok(!/lanoirbadasswitchery/i.test(raw), "the future client's address is not in the configuration at all");
   assert.equal(config.vars.PORTAL_INVITE_ALLOWED_EMAILS, undefined, "never in the top-level (Production) vars");
   const code = strip(raw);
   // the two switches (authorized for the controlled live test) exist ONLY in previews.vars, exactly once each, and the allowlist still guards them
@@ -314,7 +316,7 @@ test("every path that can email an invitation is behind the check: only admin-ac
   assert.ok(!/invitations|portal/i.test(strip(read("worker/feedback-invite.js")).replace(/Feedback invitations|feedback invitation/gi, "")), "the feedback-request email code has no portal invitation code in it");
 });
 
-test("STAGING exactly as wrangler.jsonc defines it (previews.vars + fake secrets + mocked providers): both switches are on, and the allowlist still decides who can be invited", async () => {
+test("STAGING exactly as wrangler.jsonc defines it (previews.vars + fake secrets + mocked providers): both switches on; ONLY the two approved addresses are accepted, in any casing, and everything else is refused", async () => {
   const config = JSON.parse(strip(read("wrangler.jsonc")));
   const s = await setup();
   const env = { ...s.env, ...config.previews.vars }; // the real Staging configuration on top of the test secrets and database
@@ -322,15 +324,53 @@ test("STAGING exactly as wrangler.jsonc defines it (previews.vars + fake secrets
   const access = await body(await s.call(`/api/admin/clients/${s.org.id}/access`, { method: "GET", e: env }));
   assert.deepEqual(access.capabilities, { writes: true, sending: true, recipients: "configured" });
   const before = s.snap();
-  for (const email of ["someone@example.com", "lanoirbadasswitchery+1@gmail.com", "sentbyjj@gmail.com"]) {
+  const refused = [
+    "lanoirbadasswitchery@gmail.com", "LanoirBadassSwitchery@Gmail.com", /* the future client: never */
+    "someone@example.com", "frameworkyyc@gmail.com", "framework.yyc+1@gmail.com", "framework.yyc@googlemail.com", "sentbyjj+1@gmail.com", "sent.byjj@gmail.com", "sentbyjj@gmail.co",
+    "framework.yyc@gmail.com.evil.example", "xframework.yyc@gmail.com", "sentbyjj@gmail.com,evil@example.com", "evil@example.com;sentbyjj@gmail.com", "Name <sentbyjj@gmail.com>",
+    "sentbyjj@gmail.com\r\nBcc: lanoirbadasswitchery@gmail.com", "frаmework.yyc@gmail.com", "owner@frameworkco.ca", "hello@frameworkco.ca",
+  ];
+  for (const email of refused) {
     const r = await s.invite(email, "owner", s.org, { e: env });
-    assert.deepEqual([r.status, (await body(r)).error], [403, "recipient_not_allowed"], email);
+    assert.ok([403, 422].includes(r.status), `${JSON.stringify(email)} -> ${r.status}`);
+    assert.notEqual(r.status, 201);
   }
-  assert.equal(s.snap(), before);
-  assert.equal(s.pv.calls.length, 0);
-  const ok = await s.invite("lanoirbadasswitchery@gmail.com", "owner", s.org, { e: env });
-  assert.equal(ok.status, 201);
-  const inv = (await body(ok)).invitation;
-  assert.equal((await s.act(inv, "send", s.org, { e: env })).status, 200);
-  assert.deepEqual(s.pv.calls, ["GET api.workos.com/user_management/users", "POST api.workos.com/user_management/invitations"], "mocked providers only: the one approved invitation");
+  assert.equal((await body(await s.invite("lanoirbadasswitchery@gmail.com", "owner", s.org, { e: env }))).error, "recipient_not_allowed");
+  assert.equal(s.snap(), before, "nothing was created");
+  assert.equal(s.pv.calls.length, 0, "no provider was contacted");
+  // the two approved addresses, typed loosely
+  const a = await s.invite("  Framework.YYC@Gmail.com ", "owner", s.org, { e: env });
+  const b = await s.invite("SENTBYJJ@gmail.com", "member", s.org, { e: env });
+  assert.deepEqual([a.status, b.status], [201, 201]);
+  const [invA, invB] = [(await body(a)).invitation, (await body(b)).invitation];
+  assert.deepEqual([invA.email, invB.email], ["framework.yyc@gmail.com", "sentbyjj@gmail.com"]);
+  // framework.yyc has no WorkOS user: a WorkOS invitation. sentbyjj already has one: Framework's own email (the existing-user path). Both through mocks.
+  s.pv.existing.add("sentbyjj@gmail.com");
+  assert.equal((await s.act(invA, "send", s.org, { e: env })).status, 200);
+  assert.equal((await s.act(invB, "send", s.org, { e: env })).status, 200);
+  assert.deepEqual(s.pv.calls, [
+    "GET api.workos.com/user_management/users", "POST api.workos.com/user_management/invitations",
+    "GET api.workos.com/user_management/users", "POST api.resend.com/emails",
+  ]);
+  assert.deepEqual(sql(s.w.db, "SELECT email, delivery_status, delivery_channel FROM invitations ORDER BY email"), [
+    { email: "framework.yyc@gmail.com", delivery_status: "submitted", delivery_channel: "workos" }, { email: "sentbyjj@gmail.com", delivery_status: "submitted", delivery_channel: "resend" },
+  ]);
+  // a third address can still not be added once the two exist, and the old client address is still refused for replace/resend of anything stored for it
+  const seeded = s.seed("lanoirbadasswitchery@gmail.com", "revoked");
+  for (const action of ["send", "resend", "replace"]) assert.equal((await s.act(seeded, action, s.org, { e: env })).status, 403, action);
+  assert.equal(s.pv.calls.length, 4, "still only the two approved sends reached a provider");
+  // fail closed is preserved with the real configuration minus the allowlist
+  const { PORTAL_INVITE_ALLOWED_EMAILS: _removed, ...noList } = env;
+  assert.equal((await s.invite("framework.yyc@gmail.com", "owner", s.org, { e: noList })).status, 403);
+  assert.equal((await body(await s.invite("sentbyjj@gmail.com", "owner", s.org, { e: noList }))).error, "recipient_allowlist_missing");
+});
+
+test("policy with the two real Staging addresses: both pass in any casing or spacing, and nothing else does", () => {
+  const env = { PORTAL_INVITE_ALLOWED_EMAILS: "framework.yyc@gmail.com,sentbyjj@gmail.com" };
+  for (const ok of ["framework.yyc@gmail.com", " FRAMEWORK.YYC@GMAIL.COM ", "sentbyjj@gmail.com", "SentByJJ@Gmail.com\n"]) assert.equal(checkRecipient(env, ok).ok, true, JSON.stringify(ok));
+  for (const no of ["lanoirbadasswitchery@gmail.com", "frameworkyyc@gmail.com", "framework.yyc+a@gmail.com", "sentbyjj+a@gmail.com", "sent.byjj@gmail.com", "x@gmail.com", "framework.yyc@gmail.com,sentbyjj@gmail.com", "", null]) {
+    assert.deepEqual([checkRecipient(env, no).ok, checkRecipient(env, no).error], [false, "recipient_not_allowed"], JSON.stringify(no));
+  }
+  assert.equal(allowlistStatus(env), "configured");
+  assert.equal(recipientPolicy(env).emails.size, 2);
 });
