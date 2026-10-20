@@ -128,3 +128,15 @@ test("the stylesheet is self-contained: no remote imports or urls, honours reduc
   assert.match(css, /:focus-visible/);
   assert.match(css, /\.skip-link/);
 });
+
+test("project workspace: shared anchor nav sits above two independent stacks that open on the same line", async () => {
+  const html = await (await get("/portal/demo/projects/website")).text();
+  const jump = html.indexOf('class="jump"'), cols = html.indexOf('class="cols cols--stacks"');
+  assert.ok(jump > 0 && cols > jump, "the anchor navigation precedes the columns");
+  const stacks = html.slice(cols).split('<div class="stack">').slice(1);
+  assert.equal(stacks.length, 2);
+  assert.ok(stacks[0].includes('id="milestones"') && stacks[0].includes('id="documents"'));
+  assert.ok(stacks[1].includes('id="deliverables"') && stacks[1].includes('id="details"'));
+  assert.match(css, /@media \(min-width: 881px\) \{ \.cols--stacks > \.stack > \.section:first-child \{ margin-top: 0; \} \}/);
+  assert.match(css, /prefers-reduced-motion: no-preference\) \{ html \{ scroll-behavior: smooth; \} \}/);
+});

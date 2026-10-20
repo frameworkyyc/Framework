@@ -208,13 +208,14 @@ a.row:hover .row__title, a.row:focus-visible .row__title { text-decoration: unde
 .deliv__name { font-weight: 500; } .deliv__due { font-size: 14px; color: var(--slate); white-space: nowrap; }
 @media (max-width: 560px) { .deliv { grid-template-columns: minmax(0, 1fr) auto; } .deliv__due { grid-column: 1; } }
 
-.jump { display: flex; flex-wrap: wrap; gap: 6px var(--space-3); margin: var(--space-4) 0 0; font-size: 14px; }
+.jump { display: flex; flex-wrap: wrap; gap: 6px var(--space-3); margin: var(--space-4) 0 var(--space-3); font-size: 14px; }
 .cols--stacks { row-gap: 0; }
 .cols--stacks .section { margin-top: clamp(36px, 4vw, 52px); }
 
 .stack { display: flex; flex-direction: column; min-width: 0; }
-@media (min-width: 881px) { .stack .section:first-child { margin-top: 0; } }
-@media (max-width: 880px) { .cols--stacks { display: flex; flex-direction: column; align-items: stretch; } .stack { display: contents; } #milestones { order: 1; margin-top: var(--space-4); } #deliverables { order: 2; } #documents { order: 3; } #details { order: 4; } .cols--stacks #milestones { margin-top: var(--space-4); } }
+/* Both columns open on the same line: the first section of each stack has no top margin on wide layouts. */
+@media (min-width: 881px) { .cols--stacks > .stack > .section:first-child { margin-top: 0; } }
+@media (max-width: 880px) { .cols--stacks { display: flex; flex-direction: column; align-items: stretch; } .stack { display: contents; } #milestones { order: 1; } #deliverables { order: 2; } #documents { order: 3; } #details { order: 4; } .cols--stacks #milestones { margin-top: var(--space-2); } }
 .attention { margin-top: var(--space-4); margin-bottom: calc(var(--space-2) * -1); padding-top: 14px; border-top: 1px solid var(--ink); }
 .attention ul { margin-top: var(--space-2); }
 .attention li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px var(--space-3); padding: 12px 0; border-top: 1px solid var(--hairline); }
