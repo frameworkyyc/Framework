@@ -6,8 +6,6 @@
  *
  * Storage: one row per answered question in business_profile_answers (migrations/portal/0002_business_profile.sql).
  */
-import { validateHttpsUrl } from "./repo/validate.js";
-
 export const PROFILE_SCHEMA_VERSION = 1;
 
 export const INDUSTRIES = Object.freeze(["Hospitality and food", "Retail", "Professional services", "Health and wellness", "Trades and construction", "Technology", "Non-profit", "Other"]);
@@ -41,7 +39,7 @@ export const PROFILE_STEPS = Object.freeze([
     f("competitors", "Who are your main competitors?", "textarea", { placeholder: "Names or websites, one per line. Include businesses you admire, too." }),
   ]),
   step("online", "Online presence", "Where customers can find you today.", [
-    f("site", "Existing website", "url", { placeholder: "https://" }),
+    f("site", "Existing website", "website", { placeholder: "yourbusiness.ca" }),
     f("social", "Social platforms you use", "textarea", { placeholder: "Links or handles, one per line." }),
   ]),
   step("contact", "Primary contact", "Who Framework should work with day to day.", [
@@ -61,6 +59,46 @@ export const stepById = (id) => (typeof id === "string" ? PROFILE_STEPS.find((s)
 export const FIELD_IDS = Object.freeze(new Set(PROFILE_STEPS.flatMap((s) => s.fields.map((x) => x.id))));
 const fieldById = new Map(PROFILE_STEPS.flatMap((s) => s.fields.map((x) => [x.id, x])));
 export const fieldDef = (id) => fieldById.get(id) || null;
+
+/* ------------------------------------------------------------------ website addresses */
+
+export const MAX_WEBSITE = 300;
+const HAS_HTTP = /^https?:\/\//i;
+const HOST_LABEL = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$/i;
+
+/**
+ * The one rule for turning what a person typed into a website address, shared in spirit by assets/js/portal-profile.js (which only previews the same
+ * step): trim, then add "https://" when there is no http:// or https:// in front. An explicit http:// or https:// is kept as typed. Nothing else is rewritten.
+ */
+export function withProtocol(raw) {
+  const v = String(raw == null ? "" : raw).trim();
+  if (!v) return "";
+  return HAS_HTTP.test(v) ? v.replace(/^https?:\/\//i, (m) => m.toLowerCase()) : "https://" + v;
+}
+
+/**
+ * Validate a website address and return the value to store. Accepts domains, subdomains, ports, paths, query strings and fragments, with or without a
+ * protocol. Refuses other schemes (ftp:, javascript:, mailto:), spaces and control characters, credentials, IP addresses and hosts with no dot or an
+ * invalid name. @returns {{ value: string } | { error: string }} value is "" for an empty answer.
+ */
+export function normalizeWebsite(raw) {
+  const trimmed = String(raw == null ? "" : raw).trim();
+  if (!trimmed) return { value: "" };
+  const bad = { error: "Enter a website address such as yourbusiness.ca" };
+  if (/[\s\u0000-\u001F\u007F<>"'\\^`{|}]/.test(trimmed) || /^\/\//.test(trimmed)) return bad;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) && !HAS_HTTP.test(trimmed)) return bad; // another scheme, for example ftp://
+  const candidate = withProtocol(trimmed);
+  if (candidate.length > MAX_WEBSITE) return { error: `Please keep the address under ${MAX_WEBSITE} characters.` };
+  let u;
+  try { u = new URL(candidate); } catch { return bad; }
+  if (!/^https?:$/.test(u.protocol) || u.username || u.password) return bad;
+  const host = u.hostname; // already lower-case, with international names converted to xn-- form
+  const labels = host.split(".");
+  const tld = labels[labels.length - 1];
+  if (host.length > 253 || labels.length < 2 || !labels.every((l) => HOST_LABEL.test(l))) return bad;
+  if (!/^(?:[a-z]{2,}|xn--[a-z0-9-]{2,})$/i.test(tld)) return bad; // a real top-level name, never a number (so not an IP address)
+  return { value: candidate };
+}
 
 /* ------------------------------------------------------------------ validation */
 
@@ -89,10 +127,8 @@ export function validateAnswer(def, raw) {
       return v.length <= 254 && EMAIL.test(v) && !CONTROL_SINGLE.test(v) ? { value: v } : { error: "Enter a valid email address." };
     case "tel":
       return /^[0-9+()\-.\s]{5,40}$/.test(v) && (v.match(/\d/g) || []).length >= 5 ? { value: v } : { error: "Enter a valid phone number." };
-    case "url": {
-      const u = validateHttpsUrl(v);
-      return u ? { value: u } : { error: "Enter a full web address starting with https://" };
-    }
+    case "website":
+      return normalizeWebsite(v);
     case "select":
     case "choice":
       return def.options.includes(v) ? { value: v } : { error: "Choose one of the options." };

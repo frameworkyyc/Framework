@@ -35,7 +35,7 @@ export const PROFILE_STEPS = Object.freeze([
     f("goals", "What are your main business goals this year?", "textarea", "Grow wholesale accounts and make online ordering easy."),
     f("competitors", "Who are your main competitors?", "textarea", "", { placeholder: "Names or websites, one per line. Include businesses you admire, too." }) ] },
   { id: "online", title: "Online presence", state: "todo", minutes: 2, intro: "Where customers can find you today.", fields: [
-    f("site", "Existing website", "url", "", { placeholder: "https://" }),
+    f("site", "Existing website", "website", "", { placeholder: "yourbusiness.ca" }),
     f("social", "Social platforms you use", "textarea", "", { placeholder: "Links or handles, one per line." }) ] },
   { id: "contact", title: "Primary contact", state: "todo", minutes: 2, intro: "Who Framework should work with day to day.", fields: [
     f("cname", "Name", "text"), f("crole", "Role", "text"), f("cemail", "Email", "email"), f("cphone", "Phone", "tel") ] },

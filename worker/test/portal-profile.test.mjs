@@ -51,7 +51,7 @@ test("schema: seven steps, versioned, every question defined once with a kind an
   assert.deepEqual(PROFILE_STEPS.map((s) => s.id), ["business", "location", "offering", "goals", "online", "contact", "personality"]);
   const ids = PROFILE_STEPS.flatMap((s) => s.fields.map((f) => f.id));
   assert.equal(new Set(ids).size, ids.length);
-  for (const s of PROFILE_STEPS) for (const f of s.fields) { assert.ok(["text", "textarea", "select", "choice", "email", "tel", "url"].includes(f.kind)); assert.ok(!("value" in f), "no values in the schema"); if (f.kind === "select" || f.kind === "choice") assert.ok(f.options.length > 1); }
+  for (const s of PROFILE_STEPS) for (const f of s.fields) { assert.ok(["text", "textarea", "select", "choice", "email", "tel", "website"].includes(f.kind)); assert.ok(!("value" in f), "no values in the schema"); if (f.kind === "select" || f.kind === "choice") assert.ok(f.options.length > 1); }
 });
 test("the fictional demo's questionnaire structure matches the real schema (ids, labels, kinds, options) so the two cannot drift apart", () => {
   assert.deepEqual(DEMO_STEPS.map((s) => [s.id, s.title]), PROFILE_STEPS.map((s) => [s.id, s.title]));
@@ -71,8 +71,9 @@ test("validation: types, limits, options, control characters; empty means unansw
   for (const bad of ["nope", "a@b", "a b@c.d", "@x.y"]) assert.ok(validateAnswer(def("cemail"), bad).error, bad);
   assert.deepEqual(validateAnswer(def("cphone"), "+1 (403) 555-0100"), { value: "+1 (403) 555-0100" });
   for (const bad of ["abc", "12", "<script>"]) assert.ok(validateAnswer(def("cphone"), bad).error, bad);
-  assert.equal(validateAnswer(def("site"), "https://acme.example").value, "https://acme.example/");
-  for (const bad of ["http://acme.example", "javascript:alert(1)", "acme.example", "https://user:pw@acme.example"]) assert.ok(validateAnswer(def("site"), bad).error, bad);
+  assert.equal(validateAnswer(def("site"), "https://acme.example").value, "https://acme.example");
+  assert.equal(validateAnswer(def("site"), "acme.example").value, "https://acme.example");
+  for (const bad of ["javascript:alert(1)", "https://user:pw@acme.example", "ftp://acme.example"]) assert.ok(validateAnswer(def("site"), bad).error, bad);
   assert.deepEqual(validateAnswer(def("industry"), "Retail"), { value: "Retail" });
   assert.ok(validateAnswer(def("industry"), "Spaceships").error);
   assert.ok(validateAnswer(def("tone"), "made up").error);
@@ -346,7 +347,7 @@ test("every question renders with the right input, its Optional marker only wher
     const html = await (await ann.get(`/portal/o/alpha/profile/${step.id}`)).text();
     for (const f of step.fields) {
       assert.ok(html.includes(f.label.replace(/&/g, "&amp;")), `${step.id}/${f.id} label`);
-      const tag = f.kind === "textarea" ? `<textarea id="p-${step.id}-${f.id}" name="${f.id}"` : f.kind === "select" ? `<select id="p-${step.id}-${f.id}" name="${f.id}"` : f.kind === "choice" ? `name="${f.id}" value=` : `<input id="p-${step.id}-${f.id}" name="${f.id}" type="${f.kind}"`;
+      const tag = f.kind === "textarea" ? `<textarea id="p-${step.id}-${f.id}" name="${f.id}"` : f.kind === "select" ? `<select id="p-${step.id}-${f.id}" name="${f.id}"` : f.kind === "choice" ? `name="${f.id}" value=` : f.kind === "website" ? `<input id="p-${step.id}-${f.id}" name="${f.id}" type="text" inputmode="url"` : `<input id="p-${step.id}-${f.id}" name="${f.id}" type="${f.kind}"`;
       assert.ok(html.includes(tag), `${step.id}/${f.id} control`);
     }
     const optionals = step.fields.filter((f) => !f.required).length;
@@ -388,7 +389,7 @@ test("server-side validation cannot be bypassed by crafting the request", async 
     ["business", { legal: "A", industry: "Retail", about: "x".repeat(2001) }, "about"],
     ["contact", { cname: "A", cemail: "a@b" }, "cemail"],
     ["online", { site: "javascript:alert(1)" }, "site"],
-    ["online", { site: "http://insecure.example" }, "site"],
+    ["online", { site: "ftp://files.example.com" }, "site"],
     ["business", { legal: "A\u0000B", industry: "Retail", about: "x" }, "legal"],
   ];
   for (const [step, fields, bad] of attempts) {
@@ -421,4 +422,115 @@ test("the DDL applied to the Staging database is exactly migration 0002 (whitesp
   assert.equal(norm(file), norm(applied));
   assert.ok(!/\b(DROP|ALTER|TRUNCATE|UPDATE|INSERT)\b|(?<!ON )\bDELETE\b/i.test(file), "creates one table and nothing else");
   assert.equal([...file.matchAll(/CREATE TABLE/g)].length, 1);
+});
+
+/* ------------------------------------------------------------------ website address field */
+
+import { normalizeWebsite, withProtocol } from "../portal/profile-schema.js";
+import vm from "node:vm";
+const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
+
+const ACCEPTED = [
+  ["frameworkco.ca", "https://frameworkco.ca"],
+  ["www.frameworkco.ca", "https://www.frameworkco.ca"],
+  ["  frameworkco.ca  ", "https://frameworkco.ca"],
+  ["\tframeworkco.ca\n", "https://frameworkco.ca"],
+  ["https://frameworkco.ca", "https://frameworkco.ca"],
+  ["http://frameworkco.ca", "http://frameworkco.ca"],
+  ["HTTPS://FrameworkCo.ca", "https://FrameworkCo.ca"],
+  ["Http://frameworkco.ca/About", "http://frameworkco.ca/About"],
+  ["shop.frameworkco.ca", "https://shop.frameworkco.ca"],
+  ["a.b.c.example.co.uk", "https://a.b.c.example.co.uk"],
+  ["frameworkco.ca/", "https://frameworkco.ca/"],
+  ["frameworkco.ca/about/team", "https://frameworkco.ca/about/team"],
+  ["frameworkco.ca/search?q=bread&page=2", "https://frameworkco.ca/search?q=bread&page=2"],
+  ["www.frameworkco.ca/menu#lunch", "https://www.frameworkco.ca/menu#lunch"],
+  ["https://frameworkco.ca/a%20b?x=1", "https://frameworkco.ca/a%20b?x=1"],
+  ["frameworkco.ca:8080/app", "https://frameworkco.ca:8080/app"],
+  ["my-business.ca", "https://my-business.ca"],
+  ["123bakery.ca", "https://123bakery.ca"],
+  ["café.ca", "https://café.ca"],
+  ["xn--caf-dma.ca", "https://xn--caf-dma.ca"],
+  ["frameworkco.photography", "https://frameworkco.photography"],
+  ["", ""], ["   ", ""],
+];
+const REJECTED = ["frameworkco", "localhost", "http://localhost:3000", "192.168.1.1", "http://10.0.0.1/admin", "https://[::1]/", "javascript:alert(1)", "JaVaScRiPt:alert(1)", "data:text/html,<b>x</b>", "mailto:me@frameworkco.ca", "ftp://frameworkco.ca", "file:///etc/passwd", "//frameworkco.ca", "frameworkco ca", "frameworkco.ca, other.ca", "my business.ca", "https://", "https:// frameworkco.ca", "http://http://frameworkco.ca", "user:pass@frameworkco.ca", "https://user@frameworkco.ca", ".ca", "frameworkco.", "-bad.ca", "bad-.ca", "bad..ca", "bad_name.ca", "frameworkco.c", "frameworkco.123", "<script>.ca", "frameworkco.ca\u0000", "fra\nmeworkco.ca", "frameworkco.ca/<x>", 'frameworkco.ca/"q"', "x".repeat(70) + ".ca", ("a".repeat(60) + ".").repeat(5) + "ca", "frameworkco.ca/" + "p".repeat(300)];
+
+test("website address: accepted formats are normalised the same way (protocol added only when missing, trimmed, path/query kept)", () => {
+  for (const [typed, stored] of ACCEPTED) assert.deepEqual(normalizeWebsite(typed), { value: stored }, JSON.stringify(typed));
+  assert.equal(normalizeWebsite("frameworkco.ca/?q=a b").error !== undefined, true, "a space inside is still refused");
+});
+test("website address: invalid input is refused with a helpful message and is never rewritten into something valid", () => {
+  for (const bad of REJECTED) { const r = normalizeWebsite(bad); assert.ok(r.error, JSON.stringify(bad).slice(0, 60)); assert.ok(!("value" in r)); }
+  assert.match(normalizeWebsite("frameworkco").error, /such as yourbusiness\.ca/);
+  assert.match(normalizeWebsite("frameworkco.ca/" + "p".repeat(300)).error, /under 300/);
+  assert.equal(normalizeWebsite(undefined).value, ""); assert.equal(normalizeWebsite(null).value, "");
+});
+test("website address: the browser helper and the server rule agree on every accepted input (the server is still authoritative)", () => {
+  const sandbox = { window: {}, document: { querySelector: () => null } };
+  vm.runInNewContext(read("assets/js/portal-profile.js"), sandbox);
+  const front = sandbox.window.FrameworkWebsite.withProtocol;
+  assert.equal(typeof front, "function");
+  for (const [typed] of ACCEPTED) assert.equal(front(typed), withProtocol(typed), JSON.stringify(typed));
+  for (const [typed, stored] of ACCEPTED) if (stored) assert.equal(front(typed), stored, "what the browser shows is exactly what the server stores: " + JSON.stringify(typed));
+  for (const bad of ["frameworkco", "ftp://x.ca", "javascript:alert(1)"]) assert.equal(front(bad), withProtocol(bad), "same rewrite even for input the server will refuse");
+  const js = read("assets/js/portal-profile.js");
+  assert.match(js, /input\[data-website\]/); assert.ok(!/fetch\(|XMLHttpRequest|eval\(|innerHTML/.test(js));
+});
+test("website field markup: a text box with URL keyboard hints and the new placeholder, no native URL validation; layout classes unchanged", async () => {
+  const { ann } = await setup();
+  const html = await (await ann.get("/portal/o/alpha/profile/online")).text();
+  const input = html.match(/<input id="p-online-site"[^>]*>/)[0];
+  assert.match(input, /type="text"/); assert.ok(!/type="url"/.test(input));
+  for (const attr of ['inputmode="url"', 'autocapitalize="none"', 'autocorrect="off"', 'spellcheck="false"', 'placeholder="yourbusiness.ca"', 'maxlength="300"', 'autocomplete="url"', "data-website"]) assert.ok(input.includes(attr), attr);
+  assert.ok(!html.includes('placeholder="https://"'));
+  assert.match(html, /<div class="field"><label for="p-online-site">Existing website <span class="field__opt">Optional<\/span><\/label>/);
+  assert.equal([...html.matchAll(/type="url"/g)].length, 0, "no native URL inputs anywhere in the Business Profile");
+  for (const step of PROFILE_STEPS) assert.ok(!(await (await ann.get(`/portal/o/alpha/profile/${step.id}`)).text()).includes('type="url"'), step.id);
+  assert.deepEqual(PROFILE_STEPS.flatMap((s) => s.fields).filter((f) => f.kind === "website").map((f) => f.id), ["site"], "site is the only website-address question (social platforms stay free text)");
+});
+test("website address: typed without a protocol it is saved with https://, reloads exactly so, survives sign-out, and edits normalise again", async () => {
+  const { w, ann } = await setup();
+  assert.equal((await save(w, ann, "alpha", "online", { site: "  www.acme.example/menu?lang=en  ", social: "@acme" })).status, 303);
+  assert.equal(sql(w.db, "SELECT value FROM business_profile_answers WHERE field_id='site'")[0].value, "https://www.acme.example/menu?lang=en");
+  const page = await (await ann.get("/portal/o/alpha/profile/online?saved=1")).text();
+  assert.ok(page.includes('value="https://www.acme.example/menu?lang=en"')); assert.match(page, /Saved\. This step is complete\./);
+  assert.match(await (await ann.get("/portal/o/alpha/profile")).text(), /1 of 7 steps complete/);
+  await save(w, ann, "alpha", "online", { site: "http://old.acme.example", social: "@acme" });
+  assert.equal(sql(w.db, "SELECT value FROM business_profile_answers WHERE field_id='site'")[0].value, "http://old.acme.example", "an explicit http:// is preserved");
+  await save(w, ann, "alpha", "online", { site: "acme.example", social: "" });
+  assert.equal(sql(w.db, "SELECT value FROM business_profile_answers WHERE field_id='site'")[0].value, "https://acme.example");
+  const again = w.browser(); await again.signIn(w.user(1, "ann@alpha.test"));
+  assert.ok((await (await again.get("/portal/o/alpha/profile/online")).text()).includes('value="https://acme.example"'));
+  await save(w, ann, "alpha", "online", { site: "", social: "x" });
+  assert.ok(!sql(w.db, "SELECT field_id FROM business_profile_answers").some((r) => r.field_id === "site"), "clearing it removes the answer");
+});
+test("website address: a bad address is refused with a clear message, the typed text stays in the box, and nothing is saved", async () => {
+  const { w, ann } = await setup();
+  for (const bad of ["frameworkco", "javascript:alert(1)", "my business.ca", "ftp://acme.example", "192.168.0.1"]) {
+    const r = await save(w, ann, "alpha", "online", { site: bad, social: "@acme" });
+    assert.equal(r.status, 422, bad);
+    const html = await r.text();
+    assert.match(html, /Enter a website address such as yourbusiness\.ca/); assert.match(html, /aria-invalid="true"/);
+    assert.ok(html.includes(`value="${bad}"`), "the typed text is kept");
+  }
+  assert.deepEqual(sql(w.db, "SELECT * FROM business_profile_answers"), []);
+});
+test("existing saved website answers keep working: old values (with the trailing slash the earlier rule produced) display, re-save unchanged and still count", async () => {
+  const { w, alpha, ann } = await setup();
+  const uid = sql(w.db, "SELECT id FROM portal_users LIMIT 1")[0].id;
+  for (const old of ["https://acme.example/", "https://www.acme.example/path?q=1", "http://legacy.example/"]) {
+    w.db.raw.prepare("INSERT OR REPLACE INTO business_profile_answers (organization_id, field_id, value, updated_by, updated_at) VALUES (?, 'site', ?, ?, 't')").run(alpha.id, old, uid);
+    assert.ok((await (await ann.get("/portal/o/alpha/profile/online")).text()).includes(`value="${old}"`), old);
+    assert.equal((await save(w, ann, "alpha", "online", { site: old, social: "" })).status, 303, "re-saving the stored value is accepted");
+    assert.equal(sql(w.db, "SELECT value FROM business_profile_answers WHERE field_id='site'")[0].value, old, "and unchanged");
+    assert.match(await (await ann.get("/portal/o/alpha/profile")).text(), /1 of 7 steps complete/);
+  }
+  assert.equal(normalizeWebsite("https://acme.example/").value, "https://acme.example/");
+});
+test("the fictional demo's website box uses the same text input and placeholder", async () => {
+  const env = { ...(await makeWorld()).env, PORTAL_DEMO: "1" };
+  const html = await (await handlePortal(new Request(ORIGIN + "/portal/demo/profile/online"), env, { now: new Date() })).text();
+  const input = html.match(/<input id="p-online-site"[^>]*>/)[0];
+  assert.ok(input.includes('type="text"') && input.includes('inputmode="url"') && input.includes('placeholder="yourbusiness.ca"') && !input.includes('type="url"'));
 });

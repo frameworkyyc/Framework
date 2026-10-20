@@ -42,7 +42,9 @@ function field(scope, def, value, error) {
   const label = `<label for="${id}">${e(def.label)}${optional}</label>${hint}`;
   if (def.kind === "textarea") return `<div class="field">${label}<textarea id="${id}" name="${e(def.id)}" rows="4" maxlength="2000"${aria} placeholder="${e(def.placeholder || "")}">${e(value)}</textarea>${err}</div>`;
   if (def.kind === "select") return `<div class="field">${label}<select id="${id}" name="${e(def.id)}"${aria}><option value="">Choose…</option>${def.options.map((o) => `<option${o === value ? " selected" : ""}>${e(o)}</option>`).join("")}</select>${err}</div>`;
-  return `<div class="field">${label}<input id="${id}" name="${e(def.id)}" type="${e(def.kind)}" value="${e(value)}" maxlength="${def.kind === "email" ? 254 : def.kind === "url" ? 300 : def.kind === "tel" ? 40 : 200}" placeholder="${e(def.placeholder || "")}"${aria} autocomplete="off">${err}</div>`;
+  // a website is a plain text box (so "yourbusiness.ca" is accepted) with the URL keyboard on phones; the server adds https:// and validates
+  if (def.kind === "website") return `<div class="field">${label}<input id="${id}" name="${e(def.id)}" type="text" inputmode="url" autocapitalize="none" autocorrect="off" spellcheck="false" value="${e(value)}" maxlength="300" placeholder="${e(def.placeholder || "")}"${aria} autocomplete="url" data-website>${err}</div>`;
+  return `<div class="field">${label}<input id="${id}" name="${e(def.id)}" type="${e(def.kind)}" value="${e(value)}" maxlength="${def.kind === "email" ? 254 : def.kind === "tel" ? 40 : 200}" placeholder="${e(def.placeholder || "")}"${aria} autocomplete="off">${err}</div>`;
 }
 
 /**

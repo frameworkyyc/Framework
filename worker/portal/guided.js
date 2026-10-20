@@ -30,6 +30,7 @@ function field(scope, fd) {
   const label = `<label for="${e(id)}">${e(fd.label)}</label>${hint}`;
   if (fd.kind === "textarea") return `<div class="field">${label}<textarea id="${e(id)}" rows="4"${desc} placeholder="${e(fd.placeholder || "")}">${e(fd.value)}</textarea></div>`;
   if (fd.kind === "select") return `<div class="field">${label}<select id="${e(id)}"${desc}><option value="">Choose…</option>${(fd.options || []).map((o) => `<option${o === fd.value ? " selected" : ""}>${e(o)}</option>`).join("")}</select></div>`;
+  if (fd.kind === "website") return `<div class="field">${label}<input id="${e(id)}" type="text" inputmode="url" autocapitalize="none" autocorrect="off" spellcheck="false" value="${e(fd.value)}" placeholder="${e(fd.placeholder || "")}"${desc} autocomplete="url"></div>`;
   return `<div class="field">${label}<input id="${e(id)}" type="${e(fd.kind)}" value="${e(fd.value)}" placeholder="${e(fd.placeholder || "")}"${desc} autocomplete="off"></div>`;
 }
 
