@@ -21,7 +21,7 @@ import { listActivity } from "./repo/activity.js";
 import { validateSlug, validateName } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
 import { getProfileAnswers, saveProfileStep } from "./repo/business-profile.js";
-import { stepById } from "./profile-schema.js";
+import { stepById, PROFILE_STEPS } from "./profile-schema.js";
 import { comingSoonKeys, LIVE_AREAS } from "./guided-data.js";
 import { moduleStatuses } from "./module-status.js";
 import { readForm, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES } from "./form.js";
@@ -112,8 +112,15 @@ async function saveProfile(ctx, a, stepId) {
     logEvent({ evt: "profile.save", outcome: "invalid", status: 422, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, count: Object.keys(result.errors || {}).length });
     return pages.profileStepPage(ctx, a, step, saved, { values: result.values || {}, errors: result.errors || {}, status: 422 });
   }
-  logEvent({ evt: "profile.save", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
-  return redirect(`/portal/o/${a.membership.slug}/profile/${stepId}?saved=1`);
+  const changed = result.changed || [];
+  logEvent({ evt: "profile.save", outcome: changed.length ? "saved" : "unchanged", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  const base = `/portal/o/${a.membership.slug}/profile`;
+  // "Save and continue" goes on to the next step (the overview after the last one); anything else, including a missing or unknown intent, stays here.
+  if (read.fields.get("intent") === "continue") {
+    const next = PROFILE_STEPS[PROFILE_STEPS.indexOf(step) + 1];
+    return redirect(next ? `${base}/${next.id}` : base);
+  }
+  return redirect(`${base}/${stepId}?saved=${changed.length ? 1 : 0}`);
 }
 
 /** Send feedback. Organization and person come from the membership and session; the form supplies only the kind, the message and an optional section. */
@@ -207,7 +214,7 @@ const ORG_ROUTES = [
     bucket: "profile",
     run: async (ctx, a, id) => {
       const step = stepById(id);
-      return step ? pages.profileStepPage(ctx, a, step, await getProfileAnswers(ctx.db, a.membership.organizationId), { savedNote: viewFilters(ctx.url).saved }) : notFoundPage(ctx);
+      return step ? pages.profileStepPage(ctx, a, step, await getProfileAnswers(ctx.db, a.membership.organizationId), { savedNote: viewFilters(ctx.url).saved, unchanged: viewFilters(ctx.url).nochange }) : notFoundPage(ctx);
     },
     post: (ctx, a, id) => saveProfile(ctx, a, id),
   },

@@ -195,7 +195,8 @@ test("the five other sections are clean Coming Soon pages with no demonstration 
 test("Business Profile overview starts empty and is calculated from saved answers only", async () => {
   const { w, ann } = await setup();
   const html0 = await (await ann.get("/portal/o/alpha/profile")).text();
-  assert.match(html0, /0 of 7 steps complete/); assert.equal([...html0.matchAll(/class="rowstat">/g)].length, 0);
+  assert.match(html0, /0 of 7 steps complete/); assert.equal([...html0.matchAll(/class="rowstat">/g)].length, 6, "six steps have required answers outstanding; Online presence has none");
+  assert.ok(!/class="rowstat">(Complete|In progress)/.test(html0));
   for (const fake of ["Harbour", "Grow wholesale", "Harbour & Pine"]) assert.ok(!html0.includes(fake), fake);
   let res = await save(w, ann, "alpha", "business", ANSWERS.business);
   assert.equal(res.status, 303); assert.equal(res.headers.get("Location"), "/portal/o/alpha/profile/business?saved=1");
@@ -203,7 +204,7 @@ test("Business Profile overview starts empty and is calculated from saved answer
   assert.match(html1, /1 of 7 steps complete/); assert.match(html1, /class="rowstat">Complete</);
   await save(w, ann, "alpha", "location", { city: "Calgary", size: "" });
   const html2 = await (await ann.get("/portal/o/alpha/profile")).text();
-  assert.match(html2, /1 of 7 steps complete/, "a partly answered step does not count"); assert.match(html2, /class="rowstat">In progress</);
+  assert.match(html2, /1 of 7 steps complete/, "a partly answered step does not count"); assert.match(html2, /class="rowstat">In progress · 1 required answer left</);
   for (const s of ["location", "offering", "goals", "online", "contact", "personality"]) await save(w, ann, "alpha", s, { ...ANSWERS[s], ...(s === "online" ? { social: "@acme" } : {}), ...(s === "location" ? { size: "2 to 10 people" } : {}) });
   assert.match(await (await ann.get("/portal/o/alpha/profile")).text(), /7 of 7 steps complete/);
 });
@@ -356,7 +357,7 @@ test("answers persist across sign-out and a brand-new sign-in; the ended session
   const again = w.browser();
   await again.signIn(w.user(1, "ann@alpha.test"));
   const overview = await (await again.get("/portal/o/alpha/profile")).text();
-  assert.match(overview, /1 of 7 steps complete/); assert.match(overview, /class="rowstat">In progress</);
+  assert.match(overview, /1 of 7 steps complete/); assert.match(overview, /class="rowstat">In progress · \d required answers? left</);
   const step = await (await again.get("/portal/o/alpha/profile/business")).text();
   for (const v of ["Acme Co. Ltd.", "Acme", "We sell things."]) assert.ok(step.includes(`>${v}<`) || step.includes(`value="${v}"`), v);
   assert.match(step, /<option selected>Retail<\/option>/);

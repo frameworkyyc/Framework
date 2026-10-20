@@ -23,7 +23,6 @@
   var form = typeof document !== "undefined" && document.querySelector("form[data-guard]");
   if (!form) return;
   var status = form.querySelector("[data-status]");
-  var button = form.querySelector("[data-save]");
   var dirty = false;
   var submitting = false;
 
@@ -38,14 +37,23 @@
     dirty = true;
     if (status) status.textContent = "Unsaved changes";
   });
-  form.addEventListener("submit", function () {
+  var buttons = Array.prototype.slice.call(form.querySelectorAll("[data-save]"));
+  var labels = buttons.map(function (b) { return b.textContent; });
+  function idle() {
+    submitting = false;
+    buttons.forEach(function (b, i) { b.removeAttribute("data-busy"); b.removeAttribute("aria-disabled"); b.textContent = labels[i]; });
+  }
+  form.addEventListener("submit", function (event) {
+    // One submission at a time: a second click or Enter while the first is in flight is ignored (the server also treats a repeat as harmless).
+    if (submitting) { event.preventDefault(); return; }
     submitting = true;
     if (status) status.textContent = "Saving…";
-    if (button) {
-      button.setAttribute("aria-disabled", "true");
-      button.textContent = "Saving…";
-    }
+    buttons.forEach(function (b) { b.setAttribute("aria-disabled", "true"); b.setAttribute("data-busy", ""); });
+    var sent = event.submitter;
+    if (sent && sent.hasAttribute("data-save")) sent.textContent = "Saving…";
   });
+  // Coming back with the browser's Back button can show this page from memory in its "saving" state: reset it.
+  window.addEventListener("pageshow", function (event) { if (event.persisted) { idle(); if (status) status.textContent = ""; } });
   window.addEventListener("beforeunload", function (event) {
     if (dirty && !submitting) {
       event.preventDefault();

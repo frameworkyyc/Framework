@@ -84,16 +84,16 @@ export function home(vm) {
 
 /** One navigation row: number, short title, optional plain-text status, arrow. Rows are hairline-divided, never boxed; the arrow is always present. */
 function navRow(vm, n, r) {
-  const label = r.state === "done" ? "Complete" : r.state === "current" ? "In progress" : r.status || "";
+  const label = r.state === "done" ? "Complete" : r.state === "current" ? `In progress${r.status ? ` · ${r.status}` : ""}` : r.status || "";
   const st = label ? `<span class="rowstat${r.attention ? " rowstat--attention" : ""}">${e(label)}</span>` : "";
   const sr = r.state === "todo" ? '<span class="visually-hidden">, not started</span>' : "";
   return `<li><a class="row row--step" href="${e(href(vm, r.href))}"><span class="step__n" aria-hidden="true">${String(n).padStart(2, "0")}</span><span class="row__name">${e(r.title)}${sr}</span><span class="row__st">${st}</span><span class="tile__arrow" aria-hidden="true">→</span></a></li>`;
 }
 /** The standard workspace overview: breadcrumb, title, one progress indicator when meaningful, rows. */
-function overview(vm, { key, title, progress, rows }) {
+function overview(vm, { key, title, progress, action = "", rows }) {
   const a = area(key);
   return `<header class="page-head page-head--compact">${crumb(vm, [[title || a.title]])}<h1 class="h1 h1--section">${e(title || a.title)}</h1></header>
-${progress ? `<div class="progress-line">${meter(Math.round((progress.done / progress.total) * 100), `${title || a.title} progress`)}<p class="muted small">${e(`${progress.done} of ${progress.total} ${progress.noun || "areas"} complete`)}</p></div>` : ""}
+${progress ? `<div class="progress-line">${meter(Math.round((progress.done / progress.total) * 100), `${title || a.title} progress`)}<p class="muted small">${e(`${progress.done} of ${progress.total} ${progress.noun || "areas"} complete`)}</p></div>` : ""}${action}
 <nav aria-label="${e(title || a.title)}"><ol class="rows rows--plain rows--nav">${rows.map((r, i) => navRow(vm, i + 1, r)).join("")}</ol></nav>`;
 }
 /** Back navigation + breadcrumb for a detail page under an area. */

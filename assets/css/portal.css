@@ -228,7 +228,17 @@ a.tile:hover { background: var(--mist); }
 .choice input { width: 20px; height: 20px; accent-color: var(--ink); flex: none; margin: 0; }
 .step-nav { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; padding-top: var(--space-3); border-top: 1px solid var(--hairline); }
 .step-nav .btn[aria-disabled="true"] { margin-left: auto; }
-@media (max-width: 560px) { .step-nav .btn { flex: 1 1 100%; } .step-nav .btn[aria-disabled="true"] { margin-left: 0; order: 3; } }
+/* Business Profile step actions, in reading and tab order: Save and continue (primary), Save changes (secondary), Previous (a quiet text link). */
+.step-nav__back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-left: auto; text-decoration-thickness: 1px; }
+.step-nav .btn[data-busy] { opacity: .6; cursor: progress; pointer-events: none; margin-left: 0; }
+.progress-next { margin: 0 0 var(--space-4); } .progress-next .btn { gap: 8px; }
+@media (max-width: 560px) {
+  .step-nav .btn { flex: 1 1 100%; }
+  .step-nav .btn[aria-disabled="true"] { margin-left: 0; order: 3; }
+  .step-nav .btn[data-busy] { order: 0; }
+  .step-nav__back { flex: 1 1 100%; justify-content: center; margin-left: 0; }
+  .progress-next .btn { width: 100%; }
+}
 
 .choices ul { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--hairline); border-left: 1px solid var(--hairline); }
 .choices li { border-right: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }

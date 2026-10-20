@@ -15,7 +15,14 @@ const area = (key) => AREAS.find((a) => a.key === key);
 /** Overview: seven rows and one progress line, both calculated from saved answers. */
 export function profileOverview(vm, saved) {
   const prog = profileProgress(saved);
-  return overview(vm, { key: "profile", progress: { done: prog.done, total: prog.total, noun: "steps" }, rows: PROFILE_STEPS.map((s, i) => ({ title: s.title, href: `/profile/${s.id}`, state: prog.steps[i].state })) }) + privacyNotice();
+  const left = (i) => prog.steps[i].missingRequired.length;
+  const firstOpen = prog.steps.findIndex((s) => s.missingRequired.length > 0); // the first step that still lacks a REQUIRED answer (optional-only steps never count)
+  const started = prog.steps.some((s) => s.answered > 0);
+  const rows = PROFILE_STEPS.map((s, i) => ({ title: s.title, href: `/profile/${s.id}`, state: prog.steps[i].state, status: left(i) ? `${left(i)} required ${left(i) === 1 ? "answer" : "answers"} left` : "" }));
+  const action = firstOpen >= 0
+    ? `<p class="progress-next"><a class="btn btn--primary" href="${e(href(vm, `/profile/${PROFILE_STEPS[firstOpen].id}`))}">${started ? "Continue" : "Start"}: ${e(PROFILE_STEPS[firstOpen].title)} <span aria-hidden="true">→</span></a></p>`
+    : `<p class="muted small progress-next" role="status">All required answers are complete.${prog.done < prog.total ? " The remaining steps are optional: add to them whenever it helps." : ""}</p>`;
+  return overview(vm, { key: "profile", progress: { done: prog.done, total: prog.total, noun: "steps" }, action, rows }) + privacyNotice();
 }
 
 /**
@@ -55,7 +62,7 @@ function field(scope, def, value, error) {
  * @param o {values, errors, csrf, saved, failed}  values: what to show (saved answers, or the rejected submission); errors: per-question messages;
  *   saved: show the "Saved" note; failed: the save could not be stored (values are kept on the page)
  */
-export function profileStep(vm, step, saved, { values = saved, errors = {}, csrf, savedNote = false, failed = false } = {}) {
+export function profileStep(vm, step, saved, { values = saved, errors = {}, csrf, savedNote = false, unchanged = false, failed = false } = {}) {
   const i = PROFILE_STEPS.indexOf(step), prev = PROFILE_STEPS[i - 1], next = PROFILE_STEPS[i + 1];
   const st = stepStatus(step, saved);
   const nErr = Object.keys(errors).length;
@@ -63,8 +70,8 @@ export function profileStep(vm, step, saved, { values = saved, errors = {}, csrf
     ? `<p class="form-banner form-banner--error" role="alert">We couldn’t save your answers just now. Nothing was lost on this page. Please try again in a moment.</p>`
     : nErr
       ? errorSummary(step.fields.filter((d) => errors[d.id]).map((d) => ({ id: `p-${step.id}-${d.id}`, label: d.label, message: errors[d.id] })), "Some answers need attention. Nothing was saved.")
-      : savedNote
-        ? `<p class="form-banner" role="status">Saved.${st.missingRequired.length ? ` ${st.missingRequired.length} required ${st.missingRequired.length === 1 ? "answer is" : "answers are"} still needed to complete this step.` : " This step is complete."}</p>`
+      : savedNote || unchanged
+        ? `<p class="form-banner" role="status">${savedNote ? "Saved." : "No changes to save. Your answers on this step are already up to date."}${st.missingRequired.length ? ` ${st.missingRequired.length} required ${st.missingRequired.length === 1 ? "answer is" : "answers are"} still needed to complete this step.` : " This step is complete."}</p>`
         : "";
   const stepper = `<nav class="stepper" aria-label="Business Profile steps"><ol>${PROFILE_STEPS.map((s, n) => { const ss = stepStatus(s, saved).state; return `<li class="is-${ss}"><a href="${e(href(vm, `/profile/${s.id}`))}"${s === step ? ' aria-current="step"' : ""}><span class="visually-hidden">Step ${n + 1}: ${e(s.title)}, ${ss === "done" ? "complete" : ss === "current" ? "in progress" : "not started"}</span><span aria-hidden="true">${n + 1}</span></a></li>`; }).join("")}</ol></nav>`;
   return `<header class="page-head">${crumb(vm, [["Business Profile", "/profile"], [step.title]])}<span class="eyebrow">Step ${i + 1} of ${PROFILE_STEPS.length}</span><h1 class="h1">${e(step.title)}</h1><p class="lead">${e(step.intro)}</p></header>
@@ -72,7 +79,7 @@ ${stepper}${banner}
 <form method="post" action="${e(href(vm, `/profile/${step.id}`))}" data-guard novalidate><input type="hidden" name="csrf" value="${e(csrf)}">
 <div class="questions">${step.fields.map((d) => field(`p-${step.id}`, d, values[d.id] || "", errors[d.id])).join("")}</div>
 <p class="form-status muted small" data-status role="status" aria-live="polite"></p>
-<div class="step-nav">${prev ? `<a class="btn" href="${e(href(vm, `/profile/${prev.id}`))}"><span aria-hidden="true">←</span> Previous</a>` : `<a class="btn" href="${e(href(vm, "/profile"))}"><span aria-hidden="true">←</span> All steps</a>`}<button class="btn btn--primary" type="submit" data-save>Save</button>${next ? `<a class="btn" href="${e(href(vm, `/profile/${next.id}`))}">Next <span aria-hidden="true">→</span></a>` : `<a class="btn" href="${e(href(vm, "/profile"))}">Back to your steps</a>`}</div></form>
+<div class="step-nav"><button class="btn btn--primary" type="submit" name="intent" value="continue" data-save>${next ? "Save and continue" : "Save and finish"}</button><button class="btn" type="submit" name="intent" value="save" data-save>Save changes</button><a class="step-nav__back text-link" href="${e(prev ? href(vm, `/profile/${prev.id}`) : href(vm, "/profile"))}"><span aria-hidden="true">←</span> ${prev ? "Previous" : "All steps"}</a></div></form>
 <p class="muted small privacy__link">Your answers are saved for your organization and may be reviewed by authorized Framework staff. <a class="text-link" href="${e(href(vm, "/profile#privacy"))}">How we use this information</a></p>`;
 }
 

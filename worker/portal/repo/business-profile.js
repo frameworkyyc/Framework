@@ -17,8 +17,10 @@ export async function getProfileAnswers(db, organizationId) {
 
 /**
  * Save one step of the questionnaire.
- * @returns {Promise<{ok:true, missingRequired:string[]} | {ok:false, error:string, errors?:Record<string,string>, values?:Record<string,string>}>}
+ * @returns {Promise<{ok:true, missingRequired:string[], changed:string[]} | {ok:false, error:string, errors?:Record<string,string>, values?:Record<string,string>}>}
  *   Invalid answers save NOTHING. Unanswered required questions do not block a save (progress is kept); they only keep the step incomplete.
+ *   `changed` lists the questions whose stored answer actually differs from what was submitted. Only those are written (with ONE audit entry);
+ *   when nothing differs, NOTHING is written (no rows, no audit entry), so callers can truthfully say "no changes".
  */
 export async function saveProfileStep(db, organizationId, userId, stepId, input, { now = new Date() } = {}) {
   requireOrgId(organizationId);
@@ -28,7 +30,11 @@ export async function saveProfileStep(db, organizationId, userId, stepId, input,
   const { values, errors } = validateStep(step, input);
   if (Object.keys(errors).length) return fail("invalid_answers", { errors, values });
   const t = isoTime(now);
-  const statements = step.fields.map((def) =>
+  const stored = (await db.prepare("SELECT field_id, value FROM business_profile_answers WHERE organization_id = ?").bind(organizationId).all()).results;
+  const current = Object.fromEntries(stored.map((r) => [r.field_id, r.value]));
+  const changed = step.fields.filter((def) => (typeof current[def.id] === "string" ? current[def.id] : "") !== values[def.id]).map((def) => def.id);
+  if (!changed.length) return ok({ missingRequired: stepStatus(step, values).missingRequired, changed });
+  const statements = step.fields.filter((def) => changed.includes(def.id)).map((def) =>
     values[def.id] === ""
       ? db.prepare("DELETE FROM business_profile_answers WHERE organization_id = ? AND field_id = ?").bind(organizationId, def.id)
       : db
@@ -45,5 +51,5 @@ export async function saveProfileStep(db, organizationId, userId, stepId, input,
       .bind(newId(), organizationId, userId, step.id, JSON.stringify({ step: step.id, v: PROFILE_SCHEMA_VERSION }), t),
   );
   await db.batch(statements);
-  return ok({ missingRequired: stepStatus(step, values).missingRequired });
+  return ok({ missingRequired: stepStatus(step, values).missingRequired, changed });
 }
