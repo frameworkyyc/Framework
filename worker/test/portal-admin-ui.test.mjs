@@ -174,3 +174,10 @@ test("the Business Profile review stays read-only and intact, and the navigation
   assert.match(read("admin/assets/modules.js"), /id: "clients", label: "Clients", path: "\/admin\/clients", enabled: true, load: \(\) => import\("\.\/clients\.js"\)/);
   assert.match(read("admin/assets/clients.js"), /from "\.\/clients-access\.js"/);
 });
+
+test("with changes switched off the invitation form is not shown (only the explanatory banner), and the empty state does not point at a form that is not there", () => {
+  const src = read("admin/assets/clients-access.js");
+  assert.match(src, /caps\.writes \? inviteForm\(caps\) : null/);
+  assert.match(src, /caps\.writes \? "Invite the first owner above\./);
+  assert.match(src, /!caps\.writes \? h\("p", \{ class: "adm-banner" \}, "Changes are switched off on this site\./);
+});

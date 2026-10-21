@@ -15,7 +15,7 @@ where relevant, WorkOS (read-only). Production was not touched. `PORTAL_ADMIN_WR
 | 5 | Sign-out and return | PASS | Session revoked, protected page and Back go to sign-in, replaying the pre-sign-out cookie gives `/portal/login?r=ended`; the WorkOS session ended too; a new sign-in showed the saved answers |
 | 6 | Account and Team | PASS | Name change persisted (and was reverted); Team lists the owner |
 | 7 | Feedback | PASS | Empty message refused (422); valid message stored against the right organization and person; audit holds the kind only |
-| 8 | Admin review | NOT RUN | Needs a person to sign in through Cloudflare Access; data side verified through the database |
+| 8 | Admin review | PASS | Verified by the owner in the browser (2026-10-21), signed in to the Staging Admin through Cloudflare Access: the dashboard loads; all three test organizations are listed; Framework Staging Live Test shows the right details, the accepted invitation and the active Owner; the Business Profile shows the saved answers and 71%; the write controls are disabled; Portal Feedback shows both test messages (including the automated one). Minor UX note: hide the disabled invitation form (done in a follow-up PR) |
 | 9 | Isolation | PASS | As A and as B: every page and write (feedback, profile, account) for another or unknown organization answered the same 404; nothing written; `/admin` and `/api/admin/*` redirect to Cloudflare Access |
 | 10 | Mobile and accessibility | PASS | axe (WCAG 2.0/2.1/2.2 A and AA plus best practice): 0 violations on 10 signed-in pages x 4 widths (320, 390, 768, 1280) and the login page; no sideways scroll; logical tab order with visible focus |
 
@@ -26,4 +26,4 @@ where relevant, WorkOS (read-only). Production was not touched. `PORTAL_ADMIN_WR
 * F4 (P2): the sign-in page links to the portal demo on Staging (intended on Staging; the demo is refused on the live hosts).
 
 ## Not covered (needs an invitation, a new user or a person)
-A brand-new user's first sign-in; the existing-user email (Resend) invitation path; delivery to an outside inbox; Member (non-owner) restrictions; the multi-organization picker; session expiry timing; the Admin area (Step 8); MFA.
+A brand-new user's first sign-in; the existing-user email (Resend) invitation path; delivery to an outside inbox; Member (non-owner) restrictions; the multi-organization picker; session expiry timing; MFA.

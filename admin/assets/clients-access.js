@@ -355,13 +355,13 @@ export function accessSections({ orgId, orgName, welcome = false }) {
               h("td", { "data-label": "" }, h("div", { class: "adm-row-actions" }, inviteActions(i, caps))),
             );
           })))
-      : h("div", { class: "adm-empty" }, h("p", { class: "adm-client" }, "No invitations yet."), h("p", { class: "adm-sub" }, "Invite the first owner above. They’ll get access when they sign in with that email address."));
+      : h("div", { class: "adm-empty" }, h("p", { class: "adm-client" }, "No invitations yet."), h("p", { class: "adm-sub" }, caps.writes ? "Invite the first owner above. They’ll get access when they sign in with that email address." : "Nothing has been invited yet. Changes are switched off on this site."));
     return h("section", { class: "adm-section", "aria-labelledby": "adm-inv-h" },
       h("div", { class: "adm-section-title" }, h("h2", { id: "adm-inv-h", text: "Invitations" })),
       h("p", { class: "adm-sub" }, "Creating an invitation and sending it are separate steps. Access is only granted when the person signs in with the invited email address."),
       !caps.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site. You can look, but not create, send, revoke or remove.") : !caps.sending ? h("p", { class: "adm-banner" }, "Sending is switched off on this site. You can create and revoke invitations, but nothing will be emailed.") : null,
       caps.recipients === "missing" ? h("p", { class: "adm-banner adm-banner--alert" }, "Invitations are locked: no approved recipients are configured on this site, so none can be created or sent.") : caps.recipients === "configured" ? h("p", { class: "adm-banner" }, "Controlled test: invitations can only be created for, and sent to, approved recipients. The server refuses any other address.") : null,
-      inviteForm(caps),
+      caps.writes ? inviteForm(caps) : null, // with changes switched off there is nothing to submit, so the form is not shown (the banner above says why)
       table,
     );
   }
