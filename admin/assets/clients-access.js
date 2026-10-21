@@ -16,7 +16,7 @@ const FAILURE_REASON = {
   workos_unreachable: "WorkOS could not be reached.",
   workos_unauthorized: "WorkOS refused the request (check the portal’s WorkOS key).",
   workos_rate_limited: "WorkOS asked us to slow down.",
-  workos_rejected: "WorkOS did not accept the request.",
+  workos_rejected: "WorkOS did not accept the request. A common reason is that this address already has an earlier WorkOS invitation that was never accepted or cancelled.",
   workos_unavailable: "WorkOS had a problem on its side.",
   workos_bad_response: "WorkOS answered in a way we couldn’t use.",
   workos_not_configured: "WorkOS isn’t configured on this site.",
@@ -33,7 +33,7 @@ const ERROR_TEXT = {
   invalid_website_url: "The website must be a full address starting with https://",
   invalid_email: "Enter a valid email address.",
   invalid_role: "Choose Owner or Member.",
-  already_pending: "There is already a pending invitation for this email address. Revoke it first, or use Send or Resend on it.",
+  already_pending: "There is already a pending invitation for this email address (see the list below). Use Send or Resend on it, or revoke it first.",
   already_member: "This person already has access to this organization.",
   organization_inactive: "This organization isn’t active, so it can’t receive invitations.",
   last_owner: "This is the organization’s only active owner. Make someone else an owner first.",
@@ -240,7 +240,11 @@ export function accessSections({ orgId, orgName, welcome = false }) {
   function inviteForm(caps) {
     const email = h("input", { id: "iv-email", class: "input", type: "email", maxlength: "254", autocomplete: "off", spellcheck: "false", autocapitalize: "none", required: true });
     const radio = (value, checked) => h("label", { class: "adm-choice" }, h("input", { type: "radio", name: "iv-role", value, checked: checked ? true : null }), h("span", null, h("strong", { text: ROLE_LABEL[value] }), h("span", { class: "adm-muted", text: " — " + ROLE_HELP[value] })));
-    const submit = h("button", { class: "btn btn--primary", type: "submit", disabled: caps.writes && caps.recipients !== "missing" ? null : true }, "Review invitation");
+    const canCreate = caps.writes && caps.recipients !== "missing";
+    const canSend = canCreate && caps.sending;
+    // With sending on, the main action creates AND sends in one confirmed step; "Create only" saves the invitation for later. With sending off there is only the save.
+    const sendButton = canSend ? h("button", { class: "btn btn--primary", type: "submit", "data-mode": "send" }, "Create and send") : null;
+    const saveButton = h("button", { class: canSend ? "btn btn--secondary" : "btn btn--primary", type: "submit", "data-mode": "save", disabled: canCreate ? null : true }, canSend ? "Create only" : "Review invitation");
     const emailError = h("p", { class: "adm-field__error", id: "iv-email-e", role: "alert", hidden: true });
     email.setAttribute("aria-describedby", "iv-email-e");
     return h("form", { class: "adm-form adm-form--inline", novalidate: true, "aria-label": "Invite someone", onsubmit: (ev) => {
@@ -249,24 +253,49 @@ export function accessSections({ orgId, orgName, welcome = false }) {
       const value = email.value.trim();
       const role = root.querySelector('input[name="iv-role"]:checked').value;
       if (!value) { emailError.textContent = ERROR_TEXT.invalid_email; emailError.hidden = false; email.setAttribute("aria-invalid", "true"); email.focus(); return; }
+      const mode = canSend && !(ev.submitter && ev.submitter.dataset.mode === "save") ? "send" : "save";
+      const details = [["Person", value], ["Role", ROLE_LABEL[role]], ["Organization", orgName], ["Valid for", "7 days"]];
+      const onFailure = (err) => {
+        if (err.code === "invalid_email") { emailError.textContent = errorText(err); emailError.hidden = false; email.setAttribute("aria-invalid", "true"); }
+        return { tone: "error", text: errorText(err) };
+      };
+      if (mode === "save") {
+        perform({
+          confirm: { title: "Create this invitation?", body: "This saves the invitation. It does not email anyone: you choose when to send it from the list below.", details, confirmLabel: "Create invitation" },
+          request: () => api(base + "/invitations", { method: "POST", body: { email: value, role } }),
+          onSuccess: () => { email.value = ""; return { tone: "success", text: `Invitation created for ${value}. It has not been sent. Use Send in the list below when you’re ready.` }; },
+          onFailure,
+        });
+        return;
+      }
       perform({
         confirm: {
-          title: "Create this invitation?",
-          body: "This saves the invitation. It does not email anyone: you choose when to send it from the list below.",
-          details: [["Person", value], ["Role", ROLE_LABEL[role]], ["Organization", orgName], ["Valid for", "7 days"]],
-          confirmLabel: "Create invitation",
+          title: "Create and send this invitation?",
+          body: "Framework saves the invitation and asks WorkOS to email the person an invitation. If they already have a portal sign-in, Framework sends its own email with a sign-in link instead. A provider accepting the request does not confirm the message reaches their inbox.",
+          details,
+          confirmLabel: "Create and send",
         },
-        request: () => api(base + "/invitations", { method: "POST", body: { email: value, role } }),
-        onSuccess: () => { email.value = ""; return { tone: "success", text: `Invitation created for ${value}. It has not been sent. Use Send in the list below when you’re ready.` }; },
-        onFailure: (err) => {
-          if (err.code === "invalid_email") { emailError.textContent = errorText(err); emailError.hidden = false; email.setAttribute("aria-invalid", "true"); return { tone: "error", text: errorText(err) }; }
-          return { tone: "error", text: errorText(err) };
+        request: async () => {
+          const created = await api(base + "/invitations", { method: "POST", body: { email: value, role } }); // a failure here (duplicate, address not approved...) means nothing was saved
+          try {
+            return { sent: await api(`${base}/invitations/${encodeURIComponent(created.invitation.id)}/send`, { method: "POST", body: {} }) };
+          } catch (sendError) {
+            return { sendError }; // the invitation IS saved; it can be sent again from the list
+          }
         },
+        onSuccess: (res) => {
+          email.value = "";
+          if (res.sent) return { tone: "success", text: `Invitation created and submitted to ${CHANNEL[res.sent.delivery.channel] || "the provider"} for ${value}. The provider accepted the request; this does not confirm the message reached their inbox. Its status is in the list below.` };
+          const e = res.sendError;
+          const why = e.code === "delivery_failed" ? FAILURE_REASON[e.data && e.data.delivery && e.data.delivery.error] || "The provider request failed." : errorText(e);
+          return { tone: "warning", text: `The invitation for ${value} was saved but NOT sent. ${why} Nothing was emailed. Use Try again (or Send) in the list below.` };
+        },
+        onFailure,
       });
     } },
       h("div", { class: "adm-field" }, h("label", { for: "iv-email", text: "Email address" }), email, emailError),
       h("fieldset", { class: "adm-field adm-fieldset" }, h("legend", { text: "Role" }), radio("member", true), radio("owner", false)),
-      h("div", { class: "adm-actions" }, submit),
+      h("div", { class: "adm-actions" }, sendButton, saveButton),
     );
   }
 

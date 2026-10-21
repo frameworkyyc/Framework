@@ -13,8 +13,8 @@
  *   - NO SECRETS IN OUTPUT. Only field names and types are read from Cloudflare responses. A non-secret setting's value is read only for the names listed
  *     in the expected file and is never printed (a mismatch says "differs"). Commit messages, emails and token-like strings are never printed, and a final
  *     scrub removes anything that still looks like one.
- *   - CRITICAL CHECKS FAIL CLOSED. If the configuration cannot be read, the checks that PORTAL_ADMIN_WRITES, PORTAL_INVITE_SENDING and the deprecated
- *     PORTAL_INVITE_ALLOWED_EMAILS are absent FAIL ("cannot verify") instead of passing.
+ *   - CRITICAL CHECKS FAIL CLOSED. If the configuration cannot be read, the checks of the PORTAL_ADMIN_WRITES / PORTAL_INVITE_SENDING state (declared in the expected file),
+ *     of the approved-recipient allowlist secret, and that the deprecated PORTAL_INVITE_ALLOWED_EMAILS is absent FAIL ("cannot verify") instead of passing.
  * Exit code: 1 when any check FAILs, otherwise 0.
  *
  * Behind a proxy (the Claude Code cloud environment) run Node with NODE_USE_ENV_PROXY=1. No dependencies: Node 22 built-ins only.
@@ -48,7 +48,9 @@ export function validateExpected(x) {
   for (const id of [x.d1.id, x.websiteDb.id]) if (id in x.forbiddenDatabaseIds) bad("a Staging database id is on the Production (forbidden) list");
   if (!/staging/i.test(x.d1.name) || !/staging/i.test(x.websiteDb.name)) bad("database names must be Staging databases");
   if (!PLAIN(x.plainVars) || !PLAIN(x.secrets) || !Array.isArray(x.secrets.required) || !PLAIN(x.bindings) || !Array.isArray(x.forbiddenNames)) bad("shape");
-  for (const n of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_INVITE_ALLOWED_EMAILS"]) if (!x.forbiddenNames.includes(n)) bad("forbiddenNames must include " + n);
+  if (!x.forbiddenNames.includes("PORTAL_INVITE_ALLOWED_EMAILS")) bad("forbiddenNames must include PORTAL_INVITE_ALLOWED_EMAILS");
+  // the declared state of the two invitation-workflow switches on Staging: "1" (on) or null (off), nothing else
+  if (!PLAIN(x.switches) || JSON.stringify(Object.keys(x.switches).sort()) !== JSON.stringify(["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) || Object.values(x.switches).some((v) => v !== "1" && v !== null)) bad("switches must declare PORTAL_ADMIN_WRITES and PORTAL_INVITE_SENDING as \"1\" or null");
   const text = JSON.stringify(x);
   if (/@[a-z0-9-]+\./i.test(text)) bad("no email addresses belong in this file");
   if (/\b(sk_|re_|Bearer )/.test(text)) bad("no credentials belong in this file");
@@ -191,16 +193,26 @@ export async function runHealthCheck({ fetch = globalThis.fetch, env = process.e
   const envWhy = ctx.envProblem || "configuration unavailable";
   const names = envOk ? Object.keys(ctx.deployEnv) : [];
   const typeOf = (n) => (envOk && PLAIN(ctx.deployEnv[n]) ? String(ctx.deployEnv[n].type || "") : "");
-  const critical = [
-    ["critical.admin_writes_absent", "PORTAL_ADMIN_WRITES", "administrative writes are switched off"],
-    ["critical.invite_sending_absent", "PORTAL_INVITE_SENDING", "invitation sending is switched off"],
-    ["critical.deprecated_allowlist_absent", "PORTAL_INVITE_ALLOWED_EMAILS", "the deprecated public invitation allowlist is gone"],
-  ];
-  for (const [id, name, what] of critical) {
-    if (!envOk) add(R(id, FAIL, `cannot verify that ${name} is absent: ${envWhy}`));
-    else if (names.includes(name)) add(R(id, FAIL, `${name} IS SET on the Staging Preview (${typeOf(name) || "unknown type"}): ${what} is false`));
-    else add(R(id, PASS, `${name} is absent: ${what}`));
+  // The two invitation-workflow switches have a DECLARED state (expected.switches): "1" = on for the controlled invitation workflow, null = off. Anything else FAILS.
+  // The deprecated public allowlist must always be absent. Nothing here ever prints a value.
+  const switchChecks = [["critical.admin_writes", "PORTAL_ADMIN_WRITES", "administrative writes"], ["critical.invite_sending", "PORTAL_INVITE_SENDING", "invitation sending"]];
+  for (const [id, name, what] of switchChecks) {
+    const want = expected.switches[name];
+    const e = envOk ? ctx.deployEnv[name] : undefined;
+    if (!envOk) add(R(id, FAIL, `cannot verify the state of ${name}: ${envWhy}`));
+    else if (want === null) add(names.includes(name) ? R(id, FAIL, `${name} IS SET on the Staging Preview (${typeOf(name) || "unknown type"}) but ${what} should be switched off`) : R(id, PASS, `${name} is absent: ${what} is switched off`));
+    else if (!e) add(R(id, FAIL, `${name} is ABSENT but ${what} is expected to be switched on`));
+    else if (!PLAIN(e) || e.type !== "plain_text") add(R(id, FAIL, `${name} is present but is not a plain setting (${typeOf(name) || "unknown type"})`));
+    else add(e.text === want ? R(id, PASS, `${name} is ON, as expected for the controlled invitation workflow (value not shown)`) : R(id, FAIL, `${name} has an unexpected value (not shown)`));
   }
+  if (!envOk) add(R("critical.allowlist_enforced", FAIL, `cannot verify that invitations are limited to an approved-recipient list: ${envWhy}`));
+  else {
+    const anyOn = switchChecks.some(([, n]) => names.includes(n));
+    if (!anyOn) add(R("critical.allowlist_enforced", PASS, "no invitation switch is on, so no recipient list is needed"));
+    else add(typeOf("PORTAL_INVITE_ALLOWLIST") === "secret_text" ? R("critical.allowlist_enforced", PASS, "an invitation switch is on and the approved-recipient allowlist exists as a secret (addresses never read)") : R("critical.allowlist_enforced", FAIL, "an invitation switch is ON but the approved-recipient allowlist secret is missing or not a secret"));
+  }
+  if (!envOk) add(R("critical.deprecated_allowlist_absent", FAIL, `cannot verify that PORTAL_INVITE_ALLOWED_EMAILS is absent: ${envWhy}`));
+  else add(names.includes("PORTAL_INVITE_ALLOWED_EMAILS") ? R("critical.deprecated_allowlist_absent", FAIL, `PORTAL_INVITE_ALLOWED_EMAILS IS SET on the Staging Preview (${typeOf("PORTAL_INVITE_ALLOWED_EMAILS") || "unknown type"}): the deprecated public invitation allowlist must be gone`) : R("critical.deprecated_allowlist_absent", PASS, "PORTAL_INVITE_ALLOWED_EMAILS is absent: the deprecated public invitation allowlist is gone"));
   if (envOk) {
     const missingSecrets = expected.secrets.required.filter((n) => typeOf(n) !== "secret_text");
     add(missingSecrets.length ? R("config.secrets", FAIL, `required secrets missing or not secrets: ${missingSecrets.join(", ")}`) : R("config.secrets", PASS, `all ${expected.secrets.required.length} required secret names present (values never read)`));
@@ -228,7 +240,7 @@ export async function runHealthCheck({ fetch = globalThis.fetch, env = process.e
       else if (id !== db.id) dbProblems.push(`${binding} is bound to an unexpected database`);
     }
     add(dbProblems.length ? R("config.database_binding", FAIL, dbProblems.join("; ")) : R("config.database_binding", PASS, "both D1 bindings point at the Staging databases, not Production"));
-    const known = new Set([...Object.keys(expected.plainVars), ...expected.secrets.required, ...(expected.secrets.optional || []), ...Object.keys(expected.bindings), ...expected.forbiddenNames]);
+    const known = new Set([...Object.keys(expected.plainVars), ...expected.secrets.required, ...(expected.secrets.optional || []), ...Object.keys(expected.bindings), ...Object.keys(expected.switches), ...expected.forbiddenNames]);
     const unexpected = names.filter((n) => !known.has(n));
     add(unexpected.length ? R("config.unexpected_names", WARN, `names not in the expected file: ${unexpected.slice(0, 8).join(", ")}${unexpected.length > 8 ? ` (+${unexpected.length - 8})` : ""}`) : R("config.unexpected_names", PASS, "no unexpected variable, secret or binding names"));
   } else {

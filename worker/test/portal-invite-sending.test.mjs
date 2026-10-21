@@ -76,7 +76,7 @@ async function setup(over = {}) {
 
 /* ------------------------------------------------------------------ the two switches */
 
-test("sending needs its OWN switch: with writes on but PORTAL_INVITE_SENDING unset, send and resend answer 403 sending_disabled and no provider is contacted; the switch is only in the Staging preview configuration", async () => {
+test("sending needs its OWN switch: with writes on but PORTAL_INVITE_SENDING unset, send and resend answer 403 sending_disabled and no provider is contacted; the switch is only in the Staging preview configuration (on there, never at the top level)", async () => {
   const s = await setup({ PORTAL_INVITE_SENDING: undefined });
   const inv = await s.invite(s.alpha, "sam@example.com");
   const before = s.snap();
@@ -93,8 +93,8 @@ test("sending needs its OWN switch: with writes on but PORTAL_INVITE_SENDING uns
   for (const f of [".github/workflows/ci.yml", "migrations/portal/wrangler.migrate.staging.jsonc", "migrations/portal/wrangler.migrate.production.jsonc"]) assert.ok(!/PORTAL_INVITE_SENDING|PORTAL_ADMIN_WRITES/.test(read(f).replace(/^\s*\/\/.*$/gm, "")), f);
   const cfg = JSON.parse(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, ""));
   assert.equal(cfg.vars.PORTAL_INVITE_SENDING, undefined, "never in the top-level (Production) vars");
-  assert.equal(cfg.previews.vars.PORTAL_INVITE_SENDING, undefined, "switched off on Staging as well");
-  assert.ok(!/PORTAL_INVITE_SENDING/.test(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, "")), "the switch appears nowhere in the configuration");
+  assert.equal(cfg.previews.vars.PORTAL_INVITE_SENDING, "1", "Staging only: on for the invitation workflow (recipients still limited to the allowlist secret)");
+  assert.equal((read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, "").match(/PORTAL_INVITE_SENDING/g) || []).length, 1, "the switch appears exactly once in the configuration: in the Staging (previews) block");
 });
 
 /* ------------------------------------------------------------------ sending */

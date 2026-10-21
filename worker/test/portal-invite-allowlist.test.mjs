@@ -288,7 +288,7 @@ test("defence in depth: the delivery code itself refuses to contact a provider w
 
 /* ------------------------------------------------------------------ configuration and code paths */
 
-test("configuration: the recipient allowlist is a Cloudflare SECRET, not configuration: no address and no value in any checked-in file; the switches stay off; Production is untouched", () => {
+test("configuration: the recipient allowlist is a Cloudflare SECRET, not configuration: no address and no value in any checked-in file; the two switches are Staging-only; Production is untouched", () => {
   const raw = read("wrangler.jsonc");
   const config = JSON.parse(strip(raw));
   for (const name of ["PORTAL_INVITE_ALLOWLIST", "PORTAL_INVITE_ALLOWED_EMAILS"]) {
@@ -300,12 +300,12 @@ test("configuration: the recipient allowlist is a Cloudflare SECRET, not configu
   const addresses = (raw.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).filter((a) => a !== "hello@frameworkco.ca");
   assert.deepEqual(addresses, [], "no personal or recipient address appears in the public configuration");
   for (const f of ["migrations/portal/wrangler.migrate.production.jsonc", "migrations/portal/wrangler.migrate.staging.jsonc", ".github/workflows/ci.yml"]) assert.ok(!/PORTAL_INVITE_ALLOW/.test(read(f)), f);
-  // the controlled live test is over: neither switch is set anywhere
+  // the invitation workflow switches: ON for Staging (exactly "1"), never at the top level (Production), each named exactly once in the configuration
   const code = strip(raw);
   for (const name of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) {
-    assert.equal(config.previews.vars[name], undefined, name);
-    assert.equal(config.vars[name], undefined, name);
-    assert.ok(!code.includes(name), name + " appears nowhere in the configuration");
+    assert.equal(config.previews.vars[name], "1", name);
+    assert.equal(config.vars[name], undefined, name + " is never a Production variable");
+    assert.equal((code.match(new RegExp(name, "g")) || []).length, 1, name + " appears once: in the Staging block");
   }
   assert.equal(config.previews.vars.PORTAL_BASE_URL, "https://staging.frameworkco.ca");
   assert.equal(config.previews.vars.PORTAL_ENABLED, "1", "removing the allowlist variable does not switch the portal off");
@@ -373,23 +373,22 @@ test("every path that can email an invitation is behind the check: only admin-ac
   assert.ok(!/invitations|portal/i.test(strip(read("worker/feedback-invite.js")).replace(/Feedback invitations|feedback invitation/gi, "")), "the feedback-request email code has no portal invitation code in it");
 });
 
-test("STAGING exactly as wrangler.jsonc defines it is READ-ONLY: both switches are absent, so the capabilities say so and every write route answers 403 writes_disabled with nothing changed or sent", async () => {
+test("STAGING exactly as wrangler.jsonc defines it has both switches ON, but with no allowlist secret every invitation operation is refused (fail closed) and nothing is created or sent", async () => {
   const config = JSON.parse(strip(read("wrangler.jsonc")));
   const s = await setup();
   const env = { ...s.env, ...config.previews.vars };
-  delete env.PORTAL_ADMIN_WRITES; delete env.PORTAL_INVITE_SENDING; delete env.PORTAL_INVITE_ALLOWLIST; // the harness sets them; the committed configuration sets none of them
-  for (const k of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) assert.equal(config.previews.vars[k], undefined, k);
+  delete env.PORTAL_INVITE_ALLOWLIST; // the committed configuration never contains the list: it is a Cloudflare secret
+  for (const k of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) assert.equal(config.previews.vars[k], "1", k);
   assert.equal(config.previews.vars.PORTAL_ENABLED, "1");
   assert.equal(config.previews.vars.PORTAL_INVITE_ALLOWLIST, undefined);
   const access = await body(await s.call(`/api/admin/clients/${s.org.id}/access`, { method: "GET", e: env }));
-  assert.deepEqual(access.capabilities, { writes: false, sending: false, recipients: "missing" }, "the committed configuration alone allows no recipient at all");
+  assert.deepEqual(access.capabilities, { writes: true, sending: true, recipients: "missing" }, "the committed configuration alone approves no recipient at all");
   const before = s.snap();
   const r = await s.invite(APPROVED, "member", s.org, { e: env });
   assert.equal(r.status, 403);
-  assert.equal((await body(r)).error, "writes_disabled");
-  assert.equal((await s.call("/api/admin/clients", { json: { name: "X" }, e: env })).status, 403);
-  assert.equal(s.snap(), before);
-  assert.equal(s.pv.calls.length, 0);
+  assert.equal((await body(r)).error, "recipient_allowlist_missing");
+  assert.equal(s.snap(), before, "nothing was created");
+  assert.equal(s.pv.calls.length, 0, "no provider was contacted");
 });
 
 test("(for a future controlled test) the Staging configuration plus the allowlist SECRET and both switches turned on: ONLY the two listed addresses are accepted, in any casing, and everything else is refused", async () => {
@@ -448,4 +447,15 @@ test("policy with a two-address list: both pass in any casing or spacing, and no
   }
   assert.equal(allowlistStatus(env), "configured");
   assert.equal(recipientPolicy(env).emails.size, 2);
+});
+
+test("the admin invitation runbook exists, is Staging-scoped, warns that the secret replaces the whole list, and holds no address, token or secret value (the repository is public)", () => {
+  const doc = read("worker/portal/ADMIN-INVITATIONS-RUNBOOK.md");
+  assert.match(doc, /Scope: \*\*Staging\*\*/);
+  assert.match(doc, /`secret put` REPLACES the whole list/);
+  assert.match(doc, /PORTAL_INVITE_ALLOWLIST/);
+  assert.match(doc, /Create and send/);
+  assert.deepEqual(doc.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || [], [], "no email address in the runbook");
+  assert.ok(!/\b(sk_|re_|Bearer )[A-Za-z0-9]/.test(doc));
+  assert.ok(readFileSync(new URL("../../.assetsignore", import.meta.url), "utf8").split("\n").includes("worker/"), "docs under worker/ are never published");
 });

@@ -25,6 +25,8 @@ const goodEnv = () => ({
   PORTAL_BASE_URL: { type: "plain_text", text: "https://staging.frameworkco.ca" },
   PORTAL_ENABLED: { type: "plain_text", text: "1" },
   PORTAL_DEMO: { type: "plain_text", text: "1" },
+  PORTAL_ADMIN_WRITES: { type: "plain_text", text: "1" },
+  PORTAL_INVITE_SENDING: { type: "plain_text", text: "1" },
   ...Object.fromEntries(expected.secrets.required.map((n) => [n, { type: "secret_text" }])),
   IP_HASH_SALT: { type: "secret_text" },
   ASSETS: { type: "assets" },
@@ -97,7 +99,7 @@ test("a healthy Staging reports PASS everywhere except the two unavoidable WARNs
   const r = by(report);
   assert.equal(report.counts.FAIL, 0);
   assert.deepEqual(report.results.filter((x) => x.status === "WARN").map((x) => x.id), ["d1.retention"], "only the retention/restore limitation is a standing warning");
-  for (const id of ["cloudflare.auth", "preview.exists", "deployments.recent", "deploy.commit", "github.check.workers-builds-framework", "github.check.node-tests", "critical.admin_writes_absent", "critical.invite_sending_absent", "critical.deprecated_allowlist_absent", "config.secrets", "config.variables", "config.bindings", "config.database_binding", "config.unexpected_names", "d1.available", "d1.tables", "d1.timetravel", "smoke.login", "smoke.headers", "smoke.portal_home", "smoke.org_page", "smoke.admin_page", "smoke.admin_api", "smoke.privacy"]) assert.equal(r[id].status, "PASS", id);
+  for (const id of ["cloudflare.auth", "preview.exists", "deployments.recent", "deploy.commit", "github.check.workers-builds-framework", "github.check.node-tests", "critical.admin_writes", "critical.invite_sending", "critical.allowlist_enforced", "critical.deprecated_allowlist_absent", "config.secrets", "config.variables", "config.bindings", "config.database_binding", "config.unexpected_names", "d1.available", "d1.tables", "d1.timetravel", "smoke.login", "smoke.headers", "smoke.portal_home", "smoke.org_page", "smoke.admin_page", "smoke.admin_api", "smoke.privacy"]) assert.equal(r[id].status, "PASS", id);
   assert.equal(report.overall, "WARN");
   const code = await main(["--json"], { out: () => {}, run: { fetch: world().fetch, env: {}, expected, now: () => NOW } });
   assert.equal(code, 0);
@@ -112,19 +114,42 @@ test("an optional secret that is absent (IP_HASH_SALT on the real Staging) is a 
 
 /* ------------------------------------------------------------------ critical checks fail closed */
 
-test("CRITICAL: PORTAL_ADMIN_WRITES, PORTAL_INVITE_SENDING and the deprecated allowlist FAIL when present, in any form and with any value", async () => {
-  for (const [name, id] of [["PORTAL_ADMIN_WRITES", "critical.admin_writes_absent"], ["PORTAL_INVITE_SENDING", "critical.invite_sending_absent"], ["PORTAL_INVITE_ALLOWED_EMAILS", "critical.deprecated_allowlist_absent"]]) {
-    for (const entry of [{ type: "plain_text", text: "1" }, { type: "plain_text", text: "0" }, { type: "plain_text", text: "" }, { type: "secret_text" }]) {
-      const env = { ...goodEnv(), [name]: entry };
+test("CRITICAL: the two invitation switches must match the DECLARED state (on for the controlled workflow): absent, a wrong value, or a non-plain type FAILS; the deprecated allowlist FAILS when present; values are never printed", async () => {
+  for (const [name, id] of [["PORTAL_ADMIN_WRITES", "critical.admin_writes"], ["PORTAL_INVITE_SENDING", "critical.invite_sending"]]) {
+    for (const [label, mutate] of [["absent", (e) => { delete e[name]; }], ["0", (e) => { e[name] = { type: "plain_text", text: "0" }; }], ["true", (e) => { e[name] = { type: "plain_text", text: "true" }; }], ["empty", (e) => { e[name] = { type: "plain_text", text: "" }; }], ["secret type", (e) => { e[name] = { type: "secret_text" }; }]]) {
+      const env = goodEnv(); mutate(env);
       const { report } = await run({ deployment: () => ok({ id: DEPLOY, env }) });
-      assert.equal(by(report)[id].status, "FAIL", `${name} ${JSON.stringify(entry.type)}/${entry.text}`);
+      assert.equal(by(report)[id].status, "FAIL", `${name} ${label}`);
       assert.equal(report.overall, "FAIL");
+      assert.ok(!formatMarkdown(report).includes("super-secret"), "no value is printed");
     }
   }
-  assert.equal(await main([], { out: () => {}, run: { fetch: world({ deployment: () => ok({ id: DEPLOY, env: { ...goodEnv(), PORTAL_ADMIN_WRITES: { type: "plain_text", text: "1" } } }) }).fetch, env: {}, expected, now: () => NOW } }), 1, "exit code 1 on any FAIL");
+  // the deprecated public allowlist is never allowed, in any form
+  for (const entry of [{ type: "plain_text", text: "1" }, { type: "plain_text", text: "" }, { type: "secret_text" }]) {
+    const { report } = await run({ deployment: () => ok({ id: DEPLOY, env: { ...goodEnv(), PORTAL_INVITE_ALLOWED_EMAILS: entry } }) });
+    assert.equal(by(report)["critical.deprecated_allowlist_absent"].status, "FAIL");
+  }
+  // a switch is on but the approved-recipient allowlist secret is missing or is not a secret: FAIL
+  for (const mutate of [(e) => { delete e.PORTAL_INVITE_ALLOWLIST; }, (e) => { e.PORTAL_INVITE_ALLOWLIST = { type: "plain_text", text: "visible@example.test" }; }]) {
+    const env = goodEnv(); mutate(env);
+    const { report } = await run({ deployment: () => ok({ id: DEPLOY, env }) });
+    assert.equal(by(report)["critical.allowlist_enforced"].status, "FAIL");
+    assert.ok(!formatMarkdown(report).includes("visible@example.test"));
+  }
+  assert.equal(await main([], { out: () => {}, run: { fetch: world({ deployment: () => ok({ id: DEPLOY, env: { ...goodEnv(), PORTAL_ADMIN_WRITES: { type: "plain_text", text: "0" } } }) }).fetch, env: {}, expected, now: () => NOW } }), 1, "exit code 1 on any FAIL");
 });
 
-test("CRITICAL: if the configuration cannot be read (auth, Preview missing, history unreadable, wrong shape, outage), the three critical checks FAIL with 'cannot verify'", async () => {
+test("when the declared state is 'off' (switches null in the expected file) a switch that is present FAILS, and absent passes", async () => {
+  const off = { ...expected, switches: { PORTAL_ADMIN_WRITES: null, PORTAL_INVITE_SENDING: null } };
+  const envOff = goodEnv(); delete envOff.PORTAL_ADMIN_WRITES; delete envOff.PORTAL_INVITE_SENDING;
+  let r = by((await run({ deployment: () => ok({ id: DEPLOY, env: envOff }) }, { expected: off })).report);
+  assert.equal(r["critical.admin_writes"].status, "PASS"); assert.equal(r["critical.invite_sending"].status, "PASS"); assert.equal(r["critical.allowlist_enforced"].status, "PASS");
+  r = by((await run({ deployment: () => ok({ id: DEPLOY, env: { ...envOff, PORTAL_ADMIN_WRITES: { type: "plain_text", text: "1" } } }) }, { expected: off })).report);
+  assert.equal(r["critical.admin_writes"].status, "FAIL");
+  assert.equal(r["config.unexpected_names"].status, "PASS", "a declared switch name is a known name");
+});
+
+test("CRITICAL: if the configuration cannot be read (auth, Preview missing, history unreadable, wrong shape, outage), the critical checks FAIL with 'cannot verify'", async () => {
   const broken = {
     "401 on verify": { verify: () => j(401, { success: false, errors: [{ code: 10000, message: "Authentication error" }] }) },
     "no account": { accounts: () => (ok([])) },
@@ -141,7 +166,7 @@ test("CRITICAL: if the configuration cannot be read (auth, Preview missing, hist
   for (const [label, over] of Object.entries(broken)) {
     const { report } = await run(over);
     const r = by(report);
-    for (const id of ["critical.admin_writes_absent", "critical.invite_sending_absent", "critical.deprecated_allowlist_absent"]) {
+    for (const id of ["critical.admin_writes", "critical.invite_sending", "critical.allowlist_enforced", "critical.deprecated_allowlist_absent"]) {
       assert.equal(r[id].status, "FAIL", `${label}: ${id}`);
       assert.match(r[id].message, /cannot verify/, `${label}: ${id}`);
     }
@@ -274,7 +299,9 @@ test("expected configuration is refused when it could point at Production or hol
   for (const [label, mutate] of [
     ["Staging database id on the Production list", (x) => { x.forbiddenDatabaseIds[x.d1.id] = "x"; }],
     ["database name not Staging", (x) => { x.d1.name = "framework-portal"; }],
-    ["the critical names removed", (x) => { x.forbiddenNames = x.forbiddenNames.filter((n) => n !== "PORTAL_ADMIN_WRITES"); }],
+    ["the deprecated-allowlist name removed", (x) => { x.forbiddenNames = x.forbiddenNames.filter((n) => n !== "PORTAL_INVITE_ALLOWED_EMAILS"); }],
+    ["switches missing", (x) => { delete x.switches; }],
+    ["a switch declared with another value", (x) => { x.switches.PORTAL_ADMIN_WRITES = "true"; }],
     ["an email address", (x) => { x.note = "ask person@example.test"; }],
     ["a credential", (x) => { x.note = "Bearer abcdefghijklmnop"; }],
     ["a non-https base URL", (x) => { x.baseUrl = "http://staging.frameworkco.ca"; }],
@@ -314,7 +341,7 @@ test("the expected-config file matches wrangler.jsonc (Staging databases, non-se
   const strip = (t) => t.replace(/^\s*\/\/.*$/gm, "");
   const cfg = JSON.parse(strip(read("wrangler.jsonc")));
   const p = cfg.previews;
-  assert.deepEqual(Object.keys(expected.plainVars).sort(), Object.keys(p.vars).sort(), "every Staging variable is expected, and nothing else");
+  assert.deepEqual([...Object.keys(expected.plainVars), ...Object.entries(expected.switches).filter(([, v]) => v !== null).map(([k]) => k)].sort(), Object.keys(p.vars).sort(), "every Staging variable is expected (plain settings and the declared switches), and nothing else");
   for (const [n, want] of Object.entries(expected.plainVars)) if (want !== null) assert.equal(p.vars[n], want, n);
   const portal = p.d1_databases.find((d) => d.binding === "PORTAL_DB"), site = p.d1_databases.find((d) => d.binding === "DB");
   assert.deepEqual([portal.database_name, portal.database_id], [expected.d1.name, expected.d1.id]);
@@ -325,6 +352,7 @@ test("the expected-config file matches wrangler.jsonc (Staging databases, non-se
   assert.deepEqual(Object.keys(expected.forbiddenDatabaseIds).sort(), prod.sort(), "the forbidden ids are exactly Production's databases");
   assert.deepEqual([...Object.keys(expected.bindings)].sort(), ["ASSETS", "DB", "PORTAL_DB", "PORTAL_FILES", "PORTAL_RATE_LIMITER"]);
   for (const n of expected.forbiddenNames) assert.ok(!strip(read("wrangler.jsonc")).includes(n), n + " must not be in the configuration");
+  for (const [n, want] of Object.entries(expected.switches)) { assert.equal(p.vars[n] === undefined ? null : p.vars[n], want, n + " matches the Staging block"); assert.equal(cfg.vars[n], undefined, n + " is never a Production (top-level) variable"); }
   assert.equal(expected.worker, cfg.name);
   assert.equal(expected.baseUrl, p.vars.PORTAL_BASE_URL);
   for (const n of expected.secrets.required) assert.ok(!(n in p.vars), n + " is a secret, not a variable");
