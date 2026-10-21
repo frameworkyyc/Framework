@@ -25,5 +25,5 @@ export function authFrame({ title, bodyHtml = "", ref = null }) {
   return `<!DOCTYPE html>
 <html lang="en-CA"><head>${head(title)}</head>
 <body class="auth"><header class="auth__top"><div class="wrap"><a class="brand" href="/portal/login" aria-label="Framework client portal">${MARK}<span class="brand__word">Framework</span></a></div></header>
-<main id="main" class="auth__main"><div class="wrap"><div class="auth__panel"><span class="eyebrow">Client portal</span><h1 class="h1">${e(title)}</h1>${bodyHtml}${refLine}</div></div></main>${footer}</body></html>`;
+<main id="main" class="auth__main" tabindex="-1"><div class="wrap"><div class="auth__panel"><span class="eyebrow">Client portal</span><h1 class="h1">${e(title)}</h1>${bodyHtml}${refLine}</div></div></main>${footer}</body></html>`;
 }
