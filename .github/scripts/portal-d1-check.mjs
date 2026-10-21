@@ -4,18 +4,31 @@
 // Usage: node portal-d1-check.mjs <config|info|pending-before|pending-after|tables-before|tables-after|indexes-after> [arg] < wrangler-output
 import { readFileSync } from "node:fs";
 
+// The migrations Production may receive, IN ORDER, with exactly the tables and indexes each one creates. A run is allowed only when the pending list is a tail of this
+// list (for example 0002, 0003, 0004 on a database that already has 0001), and the tables already in the database must equal what the already-applied migrations create.
+// 0004 only adds columns to `invitations` (no table or index). Anything else fails closed.
+export const STAGES = Object.freeze([
+  {
+    file: "0001_portal_foundation.sql",
+    tables: ["activity_log", "invitations", "memberships", "organizations", "portal_sessions", "portal_users", "projects"],
+    indexes: [
+      "idx_activity_org_client_time", "idx_activity_org_time", "idx_invitations_one_pending", "idx_invitations_org", "idx_invitations_pending_email",
+      "idx_invitations_workos", "idx_memberships_org", "idx_memberships_user", "idx_organizations_revenue_client", "idx_portal_sessions_expiry",
+      "idx_portal_sessions_user", "idx_projects_org_created", "idx_projects_org_status",
+    ],
+  },
+  { file: "0002_business_profile.sql", tables: ["business_profile_answers"], indexes: [] },
+  { file: "0003_portal_feedback.sql", tables: ["portal_feedback"], indexes: ["idx_portal_feedback_created", "idx_portal_feedback_user"] },
+  { file: "0004_invitation_delivery.sql", tables: [], indexes: [] },
+]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",
   id: "b213b7db-ed29-4ab6-946c-0728dd6709e8",
   binding: "PORTAL_DB",
   migrationsDir: ".",
-  migration: "0001_portal_foundation.sql",
-  tables: ["activity_log", "invitations", "memberships", "organizations", "portal_sessions", "portal_users", "projects"],
-  indexes: [
-    "idx_activity_org_client_time", "idx_activity_org_time", "idx_invitations_one_pending", "idx_invitations_org", "idx_invitations_pending_email",
-    "idx_invitations_workos", "idx_memberships_org", "idx_memberships_user", "idx_organizations_revenue_client", "idx_portal_sessions_expiry",
-    "idx_portal_sessions_user", "idx_projects_org_created", "idx_projects_org_status",
-  ],
+  migrations: STAGES.map((s) => s.file),
+  tables: STAGES.flatMap((s) => s.tables),
+  indexes: STAGES.flatMap((s) => s.indexes),
 });
 // Tables Cloudflare/Wrangler own; they may exist and are ignored. Anything else that is not expected is a surprise.
 const SYSTEM_TABLE = /^(d1_migrations|_cf_[A-Za-z0-9_]*|sqlite_[A-Za-z0-9_]*)$/;
@@ -50,10 +63,18 @@ export function pendingMigrations(text) {
   if (names.length > 0 && /No migrations to apply/i.test(text)) fail("contradictory migration list output");
   return names;
 }
+/** The pending list must be a TAIL of the known, ordered list: nothing unknown, nothing skipped, nothing out of order. */
+export function assertPendingIsTail(names) {
+  const known = EXPECTED.migrations;
+  const unknown = names.filter((n) => !known.includes(n));
+  if (unknown.length) fail("unexpected pending migration(s): " + unknown.join(", "));
+  const tail = known.slice(known.length - names.length);
+  if (names.length > known.length || names.some((n, i) => n !== tail[i])) fail("pending migrations are not the next ones in order; found: " + names.join(", "));
+}
 export function checkPendingBefore(text, mode) {
-  const names = pendingMigrations(text);
-  if (mode === "apply" && !(names.length === 1 && names[0] === EXPECTED.migration)) fail("apply requires exactly one pending migration, " + EXPECTED.migration + "; found: " + (names.join(", ") || "none"));
-  if (names.some((n) => n !== EXPECTED.migration)) fail("unexpected pending migration(s): " + names.filter((n) => n !== EXPECTED.migration).join(", "));
+  const names = [...pendingMigrations(text)].sort();
+  assertPendingIsTail(names);
+  if (mode === "apply" && names.length === 0) fail("apply requires at least one pending migration; none found");
   return "pending: " + (names.join(", ") || "none");
 }
 export function checkPendingAfter(text) {
@@ -72,10 +93,15 @@ export function namesFromExecute(text) {
   if (!first || first.success === false || !Array.isArray(first.results)) fail("d1 execute did not succeed");
   return first.results.map((r) => String(r.name));
 }
-export function checkTablesBefore(text, mode) {
+/** Tables that must already exist given which migrations are still pending (everything not pending has been applied). */
+export function tablesAlreadyApplied(pendingNames) {
+  return STAGES.filter((st) => !pendingNames.includes(st.file)).flatMap((st) => st.tables);
+}
+export function checkTablesBefore(text, mode, pendingNames = EXPECTED.migrations) {
   const user = namesFromExecute(text).filter((n) => !SYSTEM_TABLE.test(n));
-  if (mode === "apply" && user.length) fail("the Production database is not empty; found tables: " + user.join(", "));
-  return "user tables before: " + (user.join(", ") || "none");
+  const want = tablesAlreadyApplied(pendingNames);
+  if (!sameSet(user, want)) fail("the Production database does not match its migration state; expected tables: " + (want.join(", ") || "none") + "; found: " + (user.join(", ") || "none"));
+  return "user tables before: " + ([...user].sort().join(", ") || "none");
 }
 export function checkTablesAfter(text) {
   const user = namesFromExecute(text).filter((n) => !SYSTEM_TABLE.test(n));
@@ -89,7 +115,7 @@ export function checkIndexesAfter(text) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const [cmd, arg] = process.argv.slice(2);
+  const [cmd, arg, arg2] = process.argv.slice(2);
   try {
     const input = () => readFileSync(0, "utf8");
     const out = {
@@ -97,7 +123,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       info: () => checkInfo(input()),
       "pending-before": () => checkPendingBefore(input(), arg),
       "pending-after": () => checkPendingAfter(input()),
-      "tables-before": () => checkTablesBefore(input(), arg),
+      "tables-before": () => checkTablesBefore(input(), arg, pendingMigrations(readFileSync(arg2, "utf8"))),
       "tables-after": () => checkTablesAfter(input()),
       "indexes-after": () => checkIndexesAfter(input()),
     }[cmd];
