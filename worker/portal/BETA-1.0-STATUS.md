@@ -29,7 +29,7 @@ One or a few invited organizations; email-code sign-in; Home, Business Profile, 
 | 6 | First Production sign-in behind a temporary WAF rule, then isolation check (`verify-organization.sql`) | owner + Claude | open |
 | 7 | Time Travel bookmark before first client data; confirm retention window in the dashboard | owner | open |
 | 8 | Incident note and named operator | owner | **operator decided** (the owner); note still a draft, owner to read it once |
-| 9 | Administrator MFA (decided: required wherever supported). Verified: **WorkOS dashboard account has MFA NOT configured**. Cloudflare, GitHub, Access sign-in method and mailbox cannot be verified from here | owner | open: enable and confirm each (details in PRIVACY-DRAFT.md) |
+| 9 | Administrator MFA (decided: required wherever supported) | owner | **WorkOS done** (owner enrolled; dashboard-wide requirement on; client sign-in unchanged). Open, cannot be verified from here: Cloudflare, GitHub, the hello@frameworkco.ca mailbox, the Cloudflare Access sign-in method |
 | 10 | Admin area live check (Step 8 of the acceptance test) | owner | in progress |
 | 11 | WorkOS email deliverability to an outside inbox (both test inboxes are the owner's) | owner | open |
 
