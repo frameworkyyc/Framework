@@ -45,6 +45,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; margin: 0; 
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .skip-link { position: absolute; left: var(--gutter); top: -100px; z-index: 100; background: var(--ink); color: var(--paper); padding: 12px 18px; font-weight: 600; text-decoration: none; }
 .skip-link:focus { top: 12px; }
+main:focus { outline: none; } /* the skip link moves focus here so the next Tab starts inside the page; main is not interactive, so no ring */
 
 /* ---------- type ---------- */
 .eyebrow { display: block; margin: 0 0 var(--space-2); font-size: 12px; font-weight: 600; line-height: 1.2; letter-spacing: 0.14em; text-transform: uppercase; color: var(--slate); }

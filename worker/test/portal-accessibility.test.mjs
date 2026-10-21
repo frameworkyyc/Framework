@@ -206,3 +206,8 @@ test("sign-in and system pages keep every part of the page inside a landmark: ba
   assert.match(auth, /\$\{footer\}/);
   assert.doesNotMatch(auth, /<div class="auth__top">/);
 });
+
+test("the skip link target <main> can receive focus (tabindex -1) on every portal page, and shows no focus ring of its own", () => {
+  for (const f of ["../portal/frame.js", "../portal/ui.js"]) assert.match(readFileSync(new URL(f, import.meta.url), "utf8"), /<main id="main"[^>]*tabindex="-1"/, f);
+  assert.match(readFileSync(new URL("../../assets/css/portal.css", import.meta.url), "utf8"), /^main:focus \{ outline: none; \}/m);
+});
