@@ -44,3 +44,7 @@ Admin-sent invitations on Production, remaining modules and file sharing, passke
 ## Recommended order
 1 Workflow update (PR to Staging) -> 2 owner decisions (MFA, privacy, operator) -> 3 promote to `main` (inert) -> 4 Production migrations via the workflow (bookmark first) -> 5 Production configuration checks and WAF rule ->
 6 launch change (two flags) with approval -> 7 internal Production sign-in and isolation test -> 8 invite the first client. Rollback at any point: revert the launch change; `/portal` returns the plain 404.
+
+## Operational note: automatic deployments (2026-10-21)
+After PR #13 merged (`b41e816`, 14:50 UTC) no Cloudflare build started: GitHub shows no "Workers Builds: framework" check, and the Preview `Staging` still runs `f4a1e53` (deployment #134, 02:39 UTC). The Vercel preview-comments app was also silent for the PR branch commit and the merge,
+while GitHub Actions ran normally for both events. So GitHub generated the events and the apps did not respond; the problem is upstream of any build or configuration. Last known good: every push up to 02:38 UTC produced a Cloudflare build. Under investigation; this note is itself a test push.
