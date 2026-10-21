@@ -39,5 +39,6 @@
     "PORTAL_FILES": { "type": "r2_bucket", "bucket_name": "framework-portal-files-staging" },
     "PORTAL_RATE_LIMITER": { "type": "ratelimit", "namespace_id": "4101" }
   },
-  "forbiddenNames": ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_INVITE_ALLOWED_EMAILS"]
+  "switches": { "PORTAL_ADMIN_WRITES": "1", "PORTAL_INVITE_SENDING": "1" },
+  "forbiddenNames": ["PORTAL_INVITE_ALLOWED_EMAILS"]
 }

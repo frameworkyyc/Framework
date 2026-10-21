@@ -129,7 +129,7 @@ test("only the reviewed API routes are used, each write through api() with POST,
   const src = strip(read("admin/assets/clients-access.js"));
   const paths = [...src.matchAll(/api\((`[^`]*`|"[^"]*"|base \+ "[^"]*")/g)].map((m) => m[1]);
   assert.deepEqual([...new Set(paths)].sort(), [
-    "`${base}/invitations/${encodeURIComponent(i.id)}/${mode}`", "`${base}/invitations/${encodeURIComponent(i.id)}/replace`", "`${base}/invitations/${encodeURIComponent(i.id)}/revoke`",
+    "`${base}/invitations/${encodeURIComponent(created.invitation.id)}/send`", "`${base}/invitations/${encodeURIComponent(i.id)}/${mode}`", "`${base}/invitations/${encodeURIComponent(i.id)}/replace`", "`${base}/invitations/${encodeURIComponent(i.id)}/revoke`",
     "`${base}/members/${encodeURIComponent(m.user_id)}/remove`", "`${base}/members/${encodeURIComponent(m.user_id)}/role`", "\"/clients\"", "base + \"/access\"", "base + \"/invitations\"",
   ].sort());
   assert.ok(!/\/offboard|\/disable|\/users\/|reenable/i.test(src), "global offboarding is not part of this interface");
@@ -180,4 +180,21 @@ test("with changes switched off the invitation form is not shown (only the expla
   assert.match(src, /caps\.writes \? inviteForm\(caps\) : null/);
   assert.match(src, /caps\.writes \? "Invite the first owner above\./);
   assert.match(src, /!caps\.writes \? h\("p", \{ class: "adm-banner" \}, "Changes are switched off on this site\./);
+});
+
+test("Create and send: one confirmation, create first then send, a failed send keeps the saved invitation and says so, and the form offers it only when sending is on", () => {
+  const src = strip(read("admin/assets/clients-access.js"));
+  assert.match(src, /const canSend = canCreate && caps\.sending;/, "the one-step action exists only when changes AND sending are on");
+  assert.match(src, /title: "Create and send this invitation\?"/);
+  assert.match(src, /const mode = canSend && !\(ev\.submitter && ev\.submitter\.dataset\.mode === "save"\) \? "send" : "save";/);
+  // create first (a failure there means nothing was saved), then send; a send failure is returned, not thrown, so the saved invitation is reported
+  const i = src.indexOf("request: async () => {");
+  const block = src.slice(i, i + 700);
+  assert.ok(block.indexOf('/invitations", { method: "POST"') < block.indexOf("/send`"), "create before send");
+  assert.match(block, /catch \(sendError\) \{\s*return \{ sendError \};/);
+  assert.match(src, /was saved but NOT sent\./);
+  assert.match(src, /Nothing was emailed\./);
+  assert.match(src, /A common reason is that this address already has an earlier WorkOS invitation/);
+  assert.match(src, /already_pending: "There is already a pending invitation for this email address \(see the list below\)\./);
+  // the server still decides everything (allowlist, switches, CSRF): the form only calls the two reviewed routes
 });
