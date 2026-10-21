@@ -20,7 +20,7 @@ where relevant, WorkOS (read-only). Production was not touched. `PORTAL_ADMIN_WR
 | 10 | Mobile and accessibility | PASS | axe (WCAG 2.0/2.1/2.2 A and AA plus best practice): 0 violations on 10 signed-in pages x 4 widths (320, 390, 768, 1280) and the login page; no sideways scroll; logical tab order with visible focus |
 
 ## Findings
-* F1 (P1, before Production): WorkOS Staging also allows Google, Microsoft, GitHub and Apple sign-in and SSO; MFA is off. The privacy policy says clients sign in with an emailed code only. Decide: turn unused providers off (preferred) or disclose them. Check the Production environment before launch.
+* F1 (Staging only): WorkOS Staging also allows Google, Microsoft, GitHub and Apple sign-in and SSO; MFA is off. **The WorkOS Production environment already has every social provider off** (read-only check, 2026-10-21), so the privacy policy statement (email code only) is accurate for Production. Optionally turn the providers off on Staging so it matches.
 * F2 (fixed, PR 5): the sign-in page brand bar was outside every landmark.
 * F3 (P2): `<main>` has no `tabindex="-1"`, so the "Skip to content" link leaves focus on the page body in some browsers.
 * F4 (P2): the sign-in page links to the portal demo on Staging (intended on Staging; the demo is refused on the live hosts).
