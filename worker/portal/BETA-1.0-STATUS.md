@@ -22,7 +22,7 @@ One or a few invited organizations; email-code sign-in; Home, Business Profile, 
 | # | Item | Who | State |
 |---|---|---|---|
 | 1 | Promote Staging to `main` (inert: portal flags stay off) | Claude prepares, owner approves | open |
-| 2 | Production migrations 0002-0004 through the manual workflow (needs the workflow update first) | Claude updates workflow; owner runs it | open; waiting on approval to edit the workflow |
+| 2 | Production migrations 0002-0004 through the manual workflow | workflow updated and tested on Staging (tail-of-list and exact-table checks; manual, verify-only by default); owner runs it: verify-only, bookmark, apply, verify-only | open: owner to run |
 | 3 | Publish the privacy policy (real effective date; owner-confirmation items in PRIVACY-DRAFT.md; adviser review) | owner | open |
 | 4 | Client MFA decision (WorkOS Production MFA is Off; the policy says email code only) | owner | open |
 | 5 | Production secrets and Cloudflare Access check (names only) | owner / Claude read-only | open |

@@ -78,9 +78,10 @@ test("migration 0004: additive and compatible. It is the fourth portal migration
   assert.equal(rows(db, "SELECT count(*) AS n FROM invitations WHERE status = 'pending'")[0].n, 1);
 });
 
-test("migration workflows: the Production workflow and its check still expect exactly 0001 (so Production is untouched), and the Staging config reads migrations/portal", () => {
-  assert.match(read(".github/scripts/portal-d1-check.mjs"), /migration: "0001_portal_foundation\.sql"/);
-  assert.ok(!/delivery/i.test(read(".github/workflows/portal-production-d1-migration.yml")));
+test("migration workflows: the Production check knows the migrations in order (0001 to 0004) and fails closed on anything else; the Staging config reads migrations/portal", () => {
+  const check = read(".github/scripts/portal-d1-check.mjs");
+  for (const f of ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql"]) assert.ok(check.includes(`"${f}"`), f);
+  assert.match(check, /pending list must be a TAIL of the known, ordered list/);
   assert.match(read("wrangler.jsonc"), /"migrations_dir": "migrations\/portal"/);
   assert.match(read("migrations/portal/wrangler.migrate.staging.jsonc"), /"database_name": "framework-portal-staging"/);
   assert.ok(!/delivery|0004/.test(read("migrations/portal/wrangler.migrate.production.jsonc")));
