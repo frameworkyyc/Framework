@@ -1,6 +1,6 @@
 # Client portal: incident note (DRAFT, owner to confirm names and wording)
 
-**Operator:** [OWNER: name the one person who acts first]. **Contact for clients:** hello@frameworkco.ca. This note is a checklist, not legal advice; confirm the privacy-breach wording with your adviser.
+**Operator:** the owner (JJ Brick) is the designated Framework incident contact, initially. **Contact for clients:** hello@frameworkco.ca. This note is a checklist, not legal advice; confirm the privacy-breach wording with your adviser.
 
 ## 1. Something looks wrong with the portal (stop first, investigate second)
 1. **Switch the portal off.** Fastest: a Cloudflare WAF custom rule blocking `/portal*` (about a minute). Permanent: a reviewed change removing `PORTAL_ENABLED` and `PORTAL_ALLOW_PRODUCTION`; every `/portal` path then answers a plain 404.

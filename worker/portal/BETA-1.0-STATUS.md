@@ -23,13 +23,13 @@ One or a few invited organizations; email-code sign-in; Home, Business Profile, 
 |---|---|---|---|
 | 1 | Promote Staging to `main` (inert: portal flags stay off) | Claude prepares, owner approves | open |
 | 2 | Production migrations 0002-0004 through the manual workflow | workflow updated and tested on Staging (tail-of-list and exact-table checks; manual, verify-only by default); owner runs it: verify-only, bookmark, apply, verify-only | open: owner to run |
-| 3 | Publish the privacy policy (real effective date; owner-confirmation items in PRIVACY-DRAFT.md; adviser review) | owner | open |
-| 4 | Client MFA decision (WorkOS Production MFA is Off; the policy says email code only) | owner | open |
+| 3 | Publish the privacy policy (effective date = day of publication; confirmation items and adviser review in PRIVACY-DRAFT.md) | owner | wording reviewed against the code on 2026-10-21; three statements corrected; owner confirmations open |
+| 4 | Client MFA decision | owner | **decided 2026-10-21**: email code only for the initial Beta; reconsider as the portal expands |
 | 5 | Production secrets and Cloudflare Access check (names only) | owner / Claude read-only | open |
 | 6 | First Production sign-in behind a temporary WAF rule, then isolation check (`verify-organization.sql`) | owner + Claude | open |
 | 7 | Time Travel bookmark before first client data; confirm retention window in the dashboard | owner | open |
-| 8 | Incident note and named operator (INCIDENT-RESPONSE.md is a draft) | owner | open |
-| 9 | Two-factor on the Cloudflare, WorkOS and GitHub accounts | owner | open |
+| 8 | Incident note and named operator | owner | **operator decided** (the owner); note still a draft, owner to read it once |
+| 9 | Administrator MFA (decided: required wherever supported). Verified: **WorkOS dashboard account has MFA NOT configured**. Cloudflare, GitHub, Access sign-in method and mailbox cannot be verified from here | owner | open: enable and confirm each (details in PRIVACY-DRAFT.md) |
 | 10 | Admin area live check (Step 8 of the acceptance test) | owner | in progress |
 | 11 | WorkOS email deliverability to an outside inbox (both test inboxes are the owner's) | owner | open |
 
