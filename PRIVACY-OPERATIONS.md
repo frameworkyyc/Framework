@@ -174,7 +174,7 @@ Public wording: `privacy.html` ("The client portal" and the portal items elsewhe
 | invitation emails | WorkOS, or Resend | Resend keeps delivery logs |
 | Worker logs, D1 backups | Cloudflare | fixed-field logs only; backups age out on Cloudflare's schedule |
 
-**Requests** (`hello@frameworkco.ca`): acknowledge within 5 business days; complete eligible deletion within 30 calendar days (targets; legal and operational exceptions).
+**Requests** (`hello@frameworkco.ca`; the owner is the initial privacy and incident contact and handles them by hand): acknowledge within 5 business days; complete eligible deletion within 30 calendar days (targets; legal and operational exceptions).
 1. Confirm the person's identity from the portal email address (reply to that address; do not act on an unverified request).
 2. Access or correction: read the organization in Admin > Clients; correct through the person (Business Profile answers are editable by the client) or by a reviewed manual SQL change.
 3. Removal of access: `migrations/portal-ops/emergency-offboard.sql` (revokes membership and sessions). Never delete the WorkOS user afterwards (a re-created user is refused as `email_conflict`).

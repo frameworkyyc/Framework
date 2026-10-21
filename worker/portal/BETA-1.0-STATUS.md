@@ -23,7 +23,7 @@ One or a few invited organizations; email-code sign-in; Home, Business Profile, 
 |---|---|---|---|
 | 1 | Promote Staging to `main` (inert: portal flags stay off) | Claude prepares, owner approves | open |
 | 2 | Production migrations 0002-0004 through the manual workflow | workflow updated and tested on Staging (tail-of-list and exact-table checks; manual, verify-only by default); owner runs it: verify-only, bookmark, apply, verify-only | open: owner to run |
-| 3 | Publish the privacy policy (effective date = day of publication; confirmation items and adviser review in PRIVACY-DRAFT.md) | owner | wording reviewed against the code on 2026-10-21; three statements corrected; owner confirmations open |
+| 3 | Publish the privacy policy (effective date = day of publication) | owner | wording reviewed against the code; corrections merged; owner is named privacy contact. Open: **legal/adviser review (incl. the Business Profile notice approach)**, verify the admin list and Access policy, administrator MFA confirmations, calendar reminders |
 | 4 | Client MFA decision | owner | **decided 2026-10-21**: email code only for the initial Beta; reconsider as the portal expands |
 | 5 | Production secrets and Cloudflare Access check (names only) | owner / Claude read-only | open |
 | 6 | First Production sign-in behind a temporary WAF rule, then isolation check (`verify-organization.sql`) | owner + Claude | open |

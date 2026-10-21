@@ -43,13 +43,17 @@ Reviewed 2026-10-21 against the code, the tests, the live Staging site and the p
 
 If you prefer to publish before all are confirmed, keep the current sentence ("expected to use").
 
-## [OWNER CONFIRMATION] Items that still need your factual confirmation
-1. **Staff access practice:** is "only when needed to deliver services, give support, keep the portal secure, or administer accounts" true of how you will work? (No audit log of staff views exists. Adding one is possible later.)
-2. **Retention and requests:** can you keep the 12-month inactive-account review, the 5-business-day acknowledgement and the 30-day deletion target, by hand? Who does it (the policy says "we")?
-3. **Resend and invitations:** wording now covers manual invitations; confirm you are comfortable naming Resend although it is not used for Production invitations in Beta 1.0.
-4. **Business Profile consent:** no checkbox is used; the in-portal notice and this policy describe collection and use. Confirm that is acceptable for your clients.
-5. **Adviser review** of the whole portal wording (Alberta's PIPA purposes, acknowledgement versus consent, breach-notice steps).
-6. **Location:** the policy says WorkOS and Cloudflare may process portal information in the United States and other countries and that a specific location is unconfirmed. Keep that wording unless you confirm the Production database region and your providers' terms.
+## [OWNER CONFIRMATION] Items: status after the owner's answers (2026-10-21)
+| # | Item | Status |
+|---|---|---|
+| 1 | **Staff access "only when needed".** Wording kept as "Authorized Framework personnel ... only when needed". A log of staff profile views is deliberately **deferred** (it would change the Admin area from read-only to writing records). | Decided. **Not claimed:** that only one administrator has access. The size of the admin list (the `ADMIN_EMAILS` secret) and the Cloudflare Access policy are **UNVERIFIED**; verify both before publication and keep the wording at "authorized administrators" until then. |
+| 2 | **Retention and requests.** A simple manual process: the owner is the initial privacy and incident contact; targets stay "aims" (5 business days to acknowledge, 30 days to complete an eligible deletion, 12-month review of inactive beta accounts). | Decided. **Open for the owner:** set the calendar reminders (quarterly review fits `PRIVACY-OPERATIONS.md`). Whether the targets can be met cannot be verified from here. |
+| 3 | **Resend disclosed.** Verified: Resend already sends the website's assessment emails, so naming it is accurate regardless of how portal invitations are sent. | **Resolved.** |
+| 4 | **Business Profile: notice, not a consent checkbox** (invite-only Beta; the in-portal notice says what is collected, why and who sees it). | Decided for the Beta. **FLAGGED FOR LEGAL REVIEW before publication.** This is a legal judgement that cannot be verified here. |
+| 5 | **Adviser review** of the whole portal section (Alberta's PIPA purposes, acknowledgement versus consent, breach-notice steps). | **Open: required before publication.** Send the adviser this file. |
+| 6 | **Location.** The policy says WorkOS and Cloudflare may process portal information in the United States and other countries and that a specific location is unconfirmed. | Keep that wording unless the Production database region and the providers' terms are confirmed (**UNVERIFIED**). |
+
+Policy text now says: "Framework's owner is our privacy contact and handles these requests."
 
 ## Cannot be verified from here (flagged)
 Production database region; the Cloudflare Access sign-in method; two-factor status of Cloudflare, GitHub and the mailbox; whether any staff will actually view client data and how often; your ability to meet the manual retention and request targets; WorkOS's own retention periods.
