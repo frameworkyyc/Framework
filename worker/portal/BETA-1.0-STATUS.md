@@ -12,6 +12,7 @@ One or a few invited organizations; email-code sign-in; Home, Business Profile, 
 |---|---|
 | Sign-in, sessions, sign-out (portal and WorkOS side) | live (see ACCEPTANCE-LOG.md) |
 | Organization isolation (both directions) and Admin not reachable by clients | live |
+| Admin area on Staging (owner, through Cloudflare Access): organizations, details, answers, accepted invitation, feedback, write controls disabled | live (owner) |
 | Business Profile: validation, save, stale-form protection, progress | live |
 | Account, Team, portal feedback | live |
 | Accessibility (WCAG 2.x A/AA scan, keyboard) and mobile widths | live |
@@ -30,7 +31,7 @@ One or a few invited organizations; email-code sign-in; Home, Business Profile, 
 | 7 | Time Travel bookmark before first client data; confirm retention window in the dashboard | owner | open |
 | 8 | Incident note and named operator | owner | **operator decided** (the owner); note still a draft, owner to read it once |
 | 9 | Administrator MFA (decided: required wherever supported) | owner | **WorkOS done** (owner enrolled; dashboard-wide requirement on; client sign-in unchanged). Open, cannot be verified from here: Cloudflare, GitHub, the hello@frameworkco.ca mailbox, the Cloudflare Access sign-in method |
-| 10 | Admin area live check (Step 8 of the acceptance test) | owner | in progress |
+| 10 | Admin area live check (Step 8 of the acceptance test) | owner | **PASS 2026-10-21** |
 | 11 | WorkOS email deliverability to an outside inbox (both test inboxes are the owner's) | owner | open |
 
 ## Important for Beta (P1)
