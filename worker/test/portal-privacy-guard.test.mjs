@@ -114,9 +114,12 @@ test("REAL REPOSITORY: the Production configuration plus privacy.html is a safe 
   if (state !== "off") assert.deepEqual(portalDisclosureProblems(html), [], "Production portal is " + state + " but privacy.html lacks the portal disclosures");
 });
 
-test("REAL REPOSITORY: the Production variables carry neither flag today, and Admin writes, invitation sending, demo and the allowlist are Staging-only", () => {
-  for (const vars of productionVars()) for (const k of ["PORTAL_ENABLED", "PORTAL_ALLOW_PRODUCTION", "PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_DEMO", "PORTAL_INVITE_ALLOWLIST"]) assert.ok(!(k in vars), k + " must not be in Production vars yet");
-  for (const k of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_DEMO"]) assert.equal(config.previews.vars[k], "1", k + " is a Staging-only switch");
+test("REAL REPOSITORY (launch state): both portal flags are set together with the Admin switches; the demo and the allowlist never appear in Production vars; Staging keeps its own switches", () => {
+  assert.equal(productionPortalState(config), "on", "the launch configuration sets BOTH PORTAL_ENABLED and PORTAL_ALLOW_PRODUCTION");
+  assert.deepEqual(portalDisclosureProblems(html), [], "and the portal privacy disclosures are published");
+  for (const vars of productionVars()) for (const k of ["PORTAL_DEMO", "PORTAL_INVITE_ALLOWLIST", "PORTAL_INVITE_ALLOWED_EMAILS"]) assert.ok(!(k in vars), k + " must never be in Production vars");
+  for (const k of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_ENABLED"]) assert.equal(config.vars[k], "1", k + " is on in Production");
+  for (const k of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_DEMO", "PORTAL_ENABLED"]) assert.equal(config.previews.vars[k], "1", k + " is on for Staging");
   function productionVars() { return [config.vars || {}, ...Object.values(config.env || {}).map((e) => (e && e.vars) || {})]; }
   assert.equal(config.d1_databases.find((d) => d.binding === "PORTAL_DB").database_name, "framework-portal");
 });

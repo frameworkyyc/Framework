@@ -147,11 +147,13 @@ test("the digital business card route is still handled by its own module", async
 
 /* ------------------------------------------------------------------ the real wrangler.jsonc, as each environment would receive it */
 const wrangler = JSON.parse(readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, ""));
+// Production's settings WITHOUT the launch switches: the fail-closed tests below start from "the portal is off" and add flags one at a time.
+const { PORTAL_ENABLED: _pe, PORTAL_ALLOW_PRODUCTION: _pa, PORTAL_ADMIN_WRITES: _pw, PORTAL_INVITE_SENDING: _ps, ...OFF_VARS } = wrangler.vars;
 const FAKE_SECRETS = { PORTAL_AUTH_CLIENT_SECRET: "sk_test_FAKE", PORTAL_SESSION_PEPPER: PEPPER };
 const NO_DB = { prepare() { throw new Error("db must not be touched"); }, batch() { throw new Error("db must not be touched"); } };
 
-test("PRODUCTION as the config really defines it (top-level vars, even with the secrets present): every /portal path is a safe 404", async () => {
-  const { env, assetCalls } = makeEnv({ ...wrangler.vars, ...FAKE_SECRETS, PORTAL_DB: NO_DB });
+test("PRODUCTION without the launch switches (the configuration before launch, even with the secrets present): every /portal path is a safe 404", async () => {
+  const { env, assetCalls } = makeEnv({ ...OFF_VARS, ...FAKE_SECRETS, PORTAL_DB: NO_DB });
   assert.equal(env.PORTAL_ENABLED, undefined);
   for (const host of [PROD, "https://www.frameworkco.ca"]) for (const p of PORTAL_PATHS) assertSafe404(await call(env, host + p), host + p);
   assert.equal(assetCalls.length, 0);
@@ -200,14 +202,14 @@ test("STAGING rate limiter via the real wrangler config: the binding the config 
 test("PRODUCTION (top-level config) declares its own limiter binding but, with the portal off, never reaches it: every /portal path stays the safe 404", async () => {
   assert.deepEqual(wrangler.ratelimits, [{ name: "PORTAL_RATE_LIMITER", namespace_id: "4201", simple: { limit: 20, period: 60 } }]);
   let called = false;
-  const { env } = makeEnv({ ...wrangler.vars, ...FAKE_SECRETS, PORTAL_DB: NO_DB, PORTAL_RATE_LIMITER: { limit: async () => { called = true; return { success: false }; } } });
+  const { env } = makeEnv({ ...OFF_VARS, ...FAKE_SECRETS, PORTAL_DB: NO_DB, PORTAL_RATE_LIMITER: { limit: async () => { called = true; return { success: false }; } } });
   for (const p of ["/portal/login?start=1", "/portal/auth/callback?code=a&state=b"]) assertSafe404(await call(env, PROD + p, { headers: { "CF-Connecting-IP": "203.0.113.7" } }), p);
   assert.equal(called, false);
 });
 
 /* ---------------------------------------------------------------- Production launch readiness: the config as it really is + each flag combination */
 const PROD_CLIENT = "client_01M58C4236FYNJDQ3MM0E8V691";
-const prodEnv = (extra = {}, { secrets = true } = {}) => makeEnv({ ...wrangler.vars, ...(secrets ? FAKE_SECRETS : {}), PORTAL_DB: NO_DB, ...extra });
+const prodEnv = (extra = {}, { secrets = true } = {}) => makeEnv({ ...OFF_VARS, ...(secrets ? FAKE_SECRETS : {}), PORTAL_DB: NO_DB, ...extra });
 const seenCalls = () => { const calls = []; return { calls, db: { prepare() { calls.push("db"); throw new Error("db touched"); }, batch() { calls.push("db"); throw new Error("db touched"); } } }; };
 
 test("PRODUCTION fails closed in every flag combination that is not the complete launch configuration", async () => {
@@ -236,7 +238,7 @@ test("PRODUCTION fails closed in every flag combination that is not the complete
     }
     assert.equal((await call(prodEnv({ PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1", PORTAL_SESSION_PEPPER: "short", PORTAL_DB: db }).env, PROD + "/portal/login")).status, 503);
     // both flags but the database binding is missing
-    assert.equal((await call(makeEnv({ ...wrangler.vars, ...FAKE_SECRETS, PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1" }).env, PROD + "/portal/login")).status, 503);
+    assert.equal((await call(makeEnv({ ...OFF_VARS, ...FAKE_SECRETS, PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1" }).env, PROD + "/portal/login")).status, 503);
   } finally { globalThis.fetch = realFetch; }
   assert.deepEqual(calls, [], "none of the failed-closed requests touched the database or the network");
 });
@@ -273,4 +275,16 @@ test("PRODUCTION config matches what is registered in WorkOS Production (client 
   assert.equal(v.PORTAL_BASE_URL + "/portal/login", REGISTERED.logout);
   assert.notEqual(v.PORTAL_AUTH_CLIENT_ID, wrangler.previews.vars.PORTAL_AUTH_CLIENT_ID);
   assert.notEqual(v.PORTAL_AUTH_ISSUER, wrangler.previews.vars.PORTAL_AUTH_ISSUER);
+});
+
+test("PRODUCTION as the config really defines it NOW (the launch configuration): exactly the four launch switches, the portal answers on the canonical host only, and Staging-only settings are absent", async () => {
+  assert.equal(wrangler.vars.PORTAL_ENABLED, "1");
+  assert.equal(wrangler.vars.PORTAL_ALLOW_PRODUCTION, "1");
+  assert.equal(wrangler.vars.PORTAL_ADMIN_WRITES, "1");
+  assert.equal(wrangler.vars.PORTAL_INVITE_SENDING, "1");
+  for (const never of ["PORTAL_DEMO", "PORTAL_INVITE_ALLOWLIST", "PORTAL_INVITE_ALLOWED_EMAILS", "ACCESS_JWKS_JSON", "PORTAL_AUTH_CLIENT_SECRET", "PORTAL_SESSION_PEPPER"]) assert.equal(wrangler.vars[never], undefined, never + " is never a Production variable");
+  const { env } = makeEnv({ ...wrangler.vars, ...FAKE_SECRETS, PORTAL_DB: NO_DB });
+  const login = await call(env, PROD + "/portal/login");
+  assert.equal(login.status, 200);
+  for (const host of ["https://www.frameworkco.ca", "https://framework.example.workers.dev"]) assertSafe404(await call(env, host + "/portal/login"), host);
 });
