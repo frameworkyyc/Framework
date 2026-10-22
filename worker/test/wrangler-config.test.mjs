@@ -60,7 +60,7 @@ test("the Production ID appears exactly once in the file (never inside the previ
 test("Production (top-level vars) and Staging (previews.vars) each carry the sender, the same public Turnstile site key and their OWN WorkOS settings; only Staging enables the portal", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
   assert.deepEqual(config.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_BASE_URL: "https://frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691" });
-  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1" });
+  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1", PORTAL_DEMO: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1" });
 });
 
 test("the verified WorkOS issuer is pinned and belongs to the configured client id (not the bare api.workos.com base)", () => {
@@ -135,7 +135,13 @@ test("the sender is a valid From value that the Worker accepts as-is (no correct
 });
 
 test("only whitelisted NON-secret names may ever appear under vars", () => {
-  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED"]);
+  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED", "PORTAL_DEMO"]);
+  for (const name of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) {
+    assert.equal(config.vars[name], undefined, name + " is never a Production setting");
+    assert.equal(config.previews.vars[name], "1", name + " is on for Staging only (invitations are still limited to the allowlist secret)");
+    allowed.add(name); // approved NON-secret names, but only under previews.vars (the top-level check above)
+  }
+  for (const vars of [config.vars, config.previews.vars]) for (const name of ["PORTAL_INVITE_ALLOWLIST", "PORTAL_INVITE_ALLOWED_EMAILS"]) assert.equal(vars[name], undefined, name + " is a Cloudflare secret, never a checked-in variable (the repository is public)");
   for (const vars of [config.vars, config.previews.vars]) for (const name of Object.keys(vars)) assert.ok(allowed.has(name), name + " is not an approved non-secret variable");
 });
 
@@ -170,9 +176,17 @@ test("migrations_dir safeguard: both PORTAL_DB bindings point at migrations/port
   for (const d of [...config.d1_databases, ...config.previews.d1_databases].filter((d) => d.binding === "DB")) assert.equal(d.migrations_dir, undefined, d.database_name + ": the feedback binding is unchanged (default ./migrations)");
   const dir = new URL("../../migrations/portal/", import.meta.url);
   assert.ok(existsSync(dir));
-  assert.deepEqual(readdirSync(dir).filter((f) => f.endsWith(".sql")), ["0001_portal_foundation.sql"], "exactly the one reviewed portal migration is visible through that directory");
+  assert.deepEqual(readdirSync(dir).filter((f) => f.endsWith(".sql")), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql"], "exactly the four reviewed portal migrations are visible through that directory");
   const feedback = readdirSync(new URL("../../migrations/", import.meta.url)).filter((f) => f.endsWith(".sql"));
   assert.ok(feedback.length >= 6 && !feedback.some((f) => /portal/.test(f)), "the feedback migrations stay in ./migrations and are never visible to PORTAL_DB");
   const code = raw.replace(/^\s*\/\/.*$/gm, "");
   assert.equal([...code.matchAll(/migrations_dir/g)].length, 2, "only the two portal bindings declare one");
+});
+
+test("the static demo portal is switched on for Staging ONLY: PORTAL_DEMO is in previews.vars and nowhere else", () => {
+  const code = raw.replace(/^\s*\/\/.*$/gm, "");
+  assert.equal(config.previews.vars.PORTAL_DEMO, "1");
+  assert.ok(!("PORTAL_DEMO" in config.vars), "Production vars do not carry the demo flag");
+  assert.equal([...code.matchAll(/PORTAL_DEMO/g)].length, 1);
+  assert.ok(code.indexOf("PORTAL_DEMO") > code.indexOf('"previews"'));
 });

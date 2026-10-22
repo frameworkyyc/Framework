@@ -1,28 +1,64 @@
 /** Organizations: the tenants. These are admin-facing; a client reaches an organization only through memberships.js. */
-import { newId, isoTime, requireOrgId, ok, fail, isUniqueViolation, uniqueColumns, isConstraintViolation } from "./common.js";
+import { newId, isoTime, requireOrgId, ok, fail, validActor, isUniqueViolation, uniqueColumns, isConstraintViolation } from "./common.js";
 import { validateSlug, validateName, validateHttpsUrl, validateEnum, ORG_STATUSES } from "./validate.js";
 
 const COLUMNS = "id, slug, name, status, website_url, revenue_client_id, created_at, updated_at, archived_at";
 
 const validRevenueId = (raw) => (raw === undefined || raw === null || raw === "" ? null : typeof raw === "string" && raw.length <= 120 && !/[\u0000-\u001F\u007F]/.test(raw) ? raw.trim() || null : undefined);
 
-export async function createOrganization(db, input, { now = new Date() } = {}) {
+function parseOrganizationInput(input) {
   const slug = validateSlug(input && input.slug);
-  if (!slug) return fail("invalid_slug");
+  if (!slug) return fail("invalid_slug", { message: "The URL name must be 2 to 48 lower-case letters, digits and single hyphens." });
   const name = validateName(input.name);
-  if (!name) return fail("invalid_name");
+  if (!name) return fail("invalid_name", { message: "Enter the organization's name (up to 120 characters)." });
   const websiteUrl = validateHttpsUrl(input.websiteUrl);
-  if (websiteUrl === undefined) return fail("invalid_website_url");
+  if (websiteUrl === undefined) return fail("invalid_website_url", { message: "The website must be an https:// address." });
   const revenueClientId = validRevenueId(input.revenueClientId);
   if (revenueClientId === undefined) return fail("invalid_revenue_client_id");
+  return ok({ slug, name, websiteUrl, revenueClientId });
+}
+const orgInsertError = (err) => {
+  if (isUniqueViolation(err)) return fail(/revenue_client_id/.test(uniqueColumns(err)) ? "revenue_client_taken" : "slug_taken", { message: /revenue_client_id/.test(uniqueColumns(err)) ? "That client id is already used." : "That URL name is already taken. Choose another." });
+  if (isConstraintViolation(err)) return fail("invalid_organization");
+  throw err;
+};
+
+const bare = (r) => (r.ok ? r : { ok: false, error: r.error }); // the original, message-less error shape of createOrganization
+
+export async function createOrganization(db, input, { now = new Date() } = {}) {
+  const parsed = parseOrganizationInput(input);
+  if (!parsed.ok) return bare(parsed);
+  const { slug, name, websiteUrl, revenueClientId } = parsed;
   const id = newId();
   const t = isoTime(now);
   try {
     await db.prepare("INSERT INTO organizations (id, slug, name, status, website_url, revenue_client_id, created_at, updated_at) VALUES (?, ?, ?, 'active', ?, ?, ?, ?)").bind(id, slug, name, websiteUrl, revenueClientId, t, t).run();
   } catch (err) {
-    if (isUniqueViolation(err)) return fail(/revenue_client_id/.test(uniqueColumns(err)) ? "revenue_client_taken" : "slug_taken");
-    if (isConstraintViolation(err)) return fail("invalid_organization");
-    throw err;
+    return bare(orgInsertError(err));
+  }
+  return ok({ organization: await getOrganizationById(db, id) });
+}
+
+/**
+ * The administrative way to create a client organization: the organization and its internal audit entry are ONE atomic batch, so there is never
+ * an organization without its record of who created it, nor a record without an organization.
+ */
+export async function createOrganizationAudited(db, input, actor, { now = new Date() } = {}) {
+  if (!validActor(actor)) return fail("invalid_actor", { message: "An administrator must be named for this change." });
+  const parsed = parseOrganizationInput(input);
+  if (!parsed.ok) return parsed;
+  const { slug, name, websiteUrl, revenueClientId } = parsed;
+  const id = newId();
+  const t = isoTime(now);
+  try {
+    await db.batch([
+      db.prepare("INSERT INTO organizations (id, slug, name, status, website_url, revenue_client_id, created_at, updated_at) VALUES (?, ?, ?, 'active', ?, ?, ?, ?)").bind(id, slug, name, websiteUrl, revenueClientId, t, t),
+      db
+        .prepare("INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, detail, visibility, created_at) SELECT ?, id, 'admin', ?, 'org.created', 'organization', id, json_object('slug', slug), 'internal', ? FROM organizations WHERE id = ?")
+        .bind(newId(), actor.trim(), t, id),
+    ]);
+  } catch (err) {
+    return orgInsertError(err);
   }
   return ok({ organization: await getOrganizationById(db, id) });
 }

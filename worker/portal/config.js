@@ -61,6 +61,14 @@ export function portalConfigProblems(env) {
   return problems;
 }
 
+/**
+ * The static demo (/portal/demo) is available only where PORTAL_DEMO is exactly "1" AND the portal host is not a production host. The second
+ * condition is deliberate defence in depth: even if the variable were ever set on the live site by mistake, the demo stays off there.
+ */
+export function demoEnabled(env, cfg) {
+  return !!env && !!cfg && text(env.PORTAL_DEMO) === "1" && !PRODUCTION_HOSTS.includes(cfg.host);
+}
+
 /** The validated configuration, or null unless the portal is enabled AND completely, correctly configured. */
 export function readPortalConfig(env) {
   if (portalConfigProblems(env).length) return null;

@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "note": "NAMES, TYPES and non-secret settings only. No tokens, secret values, addresses or client data belong in this file. scripts/ is never published (.assetsignore), but treat the repository as public.",
+  "account": "discovered from the token (exactly one account must be visible)",
+  "worker": "framework",
+  "preview": "Staging",
+  "repository": "frameworkyyc/Framework",
+  "branch": "Staging",
+  "baseUrl": "https://staging.frameworkco.ca",
+  "requiredGithubChecks": ["Workers Builds: framework", "Node tests"],
+  "d1": {
+    "binding": "PORTAL_DB",
+    "name": "framework-portal-staging",
+    "id": "1edda8a2-5249-4f40-9dbc-d29aa44e21f8",
+    "tables": ["activity_log", "business_profile_answers", "d1_migrations", "invitations", "memberships", "organizations", "portal_feedback", "portal_sessions", "portal_users", "projects"]
+  },
+  "websiteDb": { "binding": "DB", "name": "framework-staging", "id": "c4815cdc-8948-4561-92a3-65e4860cdb94" },
+  "forbiddenDatabaseIds": {
+    "b213b7db-ed29-4ab6-946c-0728dd6709e8": "framework-portal (Production)",
+    "47d90f94-3846-4711-9495-ab3479431a6f": "framework-feedback (Production)"
+  },
+  "plainVars": {
+    "ASSESSMENT_FROM": null,
+    "TURNSTILE_SITE_KEY": null,
+    "PORTAL_AUTH_CLIENT_ID": null,
+    "PORTAL_AUTH_ISSUER": null,
+    "PORTAL_BASE_URL": "https://staging.frameworkco.ca",
+    "PORTAL_ENABLED": "1",
+    "PORTAL_DEMO": "1"
+  },
+  "secrets": {
+    "required": ["ACCESS_AUD", "ACCESS_TEAM_DOMAIN", "ADMIN_EMAILS", "PORTAL_AUTH_CLIENT_SECRET", "PORTAL_INVITE_ALLOWLIST", "PORTAL_SESSION_PEPPER", "RESEND_API_KEY", "TURNSTILE_SECRET"],
+    "optional": ["IP_HASH_SALT"]
+  },
+  "bindings": {
+    "ASSETS": { "type": "assets" },
+    "DB": { "type": "d1" },
+    "PORTAL_DB": { "type": "d1" },
+    "PORTAL_FILES": { "type": "r2_bucket", "bucket_name": "framework-portal-files-staging" },
+    "PORTAL_RATE_LIMITER": { "type": "ratelimit", "namespace_id": "4101" }
+  },
+  "switches": { "PORTAL_ADMIN_WRITES": "1", "PORTAL_INVITE_SENDING": "1" },
+  "forbiddenNames": ["PORTAL_INVITE_ALLOWED_EMAILS"]
+}

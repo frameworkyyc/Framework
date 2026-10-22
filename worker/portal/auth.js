@@ -52,7 +52,7 @@ export async function handleLogin(ctx) {
   if (ctx.url.searchParams.get("start") !== "1") {
     // An interstitial, so that returning here after sign-out never silently signs the person straight back in.
     const qs = new URLSearchParams({ start: "1", ...forward }).toString();
-    return loginPage({ continueHref: `/portal/login?${qs}`, ended: ctx.url.searchParams.get("r") === "ended" });
+    return loginPage({ continueHref: `/portal/login?${qs}`, ended: ctx.url.searchParams.get("r") === "ended", demoHref: ctx.demo ? "/portal/demo" : null });
   }
 
   const state = randomToken(32);

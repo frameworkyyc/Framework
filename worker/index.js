@@ -31,7 +31,11 @@ const FORM_VERSION = "1";
 
 /* ---- Allowed values (must match client-feedback.html) ---- */
 
-const IMPROVEMENT = ["Significant improvement", "Moderate improvement", "Slight improvement", "About the same", "Worse"];
+// "No previous website" is not a rating: nothing scores or flags it. Its first wording ("I didn\u2019t have a website before.") was stored by earlier
+// submissions and is still accepted (a page loaded before this change can submit it); new submissions store the current wording.
+const NO_PREVIOUS_WEBSITE = "No previous website";
+const LEGACY_NO_PREVIOUS_WEBSITE = "I didn\u2019t have a website before.";
+const IMPROVEMENT = ["Significant improvement", "Moderate improvement", "Slight improvement", "About the same", "Worse", NO_PREVIOUS_WEBSITE];
 const IMPACT = [
   "Our business looks more professional",
   "Customers can find information more easily",
@@ -126,7 +130,7 @@ export function validate(input) {
     ratings[key] = v;
   }
 
-  const improvement = oneOf(body.improvement, IMPROVEMENT);
+  const improvement = oneOf(body.improvement === LEGACY_NO_PREVIOUS_WEBSITE ? NO_PREVIOUS_WEBSITE : body.improvement, IMPROVEMENT);
   need(improvement, "improvement");
 
   const impact = manyOf(body.impact, IMPACT);

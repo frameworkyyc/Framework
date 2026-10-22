@@ -156,3 +156,27 @@ The website records only a yes/no `marketing_opt_in` and the request time. Befor
 * "We do not set cookies ourselves": true while no code sets cookies.
 * The effective date at the top of `privacy.html` must be the actual Production publication date. It is set to October 17, 2026; if deployment slips, change it and run `PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`.
 * The homepage "$2.5M+" figure is a combined, client-reported total; it never names or attributes an individual client's figure.
+
+## 6. Client portal (private beta): data inventory and request handling
+
+Public wording: `privacy.html` ("The client portal" and the portal items elsewhere). Owner decisions and open confirmations: `worker/portal/PRIVACY-DRAFT.md`.
+
+| data | where | notes |
+| --- | --- | --- |
+| email, name, WorkOS user id, status, last sign-in | D1 `portal_users` | name is optional; email is the identity |
+| organization, role, membership status | D1 `organizations`, `memberships` | per-organization role (Owner or Member) |
+| invitations (email, role, who invited, delivery status) | D1 `invitations` | delivery channel is WorkOS or Resend |
+| sessions (hashed token, WorkOS session id, sign-in method, hashed network value, times) | D1 `portal_sessions` | ended sessions are purged only by hand (`purgeEndedSessions`) |
+| Business Profile answers | D1 `business_profile_answers` | one row per answered question per organization |
+| portal feedback | D1 `portal_feedback` | message, kind, section, organization, person |
+| activity records | D1 `activity_log` | who and when; never answers or message text |
+| one-time codes, sign-in records | WorkOS | not stored by Framework; WorkOS retention applies |
+| invitation emails | WorkOS, or Resend | Resend keeps delivery logs |
+| Worker logs, D1 backups | Cloudflare | fixed-field logs only; backups age out on Cloudflare's schedule |
+
+**Requests** (`hello@frameworkco.ca`; the owner is the initial privacy and incident contact and handles them by hand): acknowledge within 5 business days; complete eligible deletion within 30 calendar days (targets; legal and operational exceptions).
+1. Confirm the person's identity from the portal email address (reply to that address; do not act on an unverified request).
+2. Access or correction: read the organization in Admin > Clients; correct through the person (Business Profile answers are editable by the client) or by a reviewed manual SQL change.
+3. Removal of access: `migrations/portal-ops/emergency-offboard.sql` (revokes membership and sessions). Never delete the WorkOS user afterwards (a re-created user is refused as `email_conflict`).
+4. Erasure: only after the retention need has passed; reviewed manual deletion of the organization's answers, feedback and the person's portal user row (foreign keys protect history, so order matters); then the WorkOS user in the WorkOS dashboard; note that backups and provider logs expire on their own schedules. Record the request, the dates and what was removed.
+5. Inactive beta accounts: review every 12 months (calendar reminder); delete information no longer needed, subject to legal and operational requirements.

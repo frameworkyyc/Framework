@@ -6,15 +6,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import vm from "node:vm";
+import { portalPolicyAssertionsApply } from "./helpers/portal-privacy-guard.mjs";
 
 const root = new URL("../../", import.meta.url);
 const read = (f) => readFileSync(new URL(f, root), "utf8");
 const text = (html) => html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&rsquo;|’/g, "'").replace(/\s+/g, " ");
 
-// me.html is the private personal quick-access page (noindex, six links, no data collected): not a public page, so no policy footer.
+// me.html is the private personal quick-access page (noindex, five links, no data collected): not a public page, so no policy footer.
 const PAGES = readdirSync(root).filter((f) => f.endsWith(".html") && f !== "me.html");
 const policy = read("privacy.html");
 const policyText = text(policy);
+// The portal-specific policy assertions are mandatory on Staging and whenever Production activates the portal (see helpers/portal-privacy-guard.mjs and
+// portal-privacy-guard.test.mjs); they also run whenever a portal section exists. Only a Production-bound change with the portal OFF may keep the website-only policy.
+const portalExpected = portalPolicyAssertionsApply(policy);
 
 test("every public page has a Privacy Policy link in its footer", () => {
   assert.deepEqual(PAGES.sort(), ["404.html", "about.html", "assessment.html", "card.html", "client-feedback.html", "contact.html", "index.html", "method.html", "portfolio.html", "privacy.html", "services.html"]);
@@ -35,7 +39,8 @@ test("the privacy link is a plain footer list item (no layout or navigation chan
 });
 
 test("policy: required sections, effective date, contact and decided facts are present", () => {
-  for (const id of ["summary", "who", "collect", "purposes", "assessments", "feedback", "marketing", "cookies", "advertising", "providers", "international", "security", "retention", "rights", "links", "changes", "contact"]) {
+  const sections = ["summary", "who", "collect", "purposes", "assessments", "feedback", "marketing", "portal", "cookies", "advertising", "providers", "international", "security", "retention", "rights", "links", "changes", "contact"];
+  for (const id of sections.filter((x) => portalExpected || x !== "portal")) {
     assert.ok(policy.includes(`id="${id}"`), "section " + id);
   }
   const pending = /<time id="effective-date" data-status="pending">Effective on the date this policy is published on the live website<\/time>/.test(policy);
@@ -53,7 +58,7 @@ test("policy: required sections, effective date, contact and decided facts are p
 });
 
 test("policy: names the real providers and processing it describes", () => {
-  for (const name of ["Cloudflare", "Resend", "Fontshare", "Meta", "Turnstile"]) assert.ok(policyText.includes(name), name);
+  for (const name of ["Cloudflare", "Resend", "Fontshare", "Meta", "Turnstile", ...(portalExpected ? ["WorkOS"] : [])]) assert.ok(policyText.includes(name), name);
   assert.match(policyText, /outside Alberta and outside Canada/);
   assert.match(policyText, /We do not promise that your information stays in Canada/);
 });
@@ -172,4 +177,42 @@ test("operations guide: retention rules, last interaction, search and off-system
   for (const phrase of ["24 months after the last meaningful interaction", "COALESCE(last_interaction_at, created_at)", "last_interaction_at", "no automatic deletion", "ongoing client relationship", "Resend", "Time Travel", "Workers Logs", "Downloaded exports", "Other third parties", "search box"]) {
     assert.ok(ops.toLowerCase().includes(phrase.toLowerCase()), phrase);
   }
+});
+
+test("policy: describes the client portal accurately: data, WorkOS, access, retention, requests, cookies and MFA without overclaiming", () => {
+  if (!portalExpected) return assert.ok(!/client portal/i.test(policyText), "a website-only policy must not make partial portal statements: either all the portal disclosures or none");
+  const portal = policyText.slice(policyText.indexOf("The client portal The client portal is available only"));
+  assert.match(policyText, /invitation-only area where clients sign in/);
+  for (const must of ["Business Profile information", "name, industry, location, products and services, target customers, business goals, competitors, online presence, primary contact and brand preferences", "preferred project timeline, your approximate budget and any existing brand materials or websites", "These additional questions are optional. You may choose not to disclose a budget.", "assess your needs, prepare proposals, plan projects and deliver services", "personal information about individuals you identify", "Portal feedback", "Sign-in and security records", "Activity records", "Invitation records", "WorkOS", "one-time code", "__Host-fw_auth", "__Host-fw_portal", "Resend"]) assert.ok(policyText.includes(must), must);
+  assert.match(policyText, /Authorized Framework personnel can view client information in our private administration area only when needed to deliver services, give support, keep the portal secure, or administer accounts/);
+  assert.match(policyText, /Each organization can see only its own information/);
+  assert.match(policyText, /kept while the client relationship continues, subject to any legal or contractual obligations/);
+  assert.match(policyText, /We review inactive beta accounts after 12 months, and delete information we no longer need, subject to the legal and operational retention requirements/);
+  assert.match(policyText, /We aim to acknowledge a request within 5 business days and to complete an eligible deletion request within 30 calendar days/);
+  assert.match(policyText, /These are targets, not guarantees/);
+  assert.match(policyText, /we have not been able to confirm a specific location/);
+  assert.ok(policyText.includes("we do not currently require a second sign-in step for clients"), "it says what is true today: email code only for clients");
+  // MFA is described as an expectation for staff, never as something enforced for clients or verified
+  const mfa = policyText.match(/[^.]*(multi-factor|second sign-in|second factor)[^.]*\./gi) || [];
+  assert.equal(mfa.length, 2, "exactly the two reviewed sentences mention it");
+  assert.ok(!/(require|enforce)[a-z]* (multi-factor|MFA|two-factor)/i.test(policyText.replace(/we do not currently require a second sign-in step for clients/i, "")), "no claim that MFA is required or enforced");
+  assert.ok(!/certif|SOC ?2|ISO ?27001|HIPAA|GDPR|PIPEDA|fully compliant|bank-level|military/i.test(policyText), "no certification or compliance claims");
+  assert.ok(!/data (is|are) (stored|kept|processed) (only )?in (canada|the united states|the us)/i.test(policyText), "no data residency promise");
+  assert.ok(!/payment card|credit card/i.test(policyText.replace(/We do not ask you for payment card details or government identification in the portal\./, "")));
+  assert.ok(portal.length > 0);
+});
+
+test("policy: every portal data category it lists exists in the portal's schema, and the cookies and limits match the code", () => {
+  if (!portalExpected) return assert.ok(!/client portal/i.test(policyText), "a website-only policy must not make partial portal statements: either all the portal disclosures or none");
+  const schema = ["0001_portal_foundation", "0002_business_profile", "0003_portal_feedback", "0004_invitation_delivery"].map((f) => read(`migrations/portal/${f}.sql`)).join("\n");
+  for (const table of ["portal_users", "memberships", "invitations", "portal_sessions", "activity_log", "business_profile_answers", "portal_feedback"]) assert.ok(schema.includes(table), table);
+  assert.match(schema, /ip_hash/); assert.match(schema, /auth_method/); assert.match(schema, /delivery_status/);
+  const http = read("worker/portal/http.js"), sessions = read("worker/portal/repo/sessions.js"), auth = read("worker/portal/auth.js");
+  assert.match(http, /SESSION_COOKIE = "__Host-fw_portal"/); assert.match(http, /STATE_COOKIE = "__Host-fw_auth"/);
+  assert.match(auth, /STATE_TTL_SECONDS = 600/, "10 minutes");
+  assert.match(sessions, /DEFAULT_IDLE_SECONDS = 12 \* 3600/); assert.match(sessions, /DEFAULT_ABSOLUTE_SECONDS = 14 \* 86400/);
+  for (const text of ["12 hours without activity", "14 days at most"]) assert.ok(policyText.includes(text), text);
+  assert.ok(policyText.includes("expires after 10 minutes"));
+  const fields = read("worker/portal/profile-schema.js");
+  for (const label of ["Legal business name", "Operating name", "Industry", "What does your business do?", "Who are your target customers?", "Who are your main competitors?", "Existing website", "Social platforms you use"]) assert.ok(fields.includes(label), label);
 });

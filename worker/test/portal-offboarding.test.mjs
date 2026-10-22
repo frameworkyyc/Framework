@@ -189,7 +189,7 @@ test("offboard, re-enable and offboard again are each recorded once", async () =
   const db = freshWorld();
   await repo.offboardUser(db, ID.T, { actor: ACTOR, now: new Date("2026-10-20T01:00:00Z") });
   await repo.reenableUser(db, ID.T, { actor: ACTOR, now: new Date("2026-10-20T02:00:00Z") });
-  await repo.restoreMembership(db, ID.A, ID.T);
+  await repo.restoreMembership(db, ID.A, ID.T, { actor: "admin:test" });
   await repo.offboardUser(db, ID.T, { actor: ACTOR, now: new Date("2026-10-20T03:00:00Z") });
   assert.equal(count(db, "activity_log", "action = 'user.offboarded'"), 2);
   assert.equal(count(db, "activity_log", "action = 'user.reenabled'"), 1);
@@ -230,7 +230,7 @@ test("end to end: two devices are cut off, sign-in is refused while disabled, re
   assert.equal((await fresh.get("/portal")).headers.get("Location"), "/portal/no-access", "but she has no organizations");
   for (const slug of ["alpha", "bravo", "gamma"]) assert.equal((await fresh.get("/portal/o/" + slug)).status, 404, slug);
   assert.equal(count(w.db, "memberships", "user_id = ? AND status = 'active'", aliceId), 0, "signing in did not resurrect anything, and the revoked invitation granted nothing");
-  await repo.restoreMembership(w.db, alpha.id, aliceId);
+  await repo.restoreMembership(w.db, alpha.id, aliceId, { actor: "admin:test" });
   assert.equal((await fresh.get("/portal/o/alpha")).status, 200, "access returns only when granted again on purpose");
   assert.equal((await fresh.get("/portal/o/bravo")).status, 404);
   await w.invite(gamma, "alice@example.com", "member"); // a NEW invitation works as usual
@@ -334,7 +334,7 @@ test("the SQL files are reviewed, narrow and non-destructive", () => {
   }
   assert.ok(!/memberships|invitations/.test(REENABLE_SQL.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n")), "re-enabling never touches memberships or invitations");
   assert.ok(!readdirSync(new URL("../../migrations/portal/", import.meta.url)).some((f) => /offboard|reenable/i.test(f)), "not in the migrations folder wrangler applies");
-  assert.deepEqual(readdirSync(OPS).sort(), ["README.md", "emergency-offboard.sql", "emergency-reenable.sql"]);
+  assert.deepEqual(readdirSync(OPS).filter((f) => f.startsWith("emergency-") || f === "README.md").sort(), ["README.md", "emergency-offboard.sql", "emergency-reenable.sql"], "the emergency files are exactly these two; onboarding runbooks are pinned in portal-onboarding.test.mjs");
 });
 test("the runbook README documents the procedure, partial-failure recovery and verification, and does not claim the console is atomic", () => {
   for (const needle of ["Do not assume the D1 Console is atomic", "partial-failure recovery", "Run the **entire** file", "Verify (read-only)", "unrevoked_sessions", "active_memberships", "pending_invitations", "emergency-reenable.sql", "restores **no** access", "PORTAL_SESSION_PEPPER", "WorkOS", "NOT", "outside the repository"]) assert.ok(README.includes(needle) || README.toLowerCase().includes(needle.toLowerCase()), needle);

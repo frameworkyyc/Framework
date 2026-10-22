@@ -1,5 +1,5 @@
 /** Memberships: which user may see which organization, and as what. The ONLY way a client reaches an organization. */
-import { isoTime, requireOrgId, requireUserId, ok, fail } from "./common.js";
+import { newId, isoTime, requireOrgId, requireUserId, ok, fail, validActor } from "./common.js";
 import { validateSlug, validateEnum, ROLES } from "./validate.js";
 
 /**
@@ -58,31 +58,101 @@ export async function getMembership(db, organizationId, userId) {
   return (await db.prepare("SELECT id, organization_id, user_id, role, status, created_at, created_by, revoked_at, revoked_by FROM memberships WHERE organization_id = ? AND user_id = ?").bind(organizationId, userId).first()) || null;
 }
 
-export async function setMemberRole(db, organizationId, userId, role) {
-  requireOrgId(organizationId);
-  requireUserId(userId);
-  if (!validateEnum(role, ROLES)) return fail("invalid_role");
-  const res = await db.prepare("UPDATE memberships SET role = ? WHERE organization_id = ? AND user_id = ? AND status = 'active'").bind(role, organizationId, userId).run();
-  return res.meta.changes === 1 ? ok() : fail("not_found");
+/**
+ * Access changes below are each ONE atomic D1 batch (a single transaction): the audit entry is written FIRST, guarded by exactly the same
+ * conditions as the change itself, and the change follows. So an entry exists if and only if the change happened, a repeated call changes
+ * nothing and writes nothing, and no entry can be left behind by a refused change.
+ *
+ * LAST-OWNER RULE (enforced in the SQL, not in the caller): an active owner can only be demoted or removed while ANOTHER active owner remains,
+ * meaning another owner whose membership is active and whose portal user is active. The check and the change are one statement, so two
+ * simultaneous removals can never both succeed: whichever runs second sees the first one's result and is refused.
+ * (Emergency offboarding of a whole user, offboardUser, is deliberately outside this rule: it must always be able to cut access.)
+ *
+ * Errors are structured: { ok:false, error: <code>, message: <plain sentence> }. Codes: invalid_actor, invalid_role, not_found,
+ * already_revoked, not_revoked, last_owner.
+ */
+const OTHER_ACTIVE_OWNER =
+  "EXISTS (SELECT 1 FROM memberships o JOIN portal_users ou ON ou.id = o.user_id WHERE o.organization_id = ? AND o.user_id <> ? AND o.role = 'owner' AND o.status = 'active' AND ou.status = 'active')";
+const LAST_OWNER_MESSAGE = "This is the organization's last active owner. Make someone else an owner first.";
+
+async function whyRefused(db, organizationId, userId, wanted) {
+  const m = await getMembership(db, organizationId, userId);
+  if (!m) return fail("not_found", { message: "No such member in this organization." });
+  if (wanted === "revoke" && m.status === "revoked") return fail("already_revoked", { message: "This member's access was already removed." });
+  if (wanted === "restore" && m.status === "active") return fail("not_revoked", { message: "This member already has access." });
+  if (wanted === "role" && m.status === "revoked") return fail("not_found", { message: "This member no longer has access." });
+  if (m.role === "owner" && m.status === "active") return fail("last_owner", { message: LAST_OWNER_MESSAGE });
+  return fail("not_found", { message: "No such member in this organization." });
 }
 
+/**
+ * Change an active member's role. Promotion is always allowed; demoting an owner needs another active owner (see the rule above).
+ * Setting the role a member already has is a no-op ({ ok:true, changed:false }).
+ */
+export async function setMemberRole(db, organizationId, userId, role, actor, { now = new Date() } = {}) {
+  requireOrgId(organizationId);
+  requireUserId(userId);
+  if (!validateEnum(role, ROLES)) return fail("invalid_role", { message: "The role must be owner or member." });
+  if (!validActor(actor)) return fail("invalid_actor", { message: "An administrator must be named for this change." });
+  const t = isoTime(now), by = actor.trim();
+  const cond = `status = 'active' AND role <> ? AND (? = 'owner' OR role <> 'owner' OR ${OTHER_ACTIVE_OWNER})`;
+  const results = await db.batch([
+    db
+      .prepare(
+        `INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, detail, visibility, created_at)
+         SELECT ?, organization_id, 'admin', ?, 'membership.role_changed', 'membership', id, json_object('user_id', user_id, 'from', role, 'to', ?), 'internal', ?
+           FROM memberships WHERE organization_id = ? AND user_id = ? AND ${cond}`,
+      )
+      .bind(newId(), by, role, t, organizationId, userId, role, role, organizationId, userId),
+    db.prepare(`UPDATE memberships SET role = ? WHERE organization_id = ? AND user_id = ? AND ${cond}`).bind(role, organizationId, userId, role, role, organizationId, userId),
+  ]);
+  if (results[1].meta.changes === 1) return ok({ changed: true });
+  const m = await getMembership(db, organizationId, userId);
+  if (m && m.status === "active" && m.role === role) return ok({ changed: false });
+  return whyRefused(db, organizationId, userId, "role");
+}
+
+/** Remove a member's access (the membership is kept, marked revoked; nothing the organization owns is touched). Refuses to remove the last active owner. */
 export async function revokeMembership(db, organizationId, userId, actor, { now = new Date() } = {}) {
   requireOrgId(organizationId);
   requireUserId(userId);
-  if (typeof actor !== "string" || !actor.trim() || actor.length > 254) return fail("invalid_actor");
-  const res = await db.prepare("UPDATE memberships SET status = 'revoked', revoked_at = ?, revoked_by = ? WHERE organization_id = ? AND user_id = ? AND status = 'active'").bind(isoTime(now), actor.trim(), organizationId, userId).run();
-  return res.meta.changes === 1 ? ok() : fail("not_found");
+  if (!validActor(actor)) return fail("invalid_actor", { message: "An administrator must be named for this change." });
+  const t = isoTime(now), by = actor.trim();
+  const cond = `status = 'active' AND (role <> 'owner' OR ${OTHER_ACTIVE_OWNER})`;
+  const results = await db.batch([
+    db
+      .prepare(
+        `INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, detail, visibility, created_at)
+         SELECT ?, organization_id, 'admin', ?, 'membership.revoked', 'membership', id, json_object('user_id', user_id, 'role', role), 'internal', ?
+           FROM memberships WHERE organization_id = ? AND user_id = ? AND ${cond}`,
+      )
+      .bind(newId(), by, t, organizationId, userId, organizationId, userId),
+    db.prepare(`UPDATE memberships SET status = 'revoked', revoked_at = ?, revoked_by = ? WHERE organization_id = ? AND user_id = ? AND ${cond}`).bind(t, by, organizationId, userId, organizationId, userId),
+  ]);
+  if (results[1].meta.changes === 1) return ok({ changed: true });
+  return whyRefused(db, organizationId, userId, "revoke");
 }
 
 /** Re-enable a revoked membership (an admin decision; an old invitation can never do this). */
-export async function restoreMembership(db, organizationId, userId, { role } = {}) {
+export async function restoreMembership(db, organizationId, userId, { role, actor, now = new Date() } = {}) {
   requireOrgId(organizationId);
   requireUserId(userId);
-  if (role !== undefined && !validateEnum(role, ROLES)) return fail("invalid_role");
-  const res = await db
-    .prepare("UPDATE memberships SET status = 'active', revoked_at = NULL, revoked_by = NULL, role = COALESCE(?, role) WHERE organization_id = ? AND user_id = ? AND status = 'revoked'")
-    .bind(role ?? null, organizationId, userId)
-    .run();
-  return res.meta.changes === 1 ? ok() : fail("not_found");
+  if (role !== undefined && !validateEnum(role, ROLES)) return fail("invalid_role", { message: "The role must be owner or member." });
+  if (!validActor(actor)) return fail("invalid_actor", { message: "An administrator must be named for this change." });
+  const t = isoTime(now), by = actor.trim();
+  const cond = "status = 'revoked'";
+  const results = await db.batch([
+    db
+      .prepare(
+        `INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, detail, visibility, created_at)
+         SELECT ?, organization_id, 'admin', ?, 'membership.restored', 'membership', id, json_object('user_id', user_id, 'role', COALESCE(?, role)), 'internal', ?
+           FROM memberships WHERE organization_id = ? AND user_id = ? AND ${cond}`,
+      )
+      .bind(newId(), by, role ?? null, t, organizationId, userId),
+    db
+      .prepare(`UPDATE memberships SET status = 'active', revoked_at = NULL, revoked_by = NULL, role = COALESCE(?, role) WHERE organization_id = ? AND user_id = ? AND ${cond}`)
+      .bind(role ?? null, organizationId, userId),
+  ]);
+  if (results[1].meta.changes === 1) return ok({ changed: true });
+  return whyRefused(db, organizationId, userId, "restore");
 }
-

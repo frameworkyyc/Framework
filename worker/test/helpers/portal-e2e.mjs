@@ -119,4 +119,6 @@ export async function makeWorld({ clock } = {}) {
 }
 
 export const csrfOf = (html) => /name="csrf" value="([^"]+)"/.exec(html)?.[1];
+/** The Business Profile step revision a rendered form carries (see repo/business-profile.js): a real browser posts it back with the form. */
+export const revOf = (html) => /name="rev" value="([^"]*)"/.exec(html)?.[1];
 export const stripRef = (html) => html.replace(/Reference: <strong>[^<]*<\/strong>/, "Reference: X");
