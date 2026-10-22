@@ -22,7 +22,7 @@ import { validateSlug, validateName } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
 import { getProfileAnswers, saveProfileStep, getStepRevision } from "./repo/business-profile.js";
 import { hasPriorVisit } from "./repo/visits.js";
-import { stepById, PROFILE_STEPS } from "./profile-schema.js";
+import { stepById, PROFILE_STEPS, MULTI_SEP } from "./profile-schema.js";
 import { comingSoonKeys, LIVE_AREAS } from "./guided-data.js";
 import { moduleStatuses, nextActions } from "./module-status.js";
 import { readForm, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES } from "./form.js";
@@ -92,7 +92,11 @@ async function saveProfile(ctx, a, stepId) {
     return errorPage(403, { ref: ctx.ref });
   }
   const input = {};
-  for (const d of step.fields) if (read.fields.has(d.id)) input[d.id] = read.fields.get(d.id);
+  for (const d of step.fields) {
+    // a multiple-choice question arrives as one checkbox per option (<id>__<n>); an unchecked box is simply absent, so no box checked means "unanswered"
+    if (d.kind === "multi") input[d.id] = d.options.filter((o, i) => read.fields.get(`${d.id}__${i}`) === o).join(MULTI_SEP);
+    else if (read.fields.has(d.id)) input[d.id] = read.fields.get(d.id);
+  }
   // The revision the form was loaded with (see repo/business-profile.js). Missing or malformed counts as "unknown": it can never match, so such a save is a conflict.
   const posted = read.fields.has("rev") ? read.fields.get("rev") : null;
   const rev = typeof posted === "string" && /^(?:[0-9a-f-]{36})?$/.test(posted) ? posted : null;

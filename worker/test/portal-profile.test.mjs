@@ -51,7 +51,7 @@ test("schema: seven steps, versioned, every question defined once with a kind an
   assert.deepEqual(PROFILE_STEPS.map((s) => s.id), ["business", "location", "offering", "goals", "online", "contact", "personality"]);
   const ids = PROFILE_STEPS.flatMap((s) => s.fields.map((f) => f.id));
   assert.equal(new Set(ids).size, ids.length);
-  for (const s of PROFILE_STEPS) for (const f of s.fields) { assert.ok(["text", "textarea", "select", "choice", "email", "tel", "website"].includes(f.kind)); assert.ok(!("value" in f), "no values in the schema"); if (f.kind === "select" || f.kind === "choice") assert.ok(f.options.length > 1); }
+  for (const s of PROFILE_STEPS) for (const f of s.fields) { assert.ok(["text", "textarea", "select", "choice", "multi", "email", "tel", "website"].includes(f.kind)); assert.ok(!("value" in f), "no values in the schema"); if (f.kind === "select" || f.kind === "choice" || f.kind === "multi") assert.ok(f.options.length > 1); }
 });
 test("the fictional demo's questionnaire structure matches the real schema (ids, labels, kinds, options) so the two cannot drift apart", () => {
   assert.deepEqual(DEMO_STEPS.map((s) => [s.id, s.title]), PROFILE_STEPS.map((s) => [s.id, s.title]));
@@ -167,7 +167,7 @@ test("availability is one list: activating a section turns its block into a link
   assert.deepEqual([...d.LIVE_AREAS], ["profile"]);
   assert.deepEqual(d.comingSoonKeys(), ["branding", "website", "marketing", "content", "files"]);
   assert.deepEqual(d.comingSoonKeys(["profile", "website"]), ["branding", "marketing", "content", "files"]);
-  const vm = (liveAreas) => ({ base: "/portal/o/x", user: { name: "Ann" }, ...(liveAreas ? { liveAreas } : {}) });
+  const vm = (liveAreas) => ({ base: "/portal/o/x", org: { name: "X Co" }, user: { name: "Ann" }, ...(liveAreas ? { liveAreas } : {}) });
   const links = (h) => [...h.matchAll(/class="(?:tile(?: tile--status)?|focus)" href="([^"]+)"/g)].map((m) => m[1].split("/").pop());
   assert.deepEqual(links(g.home(vm(["profile"]))), ["profile"]);
   assert.deepEqual(links(g.home(vm(["profile", "website"]))), ["profile", "website"], "one more section released: nothing else changes");
@@ -369,7 +369,7 @@ test("every question renders with the right input, its Optional marker only wher
     const html = await (await ann.get(`/portal/o/alpha/profile/${step.id}`)).text();
     for (const f of step.fields) {
       assert.ok(html.includes(f.label.replace(/&/g, "&amp;")), `${step.id}/${f.id} label`);
-      const tag = f.kind === "textarea" ? `<textarea id="p-${step.id}-${f.id}" name="${f.id}"` : f.kind === "select" ? `<select id="p-${step.id}-${f.id}" name="${f.id}"` : f.kind === "choice" ? `name="${f.id}" value=` : f.kind === "website" ? `<input id="p-${step.id}-${f.id}" name="${f.id}" type="text" inputmode="url"` : `<input id="p-${step.id}-${f.id}" name="${f.id}" type="${f.kind}"`;
+      const tag = f.kind === "textarea" ? `<textarea id="p-${step.id}-${f.id}" name="${f.id}"` : f.kind === "select" ? `<select id="p-${step.id}-${f.id}" name="${f.id}"` : f.kind === "choice" ? `name="${f.id}" value=` : f.kind === "multi" ? `name="${f.id}__0" value=` : f.kind === "website" ? `<input id="p-${step.id}-${f.id}" name="${f.id}" type="text" inputmode="url"` : `<input id="p-${step.id}-${f.id}" name="${f.id}" type="${f.kind}"`;
       assert.ok(html.includes(tag), `${step.id}/${f.id} control`);
     }
     const optionals = step.fields.filter((f) => !f.required).length;

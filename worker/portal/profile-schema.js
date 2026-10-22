@@ -11,6 +11,13 @@ export const PROFILE_SCHEMA_VERSION = 1;
 export const INDUSTRIES = Object.freeze(["Hospitality and food", "Retail", "Professional services", "Health and wellness", "Trades and construction", "Technology", "Non-profit", "Other"]);
 export const SIZES = Object.freeze(["Just me", "2 to 10 people", "11 to 50 people", "51 to 200 people", "More than 200 people"]);
 const TONES = Object.freeze(["Friendly and relaxed", "Polished and professional", "Bold and playful", "Calm and understated"]);
+// Optional "what you want from Framework" questions in the Goals step (all optional: they never change completion or the required count).
+export const SERVICES = Object.freeze(["Branding", "Website Design & Development", "Marketing", "Content & Photography", "Not sure yet"]);
+export const START_WINDOWS = Object.freeze(["As soon as possible", "Within 1 month", "Within 1–3 months", "Just exploring"]);
+export const BUDGETS = Object.freeze(["Under $5,000", "$5,000–$10,000", "$10,000–$25,000", "$25,000–$50,000", "$50,000 or more", "Not sure yet", "Prefer not to say"]);
+export const BRAND_MATERIALS = Object.freeze(["Yes", "No", "Some"]);
+/** A multiple-choice answer is stored as one string: the chosen options, in the order of the options list, joined with this separator (no option contains it). */
+export const MULTI_SEP = ", ";
 
 const f = (id, label, kind, extra = {}) => Object.freeze({ id, label, kind, required: false, ...extra });
 const step = (id, title, intro, fields) => Object.freeze({ id, title, intro, fields: Object.freeze(fields) });
@@ -37,6 +44,11 @@ export const PROFILE_STEPS = Object.freeze([
   step("goals", "Goals and competitors", "What success looks like, and who you are measured against.", [
     f("goals", "What are your main business goals this year?", "textarea", { required: true }),
     f("competitors", "Who are your main competitors?", "textarea", { placeholder: "Names or websites, one per line. Include businesses you admire, too." }),
+    f("services", "What services are you interested in?", "multi", { options: SERVICES, hint: "Choose all that apply." }),
+    f("timeline", "When are you hoping to get started?", "select", { options: START_WINDOWS }),
+    f("budget", "Do you have a budget in mind?", "select", { options: BUDGETS, hint: "A rough range helps us suggest the right scope. You don’t have to share one." }),
+    f("assets", "Do you have existing brand materials or a website?", "select", { options: BRAND_MATERIALS }),
+    f("assetsnote", "Tell us about them", "textarea", { hint: "Links, or a short description of what you have, such as a logo, brand guide, photos or a current website." }),
   ]),
   step("online", "Online presence", "Where customers can find you today.", [
     f("site", "Existing website", "website", { placeholder: "yourbusiness.ca", autocomplete: "url" }),
@@ -132,6 +144,12 @@ export function validateAnswer(def, raw) {
     case "select":
     case "choice":
       return def.options.includes(v) ? { value: v } : { error: "Choose one of the options." };
+    case "multi": {
+      // several options at once: every part must be one of the options; duplicates collapse and the order is always the options' own
+      if (CONTROL_SINGLE.test(v)) return { error: "Choose from the options." };
+      const picked = new Set(v.split(MULTI_SEP));
+      return [...picked].every((x) => def.options.includes(x)) ? { value: def.options.filter((o) => picked.has(o)).join(MULTI_SEP) } : { error: "Choose from the options." };
+    }
     default:
       return { error: "This answer isn’t valid." };
   }
