@@ -178,8 +178,8 @@ export function stepAccordion(s, index) {
   ];
   return disclosure({
     id: "profile-" + s.id, className: "adm-acc--step adm-acc--" + s.state,
-    title: h("span", { class: "adm-acc__stepname" }, h("span", { class: "adm-acc__num", text: String(index + 1).padStart(2, "0") }), s.title),
-    meta: h("span", { class: "adm-acc__state" }, icon(s.state), h("span", { text: STATE_TEXT[s.state] }), h("span", { class: "adm-acc__count adm-muted", text: `${s.answered}/${s.total_questions}` })),
+    title: h("span", { class: "adm-acc__stepname" }, h("span", { class: "adm-acc__num", text: String(index + 1).padStart(2, "0") }), h("span", { class: "adm-acc__name", text: s.title })),
+    meta: h("span", { class: "adm-acc__state" }, icon(s.state), h("span", { class: "adm-acc__label", text: STATE_TEXT[s.state] }), h("span", { class: "adm-acc__count", text: `${s.answered}/${s.total_questions}` })),
     children: body,
   });
 }
