@@ -8,17 +8,6 @@ const STATE_TEXT = { complete: "Complete", partial: "Partial", missing: "Missing
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 
-function inviteSummary(i) {
-  const parts = [];
-  if (i.pending) parts.push(`${i.pending} pending`);
-  if (i.lapsed) parts.push(`${i.lapsed} past expiry`);
-  if (i.accepted) parts.push(`${i.accepted} accepted`);
-  if (i.revoked) parts.push(`${i.revoked} revoked`);
-  return parts.length ? parts.join(" · ") : "None";
-}
-
-const profileCell = (p) => (p ? h("span", null, `${p.done} of ${p.total} steps`, h("span", { class: "adm-muted" }, ` · ${p.percent}%`)) : h("span", { class: "adm-muted" }, "Not available"));
-
 export async function render(ctx) {
   const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)$/);
   return m ? renderDetail(decodeURIComponent(m[1]), ctx) : renderList(ctx);
@@ -26,28 +15,41 @@ export async function render(ctx) {
 
 /* ---------- List ---------- */
 
+const ARROW = () => { const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false"); svg.setAttribute("class", "adm-clientrow__arrow"); const path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", "M5 12h14m-5-5 5 5-5 5"); svg.append(path); return svg; };
+
+/** Business Profile completion: a thin native progress bar and the percentage. The bar is decorative (the percentage and a screen-reader sentence carry the meaning), and a native element needs no inline style (the Admin CSP forbids those). */
+function completion(p) {
+  if (!p) return h("span", { class: "adm-clientrow__profile adm-muted" }, "Profile not available");
+  const pct = Math.max(0, Math.min(100, Number(p.percent) || 0));
+  return h("span", { class: "adm-clientrow__profile" },
+    h("progress", { class: "adm-meter", max: 100, value: pct, "aria-hidden": "true" }),
+    h("span", { class: "adm-clientrow__pct", "aria-hidden": "true" }, `${p.percent}%`),
+    h("span", { class: "visually-hidden" }, `Business Profile ${p.percent}% complete (${p.done} of ${p.total} steps)`));
+}
+
+/** One whole row is the link: name first (full width), then when it was created and how far the Business Profile is. Members and invitations live on the client's own page. */
+function clientRow(c) {
+  const created = c.status === "active" ? "Created " + fmtDate(c.created_at) : `${cap(c.status)} · created ${fmtDate(c.created_at)}`;
+  return h("a", { class: "adm-clientrow", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "" },
+    h("span", { class: "adm-clientrow__name", text: c.name }),
+    h("span", { class: "adm-clientrow__date", text: created }),
+    completion(c.profile),
+    ARROW());
+}
+
 async function renderList(ctx) {
   const data = await api("/clients");
   const rows = data.clients;
-  const table = h("table", { class: "adm-table" },
-    h("thead", null, h("tr", null, ["Organization", "Active members", "Business Profile", "Invitations", ""].map((t) => h("th", { scope: "col" }, t || h("span", { class: "visually-hidden" }, "Actions"))))),
-    h("tbody", null, rows.map((c) => h("tr", null,
-      h("td", { "data-label": "Organization" }, h("span", { class: "adm-client" }, c.name), h("span", { class: "adm-client__sub" }, c.status === "active" ? "Created " + fmtDate(c.created_at) : `${c.status[0].toUpperCase()}${c.status.slice(1)} · created ${fmtDate(c.created_at)}`)),
-      h("td", { "data-label": "Active members" }, String(c.active_members)),
-      h("td", { "data-label": "Business Profile" }, profileCell(c.profile)),
-      h("td", { "data-label": "Invitations" }, inviteSummary(c.invitations)),
-      h("td", { "data-label": "" }, h("a", { class: "adm-link", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "", "aria-label": "View " + c.name }, "View →")),
-    ))),
-  );
+  const list = h("ul", { class: "adm-clientlist", "aria-label": "Client organizations" }, rows.map((c) => h("li", null, clientRow(c))));
   const writes = Boolean(data.capabilities && data.capabilities.writes);
   const create = newClientPanel({ navigate: ctx.navigate, writesEnabled: writes });
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Clients"),
-      h("p", { class: "adm-sub" }, "Client organizations, the people who can open their portal, and their Business Profiles.")), h("div", { class: "adm-actions" }, create.button)),
+      h("p", { class: "adm-sub" }, h("span", { class: "adm-sub--full" }, "Client organizations, the people who can open their portal, and their Business Profiles."), h("span", { class: "adm-sub--short" }, "Manage your client organizations."))), h("div", { class: "adm-actions" }, create.button)),
     writes ? null : h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at clients, but not create them or change who has access."),
     create.panel,
     data.profile_available ? null : h("p", { class: "adm-banner" }, "Business Profile data isn’t available on this deployment (its database migration hasn’t been applied)."),
-    rows.length ? table : stateBlock({ title: "No client organizations yet", body: writes ? "Use New client to add the first one, then invite its first owner." : "Nothing has been created yet. Changes are switched off on this site." }),
+    rows.length ? list : stateBlock({ title: "No client organizations yet", body: writes ? "Use New client to add the first one, then invite its first owner." : "Nothing has been created yet. Changes are switched off on this site." }),
     rows.length ? h("p", { class: "adm-sub", role: "status" }, `${plural(rows.length, "organization")}.`) : null,
   );
   return { title: "Clients", node };
