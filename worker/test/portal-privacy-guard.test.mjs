@@ -12,8 +12,11 @@ const config = parseWrangler(wrangler);
 const html = read("privacy.html");
 
 // ---- fixtures --------------------------------------------------------------------------------------------------------------------------------------------
-const withVars = (vars, extra = {}) => ({ ...config, vars: { ...config.vars, ...vars }, ...extra });
-const OFF = config, ARMED_ENABLED = withVars({ PORTAL_ENABLED: "1" }), ARMED_ALLOW = withVars({ PORTAL_ALLOW_PRODUCTION: "1" }), ON = withVars({ PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1" });
+// Fixtures start from a baseline with both Production flags removed, so these unit tests do not depend on what the real file says today.
+const { PORTAL_ENABLED: _e, PORTAL_ALLOW_PRODUCTION: _a, ...baseVars } = config.vars;
+const BASE = { ...config, vars: baseVars, env: undefined };
+const withVars = (vars, extra = {}) => ({ ...BASE, vars: { ...BASE.vars, ...vars }, ...extra });
+const OFF = BASE, ARMED_ENABLED = withVars({ PORTAL_ENABLED: "1" }), ARMED_ALLOW = withVars({ PORTAL_ALLOW_PRODUCTION: "1" }), ON = withVars({ PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1" });
 
 const SECTION_BODY = "The client portal is available only to people we invite, and it is currently in a private beta, so some details may change as we learn. ".repeat(3)
   + "We use WorkOS to sign people in with a one-time code. Each organization can see only its own information. Authorized Framework personnel can view client information only when needed. "
@@ -45,13 +48,13 @@ test("flag behaviour: the code needs BOTH flags to serve the portal on the live 
   // only exactly "1" counts, as in the code; other values do not activate
   assert.equal(productionPortalState(withVars({ PORTAL_ENABLED: "0", PORTAL_ALLOW_PRODUCTION: "true" })), "off");
   // a flag in any non-Staging environment block counts too; the two flags in DIFFERENT blocks are armed, not on
-  assert.equal(productionPortalState({ ...config, env: { prod: { vars: { PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1" } } } }), "on");
-  assert.equal(productionPortalState({ ...config, vars: { ...config.vars, PORTAL_ENABLED: "1" }, env: { other: { vars: { PORTAL_ALLOW_PRODUCTION: "1" } } } }), "armed");
+  assert.equal(productionPortalState({ ...BASE, env: { prod: { vars: { PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1" } } } }), "on");
+  assert.equal(productionPortalState({ ...BASE, vars: { ...BASE.vars, PORTAL_ENABLED: "1" }, env: { other: { vars: { PORTAL_ALLOW_PRODUCTION: "1" } } } }), "armed");
 });
 
 test("the Staging previews block is not Production: enabling the portal there never counts as Production activation", () => {
   assert.equal(config.previews.vars.PORTAL_ENABLED, "1", "Staging serves the portal");
-  assert.equal(productionPortalState(config), "off", "and that does not arm Production");
+  assert.equal(productionPortalState({ ...BASE, previews: config.previews }), "off", "and that does not arm Production");
 });
 
 // ---- which situation are we in? --------------------------------------------------------------------------------------------------------------------------
