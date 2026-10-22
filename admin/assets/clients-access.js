@@ -30,6 +30,7 @@ const ERROR_TEXT = {
   invalid_name: "Enter the business name.",
   invalid_slug: "The URL name can only use lower-case letters, digits and single hyphens (2 to 48 characters).",
   slug_taken: "That URL name is already used by another client. Choose a different one.",
+  slug_unavailable: "A portal address couldn’t be made from that name. Try a slightly different business name.",
   invalid_website_url: "The website must be a full address starting with https://",
   invalid_email: "Enter a valid email address.",
   invalid_role: "Choose Owner or Member.",
@@ -114,17 +115,17 @@ export function newClientPanel({ navigate, writesEnabled = true }) {
   const panel = h("section", { class: "adm-panel", id: "adm-new-client", "aria-labelledby": "adm-new-client-h", hidden: true });
   const button = h("button", { class: "btn btn--primary", type: "button", "aria-expanded": "false", "aria-controls": "adm-new-client", disabled: writesEnabled ? null : true, title: writesEnabled ? null : "Changes are switched off on this site" }, "New client");
 
-  function show(errors = {}, values = { name: "", website: "", slug: "" }, message = "") {
+  function show(errors = {}, values = { name: "", website: "" }, message = "") {
     const name = h("input", { id: "nc-name", class: "input", type: "text", maxlength: "120", autocomplete: "off", required: true, value: values.name });
-    const website = h("input", { id: "nc-website", class: "input", type: "text", inputmode: "url", autocapitalize: "none", spellcheck: "false", autocomplete: "off", value: values.website, placeholder: "https://example.com" });
-    const slug = h("input", { id: "nc-slug", class: "input", type: "text", maxlength: "48", autocapitalize: "none", spellcheck: "false", autocomplete: "off", value: values.slug, placeholder: "made from the name" });
+    const website = h("input", { id: "nc-website", class: "input", type: "text", inputmode: "url", autocapitalize: "none", spellcheck: "false", autocomplete: "off", value: values.website, placeholder: "example.com" });
     const submit = h("button", { class: "btn btn--primary", type: "submit" }, "Create client");
     const cancel = h("button", { class: "btn btn--secondary", type: "button", onclick: () => close(true) }, "Cancel");
-    const status = h("p", { class: "adm-msg" + (message ? " is-error" : ""), role: "alert", tabindex: "-1", text: message });
+    // Only when there is something to say: an always-present empty message box rendered as a blank, bordered, focusable rectangle under the last field.
+    const status = message ? h("p", { class: "adm-msg is-error", role: "alert", tabindex: "-1", text: message }) : null;
     const form = h("form", { class: "adm-form", novalidate: true, onsubmit: async (ev) => {
       ev.preventDefault();
       if (busy) return;
-      const v = { name: name.value.trim(), website: website.value.trim(), slug: slug.value.trim() };
+      const v = { name: name.value.trim(), website: website.value.trim() };
       if (!v.name) return show({ name: ERROR_TEXT.invalid_name }, v);
       busy = true; submit.disabled = true; cancel.disabled = true; submit.textContent = "Creating…";
       // a bare domain is accepted the way the portal's own website field accepts it: the https:// is added; the server still validates the result
@@ -132,12 +133,11 @@ export function newClientPanel({ navigate, writesEnabled = true }) {
       try {
         const body = { name: v.name };
         if (site) body.websiteUrl = site;
-        if (v.slug) body.slug = v.slug;
         const out = await api("/clients", { method: "POST", body });
         navigate("/admin/clients/" + encodeURIComponent(out.organization.id) + "?welcome=1");
       } catch (err) {
         busy = false;
-        const byField = { invalid_name: "name", invalid_slug: "slug", slug_taken: "slug", invalid_website_url: "website" }[err && err.code];
+        const byField = { invalid_name: "name", invalid_website_url: "website" }[err && err.code];
         show(byField ? { [byField]: errorText(err) } : {}, v, byField ? "" : errorText(err));
         (byField ? document.getElementById("nc-" + byField) : panel.querySelector(".adm-msg"))?.focus();
       }
@@ -145,8 +145,7 @@ export function newClientPanel({ navigate, writesEnabled = true }) {
       h("h2", { id: "adm-new-client-h", text: "New client" }),
       h("p", { class: "adm-sub", text: "Creates the organization only. You’ll invite its first owner next. Nothing is emailed." }),
       field({ id: "nc-name", label: "Business name", error: errors.name, input: name }),
-      field({ id: "nc-website", label: "Website (optional)", hint: "The client’s current or new site.", error: errors.website, input: website }),
-      field({ id: "nc-slug", label: "URL name (optional)", hint: "Lower-case letters, digits and hyphens. It becomes part of the portal address. Leave it blank to make one from the business name.", error: errors.slug, input: slug }),
+      field({ id: "nc-website", label: "Website (optional)", hint: "A domain or full address, for example example.com.", error: errors.website, input: website }),
       status,
       h("div", { class: "adm-actions" }, submit, cancel),
     );

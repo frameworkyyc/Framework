@@ -8,7 +8,7 @@ import { handleAdmin } from "../admin/router.js";
 import { resetKeyCacheForTests } from "../admin/access.js";
 import { makeWorld } from "./helpers/portal-e2e.mjs";
 import { saveProfileStep } from "../portal/repo/business-profile.js";
-import { slugFromName } from "../portal/admin-access.js";
+import { slugFromName, candidateSlug } from "../portal/admin-access.js";
 
 const TEAM = "framework.cloudflareaccess.com", AUD = "a".repeat(64), ORIGIN = "https://staging.frameworkco.ca", ADMIN = "owner@frameworkco.ca";
 const pair = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -128,13 +128,70 @@ test("create organization: a URL name is derived (or given), validated and uniqu
   assert.equal(s.net.calls, 0);
   const dup = await s.post("/api/admin/clients", { name: "Anything", slug: "cafe-muller-sons-ltd" });
   assert.deepEqual([dup.status, (await dup.json()).error], [409, "slug_taken"]);
-  for (const [json, error] of [[{ name: "" }, "invalid_name"], [{ name: 5 }, "invalid_name"], [{}, "invalid_name"], [{ name: "X", slug: "Bad Slug" }, "invalid_slug"], [{ name: "X", slug: "-no" }, "invalid_slug"], [{ name: "!!!" }, "invalid_slug"], [{ name: "Ok", websiteUrl: "http://plain.example" }, "invalid_website_url"], [{ name: "Ok", slug: 5 }, "invalid_name"]]) {
+  for (const [json, error] of [[{ name: "" }, "invalid_name"], [{ name: 5 }, "invalid_name"], [{}, "invalid_name"], [{ name: "X", slug: "Bad Slug" }, "invalid_slug"], [{ name: "X", slug: "-no" }, "invalid_slug"], [{ name: "Ok", websiteUrl: "http://plain.example" }, "invalid_website_url"], [{ name: "Ok", slug: 5 }, "invalid_name"]]) {
     const bad = await s.post("/api/admin/clients", json);
     assert.equal(bad.status, 422, JSON.stringify(json));
     assert.equal((await bad.json()).error, error, JSON.stringify(json));
   }
   assert.equal(sql(s.w.db, "SELECT count(*) AS n FROM organizations")[0].n, 3, "alpha, beta and the one new organization");
   assert.deepEqual(["Acme Co. Ltd.", "  Spaces   everywhere  ", "ÅÄÖ", "a", ""].map(slugFromName), ["acme-co-ltd", "spaces-everywhere", "aao", "", ""]);
+});
+
+test("create organization WITHOUT a URL name: the slug is made from the business name (lower-case letters, digits, hyphens) and made unique with -2, -3 ...; existing organizations and their slugs are never touched", async () => {
+  const s = await setup();
+  const slugs = () => sql(s.w.db, "SELECT id, slug, name FROM organizations ORDER BY created_at, id");
+  const before = slugs();
+  const create = async (name, extra = {}) => { const r = await s.post("/api/admin/clients", { name, ...extra }); return [r.status, (await r.json()).organization]; };
+  let [st, o] = await create("Field Ready Collective", { websiteUrl: "https://frc.frameworkco.ca" });
+  assert.deepEqual([st, o.slug, o.website_url], [201, "field-ready-collective", "https://frc.frameworkco.ca/"]);
+  // the same name again, and again: -2, -3 (never the same slug, never an overwrite)
+  const second = await create("Field Ready Collective");
+  const third = await create("  field   READY collective!! ");
+  assert.deepEqual([second[0], second[1].slug, third[0], third[1].slug], [201, "field-ready-collective-2", 201, "field-ready-collective-3"]);
+  assert.notEqual(second[1].id, o.id);
+  assert.equal(sql(s.w.db, "SELECT name FROM organizations WHERE slug = 'field-ready-collective'")[0].name, "Field Ready Collective", "the first organization is unchanged");
+  // a name whose slug equals an EXISTING organization's slug gets a suffix; that organization keeps its slug
+  const existing = before[0];
+  const clash = await create(existing.slug);
+  assert.deepEqual([clash[0], clash[1].slug], [201, existing.slug + "-2"]);
+  for (const b of before) assert.deepEqual(sql(s.w.db, "SELECT id, slug, name FROM organizations WHERE id = ?", b.id)[0], b, "existing organizations are untouched");
+  // nothing usable in the name: a safe fallback; and the fallback is made unique too
+  assert.deepEqual([(await create("!!!"))[1].slug, (await create("日本語"))[1].slug, (await create("A"))[1].slug], ["client", "client-2", "client-3"]);
+  // accents are folded, punctuation collapses, an over-long name is cut, and a suffix still fits within 48 characters
+  assert.equal((await create("Café Müller & Sons Ltd."))[1].slug, "cafe-muller-sons-ltd");
+  const long = "x".repeat(70);
+  const l1 = (await create(long))[1].slug, l2 = (await create(long))[1].slug;
+  assert.deepEqual([l1.length, l2.length, l2.endsWith("-2")], [48, 48, true]);
+  // every created slug is valid and unique, and each organization has exactly one org.created audit entry carrying its real slug
+  const all = slugs();
+  assert.equal(new Set(all.map((x) => x.slug)).size, all.length);
+  for (const x of all) assert.match(x.slug, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  const created = audit(s.w.db, "action = 'org.created'").map((x) => JSON.parse(x.detail).slug).sort();
+  assert.deepEqual(created, all.filter((x) => !before.some((b) => b.id === x.id)).map((x) => x.slug).sort());
+  assert.equal(sql(s.w.db, "SELECT count(*) AS n FROM memberships")[0].n, 0, "no member is created");
+  assert.equal(sql(s.w.db, "SELECT count(*) AS n FROM invitations")[0].n, 0, "no invitation is created");
+});
+
+test("create organization without a URL name: simultaneous requests for the same name all succeed with DIFFERENT slugs; after 25 clashes it refuses cleanly and creates nothing; an explicit URL name is still used exactly as given and refused when taken", async () => {
+  const s = await setup();
+  const results = await Promise.all(Array.from({ length: 5 }, () => s.post("/api/admin/clients", { name: "Same Name Ltd" })));
+  assert.deepEqual(results.map((r) => r.status), [201, 201, 201, 201, 201]);
+  const slugs = (await Promise.all(results.map(async (r) => (await r.json()).organization.slug))).sort();
+  assert.deepEqual(slugs, ["same-name-ltd", "same-name-ltd-2", "same-name-ltd-3", "same-name-ltd-4", "same-name-ltd-5"]);
+  for (let i = 0; i < 20; i++) assert.equal((await s.post("/api/admin/clients", { name: "Same Name Ltd" })).status, 201); // -6 ... -25
+  const count = sql(s.w.db, "SELECT count(*) AS n FROM organizations")[0].n;
+  const auditBefore = sql(s.w.db, "SELECT count(*) AS n FROM activity_log WHERE action = 'org.created'")[0].n;
+  const full = await s.post("/api/admin/clients", { name: "Same Name Ltd" });
+  assert.deepEqual([full.status, (await full.json()).error], [409, "slug_unavailable"]);
+  assert.equal(sql(s.w.db, "SELECT count(*) AS n FROM organizations")[0].n, count, "a refused request creates nothing");
+  assert.equal(sql(s.w.db, "SELECT count(*) AS n FROM activity_log WHERE action = 'org.created'")[0].n, auditBefore, "and writes no audit entry");
+  // explicit slug: exact, and a taken one is refused, never altered
+  const ok = await s.post("/api/admin/clients", { name: "Explicit", slug: "my-explicit-name" });
+  assert.deepEqual([ok.status, (await ok.json()).organization.slug], [201, "my-explicit-name"]);
+  const dup = await s.post("/api/admin/clients", { name: "Explicit Again", slug: "my-explicit-name" });
+  assert.deepEqual([dup.status, (await dup.json()).error], [409, "slug_taken"]);
+  assert.deepEqual([1, 2, 3, 12, 25].map((n) => candidateSlug("Acme", n)), ["acme", "acme-2", "acme-3", "acme-12", "acme-25"]);
+  for (const n of [1, 2, 9, 10, 25]) assert.ok(candidateSlug("y".repeat(80), n).length <= 48, "within the 48-character limit: " + n);
 });
 
 /* ------------------------------------------------------------------ invitations */

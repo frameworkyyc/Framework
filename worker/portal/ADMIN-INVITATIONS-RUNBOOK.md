@@ -8,7 +8,7 @@ Scope: **Staging** (the Preview `Staging`). Production is not enabled for any of
 * **Recipients are limited server-side** to the exact addresses in the Cloudflare secret `PORTAL_INVITE_ALLOWLIST`. Missing, empty or malformed means nothing can be created or sent. Neither switch sends anything by itself.
 
 ## Invite a client (Admin, Clients)
-1. **New client:** business name, optional website, optional URL name. You land on the client's page.
+1. **New client:** business name and an optional website (a domain such as `example.com` or a full address). The portal address (the URL name) is made automatically from the business name, with `-2`, `-3` added if it is already taken; an existing organization's address never changes. You land on the client's page, which shows the portal address.
 2. **Invite:** enter the person's email address and a role (**Owner** for the first person; **Member** for colleagues).
 3. Choose **Create and send** (one confirmation shows the person, role, organization and what will be emailed) or **Create only** to save it and send later.
 4. Watch the invitation row: **Invitation** status (Pending, Accepted, Revoked, Expired) and **Delivery** (Not sent, Submitted to WorkOS or Framework email, Send failed) are shown separately. "Submitted" means the provider accepted the request; it never confirms that the email reached an inbox.

@@ -21,7 +21,7 @@
  *
  * Routes (path after /api/admin):
  *   GET  /clients/:org/access                         organization, members, invitations
- *   POST /clients                                     {name, slug?, websiteUrl?}   create an organization
+ *   POST /clients                                     {name, websiteUrl?, slug?}   create an organization; with no slug it is made from the name and made unique (-2, -3, ...)
  *   POST /clients/:org/invitations                    {email, role}                create a pending invitation (7 days), not sent
  *   POST /clients/:org/invitations/:id/revoke         {}                           revoke in D1 first, then cancel the WorkOS invitation (partial failure is reported; repeat to retry WorkOS)
  *   POST /clients/:org/invitations/:id/replace        {role?}                      replace an expired or revoked invitation with a fresh 7-day one
@@ -51,7 +51,7 @@ const err = (status, error, message, extra = {}) => json({ error, message, ...ex
 const STATUS = {
   invalid_slug: 422, invalid_name: 422, invalid_website_url: 422, invalid_email: 422, invalid_role: 422, invalid_expiry: 422, invalid_actor: 500,
   not_found: 404, invalid_organization: 404,
-  slug_taken: 409, revenue_client_taken: 409, already_pending: 409, already_member: 409, last_owner: 409, still_pending: 409, already_revoked: 409,
+  slug_taken: 409, slug_unavailable: 409, revenue_client_taken: 409, already_pending: 409, already_member: 409, last_owner: 409, still_pending: 409, already_revoked: 409,
   already_expired: 409, already_accepted: 409, not_revoked: 409, organization_inactive: 409,
   expired_replace_required: 409, already_submitted: 409, not_yet_submitted: 409, invitation_revoked: 409, send_in_progress: 409,
   delivery_unrecorded: 500, recipient_not_allowed: 403, recipient_allowlist_missing: 403,
@@ -92,10 +92,21 @@ async function readBody(request, allowed) {
   return { body };
 }
 
-/** "Acme Co. Ltd." -> "acme-co-ltd". Returns "" when nothing usable remains (the caller then asks for an explicit URL name). */
+/** "Acme Co. Ltd." -> "acme-co-ltd". Returns "" when nothing usable remains (candidateSlug then falls back to "client"). */
 export function slugFromName(name) {
   const s = String(name || "").normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48).replace(/-+$/g, "");
   return validateSlug(s) || "";
+}
+
+/** Tries per business name before giving up: "acme", "acme-2" ... "acme-25". */
+const MAX_SLUG_ATTEMPTS = 25;
+/** Attempt n (1-based) for a name: the plain slug first, then -2, -3 ... The base is shortened so the whole slug stays within 48 characters; a name with nothing usable becomes "client". */
+export function candidateSlug(name, n) {
+  const base = slugFromName(name) || "client";
+  if (n <= 1) return base;
+  const suffix = "-" + n;
+  const trimmed = base.slice(0, 48 - suffix.length).replace(/-+$/g, "");
+  return validateSlug(trimmed + suffix) || "client" + suffix;
 }
 
 const publicOrg = (o) => ({ id: o.id, name: o.name, slug: o.slug, status: o.status, website_url: o.website_url, created_at: o.created_at });
@@ -260,10 +271,19 @@ export async function handleAccessApi(request, env, principal, path, deps = {}) 
       if (typeof body.name !== "string" || !validateName(body.name) || (body.slug !== undefined && typeof body.slug !== "string") || (body.websiteUrl !== undefined && body.websiteUrl !== null && typeof body.websiteUrl !== "string")) {
         return err(422, "invalid_name", "Enter the organization's name.");
       }
-      const slug = body.slug !== undefined ? body.slug : slugFromName(body.name);
-      if (!slug) return err(422, "invalid_slug", "A URL name could not be made from that name. Enter one (letters, digits and hyphens).");
-      const r = await createOrganizationAudited(db, { name: body.name, slug, websiteUrl: body.websiteUrl }, actor, { now });
-      return r.ok ? json({ organization: publicOrg(r.organization) }, 201) : fromFailure(r);
+      if (body.slug !== undefined) {
+        // An explicit URL name (an API caller; the Admin form no longer sends one): used exactly as given. A taken name is refused, never altered.
+        const r = await createOrganizationAudited(db, { name: body.name, slug: body.slug, websiteUrl: body.websiteUrl }, actor, { now });
+        return r.ok ? json({ organization: publicOrg(r.organization) }, 201) : fromFailure(r);
+      }
+      // No URL name: it is made from the business name and made unique (-2, -3, ...). The database's unique constraint decides, atomically, so two simultaneous requests
+      // can never share a slug; an existing organization's slug is never changed or reused.
+      for (let n = 1; n <= MAX_SLUG_ATTEMPTS; n++) {
+        const r = await createOrganizationAudited(db, { name: body.name, slug: candidateSlug(body.name, n), websiteUrl: body.websiteUrl }, actor, { now });
+        if (r.ok) return json({ organization: publicOrg(r.organization) }, 201);
+        if (r.error !== "slug_taken") return fromFailure(r);
+      }
+      return err(409, "slug_unavailable", "A portal address could not be made from that name. Try a slightly different business name.");
     }
 
     const org = await getOrganizationById(db, route.org);
