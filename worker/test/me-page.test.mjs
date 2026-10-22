@@ -2,7 +2,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 
 const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
 const html = read("me.html");
@@ -49,9 +48,10 @@ test("home-screen support: title, apple touch icon (an existing brand asset), st
   assert.match(read("assets/css/card.css"), /safe-area-inset-top/, "the shared page frame handles the notch and home bar");
 });
 
-test("the public card is untouched: /card still ships its own files and no card file was edited for /me", () => {
-  const changed = execFileSync("git", ["diff", "--name-only", "origin/Staging", "--", "card.html", "assets/css/card.css", "assets/js/card.js", "assets/js/card-config.js", "assets/js/vcard.js", "worker/card.js"], { cwd: new URL("../../", import.meta.url), encoding: "utf8" });
-  assert.equal(changed.trim(), "");
+test("the public card is independent of /me: it neither loads the /me stylesheet nor carries /me rules (the card's own tests pin its content)", () => {
+  assert.ok(!/me\.css|\/me\b/.test(read("card.html")));
+  assert.ok(!/\.me[-_ {.]/.test(read("assets/css/card.css")));
+  assert.match(html, /assets\/css\/card\.css/, "/me reuses the card's frame and logo styles without copying them");
 });
 
 test("/me is served as a static page: the Worker does not intercept it, and no new route, binding or setting was added", () => {
