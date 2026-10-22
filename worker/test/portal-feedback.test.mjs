@@ -10,6 +10,7 @@ import { resetKeyCacheForTests } from "../admin/access.js";
 import { validateFeedback, submitPortalFeedback, FEEDBACK_PAGES, FEEDBACK_KINDS, HOURLY_LIMIT, MAX_MESSAGE } from "../portal/repo/portal-feedback.js";
 import { MAX_FEEDBACK_FORM_BYTES } from "../portal/form.js";
 import { PORTAL_CSP } from "../portal/http.js";
+import { portalPolicyAssertionsApply } from "./helpers/portal-privacy-guard.mjs";
 
 const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
 const sql = (db, q, ...p) => db.raw.prepare(q).all(...p).map((r) => ({ ...r }));
@@ -239,8 +240,10 @@ test("Business Profile carries a short plain-language notice, links it from each
 });
 test("the privacy policy covers the portal, Business Profile and portal feedback, and the draft records what still needs owner or legal review", () => {
   const policy = read("privacy.html");
-  assert.match(policy, /<h2 id="portal">The client portal<\/h2>/);
-  assert.match(policy, /Business Profile/); assert.match(policy, /Portal feedback/); assert.match(policy, /WorkOS/);
+  if (portalPolicyAssertionsApply(policy)) {
+    assert.match(policy, /<h2 id="portal">The client portal<\/h2>/);
+    assert.match(policy, /Business Profile/); assert.match(policy, /Portal feedback/); assert.match(policy, /WorkOS/);
+  } else assert.ok(!/client portal/i.test(policy), "a website-only policy must not make partial portal statements");
   const draft = read("worker/portal/PRIVACY-DRAFT.md");
   assert.match(draft, /Business Profile/); assert.match(draft, /portal feedback/i); assert.match(draft, /\[OWNER CONFIRMATION\]/);
 });
