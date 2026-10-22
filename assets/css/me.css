@@ -8,6 +8,18 @@
 .me__name { font-weight: 700; font-size: 26px; line-height: 1.05; letter-spacing: -0.02em; }
 .me__label { margin: 6px 0 0; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--slate); }
 
+/* My Business Card: View / Share / QR as three equal, borderless touch targets (the card's own .card-act look) */
+.me__card { padding: 0; }
+.me__card .me__env-title { padding: 2px 0 0; }
+.me__card-note { margin: 4px 0 0; font-size: 14px; line-height: 1.4; color: var(--slate); }
+.me__acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 6px 0 0; }
+.me__acts > [hidden] { display: none; }
+.me__acts .card-act { min-height: 68px; }
+.me__acts button.card-act { background: none; border: 0; border-radius: 0; cursor: pointer; }
+.me__acts .card-act:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.me-act__icon { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: square; stroke-linejoin: miter; }
+.me__card .card__status { margin: 4px 0 0; }
+
 /* the two environments: Production is the ink-topped, white section; Staging sits on the light "mist" tone, so you always know which you are in */
 .me__env { padding: 0 0 4px; }
 .me__env-title { margin: 0; padding: 14px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
@@ -33,4 +45,4 @@ a.me-link:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .me-link__soon { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 
 /* short phones (landscape or small): keep everything on one screen */
-@media (max-height: 640px) { .me { gap: 14px; } .me-link { min-height: 52px; } }
+@media (max-height: 700px) { .me { gap: 14px; } .me-link { min-height: 48px; } .me__acts .card-act { min-height: 62px; } }
