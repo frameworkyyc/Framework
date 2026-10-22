@@ -112,7 +112,7 @@ test("api(): server error codes become short, safe codes; the raw message is nev
 
 /* ------------------------------------------------------------------ source guards */
 
-const UI = ["admin/assets/clients.js", "admin/assets/clients-access.js"];
+const UI = ["admin/assets/clients.js", "admin/assets/clients-access.js", "admin/assets/client-dashboard.js"];
 
 test("the interface is built the safe way: text nodes only, no inline styles or handlers, no HTML injection, no storage of tokens", () => {
   for (const f of UI) {
@@ -168,7 +168,7 @@ test("wording: delivery is never described as arrival; 'submitted' is explained;
 test("the Business Profile review stays read-only and intact, and the navigation entry is unchanged", () => {
   const clients = strip(read("admin/assets/clients.js"));
   assert.match(read("admin/assets/clients.js"), /staff cannot edit them here/);
-  for (const w of ["Complete", "Partial", "Missing"]) assert.ok(clients.includes(`"${w}"`), w);
+  for (const w of ["Complete", "Partial", "Missing"]) assert.ok(strip(read("admin/assets/client-dashboard.js")).includes(`"${w}"`), w);
   assert.ok(!/method: "(POST|PUT|PATCH|DELETE)"/.test(clients), "clients.js itself makes no write call");
   assert.equal([...clients.matchAll(/\bapi\(/g)].length, 2, "the list and the detail reads");
   assert.match(read("admin/assets/modules.js"), /id: "clients", label: "Clients", path: "\/admin\/clients", enabled: true, load: \(\) => import\("\.\/clients\.js"\)/);
