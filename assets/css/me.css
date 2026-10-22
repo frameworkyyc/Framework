@@ -1,4 +1,4 @@
-/* Personal quick-access page (/me). Builds on card.css (page frame, logo drawing) and the styles.css tokens. Links only, no scripts. */
+/* Framework Personal Dashboard (/me). Builds on card.css (page frame, logo drawing) and the styles.css tokens. Links only, no scripts. */
 
 .me { gap: 22px; }
 
@@ -39,10 +39,13 @@
 .me-link__main { display: inline-flex; align-items: center; gap: 14px; min-width: 0; }
 .me-link__icon { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: square; stroke-linejoin: miter; }
 .me-link__arrow { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: square; stroke-linejoin: miter; }
-@media (hover: hover) { a.me-link:hover .me-link__main > span { text-decoration: underline; text-underline-offset: 5px; } }
+.me-link__arrow, .me-link__main > span { transition: transform .15s ease, color .15s ease; }
+@media (hover: hover) {
+  a.me-link:hover .me-link__main > span { text-decoration: underline; text-underline-offset: 5px; }
+  a.me-link:hover .me-link__arrow { transform: translateX(3px); }
+}
+@media (prefers-reduced-motion: reduce) { .me-link__arrow, .me-link__main > span { transition: none; } a.me-link:hover .me-link__arrow { transform: none; } }
 a.me-link:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-.me-link--off { color: var(--slate); }
-.me-link__soon { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 
 /* short phones (landscape or small): keep everything on one screen */
-@media (max-height: 700px) { .me { gap: 14px; } .me-link { min-height: 48px; } .me__acts .card-act { min-height: 62px; } }
+@media (max-height: 830px) { .me { gap: 12px; } .me-link { min-height: 45px; } .me__acts .card-act { min-height: 58px; } }

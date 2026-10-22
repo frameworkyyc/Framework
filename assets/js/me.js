@@ -1,4 +1,4 @@
-/* Personal quick-access page (/me): Share Card and Show QR for the PUBLIC business card.
+/* Framework Personal Dashboard (/me): Share Card and Show QR for the PUBLIC business card.
    Both always use the permanent Production address from card-config.js (the same one /card uses on the live site), even when /me is opened
    on Staging. The View Card link works without this script; it adds Share and the QR code. Nothing here sends data anywhere: no analytics,
    no cookies, no storage, no network requests (the QR code is drawn locally by the same vendor/qrcode.js the card uses). */

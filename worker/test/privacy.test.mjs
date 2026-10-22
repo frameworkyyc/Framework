@@ -12,7 +12,7 @@ const root = new URL("../../", import.meta.url);
 const read = (f) => readFileSync(new URL(f, root), "utf8");
 const text = (html) => html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&rsquo;|’/g, "'").replace(/\s+/g, " ");
 
-// me.html is the private personal quick-access page (noindex, five links, no data collected): not a public page, so no policy footer.
+// me.html is the private Framework Personal Dashboard (noindex, links only, no data collected): not a public page, so no policy footer.
 const PAGES = readdirSync(root).filter((f) => f.endsWith(".html") && f !== "me.html");
 const policy = read("privacy.html");
 const policyText = text(policy);
