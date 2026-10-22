@@ -229,7 +229,7 @@ test("Business Profile carries a short plain-language notice, links it from each
   const { ann } = await setup();
   const html = await (await ann.get("/portal/o/alpha/profile")).text();
   const notice = html.slice(html.indexOf('<section class="privacy"'), html.indexOf("</section>", html.indexOf('<section class="privacy"')));
-  for (const must of ["private beta", "What we collect", "Why", "Who can see it", "saved against your organization", "authorized Framework staff may review it", "Corrections and deletion", "mailto:hello@frameworkco.ca", "/privacy.html"]) assert.ok(notice.includes(must), must);
+  for (const must of ["private beta", "What we collect", "Why we collect it", "prepare proposals", "Optional information", "including those about project timing and budget", "Who can see it", "saved against your organization", "authorized Framework staff may review it", "Corrections and deletion", "mailto:hello@frameworkco.ca", "/privacy.html"]) assert.ok(notice.includes(must), must);
   assert.ok(!/encrypt|GDPR|PIPA|PIPEDA|complian|certif|retain|retention|\bdays\b|months|years|data cent|resident|Canada only|stored in|never share|secure(ly)? stored/i.test(notice), "no claims about encryption, retention, compliance or residency");
   assert.ok(!/type="checkbox"/.test(html), "no consent checkbox");
   assert.ok(notice.split(/\s+/).length < 170, "concise");
