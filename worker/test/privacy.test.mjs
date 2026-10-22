@@ -11,7 +11,8 @@ const root = new URL("../../", import.meta.url);
 const read = (f) => readFileSync(new URL(f, root), "utf8");
 const text = (html) => html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&rsquo;|’/g, "'").replace(/\s+/g, " ");
 
-const PAGES = readdirSync(root).filter((f) => f.endsWith(".html"));
+// me.html is the private personal quick-access page (noindex, six links, no data collected): not a public page, so no policy footer.
+const PAGES = readdirSync(root).filter((f) => f.endsWith(".html") && f !== "me.html");
 const policy = read("privacy.html");
 const policyText = text(policy);
 
