@@ -288,7 +288,7 @@ test("defence in depth: the delivery code itself refuses to contact a provider w
 
 /* ------------------------------------------------------------------ configuration and code paths */
 
-test("configuration: the recipient allowlist is a Cloudflare SECRET, not configuration: no address and no value in any checked-in file; the two switches are Staging-only; Production is untouched", () => {
+test("configuration: the recipient allowlist is a Cloudflare SECRET, not configuration: no address and no value in any checked-in file; the two switches are on for Staging and Production (the secret is the gate); no address in the configuration", () => {
   const raw = read("wrangler.jsonc");
   const config = JSON.parse(strip(raw));
   for (const name of ["PORTAL_INVITE_ALLOWLIST", "PORTAL_INVITE_ALLOWED_EMAILS"]) {
@@ -300,16 +300,16 @@ test("configuration: the recipient allowlist is a Cloudflare SECRET, not configu
   const addresses = (raw.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || []).filter((a) => a !== "hello@frameworkco.ca");
   assert.deepEqual(addresses, [], "no personal or recipient address appears in the public configuration");
   for (const f of ["migrations/portal/wrangler.migrate.production.jsonc", "migrations/portal/wrangler.migrate.staging.jsonc", ".github/workflows/ci.yml"]) assert.ok(!/PORTAL_INVITE_ALLOW/.test(read(f)), f);
-  // the invitation workflow switches: ON for Staging (exactly "1"), never at the top level (Production), each named exactly once in the configuration
+  // the invitation workflow switches: ON for Staging and Production (exactly "1"), each named once per environment
   const code = strip(raw);
   for (const name of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) {
     assert.equal(config.previews.vars[name], "1", name);
-    assert.equal(config.vars[name], undefined, name + " is never a Production variable");
-    assert.equal((code.match(new RegExp(name, "g")) || []).length, 1, name + " appears once: in the Staging block");
+    assert.equal(config.vars[name], "1", name + " is on in Production since launch");
+    assert.equal((code.match(new RegExp(name, "g")) || []).length, 2, name + " appears once per environment");
   }
   assert.equal(config.previews.vars.PORTAL_BASE_URL, "https://staging.frameworkco.ca");
   assert.equal(config.previews.vars.PORTAL_ENABLED, "1", "removing the allowlist variable does not switch the portal off");
-  assert.equal(config.vars.PORTAL_ENABLED, undefined, "Production's portal stays disabled");
+  assert.equal(config.vars.PORTAL_ENABLED, "1", "Production's portal is on since launch; the allowlist secret (not a variable) is the recipient gate");
   assert.ok(!/secrets"?\s*:\s*\{\s*"?required/.test(code), "no required-secrets block: a missing allowlist must never block a deploy or the portal");
 });
 

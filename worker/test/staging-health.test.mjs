@@ -352,7 +352,7 @@ test("the expected-config file matches wrangler.jsonc (Staging databases, non-se
   assert.deepEqual(Object.keys(expected.forbiddenDatabaseIds).sort(), prod.sort(), "the forbidden ids are exactly Production's databases");
   assert.deepEqual([...Object.keys(expected.bindings)].sort(), ["ASSETS", "DB", "PORTAL_DB", "PORTAL_FILES", "PORTAL_RATE_LIMITER"]);
   for (const n of expected.forbiddenNames) assert.ok(!strip(read("wrangler.jsonc")).includes(n), n + " must not be in the configuration");
-  for (const [n, want] of Object.entries(expected.switches)) { assert.equal(p.vars[n] === undefined ? null : p.vars[n], want, n + " matches the Staging block"); assert.equal(cfg.vars[n], undefined, n + " is never a Production (top-level) variable"); }
+  for (const [n, want] of Object.entries(expected.switches)) { assert.equal(p.vars[n] === undefined ? null : p.vars[n], want, n + " matches the Staging block"); assert.ok(cfg.vars[n] === undefined || cfg.vars[n] === "1", n + " is at most the launch value \"1\" at the top level (Production)"); }
   assert.equal(expected.worker, cfg.name);
   assert.equal(expected.baseUrl, p.vars.PORTAL_BASE_URL);
   for (const n of expected.secrets.required) assert.ok(!(n in p.vars), n + " is a secret, not a variable");

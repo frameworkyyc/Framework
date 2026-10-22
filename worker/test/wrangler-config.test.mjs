@@ -24,12 +24,12 @@ test("Staging (Preview): DB -> framework-staging is preserved, plus PORTAL_DB ->
   assert.deepEqual(config.previews.d1_databases, [STAGING, PORTAL_STAGING]);
 });
 
-test("Production's portal resources are exactly: its own portal database, three inert non-secret settings, the limiter; no R2 bucket and no enablement flag", () => {
+test("Production's portal resources are exactly: its own portal database, the WorkOS settings, the four launch switches, the limiter; no R2 bucket and no probe flag", () => {
   assert.deepEqual(config.previews.r2_buckets, [{ binding: "PORTAL_FILES", bucket_name: "framework-portal-files-staging" }]);
   assert.equal(config.r2_buckets, undefined, "no file storage on Production yet");
-  assert.deepEqual(Object.keys(config.vars).filter((k) => k.startsWith("PORTAL_")).sort(), ["PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER", "PORTAL_BASE_URL"]);
+  assert.deepEqual(Object.keys(config.vars).filter((k) => k.startsWith("PORTAL_")).sort(), ["PORTAL_ADMIN_WRITES", "PORTAL_ALLOW_PRODUCTION", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER", "PORTAL_BASE_URL", "PORTAL_ENABLED", "PORTAL_INVITE_SENDING"]);
   const before = raw.slice(0, raw.indexOf('"previews"')).replace(/^\s*\/\/.*$/gm, "");
-  assert.ok(!/PORTAL_ENABLED|PORTAL_ALLOW_PRODUCTION|PORTAL_PROBE/.test(before), "no enablement flag before the previews block");
+  assert.ok(!/PORTAL_PROBE|PORTAL_DEMO/.test(before), "no probe flag and no demo switch before the previews block");
   assert.ok(!/PORTAL_FILES|framework-portal-files/.test(before));
 });
 
@@ -57,9 +57,9 @@ test("the Production ID appears exactly once in the file (never inside the previ
   assert.ok(!JSON.stringify(config.previews).includes("framework-feedback"));
 });
 
-test("Production (top-level vars) and Staging (previews.vars) each carry the sender, the same public Turnstile site key and their OWN WorkOS settings; only Staging enables the portal", () => {
+test("Production (top-level vars) and Staging (previews.vars) each carry the sender, the same public Turnstile site key and their OWN WorkOS settings; both enable the portal (Production since launch), only Staging also has the demo", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
-  assert.deepEqual(config.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_BASE_URL: "https://frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691" });
+  assert.deepEqual(config.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_BASE_URL: "https://frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1" });
   assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1", PORTAL_DEMO: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1" });
 });
 
@@ -94,14 +94,17 @@ test("shared routes: the existing worker routes are unchanged and /portal + /por
   assert.ok(!config.assets.run_worker_first.some((p) => p === "/*" || p === "/portal/login"), "no catch-all, no leftover probe paths");
 });
 
-test("the portal is enabled for Staging ONLY: PORTAL_ENABLED is \"1\" in previews.vars and exists nowhere else; Production has neither flag", () => {
+test("launch configuration: Production enables the portal with BOTH PORTAL_ENABLED and PORTAL_ALLOW_PRODUCTION (each exactly \"1\"); the override and the demo are never in the Staging block's place", () => {
   const code = raw.replace(/^\s*\/\/.*$/gm, "");
-  assert.equal(config.previews.vars.PORTAL_ENABLED, "1");
-  assert.equal([...code.matchAll(/PORTAL_ENABLED/g)].length, 1, "exactly one occurrence in the whole file");
-  assert.ok(code.indexOf("PORTAL_ENABLED") > code.indexOf('"previews"'), "and it is inside the previews block");
-  assert.ok(!("PORTAL_ENABLED" in config.vars), "Production vars do not enable the portal");
-  assert.ok(!("PORTAL_ALLOW_PRODUCTION" in config.vars), "Production vars do not carry the production override");
-  assert.ok(!code.includes("PORTAL_PROBE") && !code.includes("PORTAL_ALLOW_PRODUCTION"), "no probe flag, and no override that would let the portal run on the live hosts: added only in the separate launch change");
+  assert.equal(config.previews.vars.PORTAL_ENABLED, "1", "Staging serves the portal");
+  assert.equal(config.vars.PORTAL_ENABLED, "1");
+  assert.equal(config.vars.PORTAL_ALLOW_PRODUCTION, "1", "the production override: the code refuses a production host without it");
+  assert.equal([...code.matchAll(/PORTAL_ENABLED/g)].length, 2, "once per environment");
+  assert.equal([...code.matchAll(/PORTAL_ALLOW_PRODUCTION/g)].length, 1, "the override is only in Production's vars");
+  assert.ok(code.indexOf("PORTAL_ALLOW_PRODUCTION") < code.indexOf('"previews"'));
+  assert.equal(config.vars.PORTAL_DEMO, undefined, "the demo is Staging-only (the code also refuses it on the live hosts)");
+  assert.equal(config.previews.vars.PORTAL_DEMO, "1");
+  assert.ok(!code.includes("PORTAL_PROBE"), "no probe flag");
 });
 
 test("each environment has its OWN portal rate limiter (same binding name, 20 requests per 60 seconds, different namespace ids)", () => {
@@ -135,12 +138,13 @@ test("the sender is a valid From value that the Worker accepts as-is (no correct
 });
 
 test("only whitelisted NON-secret names may ever appear under vars", () => {
-  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED", "PORTAL_DEMO"]);
+  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED", "PORTAL_ALLOW_PRODUCTION", "PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_DEMO"]);
   for (const name of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) {
-    assert.equal(config.vars[name], undefined, name + " is never a Production setting");
-    assert.equal(config.previews.vars[name], "1", name + " is on for Staging only (invitations are still limited to the allowlist secret)");
-    allowed.add(name); // approved NON-secret names, but only under previews.vars (the top-level check above)
+    assert.equal(config.vars[name], "1", name + " is on in Production since launch (invitations are still limited to the allowlist secret)");
+    assert.equal(config.previews.vars[name], "1", name + " is on for Staging (invitations are still limited to the allowlist secret)");
   }
+  assert.equal(config.vars.PORTAL_DEMO, undefined, "the demo is never a Production setting");
+  assert.equal(config.previews.vars.PORTAL_ALLOW_PRODUCTION, undefined, "the production override is never a Staging setting");
   for (const vars of [config.vars, config.previews.vars]) for (const name of ["PORTAL_INVITE_ALLOWLIST", "PORTAL_INVITE_ALLOWED_EMAILS"]) assert.equal(vars[name], undefined, name + " is a Cloudflare secret, never a checked-in variable (the repository is public)");
   for (const vars of [config.vars, config.previews.vars]) for (const name of Object.keys(vars)) assert.ok(allowed.has(name), name + " is not an approved non-secret variable");
 });
