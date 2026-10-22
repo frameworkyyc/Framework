@@ -326,7 +326,7 @@ export function accessSections({ orgId, orgName, welcome = false }) {
     if (i.status === "pending" && !isExpired(i)) {
       const d = (i.delivery && i.delivery.state) || "not_tracked";
       if (d === "submitted") btns.push(textButton("Resend", { "aria-label": "Resend invitation to " + to, disabled: cannotSend ? true : null, title: sendTitle, onclick: () => sendNow("resend") }));
-      else if (d !== "not_tracked") btns.push(textButton(d === "failed" ? "Try again" : "Send", { "aria-label": (d === "failed" ? "Try sending again to " : "Send invitation to ") + to, disabled: cannotSend ? true : null, title: sendTitle, onclick: () => sendNow("send") }));
+      else if (d !== "not_tracked") btns.push(textButton(d === "failed" ? "Try again" : "Send", { "aria-label": (d === "failed" ? "Try again: send the invitation to " : "Send invitation to ") + to, disabled: cannotSend ? true : null, title: sendTitle, onclick: () => sendNow("send") }));
       btns.push(textButton("Revoke", { "aria-label": "Revoke invitation for " + to, onclick: () => perform({
         confirm: {
           title: "Revoke this invitation?",
@@ -338,7 +338,7 @@ export function accessSections({ orgId, orgName, welcome = false }) {
         onSuccess: (res) => revokeOutcome(res, to),
       }) }));
     } else if (i.status === "revoked" && i.workos_cleanup === "pending") {
-      btns.push(textButton("Retry WorkOS cancel", { "aria-label": "Retry cancelling the WorkOS invitation for " + to, disabled: cannotSend ? true : null, title: sendTitle, onclick: () => perform({
+      btns.push(textButton("Retry WorkOS cancel", { "aria-label": "Retry WorkOS cancel for " + to, disabled: cannotSend ? true : null, title: sendTitle, onclick: () => perform({
         confirm: { title: "Cancel the WorkOS invitation?", body: "Access is already closed in Framework. This only asks WorkOS to cancel its copy of the invitation.", details: [["Person", to]], confirmLabel: "Cancel at WorkOS" },
         request: () => api(`${base}/invitations/${encodeURIComponent(i.id)}/revoke`, { method: "POST", body: {} }),
         onSuccess: (res) => revokeOutcome(res, to),
@@ -402,7 +402,7 @@ export function accessSections({ orgId, orgName, welcome = false }) {
     const only = m.last_active_owner;
     const btns = [];
     const toRole = m.role === "owner" ? "member" : "owner";
-    btns.push(textButton(toRole === "owner" ? "Make owner" : "Make member", { "aria-label": `${toRole === "owner" ? "Make" : "Change"} ${who} ${toRole === "owner" ? "an owner" : "a member"}`, disabled: only && toRole === "member" ? true : null, title: only && toRole === "member" ? "The only active owner can’t be demoted" : null, onclick: () => perform({
+    btns.push(textButton(toRole === "owner" ? "Make owner" : "Make member", { "aria-label": `${toRole === "owner" ? "Make owner" : "Make member"}: ${who}`, disabled: only && toRole === "member" ? true : null, title: only && toRole === "member" ? "The only active owner can’t be demoted" : null, onclick: () => perform({
       confirm: {
         title: toRole === "owner" ? `Make ${who} an owner?` : `Make ${who} a member?`,
         body: toRole === "owner" ? "They will be able to see the organization’s team list as well." : "They will keep access to the portal but will no longer see the team list.",

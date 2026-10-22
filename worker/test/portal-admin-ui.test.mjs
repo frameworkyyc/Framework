@@ -231,3 +231,37 @@ test("Clients list (mobile-first redesign): one semantic whole-row link per orga
   // states and layout
   for (const rule of [/\.adm-clientrow:hover/, /\.adm-clientrow:active/, /\.adm-clientrow:focus-visible \{ outline: 2px solid var\(--ink\)/, /min-height: 44px/, /overflow-wrap: anywhere/, /prefers-reduced-motion/, /\.adm-sub--short \{ display: none; \}/]) assert.match(css, rule);
 });
+
+test("Client detail (mobile-first): Invitations and Members rows become single-column records below 1280px, with readable names, labelled facts, 44px actions and no low-contrast text", () => {
+  const css = read("admin/assets/admin.css");
+  const block = css.slice(css.indexOf("/* ---------- Client detail (mobile-first)"));
+  assert.match(block, /@media \(max-width: 1279px\) \{\n  \.adm-access \.adm-table tbody tr \{ display: grid; grid-template-columns: minmax\(0, 1fr\);/, "one column per record on phones");
+  assert.match(block, /@media \(min-width: 680px\) and \(max-width: 1279px\)[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/, "two columns of status facts on tablets");
+  assert.match(block, /td\[data-label="Person"\] \.adm-client \{[^}]*font-size: 18px[^}]*overflow-wrap: anywhere/, "the email or name is the primary element and wraps safely");
+  assert.match(block, /td\[data-label="Role"\], \.adm-access \.adm-table td\[data-label="Last sign-in"\] \{ display: flex/, "short facts sit on one line with their label");
+  assert.match(block, /\.adm-access \.adm-row-actions \.adm-small \{ min-height: 44px/, "action buttons are 44px tall on small screens");
+  assert.match(block, /\.adm-row-actions \{ flex-wrap: wrap/, "buttons wrap instead of overflowing");
+  assert.match(block, /@media \(max-width: 520px\)[\s\S]*?\.adm-dialog dl div \{ grid-template-columns: 1fr/, "the confirmation dialog stacks on a phone");
+  assert.match(block, /\.adm-spec--text dd\.adm-answer/, "Business Profile answers keep clear space and readable text");
+  // the desktop table markup is unchanged: the same five columns and the same cell labels
+  const src = read("admin/assets/clients-access.js");
+  assert.match(src, /\["Person", "Role", "Invitation", "Delivery", ""\]/);
+  assert.match(src, /\["Person", "Role", "Access", "Last sign-in", ""\]/);
+  // contrast: small Admin text uses slate, not the 2.5:1 stone grey (only the disabled navigation item keeps it)
+  assert.deepEqual(css.split("\n").filter((l) => /color: var\(--stone\)/.test(l) && !/is-disabled/.test(l)), []);
+  assert.match(css, /\.adm-head \.eyebrow \{ color: var\(--slate\); \}/);
+});
+
+test("Client detail: every action button's accessible name contains its visible text (label in name), and all invitation and member actions are still offered", () => {
+  const src = strip(read("admin/assets/clients-access.js"));
+  for (const [visible, aria] of [["Resend", '"Resend invitation to "'], ["Revoke", '"Revoke invitation for "'], ["Replace", '"Replace invitation for "'], ["Remove access", '"Remove access for "'], ["Retry WorkOS cancel", '"Retry WorkOS cancel for "']]) {
+    assert.ok(src.includes(`"${visible}"`) && src.includes(aria), visible);
+  }
+  assert.match(src, /"Try again: send the invitation to "/);
+  assert.match(src, /"Send invitation to "/);
+  assert.match(src, /toRole === "owner" \? "Make owner" : "Make member"\}: \$\{who\}/);
+  // permissions and protections are untouched: the last-owner buttons stay disabled, and members' actions only render when writes are on
+  assert.match(src, /disabled: only && toRole === "member" \? true : null/);
+  assert.match(src, /disabled: only \? true : null/);
+  assert.match(src, /caps\.writes \? memberActions\(m, caps\) : \[\]/);
+});
