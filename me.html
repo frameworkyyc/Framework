@@ -41,6 +41,17 @@
     <div class="me__title"><h1 class="me__name">Framework</h1><p class="me__label">Quick Access</p></div>
   </header>
 
+  <section class="me__card" aria-labelledby="card-heading">
+    <h2 class="me__env-title" id="card-heading">My Business Card</h2>
+    <p class="me__card-note">Share your Framework contact details.</p>
+    <div class="me__acts">
+      <a class="card-act" id="me-view" href="https://frameworkco.ca/card"><svg class="me-act__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v14H4V5Zm4 4h8m-8 4h5"/></svg><span>View Card</span></a>
+      <button class="card-act" type="button" id="me-share" hidden><svg class="me-act__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4m0 0L8 8m4-4 4 4M5 12v8h14v-8"/></svg><span>Share Card</span></button>
+      <button class="card-act" type="button" id="me-qr" aria-haspopup="dialog" hidden><svg class="me-act__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h2v2h-2v-2Zm4 0h2v6h-4m0-2v2m0-6v-2"/></svg><span>Show QR</span></button>
+    </div>
+    <p class="card__status" id="me-status" role="status" aria-live="polite"></p>
+  </section>
+
   <section class="me__env me__env--production" aria-labelledby="env-production">
     <h2 class="me__env-title" id="env-production">Production</h2>
     <ul class="me__list">
@@ -59,5 +70,17 @@
     </ul>
   </section>
 </main>
+
+<dialog class="card__qr" id="qr-dialog" aria-labelledby="qr-title">
+  <button class="card__qr-close" type="button" id="qr-close" aria-label="Close QR code">
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18"/></svg>
+  </button>
+  <h2 class="card__qr-title" id="qr-title">Scan to view my business card</h2>
+  <div class="card__qr-box" id="qr-box"></div>
+  <p class="card__qr-url" id="qr-url"></p>
+</dialog>
+<script src="assets/js/card-config.js"></script>
+<script src="assets/js/vendor/qrcode.js"></script>
+<script src="assets/js/me.js"></script>
 </body>
 </html>
