@@ -1,6 +1,6 @@
 # Client portal privacy wording: DRAFT review for publication
 
-**Status: not published.** The portal wording is in `privacy.html` on the Staging branch; the live website still has the old policy. This is not legal advice and has not been reviewed by an adviser.
+**Status: PUBLISHED 2026-10-21 (Alberta date) at the owner's instruction for the Beta 1.0 launch. This is NOT legally reviewed or approved.** The adviser review, the notice-versus-consent judgement, the breach-notification wording, the staff-access practice and the other items marked **[LEGAL]** / **[OWNER CONFIRMATION]** below are still open and must be worked through; the policy text makes no claim of legal approval. This is not legal advice.
 Reviewed 2026-10-21 against the code, the tests, the live Staging site and the providers' settings (read-only). Sources are marked **code**, **live** (observed on Staging), **config** (provider setting, read-only) or **owner** (cannot be verified from here).
 
 ## Owner decisions (2026-10-21) [DECISION records]
