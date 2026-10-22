@@ -24,6 +24,10 @@ export const comingSoonKeys = (live = LIVE_AREAS) => AREAS.filter((a) => !live.i
 const f = (id, label, kind, value = "", extra = {}) => ({ id, label, kind, value, ...extra });
 const INDUSTRIES = ["Hospitality and food", "Retail", "Professional services", "Health and wellness", "Trades and construction", "Technology", "Non-profit", "Other"];
 const SIZES = ["Just me", "2 to 10 people", "11 to 50 people", "51 to 200 people", "More than 200 people"];
+const INTEREST_SERVICES = ["Branding", "Website Design & Development", "Marketing", "Content & Photography", "Not sure yet"];
+const START_WINDOWS = ["As soon as possible", "Within 1 month", "Within 1–3 months", "Just exploring"];
+const BUDGETS = ["Under $5,000", "$5,000–$10,000", "$10,000–$25,000", "$25,000–$50,000", "$50,000 or more", "Not sure yet", "Prefer not to say"];
+const BRAND_MATERIALS = ["Yes", "No", "Some"];
 
 /** state: done | current | todo. A done step has every answer filled in; the current step is partly filled. */
 export const PROFILE_STEPS = Object.freeze([
@@ -41,7 +45,12 @@ export const PROFILE_STEPS = Object.freeze([
     f("customers", "Who are your target customers?", "textarea", "Local residents who value craft food, and restaurant and café owners who want a dependable wholesale supplier.") ] },
   { id: "goals", title: "Goals and competitors", state: "current", minutes: 4, intro: "What success looks like, and who you are measured against.", fields: [
     f("goals", "What are your main business goals this year?", "textarea", "Grow wholesale accounts and make online ordering easy."),
-    f("competitors", "Who are your main competitors?", "textarea", "", { placeholder: "Names or websites, one per line. Include businesses you admire, too." }) ] },
+    f("competitors", "Who are your main competitors?", "textarea", "", { placeholder: "Names or websites, one per line. Include businesses you admire, too." }),
+    f("services", "What services are you interested in?", "multi", "", { options: INTEREST_SERVICES, hint: "Choose all that apply." }),
+    f("timeline", "When are you hoping to get started?", "select", "", { options: START_WINDOWS }),
+    f("budget", "Do you have a budget in mind?", "select", "", { options: BUDGETS, hint: "A rough range helps us suggest the right scope. You don’t have to share one." }),
+    f("assets", "Do you have existing brand materials or a website?", "select", "", { options: BRAND_MATERIALS }),
+    f("assetsnote", "Tell us about them", "textarea", "", { hint: "Links, or a short description of what you have, such as a logo, brand guide, photos or a current website." }) ] },
   { id: "online", title: "Online presence", state: "todo", minutes: 2, intro: "Where customers can find you today.", fields: [
     f("site", "Existing website", "website", "", { placeholder: "yourbusiness.ca" }),
     f("social", "Social platforms you use", "textarea", "", { placeholder: "Links or handles, one per line." }) ] },

@@ -5,9 +5,10 @@
  */
 import { e, errorSummary, conflictSummary } from "./ui.js";
 import { overview, crumb } from "./guided.js";
-import { PROFILE_STEPS, profileProgress, stepStatus } from "./profile-schema.js";
+import { PROFILE_STEPS, profileProgress, stepStatus, MULTI_SEP } from "./profile-schema.js";
+import { can } from "./policy.js";
 import { AREAS } from "./guided-data.js";
-import { FEEDBACK_KINDS, FEEDBACK_PAGES, MAX_MESSAGE } from "./repo/portal-feedback.js";
+import { FEEDBACK_KINDS, feedbackPageChoices, MAX_MESSAGE } from "./repo/portal-feedback.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const area = (key) => AREAS.find((a) => a.key === key);
@@ -48,6 +49,11 @@ function field(scope, def, value, error) {
   // Required questions are announced as required, but NEVER with the native `required` attribute: a partial save must stay possible.
   const req = def.required ? ' aria-required="true"' : "";
   const ac = e(def.autocomplete || "off");
+  if (def.kind === "multi") {
+    // several checkboxes, each with its OWN name (<field>__<n>): the form reader refuses a repeated name, and the server assembles the answer from them
+    const chosen = new Set(String(value || "").split(MULTI_SEP));
+    return `<fieldset class="field choice" id="${id}" tabindex="-1"${desc ? ` aria-describedby="${desc}"` : ""}><legend>${e(def.label)}${optional}</legend>${hint}${def.options.map((o, i) => `<label class="choice__opt"><input type="checkbox" name="${e(def.id)}__${i}" value="${e(o)}"${chosen.has(o) ? " checked" : ""}> <span>${e(o)}</span></label>`).join("")}${err}</fieldset>`;
+  }
   if (def.kind === "choice") return `<fieldset class="field choice" id="${id}" tabindex="-1"${def.required ? ' role="radiogroup" aria-required="true"' : ""}><legend>${e(def.label)}${optional}</legend>${def.options.map((o) => `<label class="choice__opt"><input type="radio" name="${e(def.id)}" value="${e(o)}"${o === value ? " checked" : ""}> <span>${e(o)}</span></label>`).join("")}${err}</fieldset>`;
   const label = `<label for="${id}">${e(def.label)}${optional}</label>${hint}`;
   if (def.kind === "textarea") return `<div class="field">${label}<textarea id="${id}" name="${e(def.id)}" rows="4" maxlength="2000"${aria}${req} placeholder="${e(def.placeholder || "")}">${e(value)}</textarea>${err}</div>`;
@@ -108,6 +114,6 @@ export function feedbackForm(vm, { values = {}, errors = {}, csrf, sent = false,
   const err = (k) => (errors[k] ? `<span class="field__error" id="fb-${k}-e">${e(errors[k])}</span>` : "");
   const kinds = `<fieldset class="field choice"${errors.kind ? ' id="fb-kind" tabindex="-1"' : ""}><legend>What kind of feedback is this?</legend>${FEEDBACK_KINDS.map(([k, label]) => `<label class="choice__opt"><input type="radio" name="kind" value="${k}"${values.kind === k ? " checked" : ""}> <span>${e(label)}</span></label>`).join("")}${err("kind")}</fieldset>`;
   const message = `<div class="field"><label for="fb-message">Your message</label><textarea id="fb-message" name="message" rows="6" maxlength="${MAX_MESSAGE}"${errors.message ? ' aria-invalid="true" aria-describedby="fb-message-e"' : ""}>${e(values.message || "")}</textarea>${err("message")}</div>`;
-  const about = `<div class="field"><label for="fb-page">About <span class="field__opt">Optional</span></label><select id="fb-page" name="page"${errors.page ? ' aria-invalid="true" aria-describedby="fb-page-e"' : ""}><option value="">Not about a specific page</option>${FEEDBACK_PAGES.map(([k, label]) => `<option value="${k}"${k === page ? " selected" : ""}>${e(label)}</option>`).join("")}</select>${err("page")}</div>`;
+  const about = `<div class="field"><label for="fb-page">About <span class="field__opt">Optional</span></label><select id="fb-page" name="page"${errors.page ? ' aria-invalid="true" aria-describedby="fb-page-e"' : ""}><option value="">Not about a specific page</option>${feedbackPageChoices(vm.org && vm.org.role, can).map(([k, label]) => `<option value="${k}"${k === page ? " selected" : ""}>${e(label)}</option>`).join("")}</select>${err("page")}</div>`;
   return `${head}${banner}<form method="post" action="${e(vm.base)}/feedback" novalidate><input type="hidden" name="csrf" value="${e(csrf)}"><div class="questions">${kinds}${message}${about}</div><div class="step-nav"><button class="btn btn--primary" type="submit">Send feedback</button></div></form>`;
 }

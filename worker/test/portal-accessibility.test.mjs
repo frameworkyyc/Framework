@@ -65,8 +65,14 @@ test("every REQUIRED Business Profile question is aria-required and no question 
     assert.ok(!/<(input|textarea|select)\b[^>]*\srequired(\s|=|>)/.test(html), `${step.id}: no native required attribute`);
     assert.match(html, /<form method="post"[^>]*\snovalidate>/, `${step.id}: novalidate stays`);
     for (const f of step.fields) {
-      const el = html.match(new RegExp(`<(?:input|textarea|select)\\b[^>]*name="${f.id}"[^>]*>`));
-      if (f.kind === "choice") {
+      const el = html.match(new RegExp(`<(?:input|textarea|select)\\b[^>]*name="${f.id}(?:__0)?"[^>]*>`));
+      if (f.kind === "multi") {
+        // optional checkbox group: a labelled fieldset (legend + hint), one named checkbox per option, never required
+        const fs = html.match(new RegExp(`<fieldset[^>]*id="p-${step.id}-${f.id}"[^>]*>`))[0];
+        assert.ok(!f.required && !/aria-required/.test(fs), `${f.id} is optional`);
+        assert.match(fs, /aria-describedby="p-goals-services-h"/);
+        assert.equal([...html.matchAll(new RegExp(`<input type="checkbox" name="${f.id}__\\d"`, "g"))].length, f.options.length);
+      } else if (f.kind === "choice") {
         const fs = html.match(new RegExp(`<fieldset[^>]*id="p-${step.id}-${f.id}"[^>]*>`))[0];
         assert.equal(/aria-required="true"/.test(fs), Boolean(f.required), `${f.id} radio group`);
         if (f.required) assert.match(fs, /role="radiogroup"/);

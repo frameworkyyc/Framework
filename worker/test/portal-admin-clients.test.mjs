@@ -192,3 +192,17 @@ test("the Clients entry is live in the admin navigation, and the Business Profil
   assert.match(ui, /staff cannot edit them here/);
   assert.ok(!/style: *"/.test(ui), "no inline styles (the admin CSP forbids them)");
 });
+
+test("the optional Goals answers (services, start window, budget, brand materials) show for staff, per organization, and unanswered ones show blank", async () => {
+  const { call, w, alpha, beta, uid } = await setup();
+  await saveProfileStep(w.db, alpha.id, uid("ann@alpha.test"), "goals", { goals: "Grow", services: "Branding, Marketing", timeline: "Within 1 month", budget: "Prefer not to say", assets: "Some", assetsnote: "Logo and a 2019 site" });
+  const fields = async (org) => Object.fromEntries((await (await call(`/api/admin/clients/${org.id}`)).json()).profile.steps.find((s) => s.id === "goals").fields.map((f) => [f.label, f.value]));
+  const a = await fields(alpha), b = await fields(beta);
+  assert.equal(a["What services are you interested in?"], "Branding, Marketing");
+  assert.equal(a["When are you hoping to get started?"], "Within 1 month");
+  assert.equal(a["Do you have a budget in mind?"], "Prefer not to say");
+  assert.equal(a["Do you have existing brand materials or a website?"], "Some");
+  assert.equal(a["Tell us about them"], "Logo and a 2019 site");
+  assert.ok(!JSON.stringify(b).includes("Branding, Marketing") && !JSON.stringify(b).includes("2019 site"), "another organization's detail never carries them");
+  assert.ok(!b["What services are you interested in?"], "unanswered shows blank");
+});

@@ -17,6 +17,11 @@ export const FEEDBACK_PAGES = Object.freeze([
   ["progress", "Progress"], ["projects", "Projects"], ["activity", "Activity"], ["documents", "Documents"], ["account", "Account"], ["team", "Team"],
 ]);
 const PAGE_KEYS = new Set(FEEDBACK_PAGES.map(([k]) => k));
+// FEEDBACK_PAGES stays the full list so feedback already stored (and old bookmarked forms) still validate and show a label. The FORM offers only pages a client can
+// actually open from the portal's navigation: the four early pages (progress, projects, activity, documents) are no longer linked, and Team is owner-only.
+const NOT_OFFERED = new Set(["progress", "projects", "activity", "documents"]);
+/** @param can policy.js can(role, action) @returns the [key, label] pairs to show in the "About" menu for this role */
+export const feedbackPageChoices = (role, can) => FEEDBACK_PAGES.filter(([k]) => !NOT_OFFERED.has(k) && (k !== "team" || (typeof can === "function" && can(role, "members.view"))));
 export const pageLabel = (key) => (FEEDBACK_PAGES.find(([k]) => k === key) || [null, null])[1];
 export const validPageKey = (v) => (typeof v === "string" && PAGE_KEYS.has(v) ? v : null);
 

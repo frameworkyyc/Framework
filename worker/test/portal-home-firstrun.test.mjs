@@ -14,7 +14,7 @@ import { PORTAL_CSP } from "../portal/http.js";
 const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
 const css = read("assets/css/portal.css");
 const ALL = PROFILE_STEPS.flatMap((s) => s.fields.map((f) => ({ ...f, step: s.id })));
-const sample = (f) => (f.kind === "select" || f.kind === "choice" ? f.options[0] : f.kind === "email" ? "a@b.co" : f.kind === "tel" ? "403-555-0100" : f.kind === "website" ? "example.com" : "Sample");
+const sample = (f) => (f.kind === "multi" ? f.options.slice(0, 2).join(", ") : f.kind === "select" || f.kind === "choice" ? f.options[0] : f.kind === "email" ? "a@b.co" : f.kind === "tel" ? "403-555-0100" : f.kind === "website" ? "example.com" : "Sample");
 
 async function setup({ names = true } = {}) {
   const w = await makeWorld();
@@ -137,7 +137,9 @@ test("next action: NEW client gets 'Start your Business Profile' to the first st
   assert.match(action(html), /<a class="btn btn--primary" href="\/portal\/o\/alpha\/profile\/business">Start your Business Profile <span aria-hidden="true">→<\/span><\/a>/);
   assert.match(html, /<p class="lead">Start with your Business Profile\. It helps Framework understand your business\.<\/p>/);
   assert.equal([...html.matchAll(/class="btn btn--primary"/g)].length, 1, "exactly one prominent action");
-  assert.ok(!/minutes?|min\b|estimate/i.test(text(html).replace(/Business Profile/g, "")), "no time estimates");
+  // the first-run expectations (approved wording): the time it takes, that progress is saved, and what happens after
+  assert.match(html, /<p class="home-note">It takes about 20–30 minutes\. Your progress is saved as you go, so you can stop and come back whenever you like\. When you finish, the Framework team will review your answers and follow up with you\.<\/p>/);
+  assert.match(html, /<span class="eyebrow">Alpha Co<\/span><h1 class="h1 h1--home">/, "the organization's name sits above the greeting");
   const overview = await (await br.ann.get("/portal/o/alpha/profile")).text();
   assert.match(overview, /href="\/portal\/o\/alpha\/profile\/business">Start: Your business/);
 });
@@ -148,6 +150,8 @@ test("next action: PARTIAL profile gets 'Continue your Business Profile' to the 
   let html = await home(br.ann);
   assert.match(action(html), /href="\/portal\/o\/alpha\/profile\/location">Continue your Business Profile /);
   assert.match(html, /Pick up where you left off\./);
+  assert.match(html, /<p class="home-note">Your progress is saved, so you can finish later\. When you finish, the Framework team will review your answers and follow up with you\.<\/p>/);
+  assert.ok(!/20–30 minutes/.test(html), "the time estimate is for the first visit only");
   // a step with a required answer saved and another missing is still "the first missing"
   await save(alpha, "ann@alpha.test", ALL.filter((f) => f.step === "location" && f.id === "city"));
   assert.match(action(await home(br.ann)), /profile\/location">Continue/);
@@ -165,14 +169,16 @@ test("next action: when every REQUIRED answer is in, Home acknowledges it and do
   await save(alpha, "ann@alpha.test", REQUIRED);
   let html = await home(br.ann);
   assert.ok(!/btn btn--primary/.test(html), "no primary action once nothing required remains");
-  assert.match(html, /All required answers in your Business Profile are complete\. Optional details can be added any time\./);
+  assert.match(html, /Your Business Profile is complete\. The Framework team will review your information and follow up with you about the next steps\./);
+  assert.match(html, /<p class="home-note">Optional details can be added any time, and you can change your answers whenever you like\.<\/p>/);
   assert.match(action(html), /<a class="text-link" href="\/portal\/o\/alpha\/profile">Review your Business Profile /);
   assert.ok(!/required answers? left|Start your|Continue your/.test(html));
   assert.match(html, /86% complete/);
   assert.match(html, /All required answers are complete/, "the module status says the same");
   await save(alpha, "ann@alpha.test", ALL);
   html = await home(br.ann);
-  assert.match(html, /Your Business Profile is complete\. You can change your answers any time\./);
+  assert.match(html, /Your Business Profile is complete\. The Framework team will review your information and follow up with you about the next steps\./);
+  assert.match(html, /<p class="home-note">You can change your answers any time\.<\/p>/);
   assert.match(html, /100% complete/);
   assert.ok(!/optional details/i.test(html));
 });

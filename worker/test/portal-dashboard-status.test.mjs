@@ -15,7 +15,7 @@ const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8")
 const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const ALL = PROFILE_STEPS.flatMap((s) => s.fields.map((f) => ({ ...f, step: s.id })));
 const REQUIRED = ALL.filter((f) => f.required);
-const sample = (f) => (f.kind === "select" || f.kind === "choice" ? f.options[0] : f.kind === "email" ? "a@b.co" : f.kind === "tel" ? "403-555-0100" : f.kind === "website" ? "example.com" : "Sample");
+const sample = (f) => (f.kind === "multi" ? f.options.slice(0, 2).join(", ") : f.kind === "select" || f.kind === "choice" ? f.options[0] : f.kind === "email" ? "a@b.co" : f.kind === "tel" ? "403-555-0100" : f.kind === "website" ? "example.com" : "Sample");
 const answers = (fields) => Object.fromEntries(fields.map((f) => [f.id, sample(f)]));
 
 /* ------------------------------------------------------------------ calculation: one source of truth */

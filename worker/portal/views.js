@@ -215,8 +215,7 @@ function docRow(vm, d, { showProject = true } = {}) {
 export function documents(vm, filters = {}) {
   if (!vm.has.documents) {
     return `<header class="page-head"><span class="eyebrow">${e(vm.org.name)}</span><h1 class="h1">Documents</h1><p class="lead">Contracts, strategy, designs and invoices, organized by project.</p></header>
-${notConnected("Document library", "Sharing files through the portal isn’t switched on yet. Until it is, Framework sends documents by email, and nothing is stored here.")}
-<p class="auth__alt"><a class="text-link" href="/portal/demo">See how the library will look in the demo</a></p>`;
+${notConnected("Document library", "Sharing files through the portal isn’t switched on yet. Until it is, Framework sends documents by email, and nothing is stored here.")}`;
   }
   const chosen = vm.projects.find((p) => p.id === filters.project) || null;
   const list = chosen ? vm.documents.filter((d) => d.projectId === chosen.id) : vm.documents;
