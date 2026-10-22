@@ -48,4 +48,6 @@
 a.me-link:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
 /* short phones (landscape or small): keep everything on one screen */
-@media (max-height: 830px) { .me { gap: 12px; } .me-link { min-height: 45px; } .me__acts .card-act { min-height: 58px; } }
+@media (max-height: 920px) { .me { gap: 12px; } .me-link { min-height: 45px; } .me__acts .card-act { min-height: 58px; } }
+/* very short screens (iPhone SE): a little tighter still, so the whole list stays on one screen; every row stays at least 44px */
+@media (max-height: 700px) { .me { gap: 8px; } .me-link { min-height: 44px; } .me .card__mark { width: 52px; } .me__env-title { padding-top: 8px; } .me__card-note { display: none; } }

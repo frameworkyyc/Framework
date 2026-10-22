@@ -9,7 +9,7 @@ const section = (id) => new RegExp(`<section[^>]*aria-labelledby="${id}">([\\s\\
 const hrefs = (s) => [...s.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
 
 const PRODUCTION_LINKS = ["https://frameworkco.ca/", "https://frameworkco.ca/admin/clients", "https://frameworkco.ca/portal", "https://nexus.frameworktools.ca/"];
-const STAGING_LINKS = ["https://staging.frameworkco.ca/", "https://staging.frameworkco.ca/admin/clients", "https://staging.frameworkco.ca/portal"];
+const STAGING_LINKS = ["https://staging.frameworkco.ca/", "https://staging.frameworkco.ca/admin/clients", "https://staging.frameworkco.ca/portal", "https://staging.nexus.frameworktools.ca/"];
 
 test("Production: Website, Admin, the live Client Portal and Nexus, in that order; no 'Coming soon' or disabled entries remain anywhere", () => {
   const prod = section("env-production");
@@ -19,14 +19,17 @@ test("Production: Website, Admin, the live Client Portal and Nexus, in that orde
   assert.match(prod, /<a class="me-link" href="https:\/\/nexus\.frameworktools\.ca\/">[\s\S]*?<span>Nexus<\/span>[\s\S]*?\(Production\)/);
 });
 
-test("Staging: Website, Admin and Client Portal all link to staging.frameworkco.ca, in that order; no Nexus Staging address is guessed (none could be verified)", () => {
-  assert.deepEqual(hrefs(section("env-staging")), STAGING_LINKS);
-  assert.ok(!/nexus/i.test(section("env-staging")), "add the Nexus Staging entry only when its real URL is confirmed");
+test("Staging: Website, Admin, Client Portal and Nexus, in that order; Nexus Staging matches the Production Nexus row (same icon, same markup) and only differs by host and environment label", () => {
+  const stag = section("env-staging"), prod = section("env-production");
+  assert.deepEqual(hrefs(stag), STAGING_LINKS);
+  const row = (sec, host, env) => new RegExp(`<li><a class="me-link" href="https://${host.replace(/\./g, "\\.")}/">([\\s\\S]*?)<span class="visually-hidden"> \\(${env}\\)</span></a></li>`).exec(sec)[1];
+  assert.equal(row(stag, "staging.nexus.frameworktools.ca", "Staging"), row(prod, "nexus.frameworktools.ca", "Production"), "identical icon, label and arrow");
+  assert.match(stag, /<span>Nexus<\/span>/);
 });
 
-test("the page links to exactly eight destinations (the public card plus the seven environment links); nothing else (no secrets, tokens or emails) is on it", () => {
+test("the page links to exactly nine destinations (the public card plus the eight environment links); nothing else (no secrets, tokens or emails) is on it", () => {
   assert.deepEqual(hrefs(section("env-production")).concat(hrefs(section("env-staging"))), [...PRODUCTION_LINKS, ...STAGING_LINKS]);
-  assert.equal(hrefs(html).length, 8);
+  assert.equal(hrefs(html).length, 9);
   assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]), ["assets/js/card-config.js", "assets/js/vendor/qrcode.js", "assets/js/me.js"], "only local scripts; no inline script, no third-party script, no service worker");
   assert.ok(!/<script(?![^>]*\ssrc=)/i.test(html));
   assert.ok(!/@|token|secret|password|key=/i.test(html.replace(/<link[^>]*>/g, "").replace(/<svg[\s\S]*?<\/svg>/g, "")), "nothing sensitive in the markup");
