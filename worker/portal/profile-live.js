@@ -34,8 +34,9 @@ export function privacyNotice() {
   return `<section class="privacy" id="privacy" aria-labelledby="h-privacy"><h2 id="h-privacy" class="privacy__title">How we use your Business Profile</h2>
 <p class="muted">The client portal is in private beta, so this may change as we learn.</p>
 <dl class="privacy__list">
-<div><dt>What we collect</dt><dd>The answers you save here about your business, customers, goals, online presence, contact person and brand.</dd></div>
-<div><dt>Why</dt><dd>So Framework can understand your business and plan and deliver services for you.</dd></div>
+<div><dt>What we collect</dt><dd>Information you provide about your business, goals, customers, online presence, contacts and brand preferences, together with any optional project details you choose to share.</dd></div>
+<div><dt>Why we collect it</dt><dd>To understand your business, evaluate your needs, prepare proposals, plan projects and deliver Framework services.</dd></div>
+<div><dt>Optional information</dt><dd>You can leave optional questions unanswered, including those about project timing and budget.</dd></div>
 <div><dt>Who can see it</dt><dd>It is saved against your organization. People in your organization who use the portal can see and edit it, and authorized Framework staff may review it to provide services to you.</dd></div>
 <div><dt>Corrections and deletion</dt><dd>You can change your answers here at any time. To ask for something to be corrected or deleted, email <a class="text-link" href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a>.</dd></div>
 </dl>
