@@ -100,3 +100,17 @@ test("dashboard styles: semantic colours always paired with an icon and text, 44
   assert.match(block, /\.adm-idhead \.eyebrow \{ color: var\(--slate\); \}/);
   assert.deepEqual(css.split("\n").filter((l) => /color: var\(--stone\)/.test(l) && !/is-disabled/.test(l)), []);
 });
+
+test("Saved answers rows: number, flexible title, fixed-width status and count, chevron; the status can never wrap under the title", () => {
+  const dash = strip(read("admin/assets/client-dashboard.js")), css = read("admin/assets/admin.css");
+  assert.match(dash, /class: "adm-acc__num"[\s\S]*class: "adm-acc__name", text: s\.title/, "number and title are separate elements");
+  assert.match(dash, /class: "adm-acc__label"[\s\S]*class: "adm-acc__count"/, "state label and answered count are separate elements");
+  const block = css.slice(css.indexOf("/* Saved answers rows:"));
+  assert.match(block, /\.adm-acc--step > \.adm-acc__sum \{ display: grid; grid-template-columns: 1\.75em minmax\(0, 1fr\) var\(--acc-state-w, 5\.75rem\)/, "a three-column grid, not wrapping flex");
+  assert.match(block, /\.adm-acc__title, \.adm-acc--step \.adm-acc__stepname \{ display: contents; \}/);
+  assert.match(block, /\.adm-acc--step \.adm-acc__state \{[^}]*white-space: nowrap/, "the status text never wraps");
+  assert.match(block, /\.adm-acc--step \.adm-acc__name \{ min-width: 0;[^}]*overflow-wrap: break-word/, "long titles wrap and the row grows; nothing is truncated");
+  assert.ok(!/text-overflow|line-clamp/.test(block), "no truncation");
+  assert.match(block, /@media \(min-width: 521px\)[\s\S]*--acc-state-w: 11rem/);
+  assert.match(block, /@media \(max-width: 359px\)/);
+});
