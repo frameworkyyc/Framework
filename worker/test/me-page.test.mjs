@@ -1,4 +1,4 @@
-// Personal quick-access page (/me): exact destinations, Production portal disabled, private-page metadata, home-screen tags, and the public card left alone.
+// Framework Personal Dashboard (/me): exact destinations (Client Portal live, Nexus), naming, private-page metadata, home-screen tags, and the public card left alone.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
@@ -8,23 +8,34 @@ const html = read("me.html");
 const section = (id) => new RegExp(`<section[^>]*aria-labelledby="${id}">([\\s\\S]*?)</section>`).exec(html)[1];
 const hrefs = (s) => [...s.matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
 
-test("Production: Website and Admin link to the live site; the Client Portal is plain 'Coming soon' text, not a link", () => {
+const PRODUCTION_LINKS = ["https://frameworkco.ca/", "https://frameworkco.ca/admin/clients", "https://frameworkco.ca/portal", "https://nexus.frameworktools.ca/"];
+const STAGING_LINKS = ["https://staging.frameworkco.ca/", "https://staging.frameworkco.ca/admin/clients", "https://staging.frameworkco.ca/portal"];
+
+test("Production: Website, Admin, the live Client Portal and Nexus, in that order; no 'Coming soon' or disabled entries remain anywhere", () => {
   const prod = section("env-production");
-  assert.deepEqual(hrefs(prod), ["https://frameworkco.ca/", "https://frameworkco.ca/admin/clients"]);
-  assert.match(prod, /Client Portal<\/span><\/span><span class="me-link__soon">Coming soon<\/span>/);
-  assert.ok(!/\/portal/.test(prod), "no Production portal URL anywhere on the page");
+  assert.deepEqual(hrefs(prod), PRODUCTION_LINKS);
+  assert.ok(!/coming soon|me-link--off|me-link__soon/i.test(html + read("assets/css/me.css")), "the unavailable state is gone");
+  assert.match(prod, /<a class="me-link" href="https:\/\/frameworkco\.ca\/portal">[\s\S]*?<span>Client Portal<\/span>[\s\S]*?\(Production\)/);
+  assert.match(prod, /<a class="me-link" href="https:\/\/nexus\.frameworktools\.ca\/">[\s\S]*?<span>Nexus<\/span>[\s\S]*?\(Production\)/);
 });
 
-test("Staging: Website, Admin and Client Portal all link to staging.frameworkco.ca, in that order", () => {
-  assert.deepEqual(hrefs(section("env-staging")), ["https://staging.frameworkco.ca/", "https://staging.frameworkco.ca/admin/clients", "https://staging.frameworkco.ca/portal"]);
+test("Staging: Website, Admin and Client Portal all link to staging.frameworkco.ca, in that order; no Nexus Staging address is guessed (none could be verified)", () => {
+  assert.deepEqual(hrefs(section("env-staging")), STAGING_LINKS);
+  assert.ok(!/nexus/i.test(section("env-staging")), "add the Nexus Staging entry only when its real URL is confirmed");
 });
 
-test("the page links to exactly six destinations (the public card plus the five environment links); nothing else (no secrets, tokens or emails) is on it", () => {
-  assert.deepEqual(hrefs(section("env-production")).concat(hrefs(section("env-staging"))), ["https://frameworkco.ca/", "https://frameworkco.ca/admin/clients", "https://staging.frameworkco.ca/", "https://staging.frameworkco.ca/admin/clients", "https://staging.frameworkco.ca/portal"]);
-  assert.equal(hrefs(html).length, 6);
+test("the page links to exactly eight destinations (the public card plus the seven environment links); nothing else (no secrets, tokens or emails) is on it", () => {
+  assert.deepEqual(hrefs(section("env-production")).concat(hrefs(section("env-staging"))), [...PRODUCTION_LINKS, ...STAGING_LINKS]);
+  assert.equal(hrefs(html).length, 8);
   assert.deepEqual([...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]), ["assets/js/card-config.js", "assets/js/vendor/qrcode.js", "assets/js/me.js"], "only local scripts; no inline script, no third-party script, no service worker");
   assert.ok(!/<script(?![^>]*\ssrc=)/i.test(html));
   assert.ok(!/@|token|secret|password|key=/i.test(html.replace(/<link[^>]*>/g, "").replace(/<svg[\s\S]*?<\/svg>/g, "")), "nothing sensitive in the markup");
+});
+
+test("naming: the page is the Framework Personal Dashboard; no trace of the old 'Quick Access' name in the page, its styles, script, headers or tests", () => {
+  assert.match(html, /<title>Personal Dashboard \| Framework<\/title>/);
+  assert.match(html, /<h1 class="me__name">Personal Dashboard<\/h1><p class="me__label">Framework<\/p>/);
+  for (const f of ["me.html", "assets/css/me.css", "assets/js/me.js", "_headers", "worker/test/privacy.test.mjs"]) assert.ok(!/quick[- ]access/i.test(read(f)), f);
 });
 
 test("private page: noindex/nofollow, no referrer, not in navigation, sitemap or robots; served with no-index headers", () => {
@@ -39,7 +50,7 @@ test("private page: noindex/nofollow, no referrer, not in navigation, sitemap or
 });
 
 test("home-screen support: title, apple touch icon (an existing brand asset), standalone metadata, safe-area viewport, no manifest or service worker", () => {
-  assert.match(html, /<title>Framework<\/title>/);
+  assert.match(html, /<title>Personal Dashboard \| Framework<\/title>/);
   assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">/);
   assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
   assert.match(html, /<meta name="apple-mobile-web-app-title" content="Framework">/);
