@@ -344,3 +344,40 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-table--left td[data-label="Role"] { white-space: nowrap; }
 @media (max-width: 1279px) { .adm-access .adm-table { margin-top: 20px; } .adm-table--left td[data-label="Person"] { min-width: 0; } }
 .adm-table--left .adm-row-actions .adm-small { min-height: 40px; }
+
+/* ---------- Clients list (mobile-first): one whole-row link per organization ---------- */
+
+.adm-sub--short { display: none; }
+@media (max-width: 760px) { .adm-sub--full { display: none; } .adm-sub--short { display: inline; } }
+
+.adm-clientlist { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
+.adm-clientlist li { border-bottom: 1px solid var(--hairline); }
+.adm-clientrow {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name name" "date arrow" "profile arrow";
+  gap: 6px 16px; align-items: center; min-height: 44px; padding: 18px 0; color: var(--ink); text-decoration: none;
+  -webkit-tap-highlight-color: transparent; transition: background-color .15s ease;
+}
+.adm-clientrow__name { grid-area: name; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: 20px; line-height: 1.25; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.adm-clientrow__date { grid-area: date; min-width: 0; font-size: 14px; line-height: 1.4; color: var(--slate); overflow-wrap: anywhere; }
+.adm-clientrow__profile { grid-area: profile; display: flex; align-items: center; gap: 12px; min-width: 0; margin-top: 4px; font-size: 14px; color: var(--slate); }
+.adm-clientrow__arrow { grid-area: arrow; width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: square; stroke-linejoin: miter; transition: transform .15s ease; }
+.adm-meter { flex: none; align-self: center; margin: 0; vertical-align: middle; width: 112px; height: 4px; border: 0; border-radius: 0; background: var(--hairline); color: var(--ink); -webkit-appearance: none; appearance: none; }
+.adm-meter::-webkit-progress-bar { background: var(--hairline); }
+.adm-meter::-webkit-progress-value { background: var(--ink); }
+.adm-meter::-moz-progress-bar { background: var(--ink); }
+.adm-clientrow__pct { line-height: 1.4; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+@media (hover: hover) {
+  .adm-clientrow:hover { background: var(--mist); }
+  .adm-clientrow:hover .adm-clientrow__arrow { transform: translateX(3px); }
+}
+.adm-clientrow:active { background: var(--mist); }
+.adm-clientrow:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; background: var(--mist); }
+@media (hover: hover) { .adm-clientrow { margin-inline: -12px; padding-inline: 12px; } }
+@media (hover: none) { .adm-clientrow { margin-inline: 0; } }
+@media (min-width: 900px) {
+  .adm-clientrow { grid-template-columns: minmax(0, 1fr) 13em 12.5em 22px; grid-template-areas: "name date profile arrow"; gap: 16px 24px; padding-block: 20px; }
+  .adm-clientrow__name { font-size: 18px; }
+  .adm-clientrow__profile { margin-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .adm-clientrow, .adm-clientrow__arrow { transition: none; } .adm-clientrow:hover .adm-clientrow__arrow { transform: none; } }
+@media print { .adm-clientrow:hover { background: transparent; } }
