@@ -19,7 +19,15 @@
     // and is unverified until the first live Production sign-in test. Secrets stay in Cloudflare: PORTAL_AUTH_CLIENT_SECRET, PORTAL_SESSION_PEPPER.
     "PORTAL_AUTH_CLIENT_ID": "client_01M58C4236FYNJDQ3MM0E8V691",
     "PORTAL_BASE_URL": "https://frameworkco.ca",
-    "PORTAL_AUTH_ISSUER": "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691"
+    "PORTAL_AUTH_ISSUER": "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691",
+    // LAUNCH (Beta 1.0): the portal is ON in Production. PORTAL_ENABLED and PORTAL_ALLOW_PRODUCTION must BOTH be exactly "1" (worker/portal/config.js).
+    // Rollback: delete these four lines (a one-line revert PR) and every /portal path returns the plain 404 again.
+    "PORTAL_ENABLED": "1",
+    "PORTAL_ALLOW_PRODUCTION": "1",
+    // Framework Admin -> Clients: create client organizations and invitations (behind Cloudflare Access AND ADMIN_EMAILS), and send invitations.
+    // Sending is still limited server-side to the exact addresses in the Cloudflare secret PORTAL_INVITE_ALLOWLIST (missing or malformed = every invitation operation refused).
+    "PORTAL_ADMIN_WRITES": "1",
+    "PORTAL_INVITE_SENDING": "1"
   },
   // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
   // redact_query_string keeps ?code= / ?invitation_token= out of platform logs; invocation_logs is OFF because the automatic per-request record
