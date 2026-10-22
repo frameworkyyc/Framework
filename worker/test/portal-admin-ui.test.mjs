@@ -198,3 +198,16 @@ test("Create and send: one confirmation, create first then send, a failed send k
   assert.match(src, /already_pending: "There is already a pending invitation for this email address \(see the list below\)\./);
   // the server still decides everything (allowlist, switches, CSRF): the form only calls the two reviewed routes
 });
+
+test("New client form: only Business name and Website (optional); no URL name field; no empty message box (the blank bordered rectangle) is rendered; a bare domain gets https:// added; slug is left to the server", () => {
+  const src = strip(read("admin/assets/clients-access.js"));
+  const form = src.slice(src.indexOf("export function newClientPanel"), src.indexOf("/* ================================================================== Access sections"));
+  assert.ok(!/nc-slug|URL name|slug/i.test(form.replace(/portal address|the server/gi, "")), "the form has no URL name field and sends no slug");
+  assert.match(form, /label: "Business name"/);
+  assert.match(form, /label: "Website \(optional\)"/);
+  assert.match(form, /const status = message \? h\("p", \{ class: "adm-msg is-error", role: "alert", tabindex: "-1", text: message \}\) : null;/, "the status box exists only when there is a message");
+  assert.ok(!/h\("p", \{ class: "adm-msg" \+/.test(form), "no always-present message element");
+  assert.match(form, /"https:\/\/" \+ v\.website/, "a bare domain such as frc.frameworkco.ca is accepted");
+  assert.equal(form.match(/field\(\{ id: "nc-/g).length, 2, "exactly two fields");
+  assert.match(src, /slug_unavailable: "A portal address couldn’t be made from that name/);
+});
