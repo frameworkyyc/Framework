@@ -50,9 +50,9 @@ test("writing: organization A's id cannot change or revoke organization B's reco
   assert.equal((await repo.updateProject(db, A.id, projB.id, { name: "hijacked", status: "live" })).error, "not_found");
   assert.equal((await repo.revokeInvitation(db, A.id, pendingB.id, ADMIN)).error, "not_found");
   assert.equal((await repo.attachWorkosInvitationId(db, A.id, pendingB.id, "invitation_01HIJACK")).error, "not_found");
-  assert.equal((await repo.setMemberRole(db, A.id, onlyB.id, "owner")).error, "not_found");
+  assert.equal((await repo.setMemberRole(db, A.id, onlyB.id, "owner", ADMIN)).error, "not_found");
   assert.equal((await repo.revokeMembership(db, A.id, onlyB.id, ADMIN)).error, "not_found");
-  assert.equal((await repo.restoreMembership(db, A.id, onlyB.id)).error, "not_found");
+  assert.equal((await repo.restoreMembership(db, A.id, onlyB.id, { actor: ADMIN })).error, "not_found");
   assert.equal(snapshot(db), before, "nothing changed anywhere");
 });
 
@@ -93,9 +93,9 @@ test("every repository function that takes an organization id REFUSES a missing 
     setOrganizationStatus: (o) => repo.setOrganizationStatus(db, o, "active"),
     listMembers: (o) => repo.listMembers(db, o),
     getMembership: (o) => repo.getMembership(db, o, onlyA.id),
-    setMemberRole: (o) => repo.setMemberRole(db, o, onlyA.id, "member"),
+    setMemberRole: (o) => repo.setMemberRole(db, o, onlyA.id, "member", ADMIN),
     revokeMembership: (o) => repo.revokeMembership(db, o, onlyA.id, ADMIN),
-    restoreMembership: (o) => repo.restoreMembership(db, o, onlyA.id),
+    restoreMembership: (o) => repo.restoreMembership(db, o, onlyA.id, { actor: ADMIN }),
     createInvitation: (o) => repo.createInvitation(db, o, { email: "x@example.com", role: "member", createdBy: ADMIN }),
     attachWorkosInvitationId: (o) => repo.attachWorkosInvitationId(db, o, pendingA.id, "invitation_01ZZZZ"),
     getInvitation: (o) => repo.getInvitation(db, o, pendingA.id),
@@ -184,6 +184,10 @@ test("SQL scan: values are always bound; the only interpolations into SQL are th
     "clientVisibleOnly ? \"AND visibility = 'client'\" : \"\"",
     "guard",
     "ACTIVE", // portal_sessions: the fixed "not revoked, not idle-expired, not past the absolute limit" predicate (user-scoped, see portal-sessions.test.mjs)
+    // Access-management statements (memberships.js, invitations.js): module-level string constants, never built from input. They are the audit INSERT header,
+    // the shared guard predicates ("another active owner remains", "already an active member") and the per-operation guard that the audit entry and the change share.
+    "AUDIT", "ACTIVE_MEMBER", "ACTIVE_MEMBER_OF_OLD", "OTHER_ACTIVE_OWNER", "cond",
+    "REVISION", // business-profile.js: the module-level, organization-scoped "newest profile.updated entry of this step" subquery (a fixed constant; every value in it is bound)
   ]);
   const used = new Set();
   for (const { file, sql } of sqlStrings()) for (const m of sql.matchAll(/\$\{([^}]*)\}/g)) {

@@ -29,6 +29,7 @@ test("only the Worker entry point and portal modules import the portal modules",
       const p = dir + e.name;
       if (e.isDirectory()) { walk(p + "/"); continue; }
       if (!/\.(m?js)$/.test(e.name) || p.startsWith("worker/portal/") || p.startsWith("worker/test/") || p === "worker/index.js") continue;
+      if (p === "worker/admin/router.js") { assert.deepEqual([...read(p).matchAll(/from "\.\.\/portal\/([^"]+)"/g)].map((m) => m[1]), ["admin-clients.js", "admin-access.js", "admin-feedback.js"], "the admin router imports exactly the two reviewed admin read modules"); continue; }
       if (/portal\//.test(read(p))) offenders.push(p);
     }
   };
@@ -54,5 +55,5 @@ test("portal modules do no work at import time, read no environment, and make no
   }
 });
 test("only the reviewed set of modules exists under worker/portal", () => {
-  assert.deepEqual(readdirSync(new URL("worker/portal/", root)).filter((f) => f.endsWith(".js")).sort(), ["auth.js", "claims.js", "config.js", "crypto.js", "guard.js", "http.js", "jwt.js", "log.js", "pages.js", "policy.js", "ratelimit.js", "router.js", "sessions.js", "workos.js"]);
+  assert.deepEqual(readdirSync(new URL("worker/portal/", root)).filter((f) => f.endsWith(".js")).sort(), ["admin-access.js", "admin-clients.js", "admin-feedback.js", "auth.js", "claims.js", "config.js", "crypto.js", "demo-data.js", "demo.js", "filters.js", "form.js", "frame.js", "guard.js", "guided-data.js", "guided.js", "http.js", "invite-delivery.js", "invite-recipients.js", "jwt.js", "log.js", "module-status.js", "pages.js", "policy.js", "profile-live.js", "profile-schema.js", "ratelimit.js", "router.js", "sessions.js", "ui.js", "views.js", "welcome.js", "workos-admin.js", "workos.js"]);
 });

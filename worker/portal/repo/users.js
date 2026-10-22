@@ -36,6 +36,18 @@ export async function upsertUserFromIdentity(db, { workosUserId, email, name } =
   }
 }
 
+/**
+ * The signed-in person's own display name. Touches exactly one portal_users row (by id) and nothing else: no organization, membership or
+ * other user is reachable from here. A disabled user cannot change it.
+ */
+export async function setUserName(db, id, name) {
+  requireUserId(id);
+  const clean = validateName(name);
+  if (!clean) return fail("invalid_name");
+  const row = await db.prepare("UPDATE portal_users SET name = ? WHERE id = ? AND status = 'active' RETURNING id, name").bind(clean, id).first();
+  return row ? ok({ user: row }) : fail("not_found");
+}
+
 export async function getUserById(db, id) {
   requireUserId(id);
   return (await db.prepare(`SELECT ${COLUMNS} FROM portal_users WHERE id = ?`).bind(id).first()) || null;

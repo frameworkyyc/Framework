@@ -5,18 +5,29 @@
  * Returns null (= "not mine"; worker/index.js then answers portalNotFound(), never the static site) when the portal is off, or the request is not for the portal or not on the
  * portal host. When it IS enabled but misconfigured it fails closed with a generic 503 for portal paths.
  */
-import { portalMode, portalConfigProblems, readPortalConfig } from "./config.js";
-import { errorPage, newRef, redirect } from "./http.js";
+import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled } from "./config.js";
+import { errorPage, newRef, redirect, checkSameSiteMutation } from "./http.js";
 import { handleLogin, handleCallback, handleLogout } from "./auth.js";
 import { requireSession, requireOrgAccess, dbCall, Unavailable, unavailablePage, notFoundPage } from "./guard.js";
 import { checkRateLimit } from "./ratelimit.js";
 import { logEvent, routeName } from "./log.js";
 import * as pages from "./pages.js";
+import { handleDemo, isDemoPath } from "./demo.js";
+import { viewFilters } from "./filters.js";
 import { listActiveMembershipsForUser, listMembers } from "./repo/memberships.js";
+import { setUserName } from "./repo/users.js";
 import { listProjects, getProject } from "./repo/projects.js";
 import { listActivity } from "./repo/activity.js";
-import { validateSlug } from "./repo/validate.js";
+import { validateSlug, validateName } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
+import { getProfileAnswers, saveProfileStep, getStepRevision } from "./repo/business-profile.js";
+import { hasPriorVisit } from "./repo/visits.js";
+import { stepById, PROFILE_STEPS, MULTI_SEP } from "./profile-schema.js";
+import { comingSoonKeys, LIVE_AREAS } from "./guided-data.js";
+import { moduleStatuses, nextActions } from "./module-status.js";
+import { readForm, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES } from "./form.js";
+import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
+import { checkCsrf } from "./sessions.js";
 
 /**
  * The answer for every /portal path when the portal is not serving this request (disabled, wrong host). Deliberately bare: no portal
@@ -66,8 +77,186 @@ async function noAccess(ctx) {
 }
 
 /** Organization pages: every one goes through requireOrgAccess; queries use ONLY the membership's organization id. */
+/** The Coming Soon pages (members only, like every organization page) for each section that is not built yet; derived from the same list that drives Home. */
+const SOON = comingSoonKeys().join("|");
+
+/** Save one questionnaire step. Every check below runs on the server for every save; the organization comes from the membership, never the form. */
+async function saveProfile(ctx, a, stepId) {
+  const step = stepById(stepId);
+  if (!step) return notFoundPage(ctx);
+  const read = await readForm(ctx.request, MAX_PROFILE_FORM_BYTES);
+  if (read.error) return errorPage(read.error, { ref: ctx.ref });
+  const csrfOk = await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || "");
+  if (!csrfOk) {
+    logEvent({ evt: "profile.save", outcome: "rejected", reason: "csrf", status: 403, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return errorPage(403, { ref: ctx.ref });
+  }
+  const input = {};
+  for (const d of step.fields) {
+    // a multiple-choice question arrives as one checkbox per option (<id>__<n>); an unchecked box is simply absent, so no box checked means "unanswered"
+    if (d.kind === "multi") input[d.id] = d.options.filter((o, i) => read.fields.get(`${d.id}__${i}`) === o).join(MULTI_SEP);
+    else if (read.fields.has(d.id)) input[d.id] = read.fields.get(d.id);
+  }
+  // The revision the form was loaded with (see repo/business-profile.js). Missing or malformed counts as "unknown": it can never match, so such a save is a conflict.
+  const posted = read.fields.has("rev") ? read.fields.get("rev") : null;
+  const rev = typeof posted === "string" && /^(?:[0-9a-f-]{36})?$/.test(posted) ? posted : null;
+  let saved;
+  try {
+    saved = await dbCall(() => getProfileAnswers(ctx.db, a.membership.organizationId));
+  } catch (err) {
+    if (err instanceof Unavailable) return unavailablePage(ctx);
+    throw err;
+  }
+  let result;
+  try {
+    result = await dbCall(() => saveProfileStep(ctx.db, a.membership.organizationId, a.session.userId, stepId, input, { now: ctx.now, expectedRevision: rev }));
+  } catch (err) {
+    if (!(err instanceof Unavailable)) throw err;
+    logEvent({ evt: "profile.save", outcome: "store_unavailable", status: 503, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    // keep what the person typed on the page and say plainly that it was not stored
+    return pages.profileStepPage(ctx, a, step, saved, { values: Object.fromEntries(step.fields.map((d) => [d.id, input[d.id] || ""])), failed: true, status: 503, revision: rev ?? "" });
+  }
+  if (!result.ok && result.error === "conflict") {
+    // The step changed since this form was loaded (another window, device or member). NOTHING was written. Show the person's own input again, say what is
+    // saved now, and carry the latest revision so that saving again is a deliberate, informed choice.
+    logEvent({ evt: "profile.save", outcome: "conflict", status: 409, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+    const latest = await dbCall(() => getProfileAnswers(ctx.db, a.membership.organizationId));
+    return pages.profileStepPage(ctx, a, step, latest, { values: Object.fromEntries(step.fields.map((d) => [d.id, input[d.id] || ""])), conflict: result.currentValues, revision: result.revision, status: 409 });
+  }
+  if (!result.ok) {
+    logEvent({ evt: "profile.save", outcome: "invalid", status: 422, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, count: Object.keys(result.errors || {}).length });
+    return pages.profileStepPage(ctx, a, step, saved, { values: result.values || {}, errors: result.errors || {}, status: 422, revision: rev ?? "" });
+  }
+  const changed = result.changed || [];
+  logEvent({ evt: "profile.save", outcome: changed.length ? "saved" : "unchanged", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  const base = `/portal/o/${a.membership.slug}/profile`;
+  // "Save and continue" goes on to the next step (the overview after the last one); anything else, including a missing or unknown intent, stays here.
+  if (read.fields.get("intent") === "continue") {
+    const next = PROFILE_STEPS[PROFILE_STEPS.indexOf(step) + 1];
+    return redirect(next ? `${base}/${next.id}` : base);
+  }
+  return redirect(`${base}/${stepId}?saved=${changed.length ? 1 : 0}`);
+}
+
+/** Send feedback. Organization and person come from the membership and session; the form supplies only the kind, the message and an optional section. */
+/**
+ * The Business Profile's "Primary contact" is the business's day-to-day contact, which is not necessarily the person signed in. It is therefore
+ * only ever a DISPLAY fallback, and only when its contact email is the signed-in (verified) email, i.e. provably the same person. It is never
+ * written to the account and never used for anyone else's account.
+ */
+/** This organization's saved Business Profile answers, or null when they cannot be read (an outage, or a database without the profile table). Never another organization's. */
+async function readAnswers(ctx, a) {
+  try {
+    return await dbCall(() => getProfileAnswers(ctx.db, a.membership.organizationId));
+  } catch (err) {
+    if (err instanceof Unavailable) return null;
+    throw err;
+  }
+}
+function contactNameFrom(answers, a) {
+  if (!answers) return "";
+  const same = String(answers.cemail || "").trim().toLowerCase() === String(a.session.email || "").trim().toLowerCase();
+  return same && validateName(answers.cname) ? validateName(answers.cname) : "";
+}
+/** Whether this person has reliable evidence of an earlier visit (repo/visits.js). A read that cannot be made means "unknown", which words the greeting neutrally. */
+async function returningVisitor(ctx, a) {
+  try {
+    return await dbCall(() => hasPriorVisit(ctx.db, { userId: a.session.userId, organizationId: a.membership.organizationId, sessionId: a.session.id }));
+  } catch (err) {
+    if (err instanceof Unavailable) return false;
+    throw err;
+  }
+}
+function withDisplayName(a, answers) {
+  if (a.session.name) return a;
+  const name = contactNameFrom(answers, a);
+  return name ? { ...a, session: { ...a.session, name } } : a;
+}
+
+async function saveAccountName(ctx, a) {
+  const read = await readForm(ctx.request, MAX_FEEDBACK_FORM_BYTES);
+  if (read.error) return errorPage(read.error, { ref: ctx.ref });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) {
+    logEvent({ evt: "account.name", outcome: "rejected", reason: "csrf", status: 403, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return errorPage(403, { ref: ctx.ref });
+  }
+  const value = read.fields.get("name") || "";
+  if (!validateName(value)) return pages.accountPage(ctx, a, { value, error: "Enter your name (up to 120 characters).", status: 422 });
+  let result;
+  try {
+    result = await dbCall(() => setUserName(ctx.db, a.session.userId, value)); // always the signed-in user's own row, never an id from the request
+  } catch (err) {
+    if (!(err instanceof Unavailable)) throw err;
+    return unavailablePage(ctx);
+  }
+  if (!result.ok) return pages.accountPage(ctx, a, { value, error: "We couldn’t save that. Please try again.", status: 422 });
+  logEvent({ evt: "account.name", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  return redirect(`/portal/o/${a.membership.slug}/account?saved=1`);
+}
+
+async function saveFeedback(ctx, a) {
+  const read = await readForm(ctx.request, MAX_FEEDBACK_FORM_BYTES);
+  if (read.error) return errorPage(read.error, { ref: ctx.ref });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) {
+    logEvent({ evt: "feedback.submit", outcome: "rejected", reason: "csrf", status: 403, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return errorPage(403, { ref: ctx.ref });
+  }
+  const input = { kind: read.fields.get("kind") || "", message: read.fields.get("message") || "", page: read.fields.get("page") || "" };
+  let result;
+  try {
+    result = await dbCall(() => submitPortalFeedback(ctx.db, a.membership.organizationId, a.session.userId, input, { now: ctx.now }));
+  } catch (err) {
+    if (!(err instanceof Unavailable)) throw err;
+    logEvent({ evt: "feedback.submit", outcome: "store_unavailable", status: 503, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return pages.feedbackPage(ctx, a, { values: input, failed: true, status: 503 });
+  }
+  if (result.ok) {
+    logEvent({ evt: "feedback.submit", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+    return redirect(`/portal/o/${a.membership.slug}/feedback?sent=1`);
+  }
+  if (result.error === "too_many") {
+    logEvent({ evt: "feedback.submit", outcome: "too_many", status: 429, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return pages.feedbackPage(ctx, a, { values: input, tooMany: true, status: 429 });
+  }
+  logEvent({ evt: "feedback.submit", outcome: "invalid", status: 422, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, count: Object.keys(result.errors || {}).length });
+  return pages.feedbackPage(ctx, a, { values: result.values || input, errors: result.errors || {}, status: 422 });
+}
+
 const ORG_ROUTES = [
-  { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, a, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },
+  { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => {
+      // One read serves both the greeting's name fallback and the module progress. null (unreadable) shows "Progress unavailable", never 0%.
+      const answers = await readAnswers(ctx, a);
+      const shown = { ...withDisplayName(a, answers), returning: await returningVisitor(ctx, a) };
+      return pages.homePage(ctx, shown, moduleStatuses(LIVE_AREAS, { profile: answers }), nextActions(LIVE_AREAS, { profile: answers }));
+    },
+  },
+  { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, { ...a, returning: await returningVisitor(ctx, a) }, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },
+  { re: /^\/portal\/o\/([^/]+)\/profile$/, action: "profile.view", run: async (ctx, a) => pages.profileOverviewPage(ctx, a, await getProfileAnswers(ctx.db, a.membership.organizationId)) },
+  {
+    re: /^\/portal\/o\/([^/]+)\/profile\/([^/]+)$/,
+    action: "profile.view",
+    postAction: "profile.edit",
+    bucket: "profile",
+    run: async (ctx, a, id) => {
+      const step = stepById(id);
+      if (!step) return notFoundPage(ctx);
+      const revision = await getStepRevision(ctx.db, a.membership.organizationId, step.id); // BEFORE the answers: a save in between can only make this form look older, never newer
+      return pages.profileStepPage(ctx, a, step, await getProfileAnswers(ctx.db, a.membership.organizationId), { savedNote: viewFilters(ctx.url).saved, unchanged: viewFilters(ctx.url).nochange, revision });
+    },
+    post: (ctx, a, id) => saveProfile(ctx, a, id),
+  },
+  {
+    re: /^\/portal\/o\/([^/]+)\/feedback$/,
+    action: "feedback.submit",
+    postAction: "feedback.submit",
+    bucket: "feedback",
+    run: async (ctx, a) => {
+      const f = viewFilters(ctx.url);
+      return pages.feedbackPage(ctx, a, f.sent ? { sent: true } : { from: validPageKey(f.from) || "" });
+    },
+    post: (ctx, a) => saveFeedback(ctx, a),
+  },
+  { re: new RegExp(`^\\/portal\\/o\\/([^/]+)\\/(${SOON})$`), action: "workspace.view", run: async (ctx, a, key) => pages.comingSoonPage(ctx, a, key) },
   { re: /^\/portal\/o\/([^/]+)\/projects$/, action: "projects.view", run: async (ctx, a) => pages.projectsPage(ctx, a, await listProjects(ctx.db, a.membership.organizationId)) },
   {
     re: /^\/portal\/o\/([^/]+)\/projects\/([^/]+)$/,
@@ -78,7 +267,19 @@ const ORG_ROUTES = [
       return p ? pages.projectPage(ctx, a, p) : notFoundPage(ctx);
     },
   },
-  { re: /^\/portal\/o\/([^/]+)\/activity$/, action: "activity.view", run: async (ctx, a) => pages.activityPage(ctx, a, await listActivity(ctx.db, a.membership.organizationId, { limit: 50 })) },
+  { re: /^\/portal\/o\/([^/]+)\/activity$/, action: "activity.view", run: async (ctx, a) => pages.activityPage(ctx, a, await listActivity(ctx.db, a.membership.organizationId, { limit: 50 }), viewFilters(ctx.url)) },
+  { re: /^\/portal\/o\/([^/]+)\/documents$/, action: "documents.view", run: async (ctx, a) => pages.documentsPage(ctx, a, viewFilters(ctx.url)) },
+    {
+    re: /^\/portal\/o\/([^/]+)\/account$/,
+    action: "account.view",
+    postAction: "account.view", // everyone may edit only their own name; the target row comes from the session, never the request
+    bucket: "profile",
+    run: async (ctx, a) => {
+      const shown = withDisplayName(a, await readAnswers(ctx, a));
+      return pages.accountPage(ctx, shown, { saved: viewFilters(ctx.url).saved, derived: !a.session.name && Boolean(shown.session.name) });
+    },
+    post: (ctx, a) => saveAccountName(ctx, a),
+  },
   {
     re: /^\/portal\/o\/([^/]+)\/members$/,
     action: "members.view",
@@ -90,13 +291,30 @@ async function orgRoute(ctx, path) {
   for (const r of ORG_ROUTES) {
     const m = r.re.exec(path);
     if (!m) continue;
-    if (ctx.request.method !== "GET" && ctx.request.method !== "HEAD") return errorPage(405, { ref: ctx.ref, headers: { Allow: "GET, HEAD" } });
+    const method = ctx.request.method;
+    const isPost = method === "POST" && !!r.post;
+    if (method !== "GET" && method !== "HEAD" && !isPost) return errorPage(405, { ref: ctx.ref, headers: { Allow: r.post ? "GET, HEAD, POST" : "GET, HEAD" } });
     const slug = validateSlug(m[1]);
     if (!slug) return notFoundPage(ctx);
-    const access = await requireOrgAccess(ctx, slug, r.action);
+    if (isPost) {
+      // cheap checks first: an oversized or cross-site request costs no database work and its body is never read
+      const declared = declaredBodyProblem(ctx.request, r.bucket === "feedback" ? MAX_FEEDBACK_FORM_BYTES : MAX_PROFILE_FORM_BYTES);
+      if (declared) return errorPage(declared, { ref: ctx.ref });
+      const same = checkSameSiteMutation(ctx.request, ctx.cfg.origin);
+      if (!same.ok) {
+        logEvent({ evt: "profile.save", outcome: "rejected", reason: same.reason, status: 403, route: routeName(path), ref: ctx.ref });
+        return errorPage(403, { ref: ctx.ref });
+      }
+      const limit = await checkRateLimit(ctx.env, ctx.request, ctx.cfg, r.bucket);
+      if (limit.limited) {
+        logEvent({ evt: "rate.limited", outcome: r.bucket, route: routeName(path), status: 429, ref: ctx.ref });
+        return errorPage(429, { ref: ctx.ref, headers: { "Retry-After": "60" } });
+      }
+    }
+    const access = await requireOrgAccess(ctx, slug, isPost ? r.postAction : r.action);
     if (access instanceof Response) return access;
     try {
-      return await r.run(ctx, access, m[2]);
+      return await (isPost ? r.post : r.run)(ctx, access, m[2]);
     } catch (err) {
       // a failed database read after the guard is an outage; a bug (TypeError and friends) or bad input is a 500 and is not disguised
       if (err instanceof Unavailable || !(err instanceof Error) || !["PortalDataError", "TypeError", "ReferenceError", "RangeError", "SyntaxError"].includes(err.name)) return unavailablePage(ctx);
@@ -129,12 +347,18 @@ export async function handlePortal(request, env, deps = {}) {
   const cfg = readPortalConfig(env);
   if (url.origin !== cfg.origin) return null;
 
-  const ctx = { request, env, cfg, db: env.PORTAL_DB, url, now: deps.now || new Date(), fetch: deps.fetch || fetch, ref };
+  const ctx = { request, env, cfg, db: env.PORTAL_DB, url, now: deps.now || new Date(), fetch: deps.fetch || fetch, ref, demo: demoEnabled(env, cfg) };
   const started = Date.now();
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   let response;
   let rl; // the limiter outcome (a fixed word), set only for the limited endpoints; logged on the final `request` event
   try {
+    if (isDemoPath(path)) {
+      // The static demonstration: no session, no database, no cookies, sample data only. Off everywhere except where demoEnabled says so (never a production host).
+      response = ctx.demo ? handleDemo(ctx, path) : errorPage(404, { ref });
+      logEvent({ evt: "request", method: request.method === "GET" || request.method === "HEAD" ? request.method : undefined, route: routeName(path), status: response.status, ms: Date.now() - started, ref });
+      return response;
+    }
     const bucket = LIMITED[path];
     const limited = bucket && !(path === "/portal/login" && request.method === "GET" && url.searchParams.get("start") !== "1"); // the plain login page is free; starting a sign-in is not
     if (limited) {

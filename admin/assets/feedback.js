@@ -1,5 +1,6 @@
 /* Framework Admin — Feedback module: /admin/feedback (list) and /admin/feedback/:id (response). */
 
+import { sharePanel } from "./feedback-share.js";
 import { h, api, ApiError, fmtDate, fmtDateTime, shortRef, clientName, permissionShort, rating5, score, meter10, stateBlock, confirmDialog } from "./ui.js";
 
 const RATING_LABELS = [
@@ -13,6 +14,11 @@ const RATING_LABELS = [
 ];
 
 /* ---------- Shared pieces (the overview imports these too) ---------- */
+
+/** Question 3 answer for clients with no earlier website: shown as not applicable, never scored or flagged. Earlier responses stored the first wording, which reads the same way here. */
+export const NO_PRIOR_WEBSITE = "No previous website";
+const LEGACY_NO_PRIOR_WEBSITE = "I didn\u2019t have a website before.";
+const improvementText = (v) => (v === NO_PRIOR_WEBSITE || v === LEGACY_NO_PRIOR_WEBSITE ? [NO_PRIOR_WEBSITE, h("span", { class: "adm-muted" }, " (not applicable)")] : v);
 
 /** "Needs attention": a low score anywhere, or the new site rated worse than before. */
 export function needsAttention(r) {
@@ -36,7 +42,7 @@ const COLUMNS = {
   date: { label: "Submitted", cell: (r) => h("td", { "data-label": "Submitted" }, fmtDate(r.created_at)) },
   satisfaction: { label: "Satisfaction", cell: (r) => h("td", { "data-label": "Satisfaction" }, score(r.satisfaction)) },
   recommend: { label: "Recommend", cell: (r) => h("td", { "data-label": "Recommend" }, score(r.recommend)) },
-  improvement: { label: "Improvement", cell: (r) => h("td", { "data-label": "Improvement" }, r.improvement) },
+  improvement: { label: "Improvement", cell: (r) => h("td", { "data-label": "Improvement" }, improvementText(r.improvement)) },
   testimonial: { label: "Testimonial", cell: (r) => h("td", { "data-label": "Testimonial" }, permissionShort(r.testimonial_permission)) },
   logo: { label: "Portfolio", cell: (r) => h("td", { "data-label": "Portfolio" }, r.logo_permission) },
   revenue: { label: "Revenue", cell: (r) => h("td", { "data-label": "Revenue" }, r.revenue ? r.revenue : h("span", { class: "adm-muted" }, "Not answered")) },
@@ -111,18 +117,20 @@ async function renderList(ctx) {
   });
   paint();
 
+  const share = await sharePanel();
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" },
-      h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Feedback"),
+      h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Client Feedback"),
         h("p", { class: "adm-sub" }, "Responses from the client feedback form, newest first.")),
       h("div", { class: "adm-actions" }, h("a", { class: "btn btn--secondary", href: "/api/admin/feedback/export", download: "" }, "Export CSV")),
     ),
+    share,
     data.reviewed_supported ? null : h("p", { class: "adm-banner" }, "Reviewed tracking is off. Apply migrations/0002_add_reviewed_at.sql in the D1 console to enable it."),
     rows.length ? bar : null,
     note,
     results,
   );
-  return { title: "Feedback", node };
+  return { title: "Client Feedback", node };
 }
 
 /* ---------- Detail ---------- */
@@ -208,7 +216,7 @@ async function renderDetail(ctx, id) {
     )),
 
     section("Experience", spec(RATING_LABELS.map(([k, label]) => [label, rating5(r[k])]))),
-    section("Improvement", spec([["Compared with previous website", r.improvement]])),
+    section("Improvement", spec([["Compared with previous website", improvementText(r.improvement)]])),
     section("Business impact", impact.length ? list(withOther(impact, r.impact_other)) : null),
     section("Value", spec([["Fair price at market rates", r.fair_price], ["Annual revenue", has(r.revenue) ? r.revenue : h("span", { class: "adm-muted" }, "Not answered")]])),
 

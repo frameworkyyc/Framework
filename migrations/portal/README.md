@@ -5,6 +5,11 @@ They are never applied to `framework-staging` / `framework-feedback` (the feedba
 older SQL files in `../` are never applied here.
 
 * `0001_portal_foundation.sql`: organizations, portal_users, memberships, invitations, portal_sessions, projects, activity_log.
+* `0002_business_profile.sql`: business_profile_answers (Business Profile answers, one row per answered question). Applied on Staging. **Production**: pending; it is applied only through the manual Production workflow below, in order after 0001, after the owner's approval.
+* `0003_portal_feedback.sql`: portal_feedback (feedback sent from inside the portal). Same status as 0002.
+* `0004_invitation_delivery.sql`: four additive columns on `invitations` (`delivery_status` default `not_sent`, `delivery_channel`, `delivery_attempted_at`,
+  `delivery_error`) that track whether an invitation email was handed to a provider, separately from the invitation's own status. **Staging only for now.**
+  Existing rows become `not_sent`; nothing existing is changed. Nothing in the running code reads these columns yet.
 * `wrangler.migrate.staging.jsonc`: a migration-only Wrangler config that binds **only** the Staging portal database. Use it with
   `-c` so Wrangler cannot fall back to the main `wrangler.jsonc` (which also binds Production's database).
 * `wrangler.migrate.production.jsonc`: the same, binding **only** the Production portal database `framework-portal`.
@@ -34,6 +39,31 @@ Alternative without the command line: Cloudflare dashboard, Storage & Databases,
 contents of `0001_portal_foundation.sql` and run it. That path does not record the migration in `d1_migrations`; every statement is
 `IF NOT EXISTS`, so running the file again through Wrangler later is harmless.
 
+## Apply 0004 (invitation delivery) to the Staging portal database
+
+Staging already has 0001, 0002 and 0003 recorded in `d1_migrations`; only 0004 is pending. Run from the repository root, signed in to Cloudflare
+(`npx wrangler login`; in a Codespace this opens a browser sign-in). **`--remote` and `-c migrations/portal/wrangler.migrate.staging.jsonc` are both required.**
+
+```
+# 0. Record a Time Travel bookmark first (write the value down; it is not kept in the repository).
+npx wrangler d1 time-travel info PORTAL_DB -c migrations/portal/wrangler.migrate.staging.jsonc
+
+# 1. See what is pending. Expect exactly one file: 0004_invitation_delivery.sql
+npx wrangler d1 migrations list PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc
+
+# 2. Apply it. The prompt must name framework-portal-staging (answer no if it names anything else).
+npx wrangler d1 migrations apply PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc
+
+# 3. Verify. Step 1 again must say there is nothing to apply, and the four columns must exist.
+npx wrangler d1 migrations list PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc
+npx wrangler d1 execute PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc --command "SELECT name FROM pragma_table_info('invitations') WHERE name LIKE 'delivery_%' ORDER BY cid"
+npx wrangler d1 execute PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc --command "SELECT id, name FROM d1_migrations ORDER BY id"
+```
+
+**Stop and do not apply** if step 1 lists anything other than `0004_invitation_delivery.sql`, if any output or prompt names `framework-portal` (Production),
+`framework-staging` or `framework-feedback`, or if a command was run without `-c`. If the migration fails part-way, check the columns before re-running,
+and restore from the bookmark if the database is in doubt. The Production workflow applies 0002 to 0004 to Production only when someone runs it by hand.
+
 ## Apply to the Production portal database (`framework-portal`)
 
 Run only when the launch plan says so; creating the config file applied nothing. The initial D1 Time Travel bookmark of the empty
@@ -48,29 +78,29 @@ are both required**; never run these commands without `-c`.
 #    id b213b7db-ed29-4ab6-946c-0728dd6709e8. Anything else (a different name or id): stop.
 npx wrangler d1 info PORTAL_DB -c migrations/portal/wrangler.migrate.production.jsonc
 
-# 1. See what is pending. Expect exactly one file: 0001_portal_foundation.sql
+# 1. See what is pending. Expect the NEXT migrations in order and nothing else (Production today: 0002, 0003 and 0004; a brand-new empty database: all four).
 npx wrangler d1 migrations list PORTAL_DB --remote -c migrations/portal/wrangler.migrate.production.jsonc
 
-# 2. Apply it. Read the prompt: it must name framework-portal. Answer no if it names anything else.
+# 2. Apply them. Read the prompt: it must name framework-portal. Answer no if it names anything else.
 npx wrangler d1 migrations apply PORTAL_DB --remote -c migrations/portal/wrangler.migrate.production.jsonc
 
 # 3. Verify completion. Step 1 again must say there is nothing to apply, and the tables must be exactly
-#    activity_log, d1_migrations, invitations, memberships, organizations, portal_sessions, portal_users, projects
+#    activity_log, business_profile_answers, d1_migrations, invitations, memberships, organizations, portal_feedback, portal_sessions, portal_users, projects
 npx wrangler d1 migrations list PORTAL_DB --remote -c migrations/portal/wrangler.migrate.production.jsonc
 npx wrangler d1 execute PORTAL_DB --remote -c migrations/portal/wrangler.migrate.production.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
 ```
 
 **Stop and do not apply** if step 0 or the step 2 prompt names `framework-portal-staging`, `framework-staging` or `framework-feedback`, if
-step 1 lists anything other than `0001_portal_foundation.sql`, or if a command was run without `-c`. If a migration fails part-way, do
+step 1 lists anything other than the next migrations in order (an unknown file, a skipped one, or one already applied), or if a command was run without `-c`. If a migration fails part-way, do
 not re-run it blindly: check the tables, then restore from the Time Travel bookmark if the database is in doubt.
 
 ### Optional: apply through the manual GitHub Actions workflow
 
 `.github/workflows/portal-production-d1-migration.yml` ("Portal Production D1 migration") runs the same checks and the same apply from GitHub.
 It is `workflow_dispatch` only, so nothing runs until someone starts it from the Actions tab. It has two inputs: the database name typed
-exactly (`framework-portal`) and a mode, **verify-only** (default; read-only) or **apply**. It fails closed on a name/id mismatch, on any pending
-migration other than `0001_portal_foundation.sql`, on output it cannot read, and (for apply) if the database already has portal tables.
-After an apply it checks that nothing is pending and that exactly the 7 tables and 13 indexes listed in the migration exist. Only one run can
+exactly (`framework-portal`) and a mode, **verify-only** (default; read-only) or **apply**. It fails closed on a name/id mismatch, on a pending list that is not the **next migrations in order** (0001, 0002, 0003, 0004; an unknown file, a skipped one or an out-of-order one is refused), on output it cannot read,
+on a database whose tables are not exactly what the already-applied migrations created, and for apply when nothing is pending. After an apply it checks that nothing is pending and that exactly the 9 tables and 15 indexes of
+the four migrations exist (0004 only adds columns). **Order of use on Production: run verify-only first, read its report, record a Time Travel bookmark, then run apply, then run verify-only again.** Only one run can
 be active at a time. It refuses any ref except `Staging` (the migration config and SQL live there); Wrangler is installed in a step
 without secrets, with install scripts disabled, at an exact pinned version.
 

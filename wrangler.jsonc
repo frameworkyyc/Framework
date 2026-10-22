@@ -85,7 +85,16 @@
       // The exact token issuer, verified in the live Staging test (it embeds the client id).
       "PORTAL_AUTH_ISSUER": "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED",
       // Switches the client portal on for Staging ONLY. It must never appear in the top-level vars (Production): without it every /portal path answers 404.
-      "PORTAL_ENABLED": "1"
+      "PORTAL_ENABLED": "1",
+      // Serves the static, clearly labelled demo portal at /portal/demo (fictional data, no sign-in, no database). Staging ONLY: never at the top level, and the code also refuses it on the live hosts (worker/portal/config.js demoEnabled).
+      "PORTAL_DEMO": "1",
+      // Framework Admin -> Clients invitation workflow, STAGING ONLY (never at the top level, so never on Production). Both are exactly "1" or absent.
+      //   PORTAL_ADMIN_WRITES  : lets the admin (behind Cloudflare Access AND the ADMIN_EMAILS list) create client organizations and invitations, change roles and remove access.
+      //   PORTAL_INVITE_SENDING: additionally lets the admin SEND invitations (WorkOS invitation email, or Framework's own email through Resend for someone who already has a sign-in).
+      // Sending is still limited server-side to the EXACT addresses in the Cloudflare secret PORTAL_INVITE_ALLOWLIST (this repository is public, so the addresses are not here).
+      // Missing, empty or malformed means every invitation operation is refused. Setup and the add-an-address procedure: worker/portal/INVITATION-DELIVERY-PLAN.md and ADMIN-INVITATIONS-RUNBOOK.md.
+      "PORTAL_ADMIN_WRITES": "1",
+      "PORTAL_INVITE_SENDING": "1"
     },
     "d1_databases": [
       {

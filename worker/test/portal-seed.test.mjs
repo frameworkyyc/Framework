@@ -39,7 +39,7 @@ test("edited seed + real sign-in: the invited person lands in the test organizat
   assert.equal(res.status, 303);
   assert.equal(res.headers.get("Location"), "/portal");
   assert.equal((await b.get("/portal")).headers.get("Location"), "/portal/o/framework-test");
-  const html = await (await b.get("/portal/o/framework-test")).text();
+  const html = await (await b.get("/portal/o/framework-test/progress")).text();
   assert.match(html, /Framework Test Organization/);
   assert.match(html, /Test website/);
   assert.match(html, /Project created/);

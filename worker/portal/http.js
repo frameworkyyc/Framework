@@ -9,6 +9,9 @@
  *  - Redirect targets are validated: a same-site portal path or an explicitly allowed origin, never a value from the request.
  */
 import { randomToken } from "./crypto.js";
+import { escapeHtml, authFrame } from "./frame.js";
+
+export { escapeHtml };
 
 export const SESSION_COOKIE = "__Host-fw_portal";
 export const STATE_COOKIE = "__Host-fw_auth";
@@ -25,10 +28,12 @@ export const PORTAL_CSP = [
   "frame-ancestors 'none'",
 ].join("; ");
 
-export const escapeHtml = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+/** The same policy plus scripts from this site only (never inline): used only by pages that load /assets/js/portal-profile.js. */
+export const PORTAL_CSP_WITH_SCRIPT = PORTAL_CSP.replace("default-src 'none'; ", "default-src 'none'; script-src 'self'; ");
 
 /** Headers every portal response carries. `extra` may add headers (never weaken the fixed ones: they are applied last). */
-export function securityHeaders(extra = {}) {
+export function securityHeaders(extra = {}, { scripts = false } = {}) {
   const h = new Headers();
   for (const [k, v] of Object.entries(extra)) {
     if (Array.isArray(v)) v.forEach((x) => h.append(k, x));
@@ -36,7 +41,7 @@ export function securityHeaders(extra = {}) {
   }
   h.set("Cache-Control", "no-store");
   h.set("Referrer-Policy", "no-referrer");
-  h.set("Content-Security-Policy", PORTAL_CSP);
+  h.set("Content-Security-Policy", scripts ? PORTAL_CSP_WITH_SCRIPT : PORTAL_CSP);
   h.set("X-Content-Type-Options", "nosniff");
   h.set("X-Frame-Options", "DENY");
   h.set("X-Robots-Tag", "noindex, nofollow");
@@ -151,18 +156,9 @@ const ERROR_COPY = {
   503: ["Temporarily unavailable", "The client portal isn’t available right now. Please try again in a moment."],
 };
 
-/** A branded, script-free HTML page. `bodyHtml` must already be escaped by the caller; `title` is escaped here. */
+/** A branded, script-free HTML page (sign-in and system pages). `bodyHtml` must already be escaped by the caller; `title` is escaped here. */
 export function htmlPage({ status = 200, title, bodyHtml = "", ref = null, cookies = [], headers = {} } = {}) {
-  const refLine = ref ? `<p class="muted">Reference: <strong>${escapeHtml(ref)}</strong></p>` : "";
-  const html = `<!DOCTYPE html>
-<html lang="en-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow"><meta name="referrer" content="no-referrer"><title>${escapeHtml(title)} | Framework</title>
-<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@600,700&f[]=general-sans@400,500,600&display=swap">
-<link rel="stylesheet" href="/assets/css/styles.css"></head>
-<body><main class="page-head"><div class="container"><span class="eyebrow">Framework client portal</span>
-<h1 class="h2">${escapeHtml(title)}</h1>${bodyHtml}${refLine}</div></main></body></html>`;
-  return new Response(html, { status, headers: securityHeaders({ ...headers, "Content-Type": "text/html; charset=utf-8", "Set-Cookie": cookies }) });
+  return new Response(authFrame({ title, bodyHtml, ref }), { status, headers: securityHeaders({ ...headers, "Content-Type": "text/html; charset=utf-8", "Set-Cookie": cookies }) });
 }
 
 /** A generic error page with a short reference. Never shows upstream text, stack traces, emails or request data. */
