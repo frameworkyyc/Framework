@@ -12,7 +12,7 @@
     "binding": "PORTAL_DB",
     "name": "framework-portal-staging",
     "id": "1edda8a2-5249-4f40-9dbc-d29aa44e21f8",
-    "tables": ["activity_log", "business_profile_answers", "d1_migrations", "invitations", "memberships", "organizations", "portal_feedback", "portal_sessions", "portal_users", "projects"]
+    "tables": ["activity_log", "brand_assets", "brand_kits", "brand_uploads", "business_profile_answers", "d1_migrations", "invitations", "memberships", "organizations", "portal_feedback", "portal_sessions", "portal_users", "projects", "service_requests"]
   },
   "websiteDb": { "binding": "DB", "name": "framework-staging", "id": "c4815cdc-8948-4561-92a3-65e4860cdb94" },
   "forbiddenDatabaseIds": {
