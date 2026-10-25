@@ -10,6 +10,8 @@ older SQL files in `../` are never applied here.
 * `0004_invitation_delivery.sql`: four additive columns on `invitations` (`delivery_status` default `not_sent`, `delivery_channel`, `delivery_attempted_at`,
   `delivery_error`) that track whether an invitation email was handed to a provider, separately from the invitation's own status. **Staging only for now.**
   Existing rows become `not_sent`; nothing existing is changed. Nothing in the running code reads these columns yet.
+* `0005_branding.sql` (**PROPOSED, not in this folder**: it lives in `../portal-proposed/` until approved): four additive tables for Branding (`brand_kits`, `brand_assets`, `brand_uploads`, `service_requests`).
+  Not applied to Staging or Production. See `worker/portal/BRANDING-FILES.md`. It is moved here, in its own reviewed change, only when its Staging application is approved.
 * `wrangler.migrate.staging.jsonc`: a migration-only Wrangler config that binds **only** the Staging portal database. Use it with
   `-c` so Wrangler cannot fall back to the main `wrangler.jsonc` (which also binds Production's database).
 * `wrangler.migrate.production.jsonc`: the same, binding **only** the Production portal database `framework-portal`.
@@ -120,3 +122,29 @@ Forward-only and additive; one numbered file each; no BEGIN/COMMIT, PRAGMA or tr
 `organization_id`, an index that starts with it, and references projects through `(project_id, organization_id)`. Rollback is a D1
 Time Travel restore, so note the Time Travel bookmark (`npx wrangler d1 time-travel info <database>`) before applying anything to a
 database that holds real data.
+
+## Apply 0005 (Branding) to the Staging portal database: NOT YET APPROVED
+
+Do not run this until the migration has been moved to `migrations/portal/` in an approved change. Checked read-only on 2026-10-26: Staging (`framework-portal-staging`,
+id `1edda8a2-5249-4f40-9dbc-d29aa44e21f8`) has 0001 to 0004 recorded and no branding tables, so only 0005 would be pending. Run from the repository root, signed in to Cloudflare;
+**`--remote` and `-c migrations/portal/wrangler.migrate.staging.jsonc` are both required.**
+
+```
+# 0. Record a Time Travel bookmark first (write the value down; it is not kept in the repository). This is the recovery point.
+npx wrangler d1 time-travel info PORTAL_DB -c migrations/portal/wrangler.migrate.staging.jsonc
+
+# 1. See what is pending. Expect exactly one file: 0005_branding.sql
+npx wrangler d1 migrations list PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc
+
+# 2. Apply it. The prompt must name framework-portal-staging (answer no if it names anything else, especially framework-portal).
+npx wrangler d1 migrations apply PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc
+
+# 3. Verify: nothing pending, the four tables exist, and the migration is recorded.
+npx wrangler d1 migrations list PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc
+npx wrangler d1 execute PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc --command "SELECT name FROM sqlite_master WHERE type='table' AND (name LIKE 'brand_%' OR name = 'service_requests') ORDER BY name"
+npx wrangler d1 execute PORTAL_DB --remote -c migrations/portal/wrangler.migrate.staging.jsonc --command "SELECT id, name FROM d1_migrations ORDER BY id"
+```
+
+**Recovery.** The migration only creates new tables, so the normal undo is to leave them unused. To return the database to its exact earlier state,
+`npx wrangler d1 time-travel restore PORTAL_DB --bookmark=<value from step 0> -c migrations/portal/wrangler.migrate.staging.jsonc` (this rewinds ALL data in that database to that moment, so use it only straight after a failed apply).
+**Stop** if step 1 lists anything other than 0005, or any output names `framework-portal`, `framework-staging` or `framework-feedback`.
