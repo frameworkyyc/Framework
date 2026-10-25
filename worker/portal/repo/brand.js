@@ -14,6 +14,7 @@
 import { newId, isoTime, requireOrgId, requireUserId, requireId, ok, fail, isUniqueViolation, isConstraintViolation, validActor } from "./common.js";
 import { validateEnum, validateName, validateText, validateHttpsUrl } from "./validate.js";
 import { recordActivity } from "./activity.js";
+import { usableName } from "../../../admin/assets/brand-names.js";
 
 export const ASSET_KINDS = ["logo", "guideline", "document", "font", "package", "other"];
 export const LOGO_ROLES = ["primary", "simplified", "icon"];
@@ -58,6 +59,13 @@ export function normaliseTypography(list) {
   return ok({ value: out });
 }
 
+/** The optional brand name used in generated file names: single-line text of up to 60 characters that leaves letters or digits for a file name. null = none (the organization's name is used). */
+export function normaliseBrandName(raw) {
+  if (raw === null || raw === undefined || (typeof raw === "string" && raw.trim() === "")) return ok({ value: null });
+  const v = validateName(raw, 60);
+  return v && usableName(v) ? ok({ value: v }) : fail("invalid_brand_name");
+}
+
 /* ------------------------------------------------------------------ audit (written in the same transaction as the change it describes) */
 
 function auditAfterChange(db, { organizationId, actorType, actorRef, action, entityType, entityId, visibility = "internal", at }) {
@@ -78,27 +86,28 @@ export async function recordBrandDownload(db, { organizationId, actorType, actor
 
 export async function getBrandKit(db, organizationId) {
   requireOrgId(organizationId);
-  const row = await db.prepare("SELECT organization_id, status, colours_json, typography_json, updated_at, updated_by, published_at, published_by FROM brand_kits WHERE organization_id = ?").bind(organizationId).first();
-  return row ? { organizationId: row.organization_id, status: row.status, colours: parseList(row.colours_json), typography: parseList(row.typography_json), updatedAt: row.updated_at, updatedBy: row.updated_by, publishedAt: row.published_at, publishedBy: row.published_by } : null;
+  const row = await db.prepare("SELECT organization_id, status, colours_json, typography_json, brand_name, updated_at, updated_by, published_at, published_by FROM brand_kits WHERE organization_id = ?").bind(organizationId).first();
+  return row ? { organizationId: row.organization_id, status: row.status, colours: parseList(row.colours_json), typography: parseList(row.typography_json), brandName: row.brand_name, updatedAt: row.updated_at, updatedBy: row.updated_by, publishedAt: row.published_at, publishedBy: row.published_by } : null;
 }
 
-/** Saves colours and/or typography. A new kit starts as a draft; saving never publishes or unpublishes. */
-export async function saveBrandKit(db, organizationId, { colours, typography }, actor, { now = new Date() } = {}) {
+/** Saves colours, typography and/or the brand name (whatever is passed; the rest is kept). A new kit starts as a draft; saving never publishes or unpublishes, and never renames an existing file. */
+export async function saveBrandKit(db, organizationId, { colours, typography, brandName }, actor, { now = new Date() } = {}) {
   requireOrgId(organizationId);
   if (!validActor(actor)) return fail("invalid_actor");
   const current = await getBrandKit(db, organizationId);
-  let c = current ? current.colours : [], t = current ? current.typography : [];
+  let c = current ? current.colours : [], t = current ? current.typography : [], bn = current ? current.brandName : null;
   if (colours !== undefined) { const r = normaliseColours(colours); if (!r.ok) return r; c = r.value; }
   if (typography !== undefined) { const r = normaliseTypography(typography); if (!r.ok) return r; t = r.value; }
+  if (brandName !== undefined) { const r = normaliseBrandName(brandName); if (!r.ok) return r; bn = r.value; }
   const at = isoTime(now);
   try {
     await db.batch([
       db
         .prepare(
-          "INSERT INTO brand_kits (organization_id, status, colours_json, typography_json, created_at, updated_at, updated_by) VALUES (?, 'draft', ?, ?, ?, ?, ?) ON CONFLICT (organization_id) DO UPDATE SET colours_json = excluded.colours_json, typography_json = excluded.typography_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by",
+          "INSERT INTO brand_kits (organization_id, status, colours_json, typography_json, brand_name, created_at, updated_at, updated_by) VALUES (?, 'draft', ?, ?, ?, ?, ?, ?) ON CONFLICT (organization_id) DO UPDATE SET colours_json = excluded.colours_json, typography_json = excluded.typography_json, brand_name = excluded.brand_name, updated_at = excluded.updated_at, updated_by = excluded.updated_by",
         )
-        .bind(organizationId, JSON.stringify(c), JSON.stringify(t), at, at, actor.trim()),
-      auditAfterChange(db, { organizationId, actorType: "admin", actorRef: actor.trim(), action: "brand.kit.saved", entityType: "brand_kit", entityId: organizationId, at }),
+        .bind(organizationId, JSON.stringify(c), JSON.stringify(t), bn, at, at, actor.trim()),
+      auditAfterChange(db, { organizationId, actorType: "admin", actorRef: actor.trim(), action: brandName !== undefined && colours === undefined && typography === undefined ? "brand.kit.brand_name_saved" : "brand.kit.saved", entityType: "brand_kit", entityId: organizationId, at }),
     ]);
   } catch (err) {
     if (isConstraintViolation(err)) return fail("invalid_kit");

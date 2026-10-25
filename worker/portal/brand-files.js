@@ -105,7 +105,9 @@ export async function clientRequestService(deps, { role, organizationId, userId,
 /* ------------------------------------------------------------------ Framework Admin side (callers are behind Cloudflare Access and ADMIN_EMAILS) */
 
 /** The naming inputs of a deliverable, from stored or submitted metadata. */
-const nameInput = (org, m, ext) => ({ company: org.name, slug: org.slug, kind: m.kind, logo: { role: m.logo_role, orientation: m.orientation, tone: m.tone, transparent: m.transparent === true || m.transparent === 1 }, description: m.title, ext });
+/** The name used for the company part of every generated file name: the kit's brand name when one is set, otherwise the organization's own name. */
+const companyName = async (db, org) => { const kit = await brand.getBrandKit(db, org.id); return kit && kit.brandName ? kit.brandName : org.name; };
+const nameInput = (org, m, ext) => ({ company: org.company || org.name, slug: org.slug, kind: m.kind, logo: { role: m.logo_role, orientation: m.orientation, tone: m.tone, transparent: m.transparent === true || m.transparent === 1 }, description: m.title, ext });
 
 /**
  * A new deliverable. The file's NAME is generated here from the organization's name and the file's details (Framework-Primary-Square-Light-Transparent.png);
@@ -116,8 +118,9 @@ export async function adminUploadAsset(deps, { organizationId, actor, meta, file
   const m = meta && typeof meta === "object" ? meta : {};
   if (!brand.ASSET_KINDS.includes(m.kind)) return fail("invalid_kind");
   if (enumError(m)) return fail(enumError(m));
-  const org = await getOrganizationById(deps.db, organizationId);
-  if (!org) return fail("not_found");
+  const base = await getOrganizationById(deps.db, organizationId);
+  if (!base) return fail("not_found");
+  const org = { ...base, company: await companyName(deps.db, base) };
   const inspected = await inspectUpload({ bytes: file && file.bytes, originalName: file && file.name, profile: "brand_admin", maxBytes: ADMIN_MAX_FILE_BYTES });
   if (!inspected.ok) return fail(inspected.error);
   const built = buildBrandFileName(nameInput(org, m, inspected.ext));
@@ -170,8 +173,9 @@ export async function adminUpdateAsset(deps, { organizationId, assetId, actor, p
   const p = patch && typeof patch === "object" ? patch : {};
   if ("kind" in p && p.kind !== cur.kind) return fail("invalid_input");
   if (enumError(p)) return fail(enumError(p));
-  const org = await getOrganizationById(deps.db, organizationId);
-  if (!org) return fail("not_found");
+  const base = await getOrganizationById(deps.db, organizationId);
+  if (!base) return fail("not_found");
+  const org = { ...base, company: await companyName(deps.db, base) };
   const isLogo = cur.kind === "logo";
   const has = (k) => k in p;
   const next = { kind: cur.kind, logo_role: has("logo_role") ? p.logo_role || null : cur.logoRole, orientation: has("orientation") ? p.orientation || null : cur.orientation, tone: has("tone") ? p.tone || null : cur.tone,

@@ -86,7 +86,12 @@ Deliverables are named by the system, not typed: `Company-Type-Shape-Version[-Tr
 * **No duplicates, no overwrites:** the insert, rename and replace statements refuse, atomically in the database statement itself, a name already used (case-insensitively) by a live file of the same organization (`duplicate_name`). Nothing is renamed with a suffix behind the staff member's back; the Admin form warns before uploading.
 * **Editing:** publishing, notes, order and fonts' licence settings never rename a file. Changing a naming detail (logo type, shape, version, transparency, or a non-logo's name) regenerates the name consistently. The file type cannot be changed after upload. Replacing keeps the file's stem and takes the new file's extension.
 * **Older files keep their names.** Nothing was migrated or renamed. An older file is renamed only if staff tick "Rename this file to the standard name" when editing it, or change a naming detail on purpose.
-* No database change was needed (the name uses the existing `original_name` column; uniqueness is enforced inside the statements).
+* **Brand name (optional):** the Admin Branding page has a Brand name field. When set it is used for the company part of generated names instead of the organization's full name ("Framework Test Organization" with brand name "Framework" gives `Framework-Primary-Square-Dark.png`); when empty, the organization's name is used. It is stored on the kit (`brand_kits.brand_name`, migration 0006, nullable, at most 60 characters). Saving, changing or clearing it never renames an existing file; a file takes the current brand name only when it is explicitly renamed (the opt-in rename, or a deliberate change to a naming detail).
+* Uniqueness is enforced inside the statements; the file name uses the existing `original_name` column.
+
+## Migration 0006 (brand name): applied to Staging only
+
+Applied 2026-10-27 to `framework-portal-staging` after confirming the target and recording a Time Travel bookmark (`000000a3-00000000-0000510f-13f013a86927a34740827a6dc3472352`): one nullable column, existing rows get NULL, nothing was renamed, the published kit and the uploaded logo were untouched. Recorded in `d1_migrations`. Production: not applied; its workflow's expected list does not know 0005 or 0006 and fails closed.
 
 ## Phase 2: the Admin interface
 
