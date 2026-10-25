@@ -29,7 +29,7 @@ async function world() {
 const file = (name, bytes) => ({ name, bytes });
 const asOwner = (w, extra = {}) => ({ role: "owner", organizationId: w.a.id, userId: w.ownerA.id, ...extra });
 const asMember = (w, extra = {}) => ({ role: "member", organizationId: w.a.id, userId: w.memberA.id, ...extra });
-const assetMeta = (o = {}) => ({ kind: "logo", title: "Primary logo", logo_role: "primary", orientation: "horizontal", tone: "light", transparent: true, ...o });
+const assetMeta = (o = {}) => ({ kind: "logo", logo_role: "primary", orientation: "horizontal", tone: "light", transparent: true, ...o });
 async function deliver(w, org, o = {}, f = file("logo.png", S.png()), actor = "admin@framework.test") {
   const r = await B.adminUploadAsset(w.deps, { organizationId: org.id, actor, meta: assetMeta(o.meta), file: f });
   assert.ok(r.ok, JSON.stringify(r));
@@ -237,7 +237,7 @@ test("colours and typography are validated; the kit starts as a draft and saving
 test("visibility: a client sees NOTHING until the kit is published, and then only published, undeleted assets of their own organization", async () => {
   const w = await world();
   const logo = await deliver(w, w.a, { meta: { published: true } });
-  const draftLogo = await deliver(w, w.a, { meta: { title: "Draft logo" } }, file("draft.png", S.png(9, 9)));
+  const draftLogo = await deliver(w, w.a, { meta: { tone: "dark" } }, file("draft.png", S.png(9, 9)));
   await repo.saveBrandKit(w.db, w.a.id, { colours: [{ name: "Ink", role: "primary", hex: "#000000" }] }, "a@f.test");
   assert.deepEqual(await repo.getClientBrand(w.db, w.a.id), { published: false }, "kit is a draft: even published assets are hidden");
   assert.equal(await repo.getClientBrandAsset(w.db, w.a.id, logo), null, "and cannot be downloaded");
@@ -406,7 +406,7 @@ test("replacing a deliverable stores the new file, swaps it on the row, and dele
   const after = await repo.getBrandAssetAdmin(w.db, w.a.id, id);
   assert.notEqual(after.storageKey, before.storageKey);
   assert.notEqual(after.sha256, before.sha256);
-  assert.equal(after.title, "Primary logo", "metadata and publication are kept");
+  assert.equal(after.title, before.title, "metadata and publication are kept");
   assert.ok(!w.bucket.store.has(before.storageKey) && w.bucket.store.has(after.storageKey));
   assert.equal(w.bucket.store.size, 1);
   assert.deepEqual(await B.adminReplaceAsset(w.deps, { organizationId: w.a.id, assetId: id, actor: "a@f.test", file: file("evil.exe", S.text("MZ")) }), { ok: false, error: "invalid_name" });

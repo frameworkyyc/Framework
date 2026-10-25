@@ -65,7 +65,7 @@ test("authorization: no token, a forged token or an unlisted email see nothing; 
 
 test("writes need Origin + the Admin header + the writes switch; reads work without writes; a database without migration 0005 answers 'not available'", async () => {
   const { call, A, upload, env } = await setup();
-  const f = () => { const x = new FormData(); x.append("file", new File([S.png()], "a.png")); x.append("meta", JSON.stringify({ kind: "logo", title: "x" })); return x; };
+  const f = () => { const x = new FormData(); x.append("file", new File([S.png()], "a.png")); x.append("meta", JSON.stringify({ kind: "logo", logo_role: "primary", orientation: "horizontal", tone: "light" })); return x; };
   assert.equal((await call(base(A) + "/assets", { method: "POST", form: f(), origin: null })).status, 403);
   assert.equal((await call(base(A) + "/assets", { method: "POST", form: f(), origin: "https://evil.example" })).status, 403);
   assert.equal((await call(base(A) + "/kit/publish", { method: "POST", json: {}, csrf: false })).status, 403);
@@ -99,7 +99,7 @@ test("kit: colours and typography are validated, saved as a draft, never publish
 
 test("uploading deliverables: accepted files are stored privately under the organization; every refusal is specific and stores nothing; admin JSON never carries storage keys", async () => {
   const { call, upload, A, bucket } = await setup();
-  const png = await upload(A, "Primary Logo.png", S.png(32, 32), { kind: "logo", title: "Primary logo", logo_role: "primary", orientation: "horizontal", tone: "light", transparent: true, variant_key: "primary-horizontal-light" });
+  const png = await upload(A, "Primary Logo.png", S.png(32, 32), { kind: "logo", logo_role: "primary", orientation: "square", tone: "light", transparent: true });
   assert.equal(png.status, 201);
   assert.equal((await upload(A, "Guidelines.pdf", S.pdf(), { kind: "guideline", title: "Guidelines" })).status, 201);
   assert.equal((await upload(A, "pack.zip", S.brandPack(), { kind: "package", title: "Complete package" })).status, 201);
@@ -127,7 +127,7 @@ test("uploading deliverables: accepted files are stored privately under the orga
 
 test("publication: a draft kit shows a client nothing; publishing the kit and an asset shows exactly that asset; unpublishing either hides it again", async () => {
   const { call, upload, A, w } = await setup();
-  const id = (await upload(A, "logo.png", S.png(), { kind: "logo", title: "Logo" })).json.id;
+  const id = (await upload(A, "logo.png", S.png(), { kind: "logo", logo_role: "primary", orientation: "horizontal", tone: "light" })).json.id;
   await call(base(A) + "/kit", { method: "PUT", json: { colours: [{ name: "Ink", role: "primary", hex: "#000000" }] } });
   await call(`${base(A)}/assets/${id}/update`, { method: "POST", json: { published: true } });
   assert.deepEqual(await brand.getClientBrand(w.db, A.id), { published: false });
@@ -146,10 +146,10 @@ test("publication: a draft kit shows a client nothing; publishing the kit and an
 
 test("download, replace and delete: attachment with hardening headers and exact bytes; replacing swaps the stored object; deleting removes it at once", async () => {
   const { call, upload, A, bucket } = await setup();
-  const id = (await upload(A, "Primary Logo.png", S.png(32, 32), { kind: "logo", title: "Primary logo" })).json.id;
+  const id = (await upload(A, "Primary Logo.png", S.png(32, 32), { kind: "logo", logo_role: "primary", orientation: "horizontal", tone: "light" })).json.id;
   const d = await call(`${base(A)}/assets/${id}/download`);
   assert.equal(d.status, 200);
-  assert.match(d.headers.get("Content-Disposition"), /^attachment; filename="Primary Logo\.png"/);
+  assert.match(d.headers.get("Content-Disposition"), /^attachment; filename="Alpha-Co-Primary-Horizontal-Light\.png"/);
   assert.equal(d.headers.get("Content-Type"), "application/octet-stream"); assert.equal(d.headers.get("X-Content-Type-Options"), "nosniff"); assert.match(d.headers.get("Content-Security-Policy"), /sandbox/);
   assert.deepEqual([...d.bytes], [...S.png(32, 32)]);
   const before = [...bucket.store.keys()];
@@ -167,7 +167,7 @@ test("download, replace and delete: attachment with hardening headers and exact 
 
 test("organization isolation: another organization's path cannot read, change, replace, download or delete anything of A's", async () => {
   const { call, upload, A, Bo, bucket, clientUpload } = await setup();
-  const id = (await upload(A, "logo.png", S.png(), { kind: "logo", title: "Logo" })).json.id;
+  const id = (await upload(A, "logo.png", S.png(), { kind: "logo", logo_role: "primary", orientation: "horizontal", tone: "light" })).json.id;
   const up = await clientUpload("theirs.png", S.png()); assert.ok(up.ok);
   const rf = new FormData(); rf.append("file", new File([S.png()], "x.png"));
   for (const [path, method, extra] of [[`${base(Bo)}/assets/${id}/update`, "POST", { json: { title: "Hijack" } }], [`${base(Bo)}/assets/${id}/delete`, "POST", { json: {} }], [`${base(Bo)}/assets/${id}/download`, "GET", {}], [`${base(Bo)}/assets/${id}/replace`, "POST", { form: rf }],
@@ -216,7 +216,7 @@ test("service requests: shown with the service name, status and internal note up
 
 test("the client page carries the branding summary (kit state, files, new uploads, open requests) for the dashboard, and the dashboard turns it into next steps", async () => {
   const { call, upload, A, Bo, clientUpload, w, ownerA } = await setup();
-  await upload(A, "logo.png", S.png(), { kind: "logo", title: "Logo", published: true });
+  await upload(A, "logo.png", S.png(), { kind: "logo", logo_role: "primary", orientation: "horizontal", tone: "light", published: true });
   await clientUpload("theirs.png", S.png());
   await brand.createServiceRequest(w.db, A.id, ownerA.id, { serviceKey: "email-signature-design" }, isKnownBrandingService);
   const b = (await call(`/clients/${A.id}`)).json.branding;
@@ -236,13 +236,13 @@ test("storage check: writes, reads back, proves another organization cannot read
   assert.equal(count(w.db, "activity_log", "action = 'brand.storage.selftest' AND organization_id IS NULL"), 1);
   const none = await call("/branding/storage-check", { method: "POST", json: {}, e: { ...env, PORTAL_FILES: undefined } });
   assert.deepEqual([none.status, none.json.ok], [200, false]);
-  const a = (await setup()); const f = new FormData(); f.append("file", new File([S.png()], "a.png")); f.append("meta", JSON.stringify({ kind: "logo", title: "x" }));
+  const a = (await setup()); const f = new FormData(); f.append("file", new File([S.png()], "a.png")); f.append("meta", JSON.stringify({ kind: "logo", logo_role: "primary", orientation: "horizontal", tone: "light" }));
   assert.equal((await a.call(`/clients/${a.A.id}/branding/assets`, { method: "POST", form: f, e: { ...a.env, PORTAL_FILES: undefined } })).json.error, "storage_unavailable");
 });
 
 test("audit: every Admin action is recorded in the activity log (internal only), with no keys, file names or URLs", async () => {
   const { call, upload, A, w } = await setup();
-  const id = (await upload(A, "Secret Logo.png", S.png(), { kind: "logo", title: "Logo" })).json.id;
+  const id = (await upload(A, "Secret Logo.png", S.png(), { kind: "logo", logo_role: "primary", orientation: "horizontal", tone: "light" })).json.id;
   await call(base(A) + "/kit", { method: "PUT", json: { colours: [] } }); await call(base(A) + "/kit/publish", { method: "POST", json: {} });
   await call(`${base(A)}/assets/${id}/update`, { method: "POST", json: { published: true } }); await call(`${base(A)}/assets/${id}/download`);
   await call(`${base(A)}/assets/${id}/delete`, { method: "POST", json: {} });
@@ -264,7 +264,7 @@ test("Branding Admin UI: built the safe way, uploads only through api(), confirm
   assert.match(ui, /new FormData\(\)/); assert.match(ui, /api\(base \+ "\/assets", \{ method: "POST", body \}\)/);
   assert.match(ui, /svg\.update = /, "swatches are SVG with a fill attribute");
   for (const title of ["Replace this file?", "Delete this file?", "Delete this client file?", "Hold this file?", "Unpublish this file?", "Unpublish the brand kit?", "Publish the brand kit?"]) assert.ok(ui.includes(`title: "${title}"`), title);
-  for (const [visible, aria] of [["Delete", "Delete ${a.title}"], ["Download", "Download ${a.title}"], ["Edit", "Edit ${a.title}"], ["Replace file", "Replace file for ${a.title}"], ["Remove", "Remove colour ${i + 1}"]]) assert.ok(ui.includes(visible) && ui.includes(aria), visible);
+  for (const [visible, aria] of [["Delete", "Delete ${a.originalName}"], ["Download", "Download ${a.originalName}"], ["Edit", "Edit ${a.originalName}"], ["Replace file", "Replace file for ${a.originalName}"], ["Remove", "Remove colour ${i + 1}"]]) assert.ok(ui.includes(visible) && ui.includes(aria), visible);
   assert.match(ui, /download: ""/);
   assert.match(read("admin/assets/clients.js"), /\(\\\/branding\)\?\$/, "the client route has a branding sub-page");
   assert.match(read("admin/assets/ui.js"), /instanceof FormData/);

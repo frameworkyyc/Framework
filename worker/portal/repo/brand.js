@@ -137,6 +137,10 @@ function assetMeta(meta, { forCreate }) {
   if ("downloadable" in meta) out.downloadable = bool(meta.downloadable);
   if ("sort_order" in meta) { if (!Number.isInteger(meta.sort_order) || meta.sort_order < 0 || meta.sort_order > 10000) return fail("invalid_sort_order"); out.sort_order = meta.sort_order; }
   if ("published" in meta) out.published = bool(meta.published);
+  if ("original_name" in meta) { // the generated download name: only the file service sets it (the HTTP layer never forwards it), and it must be plain letters, digits and hyphens plus an extension
+    if (typeof meta.original_name !== "string" || !/^[A-Za-z0-9-]{1,100}\.[a-z0-9]{1,8}$/.test(meta.original_name)) return fail("invalid_input");
+    out.original_name = meta.original_name;
+  }
   return ok({ value: out });
 }
 
@@ -154,22 +158,31 @@ export async function createBrandAsset(db, organizationId, meta, file, actor, { 
   const lic = fontRule(v.kind, v.downloadable ?? 1, v.license_note ?? null);
   if (lic) return lic;
   const id = newId(), at = isoTime(now);
+  let res;
   try {
-    await db.batch([
+    res = await db.batch([
       db
         .prepare(
           `INSERT INTO brand_assets (id, organization_id, kind, title, variant_key, logo_role, orientation, tone, transparent, usage_note, downloadable, license_note, format, content_type, size_bytes, sha256, storage_key, original_name, published, sort_order, created_at, created_by, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            WHERE NOT EXISTS (SELECT 1 FROM brand_assets d WHERE d.organization_id = ? AND d.deleted_at IS NULL AND lower(d.original_name) = lower(?))`,
         )
         .bind(id, organizationId, v.kind, v.title, v.variant_key ?? null, v.logo_role ?? null, v.orientation ?? null, v.tone ?? null, v.transparent ?? 0, v.usage_note ?? null, v.downloadable ?? 1, v.license_note ?? null,
-          file.ext, file.contentType, file.size, file.sha256, file.storageKey, file.name, v.published ?? 0, v.sort_order ?? 0, at, actor.trim(), at),
+          file.ext, file.contentType, file.size, file.sha256, file.storageKey, file.name, v.published ?? 0, v.sort_order ?? 0, at, actor.trim(), at, organizationId, file.name),
       auditAfterChange(db, { organizationId, actorType: "admin", actorRef: actor.trim(), action: "brand.asset.created", entityType: "brand_asset", entityId: id, at }),
     ]);
   } catch (err) {
     if (isConstraintViolation(err)) return fail("invalid_input");
     throw err;
   }
-  return ok({ id });
+  return res[0].meta.changes === 1 ? ok({ id }) : fail("duplicate_name"); // the name is already used by a live file of this organization: never overwritten, never renamed
+}
+
+/** Is this download name already used by a live file of the organization (case-insensitive)? `exceptId` excludes the file being changed. */
+export async function brandAssetNameTaken(db, organizationId, name, exceptId = null) {
+  requireOrgId(organizationId);
+  const r = await db.prepare("SELECT 1 AS taken FROM brand_assets WHERE organization_id = ? AND deleted_at IS NULL AND lower(original_name) = lower(?) AND id <> ?").bind(organizationId, name, exceptId || "-").first();
+  return Boolean(r);
 }
 
 export async function updateBrandAsset(db, organizationId, assetId, patch, actor, { now = new Date() } = {}) {
@@ -184,17 +197,21 @@ export async function updateBrandAsset(db, organizationId, assetId, patch, actor
   const merged = { downloadable: cur.downloadable ? 1 : 0, license_note: cur.licenseNote, ...m.value };
   const lic = fontRule(m.value.kind ?? cur.kind, merged.downloadable, merged.license_note);
   if (lic) return lic;
-  const COLUMN = { kind: "kind", title: "title", variant_key: "variant_key", logo_role: "logo_role", orientation: "orientation", tone: "tone", transparent: "transparent", usage_note: "usage_note", downloadable: "downloadable", license_note: "license_note", sort_order: "sort_order", published: "published" };
+  const COLUMN = { kind: "kind", title: "title", variant_key: "variant_key", logo_role: "logo_role", orientation: "orientation", tone: "tone", transparent: "transparent", usage_note: "usage_note", downloadable: "downloadable", license_note: "license_note", sort_order: "sort_order", published: "published", original_name: "original_name" };
   const sets = [], values = [];
   for (const [k, val] of Object.entries(m.value)) { sets.push(`${COLUMN[k]} = ?`); values.push(val); }
   const at = isoTime(now);
+  const renaming = "original_name" in m.value;
   const published = "published" in m.value && m.value.published !== (cur.published ? 1 : 0) ? (m.value.published ? "brand.asset.published" : "brand.asset.unpublished") : "brand.asset.updated";
+  const audit = auditAfterChange(db, { organizationId, actorType: "admin", actorRef: actor.trim(), action: renaming ? "brand.asset.renamed" : published, entityType: "brand_asset", entityId: assetId, at });
   try {
-    const res = await db.batch([
-      db.prepare(`UPDATE brand_assets SET ${sets.join(", ")}, updated_at = ? WHERE id = ? AND organization_id = ? AND deleted_at IS NULL`).bind(...values, at, assetId, organizationId),
-      auditAfterChange(db, { organizationId, actorType: "admin", actorRef: actor.trim(), action: published, entityType: "brand_asset", entityId: assetId, at }),
-    ]);
-    return res[0].meta.changes === 1 ? ok() : fail("not_found");
+    // a rename is refused by the statement itself when another live file of the organization already has that name
+    const update = renaming
+      ? db.prepare(`UPDATE brand_assets SET ${sets.join(", ")}, updated_at = ? WHERE id = ? AND organization_id = ? AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM brand_assets d WHERE d.organization_id = ? AND d.id <> ? AND d.deleted_at IS NULL AND lower(d.original_name) = lower(?))`).bind(...values, at, assetId, organizationId, organizationId, assetId, m.value.original_name)
+      : db.prepare(`UPDATE brand_assets SET ${sets.join(", ")}, updated_at = ? WHERE id = ? AND organization_id = ? AND deleted_at IS NULL`).bind(...values, at, assetId, organizationId);
+    const res = await db.batch([update, audit]);
+    if (res[0].meta.changes === 1) return ok();
+    return renaming && (await getBrandAssetAdmin(db, organizationId, assetId)) ? fail("duplicate_name") : fail("not_found");
   } catch (err) {
     if (isConstraintViolation(err)) return fail("invalid_input");
     throw err;
@@ -210,11 +227,16 @@ export async function replaceBrandAssetFile(db, organizationId, assetId, file, a
   const at = isoTime(now);
   const res = await db.batch([
     db
-      .prepare("UPDATE brand_assets SET format = ?, content_type = ?, size_bytes = ?, sha256 = ?, storage_key = ?, original_name = ?, updated_at = ? WHERE id = ? AND organization_id = ? AND storage_key = ? AND deleted_at IS NULL")
-      .bind(file.ext, file.contentType, file.size, file.sha256, file.storageKey, file.name, at, assetId, organizationId, cur.storageKey),
+      .prepare(
+        `UPDATE brand_assets SET format = ?, content_type = ?, size_bytes = ?, sha256 = ?, storage_key = ?, original_name = ?, updated_at = ?
+          WHERE id = ? AND organization_id = ? AND storage_key = ? AND deleted_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM brand_assets d WHERE d.organization_id = ? AND d.id <> ? AND d.deleted_at IS NULL AND lower(d.original_name) = lower(?))`,
+      )
+      .bind(file.ext, file.contentType, file.size, file.sha256, file.storageKey, file.name, at, assetId, organizationId, cur.storageKey, organizationId, assetId, file.name),
     auditAfterChange(db, { organizationId, actorType: "admin", actorRef: actor.trim(), action: "brand.asset.replaced", entityType: "brand_asset", entityId: assetId, at }),
   ]);
-  return res[0].meta.changes === 1 ? ok({ previousKey: cur.storageKey }) : fail("conflict");
+  if (res[0].meta.changes === 1) return ok({ previousKey: cur.storageKey });
+  return (await brandAssetNameTaken(db, organizationId, file.name, assetId)) ? fail("duplicate_name") : fail("conflict");
 }
 
 /** Soft delete: the row stays as a tombstone for the audit trail, is unpublished, and its storage key is returned so the object can be deleted at once. */

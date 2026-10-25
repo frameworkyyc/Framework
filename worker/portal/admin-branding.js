@@ -42,7 +42,7 @@ const STATUS = {
   invalid_license_note: 422, invalid_sort_order: 422, invalid_input: 422, invalid_status: 422, invalid_note: 422, invalid_kit: 422, font_license_required: 422,
   invalid_name: 422, type_not_allowed: 415, content_mismatch: 422, active_content: 422, image_dimensions: 422, pdf_encrypted: 422, empty_file: 422, no_file: 400, file_too_large: 413,
   archive_unsafe_entry: 422, archive_encrypted: 422, archive_unsupported: 422, archive_entries: 422, archive_too_large: 422,
-  conflict: 409, already_open: 409,
+  conflict: 409, already_open: 409, duplicate_name: 409, incomplete_logo_details: 422, invalid_description: 422,
   storage_unavailable: 503, storage_write_failed: 502, storage_read_failed: 502, storage_delete_failed: 502,
 };
 const fromFailure = (r) => (STATUS[r.error] ? err(STATUS[r.error], r.error, "The change was not made.") : err(500, "server_error", "Something went wrong. Nothing was changed."));
@@ -90,7 +90,7 @@ async function readUpload(request, { withMeta }) {
   return { file: { name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }, meta };
 }
 
-const META_FIELDS = ["kind", "title", "variant_key", "logo_role", "orientation", "tone", "transparent", "usage_note", "downloadable", "license_note", "sort_order", "published"];
+const META_FIELDS = ["kind", "title", "standard_name", "logo_role", "orientation", "tone", "transparent", "usage_note", "downloadable", "license_note", "sort_order", "published"];
 const pick = (obj, keys) => Object.fromEntries(Object.entries(obj).filter(([k]) => keys.includes(k)));
 
 const publicAsset = (a) => ({ id: a.id, kind: a.kind, title: a.title, variantKey: a.variantKey, logoRole: a.logoRole, orientation: a.orientation, tone: a.tone, transparent: a.transparent, usageNote: a.usageNote, downloadable: a.downloadable, licenseNote: a.licenseNote, format: a.format, size: a.size, sha256: a.sha256, originalName: a.originalName, published: a.published, sortOrder: a.sortOrder, createdAt: a.createdAt, createdBy: a.createdBy, updatedAt: a.updatedAt });
@@ -106,7 +106,7 @@ async function view(env, org) {
   const [kit, assets, uploads, requests, usage] = await Promise.all([brand.getBrandKit(db, org.id), brand.listBrandAssetsAdmin(db, org.id), brand.listUploadsAdmin(db, org.id), brand.listServiceRequests(db, org.id), brand.uploadUsage(db, org.id)]);
   return {
     available: true,
-    organization: { id: org.id, name: org.name },
+    organization: { id: org.id, name: org.name, slug: org.slug },
     capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", storage: Boolean(env.PORTAL_FILES) },
     limits: { ...limitsFor({ env }), adminMaxFileBytes: ADMIN_MAX_FILE_BYTES },
     usage,
@@ -205,19 +205,19 @@ export async function handleBrandingApi(request, env, principal, path, deps = {}
       const read = await readUpload(request, { withMeta: true });
       if (read.response) return read.response;
       const r = await files.adminUploadAsset(svc, { organizationId: org.id, actor, meta: pick(read.meta, META_FIELDS), file: read.file });
-      return r.ok ? json({ ok: true, id: r.id }, 201) : fromFailure(r);
+      return r.ok ? json({ ok: true, id: r.id, name: r.name }, 201) : fromFailure(r);
     }
     if (route.kind === "asset_update") {
       const read = await readJson(request, META_FIELDS);
       if (read.response) return read.response;
-      const r = await brand.updateBrandAsset(db, org.id, route.target, read.body, actor, { now });
-      return r.ok ? json({ ok: true }) : fromFailure(r);
+      const r = await files.adminUpdateAsset(svc, { organizationId: org.id, assetId: route.target, actor, patch: read.body });
+      return r.ok ? json({ ok: true, name: r.name }) : fromFailure(r);
     }
     if (route.kind === "asset_replace") {
       const read = await readUpload(request, { withMeta: false });
       if (read.response) return read.response;
       const r = await files.adminReplaceAsset(svc, { organizationId: org.id, assetId: route.target, actor, file: read.file });
-      return r.ok ? json({ ok: true }) : fromFailure(r);
+      return r.ok ? json({ ok: true, name: r.name }) : fromFailure(r);
     }
     if (route.kind === "asset_delete") {
       const r = await files.adminDeleteAsset(svc, { organizationId: org.id, assetId: route.target, actor });
