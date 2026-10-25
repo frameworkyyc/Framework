@@ -623,3 +623,13 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-brandpage .adm-acc--sub { margin: 0 0 26px; }
 .adm-brandpage .adm-acc--sub > .adm-acc__sum { min-height: 48px; }
 .adm-brandpage .adm-acc--sub .adm-acc__title { font-size: 15px; }
+.adm-brandpage .adm-brand__file { margin: 0 0 8px; font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.adm-brandpage .adm-brand__file code, .adm-brandpage .adm-brand__previewname { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; color: var(--ink); background: #F4F4F4; padding: 2px 6px; overflow-wrap: anywhere; overflow-wrap: anywhere; }
+.adm-brandpage .adm-brand__preview { display: grid; gap: 6px; padding: 12px 14px; border-left: 4px solid var(--hairline); background: #F8F8F8; }
+.adm-brandpage .adm-brand__preview.is-ok { border-left-color: var(--ok, #1E6B3C); }
+.adm-brandpage .adm-brand__preview.is-taken { border-left-color: var(--bad, #A12B2B); background: var(--bad-bg, #FBEBEB); }
+.adm-brandpage .adm-brand__preview.is-pending { border-left-color: var(--warn, #8A5300); }
+.adm-brandpage .adm-brand__previewlabel { font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--slate); }
+.adm-brandpage .adm-brand__previewname { display: inline-block; justify-self: start; max-width: 100%; }
+.adm-brandpage .adm-brand__previewnote { font-size: 14px; line-height: 1.45; color: var(--slate); }
+.adm-brandpage .adm-brand__preview.is-taken .adm-brand__previewnote { color: var(--bad, #A12B2B); font-weight: 600; }

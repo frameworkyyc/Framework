@@ -5,12 +5,14 @@
 
 import { h, api, confirmDialog, errorState, fmtDate, fmtDateTime } from "./ui.js";
 import { disclosure, chip, plural } from "./client-dashboard.js";
+import { buildBrandFileName, extensionOf } from "./brand-names.js";
 
 const KIND_LABEL = { logo: "Logos", guideline: "Guidelines", document: "Documents", font: "Fonts", package: "Packages", other: "Other files" };
 const KIND_ONE = { logo: "Logo", guideline: "Guideline", document: "Document", font: "Font", package: "Package", other: "Other file" };
 const LOGO_ROLE = { primary: "Primary", simplified: "Simplified", icon: "Icon / symbol" };
 const ORIENTATION = { horizontal: "Horizontal", vertical: "Vertical", square: "Square" };
 const TONE = { light: "For light backgrounds", dark: "For dark backgrounds", colour: "Full colour", mono: "One colour" };
+const TONE_FORM = { light: "Light (for light backgrounds)", dark: "Dark (for dark backgrounds)", colour: "Colour (full colour)", mono: "Mono (one colour)" };
 const CATEGORY = { logo: "Logo", fonts: "Fonts", colours: "Colour palette", guidelines: "Brand guidelines", stationery: "Business cards and stationery", signature: "Email signature", other: "Other" };
 const COLOUR_ROLE = { primary: "Primary", secondary: "Secondary", accent: "Accent", neutral: "Neutral" };
 const TYPE_ROLE = { logo: "Logo", heading: "Headings", subheading: "Subheadings", body: "Body text", other: "Other" };
@@ -35,7 +37,8 @@ const ERROR_TEXT = {
   font_license_required: "A font can only be made downloadable if you record its licence.",
   invalid_colours: "Check the colours: each needs a name, a role and a HEX value like #1A2B3C (up to 16).",
   invalid_typography: "Check the typefaces: each needs a role and a family; weights are 100 to 900 in steps of 100; a source link must start with https://",
-  invalid_title: "Enter a title (up to 120 characters).", invalid_variant: "The variant key can only use lower-case letters, digits and hyphens.",
+  invalid_title: "Enter a name for the file.", invalid_description: "Enter a name for the file (letters and numbers).", incomplete_logo_details: "Choose the logo type, shape and version first.",
+  duplicate_name: "A file with that name already exists for this client. Change a detail, or replace the existing file instead.",
   invalid_note: "That note is too long.", invalid_input: "Check the details and try again.", invalid_kit: "The kit couldn’t be saved: check the details.",
   invalid_status: "Choose a status.", not_found: "That item no longer exists. The page has been refreshed.", conflict: "That file changed while you were working. The page has been refreshed.",
   writes_disabled: "Changes are switched off on this site, so nothing was changed.",
@@ -82,6 +85,7 @@ export async function render(orgId, ctx) {
   const opened = new Set();
   let busy = false;
   let first = true;
+  const memory = { kind: "logo", role: "", orient: "", tone: "", transparent: false, description: "" }; // the add form keeps its details between uploads, so the next format of the same variant is quick
 
   const toggled = (id) => (ev) => { if (ev.target.open) opened.add(id); else opened.delete(id); if (id === "br-uploads" && ev.target.open) markSeen(); };
   const section = (id, title, meta, children) => disclosure({ id, title, meta, open: opened.has(id), onToggle: toggled(id), children });
@@ -123,43 +127,75 @@ export async function render(orgId, ctx) {
 
   /* ---------------------------------------------------------- deliverables */
 
-  /** The metadata fields shared by "add a file" and "edit a file". read() returns the object the API accepts. */
-  function assetFields(prefix, a = {}) {
-    const kind = select(prefix + "-kind", KIND_ONE, a.kind || "logo");
-    const title = h("input", { id: prefix + "-title", class: "input", type: "text", maxlength: "120", value: a.title || "", autocomplete: "off" });
-    const role = select(prefix + "-role", LOGO_ROLE, a.logoRole || "", { blank: "Not set" });
-    const orient = select(prefix + "-orient", ORIENTATION, a.orientation || "", { blank: "Not set" });
-    const tone = select(prefix + "-tone", TONE, a.tone || "", { blank: "Not set" });
-    const transparent = check(prefix + "-transparent", "Transparent background", a.transparent);
-    const variant = h("input", { id: prefix + "-variant", class: "input", type: "text", maxlength: "60", value: a.variantKey || "", autocomplete: "off", spellcheck: "false" });
-    const usage = h("input", { id: prefix + "-usage", class: "input", type: "text", maxlength: "300", value: a.usageNote || "", autocomplete: "off" });
-    const downloadable = check(prefix + "-dl", "Clients may download this font file", a.downloadable);
-    const licence = h("input", { id: prefix + "-lic", class: "input", type: "text", maxlength: "300", value: a.licenseNote || "", autocomplete: "off" });
+  /**
+   * The details of a deliverable, shared by "add a file" and "edit a file". There is no title or variant name to type for a logo: the file name is generated from
+   * the company and these details (the same module the server uses) and previewed live. Other files take a short name. getExt() is the file's extension.
+   */
+  function assetFields(prefix, a = null, getExt = () => "") {
+    const editing = Boolean(a);
+    const kind = editing ? null : select(prefix + "-kind", KIND_ONE, memory.kind);
+    const kindNow = () => (editing ? a.kind : kind.value);
+    const description = h("input", { id: prefix + "-title", class: "input", type: "text", maxlength: "120", value: editing ? (a.kind !== "logo" ? a.title : "") : memory.description, autocomplete: "off" });
+    const role = select(prefix + "-role", LOGO_ROLE, a ? a.logoRole || "" : memory.role, { blank: "Choose…" });
+    const orient = select(prefix + "-orient", ORIENTATION, a ? a.orientation || "" : memory.orient, { blank: "Choose…" });
+    const tone = select(prefix + "-tone", TONE_FORM, a ? a.tone || "" : memory.tone, { blank: "Choose…" });
+    const transparent = check(prefix + "-transparent", "Transparent background", a ? a.transparent : memory.transparent);
+    const usage = h("input", { id: prefix + "-usage", class: "input", type: "text", maxlength: "300", value: a && a.usageNote || "", autocomplete: "off" });
+    const downloadable = check(prefix + "-dl", "Clients may download this font file", a && a.downloadable);
+    const licence = h("input", { id: prefix + "-lic", class: "input", type: "text", maxlength: "300", value: a && a.licenseNote || "", autocomplete: "off" });
     const logoBox = h("div", { class: "adm-brand__grid" }, labelled(prefix + "-role", "Logo type", role), labelled(prefix + "-orient", "Shape", orient), labelled(prefix + "-tone", "Version", tone), transparent.node);
-    const variantBox = labelled(prefix + "-variant", "Variant name (groups the formats of one logo)", variant, "For example primary-horizontal-dark. Lower-case letters, digits and hyphens.");
+    const descriptionBox = labelled(prefix + "-title", "Name", description, "Used in the file name, for example “Brand guidelines” or “Switzer Regular”.");
     const fontBox = h("div", { class: "adm-brand__stack" }, downloadable.node, labelled(prefix + "-lic", "Licence note (required to allow downloads)", licence, "For example: Open Font Licence 1.1, or the licence you hold."));
-    const sync = () => { const k = kind.value; logoBox.hidden = k !== "logo"; variantBox.hidden = k !== "logo"; fontBox.hidden = k !== "font"; };
-    kind.addEventListener("change", sync); sync();
-    const node = h("div", { class: "adm-brand__fields" }, h("div", { class: "adm-brand__grid" }, labelled(prefix + "-kind", "Type", kind), labelled(prefix + "-title", "Title", title)), logoBox, variantBox, labelled(prefix + "-usage", "Usage note (optional)", usage, "Shown to the client, for example “Use on white or light backgrounds”."), fontBox);
+    const previewName = h("code", { class: "adm-brand__previewname" }), previewNote = h("span", { class: "adm-brand__previewnote" });
+    const preview = h("div", { class: "adm-brand__preview", "aria-live": "polite" }, h("span", { class: "adm-brand__previewlabel", text: "File name" }), previewName, previewNote);
+    const adopt = editing ? check(prefix + "-adopt", "Rename this file to the standard name", false) : null;
+    const standardOf = () => buildBrandFileName({ company: data.organization.name, slug: data.organization.slug, kind: a.kind, logo: { role: a.logoRole, orientation: a.orientation, tone: a.tone, transparent: a.transparent }, description: a.title, ext: a.format });
+    const legacy = editing && (() => { const st = standardOf(); return st.ok && st.name.toLowerCase() !== a.originalName.toLowerCase(); })();
+    const taken = new Set(data.assets.filter((x) => !a || x.id !== a.id).map((x) => x.originalName.toLowerCase()));
+    const naming = () => ({ company: data.organization.name, slug: data.organization.slug, kind: kindNow(), logo: { role: role.value, orientation: orient.value, tone: tone.value, transparent: transparent.input.checked }, description: description.value, ext: getExt() || (a ? a.format : "") });
+    const changed = () => (!editing ? true : adopt.input.checked || (kindNow() === "logo" ? (role.value || null) !== a.logoRole || (orient.value || null) !== a.orientation || (tone.value || null) !== a.tone || transparent.input.checked !== a.transparent : description.value.trim() !== a.title));
+    let state = { ok: false, message: "" };
+    const refresh = () => {
+      const k = kindNow();
+      if (!editing) Object.assign(memory, { kind: k, role: role.value, orient: orient.value, tone: tone.value, transparent: transparent.input.checked, description: description.value });
+      logoBox.hidden = k !== "logo"; descriptionBox.hidden = k === "logo"; fontBox.hidden = k !== "font"; if (adopt) adopt.node.hidden = !legacy;
+      if (!changed()) { previewName.textContent = a.originalName; previewNote.textContent = "Unchanged."; preview.className = "adm-brand__preview"; state = { ok: true, message: "", unchanged: true }; return; }
+      const built = buildBrandFileName(naming());
+      if (!built.ok) {
+        previewName.textContent = "…";
+        previewNote.textContent = built.error === "incomplete_logo_details" ? `Choose the ${built.missing.join(", ").replace(/, ([^,]*)$/, " and $1")} to see the file name.` : "Enter a name to see the file name.";
+        preview.className = "adm-brand__preview is-pending"; state = { ok: false, message: ERROR_TEXT[built.error] }; return;
+      }
+      const shown = built.name.endsWith(".") || !getExt() && !a ? built.stem + ".…" : built.name;
+      previewName.textContent = shown;
+      if (taken.has(built.name.toLowerCase())) { previewNote.textContent = "A file with this name already exists. Change a detail, or replace the existing file instead."; preview.className = "adm-brand__preview is-taken"; state = { ok: false, message: ERROR_TEXT.duplicate_name }; return; }
+      previewNote.textContent = getExt() || a ? "Clients download the file with this name." : "The file type is added when you choose a file.";
+      preview.className = "adm-brand__preview is-ok"; state = { ok: true, message: "" };
+    };
+    if (adopt) adopt.input.addEventListener("change", refresh);
+    for (const el of [role, orient, tone, description]) { el.addEventListener("change", refresh); el.addEventListener("input", refresh); }
+    transparent.input.addEventListener("change", refresh);
+    if (kind) kind.addEventListener("change", refresh);
+    refresh();
+    const node = h("div", { class: "adm-brand__fields" }, editing ? h("p", { class: "adm-brand__meta" }, `Type: ${KIND_ONE[a.kind]}. It can’t be changed after upload.`) : labelled(prefix + "-kind", "Type", kind), logoBox, descriptionBox, adopt ? adopt.node : null, preview, labelled(prefix + "-usage", "Usage note (optional)", usage, "Shown to the client, for example “Use on white or light backgrounds”."), fontBox);
+    /** What the server accepts. A logo sends only its details; any other file sends its name. The file name itself is never sent: the server generates it. */
     const read = () => {
-      const k = kind.value, out = { kind: k, title: title.value.trim(), usage_note: usage.value.trim() || null };
-      if (k === "logo") Object.assign(out, { logo_role: role.value || null, orientation: orient.value || null, tone: tone.value || null, transparent: transparent.input.checked, variant_key: variant.value.trim() || null });
-      else Object.assign(out, { logo_role: null, orientation: null, tone: null, transparent: false, variant_key: null });
+      const k = kindNow(), out = { usage_note: usage.value.trim() || null };
+      if (!editing) out.kind = k;
+      if (adopt && adopt.input.checked) out.standard_name = true;
+      if (k === "logo") { if (!editing || changed()) Object.assign(out, { logo_role: role.value || null, orientation: orient.value || null, tone: tone.value || null, transparent: transparent.input.checked }); }
+      else if (!editing || changed()) out.title = description.value.trim();
       if (k === "font") Object.assign(out, { downloadable: downloadable.input.checked, license_note: licence.value.trim() || null });
-      else Object.assign(out, { downloadable: true, license_note: null });
       return out;
     };
-    return { node, read, title, kind };
+    return { node, read, refresh, ready: () => (state.ok ? { ok: true } : { ok: false, message: state.message || ERROR_TEXT.incomplete_logo_details }), kind };
   }
 
   function addForm() {
     const fileInput = h("input", { id: "br-new-file", class: "input", type: "file", accept: ACCEPT });
-    const fields = assetFields("br-new");
+    const fields = assetFields("br-new", null, () => extensionOf((fileInput.files && fileInput.files[0] && fileInput.files[0].name) || ""));
     const errorEl = h("p", { class: "adm-field__error", id: "br-new-err", role: "alert", hidden: true });
-    fileInput.addEventListener("change", () => {
-      const f = fileInput.files && fileInput.files[0];
-      if (f && !fields.title.value.trim()) fields.title.value = f.name.replace(/\.[^.]+$/, "").slice(0, 120);
-    });
+    fileInput.addEventListener("change", () => fields.refresh());
     const form = h("form", { class: "adm-form adm-brand__form", novalidate: true, "aria-label": "Add a file", onsubmit: (ev) => {
       ev.preventDefault();
       errorEl.hidden = true;
@@ -167,10 +203,11 @@ export async function render(orgId, ctx) {
       const fail = (t) => { errorEl.textContent = t; errorEl.hidden = false; };
       if (!f) return fail(ERROR_TEXT.no_file);
       if (f.size > data.limits.adminMaxFileBytes) return fail(`That file is ${fmtSize(f.size)}. The limit is ${fmtSize(data.limits.adminMaxFileBytes)}.`);
+      const ready = fields.ready();
+      if (!ready.ok) return fail(ready.message);
       const meta = fields.read();
-      if (!meta.title) return fail(ERROR_TEXT.invalid_title);
       const body = new FormData(); body.append("file", f, f.name); body.append("meta", JSON.stringify(meta));
-      perform({ request: () => api(base + "/assets", { method: "POST", body }), success: `${meta.title} was added as a draft. Publish it when it’s ready for the client.`, onError: (err) => { fail(errorText(err)); return errorText(err); } });
+      perform({ request: () => api(base + "/assets", { method: "POST", body }), success: (res) => `${res.name} was added as a draft. Publish it when it’s ready for the client.`, onError: (err) => { fail(errorText(err)); return errorText(err); } });
     } },
       labelled("br-new-file", "File", fileInput, `Up to ${fmtSize(data.limits.adminMaxFileBytes)}. It’s added as a draft: the client sees nothing until you publish it.`),
       fields.node, errorEl,
@@ -183,39 +220,40 @@ export async function render(orgId, ctx) {
     const chips = [chip(a.published ? "ok" : "plain", a.published ? "Published" : "Draft", a.published ? "complete" : null)];
     if (a.kind === "logo") for (const t of [LOGO_ROLE[a.logoRole], ORIENTATION[a.orientation], TONE[a.tone], a.transparent ? "Transparent" : null]) if (t) chips.push(chip("plain", t));
     if (a.kind === "font") chips.push(a.downloadable ? chip("ok", "Download allowed") : chip("warn", "View only", "warn"));
-    const replaceInput = h("input", { type: "file", class: "visually-hidden", accept: ACCEPT, "aria-label": `Replace file for ${a.title}`, tabindex: "-1", onchange: () => {
+    const replaceInput = h("input", { type: "file", class: "visually-hidden", accept: ACCEPT, "aria-label": `Replace file for ${a.originalName}`, tabindex: "-1", onchange: () => {
       const f = replaceInput.files && replaceInput.files[0]; if (!f) return;
       replaceInput.value = "";
       if (f.size > data.limits.adminMaxFileBytes) { say(`That file is ${fmtSize(f.size)}. The limit is ${fmtSize(data.limits.adminMaxFileBytes)}.`, "error"); return; }
       const body = new FormData(); body.append("file", f, f.name);
-      perform({ confirm: { title: "Replace this file?", body: "The new file takes the old one’s place, keeping its title, settings and publication. The old file is deleted.", details: [["Item", a.title], ["New file", f.name], ["Size", fmtSize(f.size)]], confirmLabel: "Replace file" },
-        request: () => api(`${base}/assets/${encodeURIComponent(a.id)}/replace`, { method: "POST", body }), success: `${a.title} was replaced.` });
+      perform({ confirm: { title: "Replace this file?", body: "The new file takes the old one’s place, keeping its settings and publication. Its file name keeps the same start and takes the new file’s type. The old file is deleted.", details: [["File", a.originalName], ["New file", f.name], ["Size", fmtSize(f.size)]], confirmLabel: "Replace file" },
+        request: () => api(`${base}/assets/${encodeURIComponent(a.id)}/replace`, { method: "POST", body }), success: (res) => `${res.name} was replaced.` });
     } });
     const actions = [];
     if (canWrite()) {
-      actions.push(button(a.published ? "Unpublish" : "Publish", { "aria-label": `${a.published ? "Unpublish" : "Publish"} ${a.title}`, onclick: () => perform({
-        confirm: a.published ? { title: "Unpublish this file?", body: "The client will no longer see or be able to download it.", details: [["Item", a.title]], confirmLabel: "Unpublish" } : null,
+      actions.push(button(a.published ? "Unpublish" : "Publish", { "aria-label": `${a.published ? "Unpublish" : "Publish"} ${a.originalName}`, onclick: () => perform({
+        confirm: a.published ? { title: "Unpublish this file?", body: "The client will no longer see or be able to download it.", details: [["File", a.originalName]], confirmLabel: "Unpublish" } : null,
         request: () => api(`${base}/assets/${encodeURIComponent(a.id)}/update`, { method: "POST", body: { published: !a.published } }),
-        success: a.published ? `${a.title} is no longer published.` : data.kit && data.kit.status === "published" ? `${a.title} is published and visible to the client.` : `${a.title} is marked published. The client sees it once the kit is published.` }) }));
+        success: a.published ? `${a.originalName} is no longer published.` : data.kit && data.kit.status === "published" ? `${a.originalName} is published and visible to the client.` : `${a.originalName} is marked published. The client sees it once the kit is published.` }) }));
     }
-    actions.push(h("a", { class: "btn btn--secondary adm-small", href: assetLink(a), "aria-label": `Download ${a.title}`, download: "" }, "Download"));
+    actions.push(h("a", { class: "btn btn--secondary adm-small", href: assetLink(a), "aria-label": `Download ${a.originalName}`, download: "" }, "Download"));
     if (canWrite()) {
-      actions.push(button("Edit", { "aria-label": `Edit ${a.title}`, "aria-expanded": "false", onclick: (ev) => { editor.hidden = !editor.hidden; ev.currentTarget.setAttribute("aria-expanded", String(!editor.hidden)); if (!editor.hidden) editor.querySelector("input, select")?.focus(); } }));
-      if (canUpload()) actions.push(button("Replace file", { "aria-label": `Replace file for ${a.title}`, onclick: () => replaceInput.click() }));
-      actions.push(button("Delete", { "aria-label": `Delete ${a.title}`, onclick: () => perform({
-        confirm: { title: "Delete this file?", body: "It is removed from the client’s Branding page if it was published, and the stored file is deleted. This can’t be undone.", details: [["Item", a.title], ["File", a.originalName]], confirmLabel: "Delete file" },
-        request: () => api(`${base}/assets/${encodeURIComponent(a.id)}/delete`, { method: "POST", body: {} }), success: `${a.title} was deleted.` }) }));
+      actions.push(button("Edit", { "aria-label": `Edit ${a.originalName}`, "aria-expanded": "false", onclick: (ev) => { editor.hidden = !editor.hidden; ev.currentTarget.setAttribute("aria-expanded", String(!editor.hidden)); if (!editor.hidden) editor.querySelector("input, select")?.focus(); } }));
+      if (canUpload()) actions.push(button("Replace file", { "aria-label": `Replace file for ${a.originalName}`, onclick: () => replaceInput.click() }));
+      actions.push(button("Delete", { "aria-label": `Delete ${a.originalName}`, onclick: () => perform({
+        confirm: { title: "Delete this file?", body: "It is removed from the client’s Branding page if it was published, and the stored file is deleted. This can’t be undone.", details: [["File", a.originalName]], confirmLabel: "Delete file" },
+        request: () => api(`${base}/assets/${encodeURIComponent(a.id)}/delete`, { method: "POST", body: {} }), success: `${a.originalName} was deleted.` }) }));
       const fields = assetFields("br-ed-" + a.id.slice(0, 8), a);
       const sort = h("input", { id: "br-ed-sort-" + a.id.slice(0, 8), class: "input", type: "number", min: "0", max: "10000", value: String(a.sortOrder), inputmode: "numeric" });
-      editor.append(h("form", { class: "adm-form adm-brand__form", novalidate: true, "aria-label": "Edit " + a.title, onsubmit: (ev) => {
+      editor.append(h("form", { class: "adm-form adm-brand__form", novalidate: true, "aria-label": "Edit " + a.originalName, onsubmit: (ev) => {
         ev.preventDefault();
+        const ready = fields.ready();
+        if (!ready.ok) { say(ready.message, "error"); return; }
         const body = { ...fields.read(), sort_order: Number(sort.value) || 0 };
-        if (!body.title) { say(ERROR_TEXT.invalid_title, "error"); return; }
-        perform({ request: () => api(`${base}/assets/${encodeURIComponent(a.id)}/update`, { method: "POST", body }), success: `${body.title} was updated.` });
+        perform({ request: () => api(`${base}/assets/${encodeURIComponent(a.id)}/update`, { method: "POST", body }), success: (res) => `${res.name || a.originalName} was updated.` });
       } }, fields.node, labelled("br-ed-sort-" + a.id.slice(0, 8), "Order (lower numbers first)", sort), h("div", { class: "adm-actions" }, h("button", { class: "btn btn--primary adm-small", type: "submit" }, "Save changes"), button("Cancel", { onclick: () => { editor.hidden = true; } }))));
     }
     return h("li", { class: "adm-brand__item" },
-      h("div", { class: "adm-brand__main" }, h("p", { class: "adm-brand__name", text: a.title }), h("p", { class: "adm-brand__chips" }, chips),
+      h("div", { class: "adm-brand__main" }, h("p", { class: "adm-brand__name", text: a.title }), h("p", { class: "adm-brand__file" }, h("code", { text: a.originalName })), h("p", { class: "adm-brand__chips" }, chips),
         h("p", { class: "adm-brand__meta" }, `${a.format.toUpperCase()} · ${fmtSize(a.size)} · added ${fmtDate(a.createdAt)}`, a.usageNote ? h("span", { class: "adm-brand__note", text: a.usageNote }) : null)),
       h("div", { class: "adm-row-actions" }, actions, replaceInput), editor);
   }

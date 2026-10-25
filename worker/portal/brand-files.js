@@ -15,6 +15,8 @@ import * as brand from "./repo/brand.js";
 import { recordActivity } from "./repo/activity.js";
 import { inspectUpload, makeKey, putObject, getObject, deleteObject, listOrganizationKeys, fileResponse, StorageError, ADMIN_MAX_FILE_BYTES, limitsFromEnv, parseKey } from "./files/index.js";
 import { isKnownBrandingService } from "./brand-services.js";
+import { getOrganizationById } from "./repo/orgs.js";
+import { buildBrandFileName } from "../../admin/assets/brand-names.js";
 
 const denied = () => fail("forbidden");
 const storageFail = (err) => (err instanceof StorageError ? fail(err.code) : (() => { throw err; })());
@@ -102,29 +104,90 @@ export async function clientRequestService(deps, { role, organizationId, userId,
 
 /* ------------------------------------------------------------------ Framework Admin side (callers are behind Cloudflare Access and ADMIN_EMAILS) */
 
+/** The naming inputs of a deliverable, from stored or submitted metadata. */
+const nameInput = (org, m, ext) => ({ company: org.name, slug: org.slug, kind: m.kind, logo: { role: m.logo_role, orientation: m.orientation, tone: m.tone, transparent: m.transparent === true || m.transparent === 1 }, description: m.title, ext });
+
+/**
+ * A new deliverable. The file's NAME is generated here from the organization's name and the file's details (Framework-Primary-Square-Light-Transparent.png);
+ * the browser never supplies it. The same logo in another format gets the same stem and a different extension. A name that is already used by a live file of
+ * the organization is refused (never overwritten, never silently renamed).
+ */
 export async function adminUploadAsset(deps, { organizationId, actor, meta, file }) {
+  const m = meta && typeof meta === "object" ? meta : {};
+  if (!brand.ASSET_KINDS.includes(m.kind)) return fail("invalid_kind");
+  if (enumError(m)) return fail(enumError(m));
+  const org = await getOrganizationById(deps.db, organizationId);
+  if (!org) return fail("not_found");
   const inspected = await inspectUpload({ bytes: file && file.bytes, originalName: file && file.name, profile: "brand_admin", maxBytes: ADMIN_MAX_FILE_BYTES });
   if (!inspected.ok) return fail(inspected.error);
+  const built = buildBrandFileName(nameInput(org, m, inspected.ext));
+  if (!built.ok) return fail(built.error);
+  if (await brand.brandAssetNameTaken(deps.db, organizationId, built.name)) return fail("duplicate_name"); // checked before anything is stored; the insert checks again atomically
+  const isLogo = m.kind === "logo";
+  const finalMeta = { ...pickKeys(m, ["kind", "usage_note", "downloadable", "license_note", "sort_order", "published"]), title: built.title, variant_key: built.variantKey,
+    logo_role: isLogo ? m.logo_role : null, orientation: isLogo ? m.orientation : null, tone: isLogo ? m.tone : null, transparent: isLogo && m.transparent === true };
   const key = makeKey(organizationId, "brand-assets");
   try { await putObject(deps.bucket, { key, organizationId, bytes: file.bytes, sha256: inspected.sha256, contentType: inspected.contentType }); } catch (err) { return storageFail(err); }
   let rec;
-  try { rec = await brand.createBrandAsset(deps.db, organizationId, meta, describe(inspected, key), actor, { now: deps.now }); } catch (err) { await cleanup(deps, organizationId, key); throw err; }
+  try { rec = await brand.createBrandAsset(deps.db, organizationId, finalMeta, describe({ ...inspected, name: built.name }, key), actor, { now: deps.now }); } catch (err) { await cleanup(deps, organizationId, key); throw err; }
   if (!rec.ok) { await cleanup(deps, organizationId, key); return rec; }
-  return ok({ id: rec.id });
+  return ok({ id: rec.id, name: built.name });
 }
 
+/** A submitted logo detail that is not one of the allowed values gets its specific error (not "incomplete"). */
+const enumError = (m) => {
+  for (const [key, list, code] of [["logo_role", brand.LOGO_ROLES, "invalid_logo_role"], ["orientation", brand.ORIENTATIONS, "invalid_orientation"], ["tone", brand.TONES, "invalid_tone"]]) if (m[key] !== undefined && m[key] !== null && m[key] !== "" && !list.includes(m[key])) return code;
+  return null;
+};
+const pickKeys = (obj, keys) => Object.fromEntries(Object.entries(obj).filter(([k]) => keys.includes(k)));
+const stemOf = (name) => String(name).replace(/\.[^.]+$/, "");
+
+/** Replacing keeps the file's stem (its identity) and takes the new file's extension: Primary-…-Light.png replaced by an SVG becomes Primary-…-Light.svg. */
 export async function adminReplaceAsset(deps, { organizationId, assetId, actor, file }) {
   const cur = await brand.getBrandAssetAdmin(deps.db, organizationId, assetId);
   if (!cur) return fail("not_found");
   const inspected = await inspectUpload({ bytes: file && file.bytes, originalName: file && file.name, profile: "brand_admin", maxBytes: ADMIN_MAX_FILE_BYTES });
   if (!inspected.ok) return fail(inspected.error);
+  const name = `${stemOf(cur.originalName)}.${inspected.ext}`;
+  if (await brand.brandAssetNameTaken(deps.db, organizationId, name, assetId)) return fail("duplicate_name");
   const key = makeKey(organizationId, "brand-assets");
   try { await putObject(deps.bucket, { key, organizationId, bytes: file.bytes, sha256: inspected.sha256, contentType: inspected.contentType }); } catch (err) { return storageFail(err); }
   let rec;
-  try { rec = await brand.replaceBrandAssetFile(deps.db, organizationId, assetId, describe(inspected, key), actor, { now: deps.now }); } catch (err) { await cleanup(deps, organizationId, key); throw err; }
+  try { rec = await brand.replaceBrandAssetFile(deps.db, organizationId, assetId, describe({ ...inspected, name }, key), actor, { now: deps.now }); } catch (err) { await cleanup(deps, organizationId, key); throw err; }
   if (!rec.ok) { await cleanup(deps, organizationId, key); return rec; }
   if (!(await cleanup(deps, organizationId, rec.previousKey))) await noteCleanupFailure(deps, organizationId, "brand_asset", assetId);
-  return ok({ id: assetId });
+  return ok({ id: assetId, name });
+}
+
+/**
+ * Editing a deliverable. The file name is regenerated ONLY when a naming detail changed (logo type, shape, version, transparency, or a non-logo's name); other
+ * edits (publication, usage note, order) never touch it, so older files keep their names until their naming details are edited on purpose. The file type
+ * (logo, font ...) cannot be changed after upload.
+ */
+export async function adminUpdateAsset(deps, { organizationId, assetId, actor, patch }) {
+  const cur = await brand.getBrandAssetAdmin(deps.db, organizationId, assetId);
+  if (!cur) return fail("not_found");
+  const p = patch && typeof patch === "object" ? patch : {};
+  if ("kind" in p && p.kind !== cur.kind) return fail("invalid_input");
+  if (enumError(p)) return fail(enumError(p));
+  const org = await getOrganizationById(deps.db, organizationId);
+  if (!org) return fail("not_found");
+  const isLogo = cur.kind === "logo";
+  const has = (k) => k in p;
+  const next = { kind: cur.kind, logo_role: has("logo_role") ? p.logo_role || null : cur.logoRole, orientation: has("orientation") ? p.orientation || null : cur.orientation, tone: has("tone") ? p.tone || null : cur.tone,
+    transparent: has("transparent") ? p.transparent === true : cur.transparent, title: !isLogo && has("title") ? p.title : cur.title };
+  const adopt = p.standard_name === true; // "rename to the standard name": an explicit, opt-in rename of an older file
+  const changed = adopt || (isLogo ? next.logo_role !== cur.logoRole || next.orientation !== cur.orientation || next.tone !== cur.tone || next.transparent !== cur.transparent : next.title !== cur.title);
+  const out = pickKeys(p, ["usage_note", "downloadable", "license_note", "sort_order", "published"]);
+  if (changed) {
+    const built = buildBrandFileName(nameInput(org, next, cur.format));
+    if (!built.ok) return fail(built.error);
+    if (await brand.brandAssetNameTaken(deps.db, organizationId, built.name, assetId)) return fail("duplicate_name");
+    Object.assign(out, { title: built.title, variant_key: built.variantKey, original_name: built.name }, isLogo ? { logo_role: next.logo_role, orientation: next.orientation, tone: next.tone, transparent: next.transparent } : {});
+  }
+  if (!Object.keys(out).length) return ok({ name: cur.originalName }); // nothing that changes anything
+  const r = await brand.updateBrandAsset(deps.db, organizationId, assetId, out, actor, { now: deps.now });
+  return r.ok ? ok({ name: out.original_name || cur.originalName }) : r;
 }
 
 export async function adminDeleteAsset(deps, { organizationId, assetId, actor }) {
