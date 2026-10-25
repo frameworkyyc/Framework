@@ -57,9 +57,9 @@ export function teamFacts(members, invitations) {
 const RANK = { bad: 0, warn: 1, info: 2 };
 
 /** Most urgent first. Each item: tone (bad = something failed, warn = needs action, info = waiting on the client), text, and where "Review" goes. */
-export function attention({ org, profile, facts }) {
+export function attention({ org, profile, facts, branding = null }) {
   const out = [];
-  const add = (tone, text, go, label) => out.push({ tone, text, go, label });
+  const add = (tone, text, go, label, href = null) => out.push({ tone, text, go, label, href });
   if (org.status !== "active") add("bad", `This organization is ${org.status}, so it can’t receive invitations.`, "org-details", "See details");
   if (facts.failed) add("bad", `${plural(facts.failed, "invitation")} failed to send. Nothing was emailed.`, "team-invitations", "Review invitations");
   if (facts.lapsed) add("warn", `${plural(facts.lapsed, "invitation")} expired. Replace ${facts.lapsed === 1 ? "it" : "them"} to invite again.`, "team-invitations", "Review invitations");
@@ -67,6 +67,8 @@ export function attention({ org, profile, facts }) {
   if (facts.cleanup) add("warn", `${plural(facts.cleanup, "revoked invitation")} still to be cancelled at WorkOS.`, "team-invitations", "Review invitations");
   if (org.status === "active" && facts.members === 0 && facts.pending === 0 && !facts.lapsed) add("warn", "No one has access yet. Invite the first owner.", "team-invitations", "Invite an owner");
   else if (facts.members > 0 && facts.owners === 0) add("warn", "No active owner. Make someone an owner.", "team-members", "Review members");
+  if (branding && branding.requestsNew) add("warn", `${plural(branding.requestsNew, "new service request")} to follow up.`, null, "Open Branding", "__BRANDING__");
+  if (branding && branding.uploadsNew) add("warn", `${plural(branding.uploadsNew, "new client upload")} to review.`, null, "Open Branding", "__BRANDING__");
   if (profile) {
     const firstOpen = profile.steps.find((s) => s.state !== "complete");
     if (profile.steps.every((s) => s.answered === 0)) add("info", "The client hasn’t started their Business Profile.", "adm-profile", "See sections");
@@ -99,10 +101,12 @@ export function goTo(key) {
 
 /* ---------- Dashboard ---------- */
 
-const dashButton = (label, go) => h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => go(), text: label });
+const dashButton = (label, go, href) => (href ? h("a", { class: "btn btn--secondary adm-small", href, "data-link": "", text: label }) : h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => go(), text: label }));
+const linkFor = (it, brandingHref) => (it.href === "__BRANDING__" ? brandingHref : it.href);
 
 /** Header, "next step" card and the two overview tiles. `update(members, invitations)` refreshes the team-dependent parts after the access panel loads or changes. */
-export function dashboard({ org, profile, members, invitations }) {
+export function dashboard({ org, profile, members, invitations, branding = null }) {
+  const brandingHref = `/admin/clients/${encodeURIComponent(org.id)}/branding`;
   const next = h("section", { class: "adm-next", "aria-labelledby": "adm-next-h" });
   const team = h("div", { class: "adm-tile adm-tile--team" });
   const header = h("div", { class: "adm-idhead" },
@@ -113,18 +117,18 @@ export function dashboard({ org, profile, members, invitations }) {
       org.status !== "active" ? h("p", { class: "adm-idhead__chips" }, chip("bad", org.status[0].toUpperCase() + org.status.slice(1), "warn")) : null));
 
   function paint(facts) {
-    const items = attention({ org, profile, facts });
+    const items = attention({ org, profile, facts, branding });
     const lead = items[0];
     next.className = "adm-next adm-next--" + (lead ? lead.tone : "ok");
     next.replaceChildren(...[
       h("h2", { id: "adm-next-h", class: "adm-next__label" }, lead ? "Next step" : "All clear"),
       lead
-        ? h("div", { class: "adm-next__lead" }, icon(lead.tone === "info" ? "info" : "warn"), h("p", { class: "adm-next__text", text: lead.text }), dashButton(lead.label, () => goTo(lead.go)))
+        ? h("div", { class: "adm-next__lead" }, icon(lead.tone === "info" ? "info" : "warn"), h("p", { class: "adm-next__text", text: lead.text }), dashButton(lead.label, () => goTo(lead.go), linkFor(lead, brandingHref)))
         : h("div", { class: "adm-next__lead" }, icon("complete"), h("p", { class: "adm-next__text" }, "Nothing needs your attention right now.")),
       items.length > 1
         ? h("details", { class: "adm-next__morebox" },
             h("summary", null, `${items.length - 1} more to review`),
-            h("ul", { class: "adm-next__more" }, items.slice(1).map((it) => h("li", null, icon(it.tone === "info" ? "info" : "warn"), h("span", { text: it.text }), h("button", { class: "adm-linkbtn", type: "button", onclick: () => goTo(it.go), text: it.label })))))
+            h("ul", { class: "adm-next__more" }, items.slice(1).map((it) => h("li", null, icon(it.tone === "info" ? "info" : "warn"), h("span", { text: it.text }), it.href ? h("a", { class: "adm-linkbtn", href: linkFor(it, brandingHref), "data-link": "", text: it.label }) : h("button", { class: "adm-linkbtn", type: "button", onclick: () => goTo(it.go), text: it.label })))))
         : null].filter(Boolean));
     const withAccess = facts.members === 1 ? "person has access" : "people have access";
     team.replaceChildren(

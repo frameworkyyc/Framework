@@ -1,7 +1,6 @@
 # Branding and private files: Phase 1 (infrastructure) design
 
-Status: **built and tested on a feature branch for Staging. Not applied anywhere.** No routes, no pages, no Admin screens, no Production change. Phase 2 (Admin) and
-Phase 3 (client interface) are separate approvals.
+Status: **Phase 1 (infrastructure) and Phase 2 (Admin interface) are on Staging. Migration 0005 is applied to the Staging database only; Production has no bucket, no migration and no Branding.** The client-facing pages (Phase 3) are not built.
 
 ## What exists
 
@@ -64,19 +63,27 @@ Attachment headers and extension checks do not make a file safe, and nothing her
 
 Optional later hardening, only if you want it: an on-demand malware check by hash or file via an external service (needs a privacy decision, because the file would leave Cloudflare), or restricting clients to images and PDFs.
 
-## Retention and deletion (decisions needed before Production)
+## Retention and deletion
 
-Files stay available during an active client relationship. Nothing in the code hard-codes a retention period. Decisions needed from you (and, for wording, your adviser):
+**Decided (2026-10-26):** files stay available during an active client relationship and are generally kept for **90 days afterward**, subject to contractual, legal and privacy requirements. Owners and members can access shared branding files. Staff download activity stays internal (it is not shown to clients). Nothing in the code hard-codes the period: offboarding is an explicit action (`deleteOrganizationFiles`), run by Framework when the relationship has ended and the 90 days have passed (or earlier on a valid request).
 
-1. How long client uploads and deliverables are kept **after** the relationship ends (the draft policy's 12-month inactive-account review is the nearest existing commitment), and whether deliverables are kept longer than client uploads.
-2. Who can ask for early deletion and how it is requested (today: an owner deletes uploads; Framework runs `deleteOrganizationFiles` for offboarding).
-3. Whether deleted-file **metadata tombstones** (name, hash, time) are kept for the audit trail, and for how long.
-4. Backups: R2 has no versioning here; D1 has Time Travel (about 30 days). State that deleted files are not recoverable from R2.
-5. Whether staff downloads of client uploads should be visible to the client (they are logged internally today).
+Still to settle before Production (wording, not code):
 
-## Staging migration: not applied
+1. Whether deliverables Framework made are kept longer than client uploads, and whether any file is kept longer for a legal or contractual reason (for example an unpaid account or a dispute).
+2. Whether deleted-file **metadata tombstones** (name, hash, time) are kept, and for how long.
+3. The backup statement: R2 has no versioning here and a deleted file is not recoverable from R2; D1 has Time Travel (about 30 days) for the database only.
+4. Who can ask for early deletion and how (today: an owner deletes uploads; Framework runs `deleteOrganizationFiles`).
+5. How the 90-day period is tracked (a reminder when a client is archived, since there is no scheduled job).
 
-Confirmed read-only on 2026-10-26: `framework-portal-staging` (id `1edda8a2-5249-4f40-9dbc-d29aa44e21f8`) has migrations 0001 to 0004 recorded and **no** branding tables. The apply procedure is in `migrations/portal/README.md`, "Apply 0005 to the Staging portal database". It must not be run until you approve it, and only after: (1) the proposed file is moved to `migrations/portal/` in its own reviewed change, (2) a Time Travel bookmark is recorded, (3) the prompt names `framework-portal-staging`.
+## Staging migration: applied (Staging only)
+
+Applied on 2026-10-26 to `framework-portal-staging` (id `1edda8a2-5249-4f40-9dbc-d29aa44e21f8`). Before: migrations 0001 to 0004 recorded, no branding tables. A Time Travel bookmark was recorded first. After: the four tables and four indexes exist, `0005_branding.sql` is recorded in `d1_migrations`, and the existing organizations, memberships and data were not touched. The statements were exactly the file's contents, run through the D1 API (the sandbox has no `wrangler` login) and recorded in `d1_migrations` by hand, which is what `wrangler d1 migrations apply` would have done. The Production workflow's expected list deliberately does **not** include 0005, so it fails closed if 0005 ever appears pending there.
+
+## Phase 2: the Admin interface
+
+Admin only (behind Cloudflare Access and `ADMIN_EMAILS`); clients cannot reach any of it. `/admin/clients/:id/branding` (linked from the client page's Branding row and its "Next step" card): upload and organize logo variants and brand files (draft until published), edit colours and typography, publish or unpublish single files and the whole kit, replace and delete files, review and download client uploads (hold, release, delete), update service requests, and run a storage check. API: `worker/portal/admin-branding.js`. The client page also receives a branding summary (kit state, files, new uploads, open requests) which feeds its "Next step" card.
+
+Tested against real Staging: the exact SQL of every write path was replayed on the Staging D1 (all statements accepted, change counts as expected, the one-open-request rule enforced by the database), the read paths were run against the real data, and the full Admin read stack answered from the real database. R2 could **not** be exercised from the build environment (no R2 credential), so the Admin has a "Run storage check" button that writes, reads back, isolates and deletes one tiny object in the real Staging bucket and logs the result (`brand.storage.selftest`).
 
 ## Before Production (all separate approvals; none done)
 

@@ -3,13 +3,14 @@
 
 import { h, api, fmtDate, stateBlock } from "./ui.js";
 import { newClientPanel, accessSections } from "./clients-access.js";
-import { dashboard, sectionMap, stepAccordion, disclosure } from "./client-dashboard.js";
+import { dashboard, sectionMap, stepAccordion, disclosure, chip } from "./client-dashboard.js";
 
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 
 export async function render(ctx) {
-  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)$/);
+  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding)?$/);
+  if (m && m[2]) return (await import("./branding.js")).render(decodeURIComponent(m[1]), ctx);
   return m ? renderDetail(decodeURIComponent(m[1]), ctx) : renderList(ctx);
 }
 
@@ -59,12 +60,24 @@ async function renderList(ctx) {
 
 const spec = (rows) => h("dl", { class: "adm-spec" }, rows.filter(Boolean).map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", null, v))));
 
+/** A quiet row that opens the client's Branding page: the kit's state and anything waiting for staff, without the page's weight. Not shown on a database without branding. */
+function brandingRow(orgId, b) {
+  if (!b) return null;
+  const chips = [chip(b.kitStatus === "published" ? "ok" : "plain", b.kitStatus === "published" ? "Kit published" : b.kitStatus === "draft" ? "Kit draft" : "No kit yet", b.kitStatus === "published" ? "complete" : null)];
+  if (b.assets) chips.push(chip("plain", `${b.assetsPublished} of ${b.assets} files published`));
+  if (b.uploadsNew) chips.push(chip("pending", plural(b.uploadsNew, "new upload"), "info"));
+  if (b.requestsOpen) chips.push(chip(b.requestsNew ? "pending" : "warn", plural(b.requestsOpen, "open request"), "info"));
+  return h("section", { class: "adm-section adm-brandrow", "aria-labelledby": "adm-brandrow-h" },
+    h("div", { class: "adm-section-title" }, h("h2", { id: "adm-brandrow-h", text: "Branding" }), h("a", { class: "btn btn--secondary adm-small", href: `/admin/clients/${encodeURIComponent(orgId)}/branding`, "data-link": "" }, "Manage branding")),
+    h("p", { class: "adm-brandrow__chips" }, chips));
+}
+
 async function renderDetail(id, ctx) {
   const data = await api("/clients/" + encodeURIComponent(id));
   const o = data.organization;
   const p = data.profile;
   const welcome = ctx.url.searchParams.get("welcome") === "1";
-  const dash = dashboard({ org: o, profile: data.profile_available ? p : null, members: data.members, invitations: data.invitations });
+  const dash = dashboard({ org: o, profile: data.profile_available ? p : null, members: data.members, invitations: data.invitations, branding: data.branding });
 
   const allOpen = () => [...document.querySelectorAll(".adm-acc--step")].every((d) => d.open);
   const toggleAll = h("button", { class: "adm-linkbtn", type: "button", "aria-live": "polite", text: "Expand all", onclick: () => {
@@ -98,6 +111,7 @@ async function renderDetail(id, ctx) {
     dash.header,
     dash.overview,
     data.profile_available ? h("section", { class: "adm-section adm-mapsec", "aria-labelledby": "adm-map-h" }, h("div", { class: "adm-section-title" }, h("h2", { id: "adm-map-h", text: "Business Profile sections" }), h("span", { class: "adm-sub" }, `${p.done} of ${p.total} complete`)), sectionMap(p.steps)) : null,
+    brandingRow(o.id, data.branding),
     access,
     h("section", { class: "adm-section", id: "adm-profile", tabindex: "-1", "aria-labelledby": "adm-prof-h" },
       h("div", { class: "adm-section-title" }, h("h2", { id: "adm-prof-h", text: "Saved answers" }), data.profile_available ? toggleAll : null),

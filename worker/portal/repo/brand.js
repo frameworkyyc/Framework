@@ -273,6 +273,7 @@ export async function getClientBrandAsset(db, organizationId, assetId) {
 /* ------------------------------------------------------------------ client uploads (brand_uploads) */
 
 const UPLOAD_COLUMNS = "id, organization_id, category, original_name, format, content_type, size_bytes, sha256, storage_key, uploaded_by, font_rights_ack, status, admin_seen_at, created_at";
+const UPLOAD_COLUMNS_U = UPLOAD_COLUMNS.split(", ").map((c) => "u." + c).join(", ");
 const upload = (r) => ({ id: r.id, organizationId: r.organization_id, category: r.category, originalName: r.original_name, format: r.format, contentType: r.content_type, size: r.size_bytes, sha256: r.sha256, storageKey: r.storage_key, uploadedBy: r.uploaded_by, fontRightsAck: !!r.font_rights_ack, status: r.status, adminSeenAt: r.admin_seen_at, createdAt: r.created_at });
 
 /** How much room an organization has left (live files only). */
@@ -336,7 +337,26 @@ export async function getUploadAdmin(db, organizationId, uploadId) {
 
 export async function listUploadsAdmin(db, organizationId) {
   requireOrgId(organizationId);
-  return (await db.prepare(`SELECT ${UPLOAD_COLUMNS} FROM brand_uploads WHERE organization_id = ? AND deleted_at IS NULL ORDER BY created_at DESC, id`).bind(organizationId).all()).results.map(upload);
+  return (await db
+    .prepare(`SELECT ${UPLOAD_COLUMNS_U}, p.email AS uploader_email, p.name AS uploader_name FROM brand_uploads u JOIN portal_users p ON p.id = u.uploaded_by WHERE u.organization_id = ? AND u.deleted_at IS NULL ORDER BY u.created_at DESC, u.id`)
+    .bind(organizationId).all()).results.map((r) => ({ ...upload(r), uploaderEmail: r.uploader_email, uploaderName: r.uploader_name }));
+}
+
+/** Counts for the client page and the Admin dashboard: what exists and what needs a look. Admin only. */
+export async function brandingSummary(db, organizationId) {
+  requireOrgId(organizationId);
+  const r = await db
+    .prepare(
+      `SELECT (SELECT status FROM brand_kits WHERE organization_id = ?) AS kit_status,
+              (SELECT count(*) FROM brand_assets WHERE organization_id = ? AND deleted_at IS NULL) AS assets,
+              (SELECT count(*) FROM brand_assets WHERE organization_id = ? AND deleted_at IS NULL AND published = 1) AS assets_published,
+              (SELECT count(*) FROM brand_uploads WHERE organization_id = ? AND deleted_at IS NULL) AS uploads,
+              (SELECT count(*) FROM brand_uploads WHERE organization_id = ? AND deleted_at IS NULL AND admin_seen_at IS NULL) AS uploads_new,
+              (SELECT count(*) FROM service_requests WHERE organization_id = ? AND status IN ('new', 'contacted')) AS requests_open,
+              (SELECT count(*) FROM service_requests WHERE organization_id = ? AND status = 'new') AS requests_new`,
+    )
+    .bind(organizationId, organizationId, organizationId, organizationId, organizationId, organizationId, organizationId).first();
+  return { kitStatus: r.kit_status || null, assets: r.assets, assetsPublished: r.assets_published, uploads: r.uploads, uploadsNew: r.uploads_new, requestsOpen: r.requests_open, requestsNew: r.requests_new };
 }
 
 /** Soft-deletes one upload and returns its storage key. `by` is a client user id or an admin label; who may call this is decided by the caller. */

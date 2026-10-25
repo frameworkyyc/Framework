@@ -56,7 +56,7 @@ test("what needs attention: most urgent first, each with a place to go; a health
 test("the dashboard module only presents: text nodes, no network, no storage, no writes, and shows nothing it cannot compute from the data", () => {
   const src = strip(read("admin/assets/client-dashboard.js"));
   assert.ok(!/innerHTML|fetch\(|api\(|localStorage|sessionStorage|\.style\b|method:/.test(src));
-  assert.ok(!/logo|upload|<img|"img"/i.test(src), "no logo or image infrastructure: the monogram is the only mark");
+  assert.ok(!/logo_url|logoUrl|<img|"img"|FormData|multipart/i.test(src), "no logo or image infrastructure: the monogram is the only mark");
   for (const w of ["Complete", "Partial", "Missing"]) assert.ok(src.includes(`"${w}"`), w);
 });
 
