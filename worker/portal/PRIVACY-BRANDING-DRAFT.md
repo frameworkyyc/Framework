@@ -25,7 +25,7 @@ Branding adds three new kinds of information to the portal: (1) **files** client
 ## 3. Who can see files
 > People in your organization who use the portal can see, download and upload brand files. Only Owners can delete files uploaded for the organization or request a quote. Authorized Framework personnel can view and download files you upload, when needed to provide services to you.
 
-**[DECISION D2]** The current design lets **members** (not only Owners) upload and download. Confirm that is acceptable given that files may include personal information.
+**[DECIDED D2]** Owners and members can view, download and upload; only Owners delete shared uploads or request a quote. Staff download activity stays internal. Counsel should still confirm that is acceptable given that files may include personal information.
 
 ## 4. Security and where files are stored
 > Files are stored in a private Cloudflare storage service and are only reachable through the portal after you sign in. We check files when they are uploaded and do not display them in the portal. No technical control can guarantee that a file is free of harmful content; please upload only files you trust.
@@ -33,9 +33,9 @@ Branding adds three new kinds of information to the portal: (1) **files** client
 > As with other portal information, this storage may be located outside Alberta and outside Canada. **[LEGAL]** the existing wording on providers outside Canada should be checked for files.
 
 ## 5. Retention and deletion
-> We keep files while your organization has an active relationship with us. When the relationship ends, we delete files [after __ months]. You can ask us to delete files earlier by contacting [owner contact], and Owners can delete files they or their colleagues uploaded.
+> We keep files while your organization has an active relationship with us, and generally for 90 days afterward, unless we need to keep them longer for contractual, legal or privacy reasons. After that we delete them. You can ask us to delete files earlier by contacting [owner contact], and Owners can delete files they or their colleagues uploaded.
 
-**[DECISION D3]** The period, whether deliverables are kept longer, whether deletion metadata is kept, and the backup statement (deleted files are not recoverable). **[LEGAL]** consistency with the 12-month review promise and the access/deletion request timing already in the draft.
+**[DECISION D3]** The 90-day period is decided. Still open: whether deliverables are kept longer, whether deletion metadata is kept, and the backup statement (deleted files are not recoverable). **[LEGAL]** consistency with the 12-month review promise and the access/deletion request timing already in the draft.
 
 ## 6. Fonts
 > If you upload font files, you confirm that you are allowed to share them with Framework for the purpose of your project. We do not make uploaded fonts available to anyone outside Framework and your organization.

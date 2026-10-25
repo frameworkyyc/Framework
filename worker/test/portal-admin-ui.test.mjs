@@ -90,10 +90,10 @@ test("api(): server error codes become short, safe codes; the raw message is nev
   const cases = [
     [403, { error: "writes_disabled", message: "m" }, "writes_disabled"], [403, { error: "sending_disabled" }, "sending_disabled"], [403, { error: "forbidden" }, "denied"], [401, {}, "denied"],
     [404, {}, "not_found"], [409, { error: "last_owner", message: "m" }, "last_owner"], [409, {}, "conflict"], [422, { error: "invalid_slug", message: "plain sentence" }, "invalid_slug"],
-    [502, { error: "delivery_failed", delivery: { state: "failed", channel: "workos", error: "workos_unavailable" } }, "delivery_failed"], [502, { error: "other" }, "error"],
+    [502, { error: "delivery_failed", delivery: { state: "failed", channel: "workos", error: "workos_unavailable" } }, "delivery_failed"], [502, { error: "other" }, "other"], [502, { error: "storage_write_failed" }, "storage_write_failed"], [503, { error: "storage_unavailable" }, "storage_unavailable"], [413, { error: "file_too_large" }, "file_too_large"], [415, { error: "type_not_allowed" }, "type_not_allowed"], [422, { error: "active_content" }, "active_content"], [502, { error: "Has Spaces And SQL" }, "error"],
     [500, { error: "delivery_unrecorded", message: "m" }, "delivery_unrecorded"], [500, { error: "server_error" }, "error"],
     [503, { error: "provider_not_configured" }, "provider_not_configured"], [503, { error: "delivery_tracking_unavailable" }, "delivery_tracking_unavailable"], [503, { error: "portal_unavailable" }, "unavailable"],
-    [400, { error: "unknown_field" }, "error"], [413, {}, "error"], [415, {}, "error"],
+    [400, { error: "unknown_field" }, "unknown_field"], [413, {}, "error"], [415, {}, "error"],
   ];
   for (const [status, body, code] of cases) {
     await withFetch((url, init) => { seen.push({ url, init }); return json(status, { ...body, secret: "SQL: SELECT * FROM users" }); }, async ({ api, ApiError }) => {
