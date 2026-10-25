@@ -271,3 +271,24 @@ test("Branding Admin UI: built the safe way, uploads only through api(), confirm
   const router = strip(read("worker/admin/router.js"));
   assert.match(router, /handleBrandingApi, handleAccessApi/);
 });
+
+test("brand name over the API: saved through the kit route, returned in the view, validated, clearable; uploads then use it, and nothing existing is renamed", async () => {
+  const { call, upload, A, w } = await setup();
+  const LG = { kind: "logo", logo_role: "primary", orientation: "square", tone: "dark" };
+  const first = await upload(A, "a.png", S.png(), LG); assert.equal(first.json.name, "Alpha-Co-Primary-Square-Dark.png");
+  assert.equal((await call(base(A))).json.kit, null, "no kit yet: no brand name");
+  const set = await call(base(A) + "/kit", { method: "PUT", json: { brand_name: "Alpha" } });
+  assert.equal(set.status, 200); assert.equal(set.json.kit.brandName, "Alpha"); assert.equal(set.json.kit.status, "draft");
+  assert.equal((await call(base(A))).json.kit.brandName, "Alpha");
+  assert.equal((await call(base(A))).json.assets[0].originalName, "Alpha-Co-Primary-Square-Dark.png", "the earlier file kept its name");
+  assert.equal((await upload(A, "b.png", S.png(), { ...LG, tone: "light" })).json.name, "Alpha-Primary-Square-Light.png");
+  assert.equal((await call(base(A) + "/kit", { method: "PUT", json: { brand_name: "!!!" } })).json.error, "invalid_brand_name");
+  assert.equal((await call(base(A) + "/kit", { method: "PUT", json: { brand_name: 5 } })).json.error, "invalid_brand_name");
+  assert.equal((await call(base(A) + "/kit", { method: "PUT", json: { brand_name: "x", extra: 1 } })).json.error, "unknown_field");
+  assert.equal((await call(base(A) + "/kit", { method: "PUT", json: {} })).json.error, "invalid_input");
+  assert.equal((await call(base(A) + "/kit", { method: "PUT", json: { brand_name: null } })).json.kit.brandName, null);
+  assert.equal((await upload(A, "c.png", S.png(), { ...LG, tone: "mono" })).json.name, "Alpha-Co-Primary-Square-Mono.png", "cleared: back to the organization's name");
+  // writes switch and Access still apply
+  assert.equal((await call(base(A) + "/kit", { method: "PUT", json: { brand_name: "x" }, token: null })).status, 401);
+  assert.equal(rows(w.db, "SELECT count(*) AS n FROM brand_assets").length, 1);
+});

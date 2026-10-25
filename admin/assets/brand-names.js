@@ -25,7 +25,11 @@ function limit(list, max) {
   return out;
 }
 
+/** Does this text leave anything usable for a file name (letters or digits after folding accents)? */
+export const usableName = (text) => words(text).length > 0;
+
 /** The company part: from the organization's name, falling back to its portal address, then "Client". */
+/** `brandName` (when set) is used instead of the organization's full name; with none, the organization name is used. */
 export function companyPart(name, slug = "") {
   return limit(words(name), COMPANY_MAX) || limit(words(slug), COMPANY_MAX) || "Client";
 }

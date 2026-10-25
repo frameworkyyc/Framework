@@ -193,3 +193,72 @@ test("the Admin form uses the shared naming module, shows a live preview with du
   assert.ok(!/document\.|fetch\(|window\.|import\s/.test(src), "the naming module is pure");
   assert.match(strip(read("worker/portal/brand-files.js")), /from "\.\.\/\.\.\/admin\/assets\/brand-names\.js"/, "the server uses the very same module");
 });
+
+/* ------------------------------------------------------------------ brand name */
+
+test("a Brand Name is used instead of the organization's full name; without one the organization's name is used", async () => {
+  const w = await world("Framework Test Organization");
+  const DARK = { kind: "logo", logo_role: "primary", orientation: "square", tone: "dark" };
+  const before = await up(w, DARK, "a.png", S.png());
+  assert.equal(before.name, "Framework-Test-Organization-Primary-Square-Dark.png", "no brand name: the organization's name");
+  assert.ok((await repo.saveBrandKit(w.db, w.org.id, { brandName: "Framework" }, "a@f.test")).ok);
+  const after = await up(w, { ...DARK, tone: "light" }, "b.png", S.png());
+  assert.equal(after.name, "Framework-Primary-Square-Light.png");
+  assert.equal((await up(w, { ...DARK, transparent: true }, "c.png", S.png())).name, "Framework-Primary-Square-Dark-Transparent.png");
+  assert.equal((await up(w, { kind: "guideline", title: "brand guidelines" }, "g.pdf", S.pdf())).name, "Framework-Brand-Guidelines.pdf", "non-logo files too");
+  // the exact example from the request
+  assert.equal((await up(w, DARK, "d.svg", S.svg())).name, "Framework-Primary-Square-Dark.svg");
+  // clearing it goes back to the organization's name for NEW files
+  assert.ok((await repo.saveBrandKit(w.db, w.org.id, { brandName: "" }, "a@f.test")).ok);
+  assert.equal((await repo.getBrandKit(w.db, w.org.id)).brandName, null);
+  assert.equal((await up(w, { ...DARK, tone: "mono" }, "e.png", S.png())).name, "Framework-Test-Organization-Primary-Square-Mono.png");
+  assert.equal(before.ok, true);
+});
+
+test("existing files are never renamed by setting, changing or clearing the brand name; they change only when explicitly renamed, and then use the current brand name", async () => {
+  const w = await world("Framework Test Organization");
+  const L = { kind: "logo", logo_role: "primary", orientation: "square", tone: "dark" };
+  const a = await up(w, L, "a.png", S.png());
+  const guide = await up(w, { kind: "guideline", title: "brand guidelines" }, "g.pdf", S.pdf());
+  const names = () => rows(w.db, "SELECT original_name FROM brand_assets ORDER BY original_name").map((r) => r.original_name);
+  const start = names();
+  for (const brandName of ["Framework", "Acme Studio", "", "Framework"]) { assert.ok((await repo.saveBrandKit(w.db, w.org.id, { brandName }, "a@f.test")).ok); assert.deepEqual(names(), start, `brand name ${JSON.stringify(brandName)} renamed nothing`); }
+  const edit = (id, patch) => B.adminUpdateAsset(w.deps, { organizationId: w.org.id, assetId: id, actor: "a@f.test", patch });
+  assert.equal((await edit(a.id, { published: true, usage_note: "x" })).name, "Framework-Test-Organization-Primary-Square-Dark.png", "publishing and notes still never rename");
+  assert.equal((await edit(a.id, { standard_name: true })).name, "Framework-Primary-Square-Dark.png", "an explicit rename adopts the current brand name");
+  assert.equal((await edit(a.id, { tone: "light" })).name, "Framework-Primary-Square-Light.png", "so does a deliberate naming change");
+  assert.equal((await edit(guide.id, { standard_name: true })).name, "Framework-Brand-Guidelines.pdf");
+  // replacing keeps the stem, whatever the brand name is now
+  assert.ok((await repo.saveBrandKit(w.db, w.org.id, { brandName: "Other Brand" }, "a@f.test")).ok);
+  assert.equal((await B.adminReplaceAsset(w.deps, { organizationId: w.org.id, assetId: a.id, actor: "a@f.test", file: { name: "x.svg", bytes: S.svg() } })).name, "Framework-Primary-Square-Light.svg");
+});
+
+test("the brand name is validated, saved without touching colours or typography (and the other way round), and recorded in the audit trail", async () => {
+  const w = await world();
+  const save = (x) => repo.saveBrandKit(w.db, w.org.id, x, "a@f.test");
+  assert.ok((await save({ colours: [{ name: "Ink", role: "primary", hex: "#000000" }], typography: [{ role: "body", family: "Switzer" }] })).ok);
+  assert.ok((await save({ brandName: "  Framework  " })).ok);
+  let kit = await repo.getBrandKit(w.db, w.org.id);
+  assert.deepEqual([kit.brandName, kit.colours.length, kit.typography.length, kit.status], ["Framework", 1, 1, "draft"]);
+  assert.ok((await save({ colours: [] })).ok); kit = await repo.getBrandKit(w.db, w.org.id);
+  assert.deepEqual([kit.brandName, kit.colours.length, kit.typography.length], ["Framework", 0, 1], "saving colours keeps the brand name");
+  for (const bad of ["日本語", "!!!", "x".repeat(61), "bad\u0007name", 5, {}, ["a"]]) assert.deepEqual(await save({ brandName: bad }), { ok: false, error: "invalid_brand_name" }, JSON.stringify(bad));
+  assert.equal((await repo.getBrandKit(w.db, w.org.id)).brandName, "Framework", "a refused value changed nothing");
+  for (const good of ["Framework", "Zoë & Sons", "A", "x".repeat(60), "iPhone Co."]) assert.ok((await save({ brandName: good })).ok, good);
+  assert.ok((await save({ brandName: null })).ok); assert.equal((await repo.getBrandKit(w.db, w.org.id)).brandName, null);
+  assert.ok(count(w.db, "activity_log", "action = 'brand.kit.brand_name_saved'") >= 5);
+  assert.throws(() => w.db.raw.prepare("UPDATE brand_kits SET brand_name = ? WHERE organization_id = ?").run("x".repeat(61), w.org.id), /constraint/i, "the database refuses an over-long name by itself");
+  assert.throws(() => w.db.raw.prepare("UPDATE brand_kits SET brand_name = '' WHERE organization_id = ?").run(w.org.id), /constraint/i, "…and an empty one");
+});
+
+test("the Admin form has a Brand name field whose live example matches the generated names, and says existing files keep their names", () => {
+  const ui = strip(read("admin/assets/branding.js"));
+  assert.match(ui, /label.*"Brand name \(optional\)"|"Brand name \(optional\)"/);
+  assert.match(ui, /const brandCompany = \(\) => \(data\.kit && data\.kit\.brandName\) \|\| data\.organization\.name;/);
+  assert.match(ui, /company: brandCompany\(\)/, "the live preview uses it");
+  assert.match(ui, /Files already uploaded keep their names/);
+  assert.match(ui, /api\(base \+ "\/kit", \{ method: "PUT", body: \{ brand_name: value \|\| null \} \}\)/);
+  assert.match(strip(read("worker/portal/brand-files.js")), /kit && kit\.brandName \? kit\.brandName : org\.name/, "the server resolves the same fallback");
+  const m = read("migrations/portal/0006_brand_name.sql");
+  assert.match(m, /ALTER TABLE brand_kits ADD COLUMN brand_name TEXT CHECK/); assert.ok(!/\b(DROP|DELETE|UPDATE)\b/i.test(m.replace(/--.*$/gm, "")), "additive only");
+});

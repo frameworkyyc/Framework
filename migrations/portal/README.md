@@ -12,6 +12,7 @@ older SQL files in `../` are never applied here.
   Existing rows become `not_sent`; nothing existing is changed. Nothing in the running code reads these columns yet.
 * `0005_branding.sql`: four additive tables for Branding (`brand_kits`, `brand_assets`, `brand_uploads`, `service_requests`). **Approved for Staging only.** Production: NOT applied, and the Production
   workflow's expected list (`.github/scripts/portal-d1-check.mjs`) deliberately does not know it, so a pending 0005 makes that workflow fail closed. See `worker/portal/BRANDING-FILES.md`.
+* `0006_brand_name.sql`: one nullable column `brand_name` on `brand_kits` (the optional brand name used in generated file names). **Approved for Staging only; applied to Staging.** Production: NOT applied, and the Production workflow's expected list does not know it (fails closed).
 * `wrangler.migrate.staging.jsonc`: a migration-only Wrangler config that binds **only** the Staging portal database. Use it with
   `-c` so Wrangler cannot fall back to the main `wrangler.jsonc` (which also binds Production's database).
 * `wrangler.migrate.production.jsonc`: the same, binding **only** the Production portal database `framework-portal`.

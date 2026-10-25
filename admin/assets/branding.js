@@ -35,6 +35,7 @@ const ERROR_TEXT = {
   archive_entries: "The ZIP has too many (or no) files in it.",
   archive_too_large: "The ZIP expands to an unreasonable size.",
   font_license_required: "A font can only be made downloadable if you record its licence.",
+  invalid_brand_name: "Use a brand name with at least one letter or number (up to 60 characters), or leave it empty to use the organization’s name.",
   invalid_colours: "Check the colours: each needs a name, a role and a HEX value like #1A2B3C (up to 16).",
   invalid_typography: "Check the typefaces: each needs a role and a family; weights are 100 to 900 in steps of 100; a source link must start with https://",
   invalid_title: "Enter a name for the file.", invalid_description: "Enter a name for the file (letters and numbers).", incomplete_logo_details: "Choose the logo type, shape and version first.",
@@ -119,6 +120,8 @@ export async function render(orgId, ctx) {
     try { await api(base + "/uploads/seen", { method: "POST", body: {} }); data.uploads.forEach((u) => { u.seen = true; }); } catch { /* seen-marking is a courtesy; the list is unaffected */ }
   }
 
+  /** What generated file names start with: the kit's brand name when set, otherwise the organization's own name. */
+  const brandCompany = () => (data.kit && data.kit.brandName) || data.organization.name;
   const caps = () => data.capabilities;
   const canWrite = () => caps().writes;
   const canUpload = () => caps().writes && caps().storage;
@@ -149,10 +152,10 @@ export async function render(orgId, ctx) {
     const previewName = h("code", { class: "adm-brand__previewname" }), previewNote = h("span", { class: "adm-brand__previewnote" });
     const preview = h("div", { class: "adm-brand__preview", "aria-live": "polite" }, h("span", { class: "adm-brand__previewlabel", text: "File name" }), previewName, previewNote);
     const adopt = editing ? check(prefix + "-adopt", "Rename this file to the standard name", false) : null;
-    const standardOf = () => buildBrandFileName({ company: data.organization.name, slug: data.organization.slug, kind: a.kind, logo: { role: a.logoRole, orientation: a.orientation, tone: a.tone, transparent: a.transparent }, description: a.title, ext: a.format });
+    const standardOf = () => buildBrandFileName({ company: brandCompany(), slug: data.organization.slug, kind: a.kind, logo: { role: a.logoRole, orientation: a.orientation, tone: a.tone, transparent: a.transparent }, description: a.title, ext: a.format });
     const legacy = editing && (() => { const st = standardOf(); return st.ok && st.name.toLowerCase() !== a.originalName.toLowerCase(); })();
     const taken = new Set(data.assets.filter((x) => !a || x.id !== a.id).map((x) => x.originalName.toLowerCase()));
-    const naming = () => ({ company: data.organization.name, slug: data.organization.slug, kind: kindNow(), logo: { role: role.value, orientation: orient.value, tone: tone.value, transparent: transparent.input.checked }, description: description.value, ext: getExt() || (a ? a.format : "") });
+    const naming = () => ({ company: brandCompany(), slug: data.organization.slug, kind: kindNow(), logo: { role: role.value, orientation: orient.value, tone: tone.value, transparent: transparent.input.checked }, description: description.value, ext: getExt() || (a ? a.format : "") });
     const changed = () => (!editing ? true : adopt.input.checked || (kindNow() === "logo" ? (role.value || null) !== a.logoRole || (orient.value || null) !== a.orientation || (tone.value || null) !== a.tone || transparent.input.checked !== a.transparent : description.value.trim() !== a.title));
     let state = { ok: false, message: "" };
     const refresh = () => {
@@ -258,11 +261,33 @@ export async function render(orgId, ctx) {
       h("div", { class: "adm-row-actions" }, actions, replaceInput), editor);
   }
 
+  /** The optional brand name that file names start with. Saving it never renames an existing file. */
+  function brandNameBox() {
+    const input = h("input", { id: "br-brand-name", class: "input", type: "text", maxlength: "60", value: (data.kit && data.kit.brandName) || "", autocomplete: "off", placeholder: data.organization.name });
+    const example = h("p", { class: "adm-field__hint", id: "br-brand-name-example", "aria-live": "polite" });
+    const err = h("p", { class: "adm-field__error", role: "alert", hidden: true });
+    const sample = () => {
+      const company = input.value.trim() || data.organization.name;
+      const b = buildBrandFileName({ company, slug: data.organization.slug, kind: "logo", logo: { role: "primary", orientation: "square", tone: "dark" }, ext: "png" });
+      example.textContent = `New files will be named like ${b.name}. ${input.value.trim() ? "" : "(No brand name set: the organization’s name is used.) "}Files already uploaded keep their names.`;
+    };
+    input.addEventListener("input", sample); sample();
+    return h("form", { class: "adm-form adm-brand__form adm-brand__brandname", novalidate: true, "aria-label": "Brand name for file names", onsubmit: (ev) => {
+      ev.preventDefault(); err.hidden = true;
+      const value = input.value.trim();
+      perform({ request: () => api(base + "/kit", { method: "PUT", body: { brand_name: value || null } }), success: value ? `Brand name saved. New files will start with “${value}”; existing files keep their names.` : "Brand name cleared. New files will start with the organization’s name; existing files keep their names.", onError: (e) => { err.textContent = errorText(e); err.hidden = false; return errorText(e); } });
+    } },
+      labelled("br-brand-name", "Brand name (optional)", input, `Used at the start of generated file names instead of “${data.organization.name}”. Leave empty to use the organization’s name.`),
+      example, err,
+      h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "submit" }, "Save brand name")));
+  }
+
   function assetsSection() {
     const groups = Object.keys(KIND_LABEL).map((k) => [k, data.assets.filter((a) => a.kind === k)]).filter(([, list]) => list.length);
     const published = data.assets.filter((a) => a.published).length;
     const body = [
       !canWrite() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at files, but not add, publish or delete them.") : !caps().storage ? h("p", { class: "adm-banner" }, "File storage isn’t available on this site, so files can’t be added or replaced. Colours and typography can still be set.") : null,
+      canWrite() ? brandNameBox() : null,
       canUpload() ? disclosure({ id: "br-add", title: "Add a file", className: "adm-acc--sub", open: opened.has("br-add"), onToggle: toggled("br-add"), children: addForm() }) : null,
       groups.length
         ? groups.map(([k, list]) => h("div", { class: "adm-brand__group" }, h("p", { class: "adm-brand__h3", text: `${KIND_LABEL[k]} (${list.length})` }), h("ul", { class: "adm-brand__list", "aria-label": KIND_LABEL[k] }, list.map(assetRecord))))

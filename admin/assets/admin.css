@@ -633,3 +633,5 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-brandpage .adm-brand__previewname { display: inline-block; justify-self: start; max-width: 100%; }
 .adm-brandpage .adm-brand__previewnote { font-size: 14px; line-height: 1.45; color: var(--slate); }
 .adm-brandpage .adm-brand__preview.is-taken .adm-brand__previewnote { color: var(--bad, #A12B2B); font-weight: 600; }
+.adm-brandpage .adm-brand__brandname { margin: 4px 0 22px; padding-bottom: 22px; border-bottom: 1px solid var(--hairline); }
+.adm-brandpage .adm-brand__brandname .adm-field__hint { margin: 0; overflow-wrap: anywhere; }

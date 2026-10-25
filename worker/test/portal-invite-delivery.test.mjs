@@ -48,7 +48,7 @@ const send = (m, db, o, inv, over = {}) => deliverInvitation(m.ctx(db, over.now)
 /* ------------------------------------------------------------------ the proposed migration */
 
 test("migration 0004: additive and compatible. It is the fourth portal migration, existing invitations become 'not_sent', and the constraints hold", () => {
-  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql"]);
+  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql"]);
   assert.ok(!existsSync(new URL("../../migrations/portal-proposed/0004_invitation_delivery.sql", import.meta.url)), "0004 was moved out of the proposal folder, not copied (the folder now holds later, still unapplied proposals)");
   const sqlText = read(MIGRATION).replace(/^--.*$/gm, "");
   assert.deepEqual(sqlText.match(/\b(ALTER|CREATE|DROP|INSERT|UPDATE|DELETE)\b/g), ["ALTER", "ALTER", "ALTER", "ALTER"], "four ALTER TABLE ... ADD COLUMN statements and nothing else");
