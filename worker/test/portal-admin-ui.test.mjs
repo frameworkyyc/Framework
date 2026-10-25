@@ -112,7 +112,7 @@ test("api(): server error codes become short, safe codes; the raw message is nev
 
 /* ------------------------------------------------------------------ source guards */
 
-const UI = ["admin/assets/clients.js", "admin/assets/clients-access.js"];
+const UI = ["admin/assets/clients.js", "admin/assets/clients-access.js", "admin/assets/client-dashboard.js"];
 
 test("the interface is built the safe way: text nodes only, no inline styles or handlers, no HTML injection, no storage of tokens", () => {
   for (const f of UI) {
@@ -168,7 +168,7 @@ test("wording: delivery is never described as arrival; 'submitted' is explained;
 test("the Business Profile review stays read-only and intact, and the navigation entry is unchanged", () => {
   const clients = strip(read("admin/assets/clients.js"));
   assert.match(read("admin/assets/clients.js"), /staff cannot edit them here/);
-  for (const w of ["Complete", "Partial", "Missing"]) assert.ok(clients.includes(`"${w}"`), w);
+  for (const w of ["Complete", "Partial", "Missing"]) assert.ok(strip(read("admin/assets/client-dashboard.js")).includes(`"${w}"`), w);
   assert.ok(!/method: "(POST|PUT|PATCH|DELETE)"/.test(clients), "clients.js itself makes no write call");
   assert.equal([...clients.matchAll(/\bapi\(/g)].length, 2, "the list and the detail reads");
   assert.match(read("admin/assets/modules.js"), /id: "clients", label: "Clients", path: "\/admin\/clients", enabled: true, load: \(\) => import\("\.\/clients\.js"\)/);
@@ -210,4 +210,58 @@ test("New client form: only Business name and Website (optional); no URL name fi
   assert.match(form, /"https:\/\/" \+ v\.website/, "a bare domain such as frc.frameworkco.ca is accepted");
   assert.equal(form.match(/field\(\{ id: "nc-/g).length, 2, "exactly two fields");
   assert.match(src, /slug_unavailable: "A portal address couldn’t be made from that name/);
+});
+
+test("Clients list (mobile-first redesign): one semantic whole-row link per organization showing only name, created date, Business Profile completion and an arrow; members and invitations stay on the client's own page", () => {
+  const src = strip(read("admin/assets/clients.js")), css = read("admin/assets/admin.css");
+  const list = src.slice(src.indexOf("function clientRow"), src.indexOf("/* ---------- Detail"));
+  assert.match(list, /h\("ul", \{ class: "adm-clientlist"/);
+  assert.match(list, /h\("a", \{ class: "adm-clientrow", href: "\/admin\/clients\/" \+ encodeURIComponent\(c\.id\), "data-link": "" \}/, "the whole row is the link");
+  assert.match(list, /class: "adm-clientrow__name", text: c\.name/, "the name is a text node, never HTML");
+  for (const field of ["active_members", "invitations", "Active members", "Invitations", "Organization", "View"]) assert.ok(!list.slice(list.indexOf("function clientRow"), list.indexOf("async function renderList")).includes(field), field + " is not in a list row");
+  assert.ok(!/h\("table"/.test(list), "the list is not a table");
+  assert.match(src, /Manage your client organizations\./, "the short description for small screens");
+  assert.match(src, /Client organizations, the people who can open their portal, and their Business Profiles\./, "the full description stays for larger screens");
+  assert.match(src, /h\("progress", \{ class: "adm-meter"/, "a native progress element: no inline style");
+  // the removed summary fields are still on the detail page
+  const detail = src.slice(src.indexOf("async function renderDetail"));
+  assert.match(detail, /accessSections\(/, "members and invitations are shown by the detail page");
+  assert.match(read("admin/assets/clients-access.js"), /Invitations/);
+  assert.match(read("admin/assets/clients-access.js"), /Members|People/);
+  // states and layout
+  for (const rule of [/\.adm-clientrow:hover/, /\.adm-clientrow:active/, /\.adm-clientrow:focus-visible \{ outline: 2px solid var\(--ink\)/, /min-height: 44px/, /overflow-wrap: anywhere/, /prefers-reduced-motion/, /\.adm-sub--short \{ display: none; \}/]) assert.match(css, rule);
+});
+
+test("Client detail (mobile-first): Invitations and Members rows become single-column records below 1280px, with readable names, labelled facts, 44px actions and no low-contrast text", () => {
+  const css = read("admin/assets/admin.css");
+  const block = css.slice(css.indexOf("/* ---------- Client detail (mobile-first)"));
+  assert.match(block, /@media \(max-width: 1279px\) \{\n  \.adm-access \.adm-table tbody tr \{ display: grid; grid-template-columns: minmax\(0, 1fr\);/, "one column per record on phones");
+  assert.match(block, /@media \(min-width: 680px\) and \(max-width: 1279px\)[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/, "two columns of status facts on tablets");
+  assert.match(block, /td\[data-label="Person"\] \.adm-client \{[^}]*font-size: 18px[^}]*overflow-wrap: anywhere/, "the email or name is the primary element and wraps safely");
+  assert.match(block, /td\[data-label="Role"\], \.adm-access \.adm-table td\[data-label="Last sign-in"\] \{ display: flex/, "short facts sit on one line with their label");
+  assert.match(block, /\.adm-access \.adm-row-actions \.adm-small \{ min-height: 44px/, "action buttons are 44px tall on small screens");
+  assert.match(block, /\.adm-row-actions \{ flex-wrap: wrap/, "buttons wrap instead of overflowing");
+  assert.match(block, /@media \(max-width: 520px\)[\s\S]*?\.adm-dialog dl div \{ grid-template-columns: 1fr/, "the confirmation dialog stacks on a phone");
+  assert.match(block, /\.adm-spec--text dd\.adm-answer/, "Business Profile answers keep clear space and readable text");
+  // the desktop table markup is unchanged: the same five columns and the same cell labels
+  const src = read("admin/assets/clients-access.js");
+  assert.match(src, /\["Person", "Role", "Invitation", "Delivery", ""\]/);
+  assert.match(src, /\["Person", "Role", "Access", "Last sign-in", ""\]/);
+  // contrast: small Admin text uses slate, not the 2.5:1 stone grey (only the disabled navigation item keeps it)
+  assert.deepEqual(css.split("\n").filter((l) => /color: var\(--stone\)/.test(l) && !/is-disabled/.test(l)), []);
+  assert.match(css, /\.adm-head \.eyebrow \{ color: var\(--slate\); \}/);
+});
+
+test("Client detail: every action button's accessible name contains its visible text (label in name), and all invitation and member actions are still offered", () => {
+  const src = strip(read("admin/assets/clients-access.js"));
+  for (const [visible, aria] of [["Resend", '"Resend invitation to "'], ["Revoke", '"Revoke invitation for "'], ["Replace", '"Replace invitation for "'], ["Remove access", '"Remove access for "'], ["Retry WorkOS cancel", '"Retry WorkOS cancel for "']]) {
+    assert.ok(src.includes(`"${visible}"`) && src.includes(aria), visible);
+  }
+  assert.match(src, /"Try again: send the invitation to "/);
+  assert.match(src, /"Send invitation to "/);
+  assert.match(src, /toRole === "owner" \? "Make owner" : "Make member"\}: \$\{who\}/);
+  // permissions and protections are untouched: the last-owner buttons stay disabled, and members' actions only render when writes are on
+  assert.match(src, /disabled: only && toRole === "member" \? true : null/);
+  assert.match(src, /disabled: only \? true : null/);
+  assert.match(src, /caps\.writes \? memberActions\(m, caps\) : \[\]/);
 });

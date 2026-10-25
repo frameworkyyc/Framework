@@ -3,6 +3,7 @@
    server APIs (worker/portal/admin-access.js); nothing here decides access. Server text is never inserted as HTML, and only friendly copy for known codes is shown. */
 
 import { h, api, confirmDialog, errorState, fmtDate, fmtDateTime } from "./ui.js";
+import { disclosure, chip, teamFacts } from "./client-dashboard.js";
 
 const ROLE_LABEL = { owner: "Owner", member: "Member" };
 const ROLE_HELP = {
@@ -174,11 +175,13 @@ export function newClientPanel({ navigate, writesEnabled = true }) {
  * The Invitations and Members sections for one organization. Returns a container that loads itself.
  * @param opts { orgId, orgName, welcome }
  */
-export function accessSections({ orgId, orgName, welcome = false }) {
+export function accessSections({ orgId, orgName, welcome = false, onData = null }) {
   const root = h("div", { class: "adm-access" });
   const live = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
   let data = null;
   let busy = false;
+  let opened = null; // which disclosures are open: chosen once from the data, then whatever the person leaves open survives each refresh
+  const toggled = (id) => (ev) => { if (opened) { if (ev.target.open) opened.add(id); else opened.delete(id); } };
   const base = "/clients/" + encodeURIComponent(orgId);
 
   function say(text, tone = "info", { focus = true } = {}) {
@@ -326,7 +329,7 @@ export function accessSections({ orgId, orgName, welcome = false }) {
     if (i.status === "pending" && !isExpired(i)) {
       const d = (i.delivery && i.delivery.state) || "not_tracked";
       if (d === "submitted") btns.push(textButton("Resend", { "aria-label": "Resend invitation to " + to, disabled: cannotSend ? true : null, title: sendTitle, onclick: () => sendNow("resend") }));
-      else if (d !== "not_tracked") btns.push(textButton(d === "failed" ? "Try again" : "Send", { "aria-label": (d === "failed" ? "Try sending again to " : "Send invitation to ") + to, disabled: cannotSend ? true : null, title: sendTitle, onclick: () => sendNow("send") }));
+      else if (d !== "not_tracked") btns.push(textButton(d === "failed" ? "Try again" : "Send", { "aria-label": (d === "failed" ? "Try again: send the invitation to " : "Send invitation to ") + to, disabled: cannotSend ? true : null, title: sendTitle, onclick: () => sendNow("send") }));
       btns.push(textButton("Revoke", { "aria-label": "Revoke invitation for " + to, onclick: () => perform({
         confirm: {
           title: "Revoke this invitation?",
@@ -338,7 +341,7 @@ export function accessSections({ orgId, orgName, welcome = false }) {
         onSuccess: (res) => revokeOutcome(res, to),
       }) }));
     } else if (i.status === "revoked" && i.workos_cleanup === "pending") {
-      btns.push(textButton("Retry WorkOS cancel", { "aria-label": "Retry cancelling the WorkOS invitation for " + to, disabled: cannotSend ? true : null, title: sendTitle, onclick: () => perform({
+      btns.push(textButton("Retry WorkOS cancel", { "aria-label": "Retry WorkOS cancel for " + to, disabled: cannotSend ? true : null, title: sendTitle, onclick: () => perform({
         confirm: { title: "Cancel the WorkOS invitation?", body: "Access is already closed in Framework. This only asks WorkOS to cancel its copy of the invitation.", details: [["Person", to]], confirmLabel: "Cancel at WorkOS" },
         request: () => api(`${base}/invitations/${encodeURIComponent(i.id)}/revoke`, { method: "POST", body: {} }),
         onSuccess: (res) => revokeOutcome(res, to),
@@ -384,14 +387,23 @@ export function accessSections({ orgId, orgName, welcome = false }) {
             );
           })))
       : h("div", { class: "adm-empty" }, h("p", { class: "adm-client" }, "No invitations yet."), h("p", { class: "adm-sub" }, caps.writes ? "Invite the first owner above. They’ll get access when they sign in with that email address." : "Nothing has been invited yet. Changes are switched off on this site."));
-    return h("section", { class: "adm-section", "aria-labelledby": "adm-inv-h" },
-      h("div", { class: "adm-section-title" }, h("h2", { id: "adm-inv-h", text: "Invitations" })),
-      h("p", { class: "adm-sub" }, "Creating an invitation and sending it are separate steps. Access is only granted when the person signs in with the invited email address."),
-      !caps.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site. You can look, but not create, send, revoke or remove.") : !caps.sending ? h("p", { class: "adm-banner" }, "Sending is switched off on this site. You can create and revoke invitations, but nothing will be emailed.") : null,
-      caps.recipients === "missing" ? h("p", { class: "adm-banner adm-banner--alert" }, "Invitations are locked: no approved recipients are configured on this site, so none can be created or sent.") : caps.recipients === "configured" ? h("p", { class: "adm-banner" }, "Controlled test: invitations can only be created for, and sent to, approved recipients. The server refuses any other address.") : null,
-      caps.writes ? inviteForm(caps) : null, // with changes switched off there is nothing to submit, so the form is not shown (the banner above says why)
-      table,
-    );
+    const f = teamFacts(data.members, list);
+    return disclosure({
+      id: "team-invitations", title: "Invitations", open: opened.has("team-invitations"), onToggle: toggled("team-invitations"),
+      meta: [
+        f.failed ? chip("bad", `${f.failed} failed`, "warn") : null,
+        f.lapsed ? chip("warn", `${f.lapsed} expired`, "warn") : null,
+        f.unsent ? chip("warn", `${f.unsent} not sent`, "warn") : null,
+        f.pending ? chip("pending", `${f.pending} pending`, "info") : chip("plain", list.length ? "None pending" : "None yet"),
+      ],
+      children: [
+        h("p", { class: "adm-sub" }, "Creating an invitation and sending it are separate steps. Access is only granted when the person signs in with the invited email address."),
+        !caps.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site. You can look, but not create, send, revoke or remove.") : !caps.sending ? h("p", { class: "adm-banner" }, "Sending is switched off on this site. You can create and revoke invitations, but nothing will be emailed.") : null,
+        caps.recipients === "missing" ? h("p", { class: "adm-banner adm-banner--alert" }, "Invitations are locked: no approved recipients are configured on this site, so none can be created or sent.") : caps.recipients === "configured" ? h("p", { class: "adm-banner" }, "Controlled test: invitations can only be created for, and sent to, approved recipients. The server refuses any other address.") : null,
+        caps.writes ? inviteForm(caps) : null, // with changes switched off there is nothing to submit, so the form is not shown (the banner above says why)
+        table,
+      ],
+    });
   }
 
   /* ----- members ----- */
@@ -402,7 +414,7 @@ export function accessSections({ orgId, orgName, welcome = false }) {
     const only = m.last_active_owner;
     const btns = [];
     const toRole = m.role === "owner" ? "member" : "owner";
-    btns.push(textButton(toRole === "owner" ? "Make owner" : "Make member", { "aria-label": `${toRole === "owner" ? "Make" : "Change"} ${who} ${toRole === "owner" ? "an owner" : "a member"}`, disabled: only && toRole === "member" ? true : null, title: only && toRole === "member" ? "The only active owner can’t be demoted" : null, onclick: () => perform({
+    btns.push(textButton(toRole === "owner" ? "Make owner" : "Make member", { "aria-label": `${toRole === "owner" ? "Make owner" : "Make member"}: ${who}`, disabled: only && toRole === "member" ? true : null, title: only && toRole === "member" ? "The only active owner can’t be demoted" : null, onclick: () => perform({
       confirm: {
         title: toRole === "owner" ? `Make ${who} an owner?` : `Make ${who} a member?`,
         body: toRole === "owner" ? "They will be able to see the organization’s team list as well." : "They will keep access to the portal but will no longer see the team list.",
@@ -440,11 +452,15 @@ export function accessSections({ orgId, orgName, welcome = false }) {
             h("td", { "data-label": "" }, h("div", { class: "adm-row-actions" }, caps.writes ? memberActions(m, caps) : [])),
           ))))
       : h("div", { class: "adm-empty" }, h("p", { class: "adm-client" }, "No members yet."), h("p", { class: "adm-sub" }, "People appear here after they sign in with an invited email address."));
-    return h("section", { class: "adm-section", "aria-labelledby": "adm-mem-h" },
-      h("div", { class: "adm-section-title" }, h("h2", { id: "adm-mem-h", text: "Members" })),
-      h("p", { class: "adm-sub" }, `${plural(list.filter((m) => m.status === "active" && m.user_status === "active").length, "person", "people")} can open this organization’s portal. Removing someone’s access never deletes ${orgName}’s information.`),
-      table,
-    );
+    const f = teamFacts(list, []);
+    return disclosure({
+      id: "team-members", title: "Members", open: opened.has("team-members"), onToggle: toggled("team-members"),
+      meta: [chip(f.members ? "ok" : "plain", `${f.members} with access`, f.members ? "complete" : null), f.members && !f.owners ? chip("warn", "No owner", "warn") : null],
+      children: [
+        h("p", { class: "adm-sub" }, `${plural(f.members, "person", "people")} can open this organization’s portal. Removing someone’s access never deletes ${orgName}’s information.`),
+        table,
+      ],
+    });
   }
 
   /* ----- draw ----- */
@@ -456,7 +472,13 @@ export function accessSections({ orgId, orgName, welcome = false }) {
       ? h("div", { class: "adm-welcome", role: "status" }, h("p", { class: "adm-client" }, `${orgName} was created.`), h("p", { class: "adm-sub" }, "Next step: invite its first owner using the form below. They’ll get access when they sign in with that email address."))
       : null;
     welcome = false; // only on first draw
-    root.replaceChildren(...[welcomeBox, live, invitationsSection(caps), membersSection(caps)].filter(Boolean));
+    if (!opened) { // first look: open what the person is likely to act on (a new client, an empty team, or anything that needs attention); everything else starts closed
+      const f = teamFacts(data.members, data.invitations);
+      opened = new Set();
+      if (welcomeBox || (!f.members && !f.pending) || f.failed || f.lapsed || f.unsent || f.cleanup) opened.add("team-invitations");
+    }
+    root.replaceChildren(...[welcomeBox, live, h("div", { class: "adm-section-title" }, h("h2", { text: "Team and invitations" })), invitationsSection(caps), membersSection(caps)].filter(Boolean));
+    if (onData) onData(data);
     if (wasFocused && document.getElementById(wasFocused) && document.getElementById(wasFocused).tagName !== "BUTTON") document.getElementById(wasFocused).focus();
   }
 
