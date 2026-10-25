@@ -1,5 +1,5 @@
--- PROPOSED, NOT APPLIED ON ANY ENVIRONMENT. Lives outside migrations/portal on purpose: `wrangler d1 migrations apply` only reads migrations/portal, so nothing
--- can apply this file until it is moved there after explicit approval (same procedure as 0004). See worker/portal/BRANDING-FILES.md.
+-- Branding (Staging first). Approved for Staging only; NOT applied to Production, which follows the manual Production workflow after its own approval.
+-- See worker/portal/BRANDING-FILES.md. Four additive tables; nothing existing is altered.
 --
 -- Branding: official deliverables published by Framework, files submitted by clients, and service requests. Four ADDITIVE tables, no change to any existing table.
 -- Every table is scoped by organization_id (ON DELETE RESTRICT: an organization with brand data cannot be deleted by accident). File CONTENT is never stored

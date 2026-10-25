@@ -8,7 +8,7 @@ const sql = readFileSync(new URL("0001_portal_foundation.sql", MIGRATIONS_DIR), 
 const uuid = () => crypto.randomUUID();
 const T = "2026-10-20T12:00:00.000Z";
 const LATER = "2026-10-27T12:00:00.000Z";
-const TABLES = ["activity_log", "business_profile_answers", "invitations", "memberships", "organizations", "portal_feedback", "portal_sessions", "portal_users", "projects"];
+const TABLES = ["activity_log", "brand_assets", "brand_kits", "brand_uploads", "business_profile_answers", "invitations", "memberships", "organizations", "portal_feedback", "portal_sessions", "portal_users", "projects", "service_requests"];
 
 const insertOrg = (db, id = uuid(), slug = "acme-" + id.slice(0, 6)) => (db.raw.prepare("INSERT INTO organizations (id, slug, name) VALUES (?, ?, 'Acme')").run(id, slug), id);
 const insertUser = (db, id = uuid(), email = `u${id.slice(0, 6)}@example.com`) => (db.raw.prepare("INSERT INTO portal_users (id, workos_user_id, email) VALUES (?, ?, ?)").run(id, "user_" + id.slice(0, 12), email), id);
@@ -22,7 +22,7 @@ const insertInvitation = (db, org, email = "a@example.com", extra = {}) => {
 const rejects = (fn, re = /constraint failed/i, label = "") => assert.throws(fn, re, label);
 
 test("migration files: one numbered file, applied in order, named for wrangler", () => {
-  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql"]);
+  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql"]);
 });
 
 test("applies to an empty database and creates exactly the portal tables", () => {
@@ -47,7 +47,7 @@ test("Cloudflare D1 compatibility: no transaction control, PRAGMA, triggers or A
 
 test("the migration touches only portal tables (never the feedback, assessment or revenue tables)", () => {
   const created = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).sort();
-  assert.deepEqual(created, TABLES.filter((t) => !["business_profile_answers", "portal_feedback"].includes(t)), "0001 is unchanged; later tables live in 0002 and 0003");
+  assert.deepEqual(created, TABLES.filter((t) => !["business_profile_answers", "portal_feedback", "brand_assets", "brand_kits", "brand_uploads", "service_requests"].includes(t)), "0001 is unchanged; later tables live in 0002, 0003 and 0005");
   for (const other of ["feedback_responses", "client_revenue", "assessment_requests", "framework_environment"]) assert.ok(!sql.replace(/--.*$/gm, "").includes(other), other);
 });
 
@@ -203,7 +203,7 @@ test("deleting an organization or user that has dependent rows is refused", () =
 test("indexes exist and the main lookups use them", () => {
   const db = openPortalDb();
   const names = rows(db, "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%'").map((r) => r.name).sort();
-  assert.deepEqual(names, ["idx_activity_org_client_time", "idx_activity_org_time", "idx_invitations_one_pending", "idx_invitations_org", "idx_invitations_pending_email", "idx_invitations_workos", "idx_memberships_org", "idx_memberships_user", "idx_organizations_revenue_client", "idx_portal_feedback_created", "idx_portal_feedback_user", "idx_portal_sessions_expiry", "idx_portal_sessions_user", "idx_projects_org_created", "idx_projects_org_status"]);
+  assert.deepEqual(names, ["idx_activity_org_client_time", "idx_activity_org_time", "idx_brand_assets_org", "idx_brand_uploads_org", "idx_invitations_one_pending", "idx_invitations_org", "idx_invitations_pending_email", "idx_invitations_workos", "idx_memberships_org", "idx_memberships_user", "idx_organizations_revenue_client", "idx_portal_feedback_created", "idx_portal_feedback_user", "idx_portal_sessions_expiry", "idx_portal_sessions_user", "idx_projects_org_created", "idx_projects_org_status", "idx_service_requests_open", "idx_service_requests_org"]);
   const plan = (q, ...p) => rows(db, "EXPLAIN QUERY PLAN " + q, ...p).map((r) => r.detail).join(" | ");
   assert.match(plan("SELECT * FROM memberships WHERE user_id = ? AND status = 'active'", "x"), /idx_memberships_user|sqlite_autoindex_memberships/);
   assert.match(plan("SELECT * FROM memberships WHERE organization_id = ? AND user_id = ?", "x", "y"), /autoindex_memberships/);
