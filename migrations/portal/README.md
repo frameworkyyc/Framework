@@ -10,8 +10,8 @@ older SQL files in `../` are never applied here.
 * `0004_invitation_delivery.sql`: four additive columns on `invitations` (`delivery_status` default `not_sent`, `delivery_channel`, `delivery_attempted_at`,
   `delivery_error`) that track whether an invitation email was handed to a provider, separately from the invitation's own status. **Staging only for now.**
   Existing rows become `not_sent`; nothing existing is changed. Nothing in the running code reads these columns yet.
-* `0005_branding.sql` (**PROPOSED, not in this folder**: it lives in `../portal-proposed/` until approved): four additive tables for Branding (`brand_kits`, `brand_assets`, `brand_uploads`, `service_requests`).
-  Not applied to Staging or Production. See `worker/portal/BRANDING-FILES.md`. It is moved here, in its own reviewed change, only when its Staging application is approved.
+* `0005_branding.sql`: four additive tables for Branding (`brand_kits`, `brand_assets`, `brand_uploads`, `service_requests`). **Approved for Staging only.** Production: NOT applied, and the Production
+  workflow's expected list (`.github/scripts/portal-d1-check.mjs`) deliberately does not know it, so a pending 0005 makes that workflow fail closed. See `worker/portal/BRANDING-FILES.md`.
 * `wrangler.migrate.staging.jsonc`: a migration-only Wrangler config that binds **only** the Staging portal database. Use it with
   `-c` so Wrangler cannot fall back to the main `wrangler.jsonc` (which also binds Production's database).
 * `wrangler.migrate.production.jsonc`: the same, binding **only** the Production portal database `framework-portal`.
@@ -123,9 +123,9 @@ Forward-only and additive; one numbered file each; no BEGIN/COMMIT, PRAGMA or tr
 Time Travel restore, so note the Time Travel bookmark (`npx wrangler d1 time-travel info <database>`) before applying anything to a
 database that holds real data.
 
-## Apply 0005 (Branding) to the Staging portal database: NOT YET APPROVED
+## Apply 0005 (Branding) to the Staging portal database (approved for Staging only)
 
-Do not run this until the migration has been moved to `migrations/portal/` in an approved change. Checked read-only on 2026-10-26: Staging (`framework-portal-staging`,
+The file is in `migrations/portal/`. The Production database must NOT be touched. Checked read-only on 2026-10-26: Staging (`framework-portal-staging`,
 id `1edda8a2-5249-4f40-9dbc-d29aa44e21f8`) has 0001 to 0004 recorded and no branding tables, so only 0005 would be pending. Run from the repository root, signed in to Cloudflare;
 **`--remote` and `-c migrations/portal/wrangler.migrate.staging.jsonc` are both required.**
 

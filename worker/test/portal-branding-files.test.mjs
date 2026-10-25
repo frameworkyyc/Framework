@@ -15,7 +15,7 @@ const NOW = new Date("2026-10-26T12:00:00.000Z");
 const MB = 1024 * 1024;
 
 async function world() {
-  const db = openPortalDb({ proposed: ["0005_branding.sql"] });
+  const db = openPortalDb();
   const bucket = fakeR2();
   const org = async (slug) => (await repo.createOrganizationAudited(db, { slug, name: slug.toUpperCase() }, "seed")).organization;
   const user = async (n, email) => (await repo.upsertUserFromIdentity(db, { workosUserId: `user_01BRAND${n}0000`, email, name: email.split("@")[0] })).user;
@@ -38,17 +38,17 @@ async function deliver(w, org, o = {}, f = file("logo.png", S.png()), actor = "a
 
 /* ------------------------------------------------------------------ migration */
 
-test("migration 0005 is PROPOSED only: not in migrations/portal, additive, idempotent, and creates exactly the four branding tables", () => {
-  assert.ok(!readdirSync(new URL("../../migrations/portal/", import.meta.url)).some((f) => /branding/.test(f)), "nothing in the applied folder");
-  const sql = readFileSync(new URL("../../migrations/portal-proposed/0005_branding.sql", import.meta.url), "utf8");
-  assert.match(sql, /PROPOSED, NOT APPLIED/);
+test("migration 0005 (approved for Staging only): additive, idempotent, and creates exactly the four branding tables; Production is not mentioned as applied", () => {
+  assert.ok(readdirSync(new URL("../../migrations/portal/", import.meta.url)).includes("0005_branding.sql"));
+  assert.ok(!readdirSync(new URL("../../migrations/", import.meta.url)).includes("portal-proposed"), "the proposal folder is empty and gone");
+  const sql = readFileSync(new URL("../../migrations/portal/0005_branding.sql", import.meta.url), "utf8");
+  assert.match(sql, /NOT applied to Production/);
   assert.ok(!/\b(ALTER|DROP)\b|(?<!ON )\b(DELETE|UPDATE)\b/i.test(sql.replace(/--.*$/gm, "")), "no change to anything that exists");
   assert.deepEqual([...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]), ["brand_kits", "brand_assets", "brand_uploads", "service_requests"]);
-  const db = openPortalDb({ proposed: ["0005_branding.sql"] });
+  const db = openPortalDb();
   const tables = rows(db, "SELECT name FROM sqlite_master WHERE type='table'").map((r) => r.name);
   for (const t of ["brand_kits", "brand_assets", "brand_uploads", "service_requests"]) assert.ok(tables.includes(t), t);
   db.raw.exec(sql); // a second run changes nothing
-  assert.ok(!openPortalDb().raw.prepare("SELECT 1 FROM sqlite_master WHERE name='brand_assets'").get(), "the normal test database (the shipped migrations) has no branding tables");
 });
 
 test("the schema refuses bad rows by itself (CHECK constraints are the backstop): bad hash, bad kind, font upload without the rights tick, two open requests", async () => {
