@@ -106,3 +106,17 @@ Tested against real Staging: the exact SQL of every write path was replayed on t
 3. Publish the privacy policy amendments (see `PRIVACY-BRANDING-DRAFT.md`) after adviser review.
 4. Decide the retention items above.
 5. Add `branding` to `LIVE_AREAS` only when the pages exist and have been reviewed.
+
+## Phase 3: the client Branding page (Staging only)
+
+Enabled by `PORTAL_BRANDING = "1"` in `previews.vars` only (never the top-level vars, so never Production). Without it Branding stays the "Coming soon" page and the routes below answer 404.
+
+| Route (under `/portal/o/:slug/branding`) | Who | What |
+| --- | --- | --- |
+| `` (GET) | owner, member | Published brand system, or the empty state when the kit is a draft or absent |
+| `/files/:assetId` (GET, `?preview=1` for logos) | owner, member | Download of a published deliverable; previews are inline for logo images only |
+| `/uploads` (GET, POST multipart) | view: both; upload: both | Separate area for the client's own materials |
+| `/uploads/:id/download` (GET) | owner, member | Own organization's, non-held uploads, always as an attachment |
+| `/uploads/:id/delete` (POST) | owner only | Removes a shared upload (object deleted, row tombstoned) |
+
+Every route re-checks organization membership and permission; a file that is another organization's, unpublished, held, deleted or an unlicensed font is the same 404. Uploads use the `branding` rate-limit bucket, a CSRF token and the same-site check; the body is size-limited while streaming (`readUpload` in `form.js`). Downloads are audited (`brand.asset.download`, `brand.upload.download`) without keys or addresses. Colour swatches are SVG fills (no inline style); `/assets/js/portal-branding.js` only reveals the Copy buttons. "Request a quote" services are not part of this phase.
