@@ -38,6 +38,10 @@ const dateOnly = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTi
 const downloadLink = (vm, a, label) => `<a class="btn btn--small" href="${e(href(vm, `/branding/files/${a.id}`))}" download>${label}<span class="visually-hidden"> ${e(a.title)} (${e(upper(a.format))}, ${e(fileSize(a.size))})</span></a>`;
 const previewUrl = (vm, a) => href(vm, `/branding/files/${a.id}?preview=1`);
 
+/** A stable order for formats (vector first), so buttons and summaries never depend on the order rows came back in. */
+const formatRank = (f) => { const i = IMAGE_FORMATS.indexOf(f); return i < 0 ? IMAGE_FORMATS.length : i; };
+const byFormat = (a, b) => formatRank(a.format) - formatRank(b.format) || a.format.localeCompare(b.format);
+
 /** Logo files that are the same variation in several formats are one card with one download button per format. */
 function logoGroups(assets) {
   const groups = new Map();
@@ -46,7 +50,7 @@ function logoGroups(assets) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(a);
   }
-  return [...groups.values()];
+  return [...groups.values()].map((files) => files.sort(byFormat));
 }
 
 function logoCard(vm, files) {
@@ -117,7 +121,7 @@ export function brandingOverview(vm, brand, { canUpload = false, uploadCount = 0
 
   const parts = [];
   if (logos.length) {
-    const formats = [...new Set(assets.filter((x) => x.kind === "logo").map((x) => upper(x.format)))];
+    const formats = [...new Set(assets.filter((x) => x.kind === "logo").sort(byFormat).map((x) => upper(x.format)))];
     parts.push(section("logos", "Logos", list([count(logos.length, "logo variation"), formats.join(", ")]), "Use the version that suits the background. Each logo is available in every format we’ve prepared.", `<ul class="logo-grid">${logos.map((g) => logoCard(vm, g)).join("")}</ul>`));
   }
   if (colours.length) parts.push(section("colours", "Colours", count(colours.length, "colour"), "", `<ul class="swatches">${colours.map(swatch).join("")}</ul>`));
