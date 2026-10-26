@@ -608,3 +608,21 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 @media (max-width: 560px) { .hub { min-height: 0; padding: 20px 18px; gap: 16px 12px; } }
 .soon-line { margin: var(--space-4) 0 0; font-size: 14px; color: var(--slate); }
 .soon-line__label { margin-right: 8px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+
+/* Branding accordion: native <details>. Closed = a compact row (title, one summary line, chevron); open = the content. */
+.acc-list { border-top: 1px solid var(--ink); }
+.acc { border-bottom: 1px solid var(--hairline); }
+.acc__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: 72px; padding: 16px 0; list-style: none; cursor: pointer; }
+.acc__head::-webkit-details-marker { display: none; }
+.acc__head:hover .acc__title { text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+.acc__head:focus-visible { outline-offset: -2px; }
+.acc__text { display: grid; gap: 2px; min-width: 0; }
+.acc__title { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(20px, 2.6vw, 26px); line-height: 1.15; letter-spacing: -0.012em; }
+.acc__sum { font-size: 15px; color: var(--slate); overflow-wrap: anywhere; }
+.acc__chev { flex: none; width: 10px; height: 10px; margin-right: 6px; border-right: 2px solid var(--ink); border-bottom: 2px solid var(--ink); transform: rotate(45deg); transition: transform .15s ease; }
+.acc[open] > .acc__head .acc__chev { transform: rotate(-135deg); }
+.acc__body { padding: 4px 0 var(--space-4); }
+.acc__body > :first-child { margin-top: 0; }
+.acc__group { margin: var(--space-3) 0 0; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--slate); }
+.acc__group:first-child { margin-top: 0; }
+.acc__body .logo-grid, .acc__body .swatches, .acc__body .types, .acc__body .file-list { margin-top: var(--space-2); }

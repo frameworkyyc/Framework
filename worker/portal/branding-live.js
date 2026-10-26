@@ -18,7 +18,7 @@ const TONE_LABEL = { light: "For light backgrounds", dark: "For dark backgrounds
 const TYPE_ROLE_LABEL = { logo: "Logo", heading: "Headings", subheading: "Subheadings", body: "Body text", other: "Other" };
 const COLOUR_ROLE_LABEL = { primary: "Primary", secondary: "Secondary", accent: "Accent", neutral: "Neutral" };
 const DOC_KINDS = ["guideline", "document", "package", "other"];
-const DOC_LABEL = { guideline: "Brand guidelines", document: "Documents", package: "Packages", other: "Other files" };
+const DOC_LABEL = { guideline: "Guidelines", document: "Documents", package: "Packages", other: "Other files" };
 const IMAGE_FORMATS = ["svg", "png", "webp", "jpg"];
 
 export function fileSize(bytes) {
@@ -79,9 +79,15 @@ function docRow(vm, a) {
   return `<li class="file-row"><div class="file-row__main"><p class="file-row__name">${e(a.title)}</p><p class="muted small">${e(upper(a.format))} · ${e(fileSize(a.size))}${a.usageNote ? ` · ${e(a.usageNote)}` : ""}</p></div>${downloadLink(vm, a, "Download")}</li>`;
 }
 
-function section(id, title, intro, inner) {
-  return `<section class="brand-section" id="${id}" aria-labelledby="h-${id}"><h2 class="h2" id="h-${id}">${e(title)}</h2>${intro ? `<p class="muted brand-section__intro">${e(intro)}</p>` : ""}${inner}</section>`;
+/**
+ * One accordion section: a native <details>, so it opens and closes with no script and is keyboard- and screen-reader-operable. It is rendered closed (compact on a
+ * phone); /assets/js/portal-branding.js opens every section on a wide screen and opens the one a link points at. `summary` is the concise line shown while closed.
+ */
+function section(id, title, summary, intro, inner) {
+  return `<details class="acc" id="${id}"><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">${e(title)}</h2><span class="acc__sum">${e(summary)}</span></span><span class="acc__chev" aria-hidden="true"></span></summary><div class="acc__body">${intro ? `<p class="muted brand-section__intro">${e(intro)}</p>` : ""}${inner}</div></details>`;
 }
+const count = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+const list = (items) => items.join(" · ");
 
 /** Shown when there is no published brand system: a useful next step, never an empty library. */
 function emptyState(vm, { canUpload, uploadCount }) {
@@ -110,28 +116,29 @@ export function brandingOverview(vm, brand, { canUpload = false, uploadCount = 0
   const docs = DOC_KINDS.map((k) => [k, assets.filter((a) => a.kind === k)]).filter(([, list]) => list.length);
 
   const parts = [];
-  const jump = [];
-  if (logos.length) { jump.push(["logos", "Logos"]); parts.push(section("logos", "Logos", "Use the version that suits the background. Each logo is available in every format we’ve prepared.", `<ul class="logo-grid">${logos.map((g) => logoCard(vm, g)).join("")}</ul>`)); }
-  if (colours.length) { jump.push(["colours", "Colours"]); parts.push(section("colours", "Colours", "", `<ul class="swatches">${colours.map(swatch).join("")}</ul>`)); }
+  if (logos.length) {
+    const formats = [...new Set(assets.filter((x) => x.kind === "logo").map((x) => upper(x.format)))];
+    parts.push(section("logos", "Logos", list([count(logos.length, "logo variation"), formats.join(", ")]), "Use the version that suits the background. Each logo is available in every format we’ve prepared.", `<ul class="logo-grid">${logos.map((g) => logoCard(vm, g)).join("")}</ul>`));
+  }
+  if (colours.length) parts.push(section("colours", "Colours", count(colours.length, "colour"), "", `<ul class="swatches">${colours.map(swatch).join("")}</ul>`));
   if (type.length || fonts.length) {
-    jump.push(["typography", "Typography"]);
     const unlisted = fontFiles.filter((f) => !type.some((t) => f.title.toLowerCase().includes(t.family.toLowerCase())));
     const note = fonts.some((f) => !f.canDownload) ? `<p class="muted small">Some fonts can’t be shared as files because of their licence. Use the link beside each one to get it from its provider, or ask us.</p>` : "";
-    parts.push(section("typography", "Typography and fonts", "", `${type.length ? `<ul class="types">${type.map((t) => typeface(vm, t, fontFiles)).join("")}</ul>` : ""}${unlisted.length ? `<ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}`));
+    const names = type.map((t) => t.family);
+    parts.push(section("typography", "Typography & Fonts", names.length ? list([count(names.length, "typeface"), names.slice(0, 2).join(", ") + (names.length > 2 ? "…" : "")]) : count(fontFiles.length, "font file"), "", `${type.length ? `<ul class="types">${type.map((t) => typeface(vm, t, fontFiles)).join("")}</ul>` : ""}${unlisted.length ? `<ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}`));
   }
-  for (const [k, list] of docs) {
-    const id = k === "guideline" ? "guidelines" : `files-${k}`;
-    jump.push([id, DOC_LABEL[k]]);
-    parts.push(section(id, DOC_LABEL[k], k === "guideline" ? "How to use your brand consistently." : "", `<ul class="file-list">${list.map((a) => docRow(vm, a)).join("")}</ul>`));
+  if (docs.length) {
+    const total = docs.reduce((n, [, l]) => n + l.length, 0);
+    const inner = docs.map(([k, l]) => `${docs.length > 1 ? `<p class="acc__group">${e(DOC_LABEL[k])}</p>` : ""}<ul class="file-list">${l.map((a) => docRow(vm, a)).join("")}</ul>`).join("");
+    parts.push(section("guidelines", "Brand Guidelines & Documents", count(total, "file"), "How to use your brand consistently.", inner));
   }
   if (!parts.length) parts.push(`<div class="empty"><strong>Nothing to download yet</strong>Your brand system is published, but Framework hasn’t added files to it yet.</div>`);
 
-  const nav = jump.length > 1 ? `<nav class="brand-jump" aria-label="On this page"><ul>${jump.map(([id, label]) => `<li><a href="#${id}">${e(label)}</a></li>`).join("")}</ul></nav>` : "";
   const share = canUpload
     ? `<aside class="brand-aside" aria-labelledby="h-share"><h2 class="h3" id="h-share">Have brand materials of your own?</h2><p class="muted">Share your existing logo, fonts or guidelines and Framework will review them.</p><p><a class="btn" href="${e(href(vm, "/branding/uploads"))}">Upload your materials${uploadCount ? ` (${uploadCount} shared)` : ""}</a></p></aside>`
     : "";
   const meta = brand.publishedAt ? `<p class="muted small">Last published ${e(dateOnly(brand.publishedAt))}.</p>` : "";
-  return head + nav + parts.join("") + meta + share;
+  return head + `<div class="acc-list">${parts.join("")}</div>` + meta + share;
 }
 
 /* ------------------------------------------------------------------ the uploads area */
