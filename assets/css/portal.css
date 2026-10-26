@@ -627,3 +627,17 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .contact { margin: var(--space-4) 0 var(--space-3); display: grid; gap: 12px; max-width: 34em; }
 .contact > div { display: grid; grid-template-columns: 8em minmax(0, 1fr); gap: 12px; padding: 12px 0; border-top: 1px solid var(--hairline); }
 .contact dt { color: var(--slate); font-size: 14px; } .contact dd { margin: 0; overflow-wrap: anywhere; }
+
+/* Invoices (client): one row per invoice; stacked on a phone. Status is a word first; the colour only supports it. */
+.inv-list { list-style: none; margin: var(--space-3) 0; padding: 0; border-top: 1px solid var(--ink); }
+.inv { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px 16px; padding: 16px 0; border-bottom: 1px solid var(--hairline); }
+.inv p { margin: 0; } .inv__main > p + p { margin-top: 2px; }
+.inv__no { font-family: var(--font-display); font-weight: 600; font-size: 19px; overflow-wrap: anywhere; }
+.inv__side { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.inv__amount { font-size: 18px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.inv__status { display: inline-block; padding: 2px 8px; border: 1px solid var(--field-edge); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); }
+.inv__status--paid { border-color: var(--ink); color: var(--ink); }
+.inv__status--overdue { border-color: var(--signal); color: var(--signal); }
+.inv__act .btn { min-height: 44px; }
+@media (max-width: 560px) { .inv__act .btn { width: 100%; } }
+@media (min-width: 760px) { .inv { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; } .inv__side { flex-direction: column; align-items: flex-end; gap: 6px; } }

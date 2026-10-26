@@ -644,3 +644,18 @@ a.adm-tile--link:focus-visible { outline: 2px solid var(--ink); outline-offset: 
 .adm-tile__go { font-size: 18px; line-height: 1; color: var(--slate); transition: transform .15s ease, color .15s ease; }
 a.adm-tile--link:hover .adm-tile__go { color: var(--ink); transform: translateX(3px); }
 .adm-section-title .adm-linkbtn { white-space: nowrap; }
+
+/* Invoices (Admin): one card per invoice; the edit forms sit in a disclosure so the list stays scannable. */
+.adm-invlist { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+.adm-inv { padding: 16px; border: 1px solid var(--hairline); background: var(--paper); display: grid; gap: 10px; min-width: 0; }
+.adm-inv.is-archived { background: var(--mist); }
+.adm-inv__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.adm-inv__no { margin: 0; font-size: 18px; overflow-wrap: anywhere; } .adm-inv__amount { margin: 0; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.adm-inv__chips { margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.adm-inv p { margin: 0; overflow-wrap: anywhere; }
+.adm-inv__more > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
+.adm-fgrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+@media (min-width: 560px) { .adm-fgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.adm-payrow { display: grid; gap: 10px; margin: 8px 0 16px; max-width: 640px; }
+.adm-fgrid--pay { align-items: end; } .adm-paydate[hidden] { display: none; }
+.adm-invpage .adm-acc { margin: 16px 0; }

@@ -117,6 +117,8 @@ export const INLINE_IMAGE_TYPES = Object.freeze(["png", "jpg", "webp", "svg"]);
 /** Which extensions each profile accepts. A new area (for example Files & Deliverables) adds its own profile here. */
 export const PROFILES = Object.freeze({
   brand_client: Object.freeze(["png", "jpg", "webp", "svg", "pdf", "ai", "eps", "ttf", "otf", "woff", "woff2", "txt", "docx", "xlsx", "pptx", "zip"]),
+  // Invoices are PDFs prepared by Framework: nothing else is accepted.
+  invoice: Object.freeze(["pdf"]),
   brand_admin: Object.freeze(["png", "jpg", "webp", "svg", "pdf", "ai", "eps", "ttf", "otf", "woff", "woff2", "txt", "docx", "xlsx", "pptx", "zip"]),
 });
 

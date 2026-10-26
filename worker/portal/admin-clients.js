@@ -11,6 +11,7 @@
  */
 import { PROFILE_STEPS, profileProgress, stepStatus } from "./profile-schema.js";
 import { brandingSummary } from "./repo/brand.js";
+import { adminInvoiceSummary } from "./repo/invoices.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const LIST_LIMIT = 500;
@@ -94,6 +95,11 @@ async function brandingFor(rdb, id) {
   try { return await brandingSummary(rdb, id); } catch { return null; }
 }
 
+/** Invoice counts (drafts waiting, past due) for the client page, or null on a database without migration 0007. */
+async function invoicesFor(rdb, id, now) {
+  try { return await adminInvoiceSummary(rdb, id, { now }); } catch { return null; }
+}
+
 async function one(rdb, id, now) {
   const org = await rdb.prepare("SELECT id, name, slug, status, website_url, created_at FROM organizations WHERE id = ?").bind(id).first();
   if (!org) return json({ error: "not_found" }, 404);
@@ -105,7 +111,7 @@ async function one(rdb, id, now) {
   const invitations = (await rdb.prepare("SELECT email, role, status, created_at, created_by, expires_at, accepted_at, revoked_at FROM invitations WHERE organization_id = ? ORDER BY created_at DESC LIMIT 100").bind(id).all()).results
     .map((i) => ({ ...i, past_expiry: i.status === "pending" && i.expires_at <= t })); // the stored status is reported as it is; "past_expiry" is only a fact about the date
   const ans = await answersFor(rdb, id);
-  return json({ organization: org, members, invitations, profile_available: ans.ok, profile: ans.ok ? profileFor(ans.rows, { withAnswers: true }) : null, branding: await brandingFor(rdb, id) });
+  return json({ organization: org, members, invitations, profile_available: ans.ok, profile: ans.ok ? profileFor(ans.rows, { withAnswers: true }) : null, branding: await brandingFor(rdb, id), invoices: await invoicesFor(rdb, id, now) });
 }
 
 /**

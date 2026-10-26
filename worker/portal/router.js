@@ -30,6 +30,9 @@ import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
 import { checkCsrf } from "./sessions.js";
 import { can } from "./policy.js";
 import { getClientBrand, listClientUploads, uploadUsage, getBrandKit } from "./repo/brand.js";
+import { listClientInvoices, clientInvoiceSummary } from "./repo/invoices.js";
+import { clientDownloadInvoice } from "./invoice-files.js";
+import { invoiceStatusLine } from "./services-live.js";
 import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, limitsFor } from "./brand-files.js";
 
 /**
@@ -321,9 +324,24 @@ const BRANDING_ROUTES = [
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/files\/([^/]+)$/, action: "branding.view", run: (ctx, a, id) => downloadBrandFile(ctx, a, id, "asset") },
 ];
 
+/** The Invoices card status on the hub, or "" when invoices cannot be read (a database without migration 0007): the card then stays "Coming soon". */
+async function invoiceCard(ctx, a) {
+  try { return invoiceStatusLine(await dbCall(() => clientInvoiceSummary(ctx.db, a.membership.organizationId, { now: ctx.now }))); }
+  catch (err) { if (err instanceof Unavailable || /no such table/i.test(String(err && err.message))) return ""; throw err; }
+}
+
 /* Client Services (only where PORTAL_SERVICES is on). Phase 1: the hub and the Contact page; invoices and support requests follow. */
 const SERVICES_ROUTES = [
-  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services$/, action: "services.view", run: (ctx, a) => pages.servicesPage(ctx, a, {}) },
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services$/, action: "services.view", run: async (ctx, a) => pages.servicesPage(ctx, a, { invoices: can(a.membership.role, "invoices.view") ? await invoiceCard(ctx, a) : "" }) },
+  // owners only (policy invoices.view): a member who opens the address gets the portal's plain "not allowed" page
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/invoices$/, action: "invoices.view", run: async (ctx, a) => pages.invoicesPage(ctx, a, await listClientInvoices(ctx.db, a.membership.organizationId, { now: ctx.now })) },
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/invoices\/([^/]+)\/download$/, action: "invoices.view", run: async (ctx, a, id) => {
+      if (!UUID.test(id)) return notFoundPage(ctx);
+      if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
+      const res = await clientDownloadInvoice(brandDeps(ctx), { ...who(a), invoiceId: id });
+      return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
+    },
+  },
   { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/contact$/, action: "services.view", run: (ctx, a) => pages.contactPage(ctx, a) },
 ];
 

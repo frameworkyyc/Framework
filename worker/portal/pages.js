@@ -155,6 +155,10 @@ export async function servicesPage(ctx, a, live = {}) {
   const vm = liveModel(ctx, a, {});
   return shell(ctx, a, { title: "Client Services", active: "home", body: servicesLive.servicesHub(vm, a.membership.role, live), vm, ref: "services" });
 }
+export async function invoicesPage(ctx, a, items) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Invoices", active: "home", body: servicesLive.invoicesPage(vm, items), vm, ref: "services-invoices" });
+}
 export async function contactPage(ctx, a) {
   const vm = liveModel(ctx, a, {});
   return shell(ctx, a, { title: "Contact", active: "home", body: servicesLive.contactPage(vm), vm, ref: "services-contact" });

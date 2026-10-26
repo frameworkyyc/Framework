@@ -29,11 +29,11 @@ import { limitsFor } from "./brand-files.js";
 import { ADMIN_MAX_FILE_BYTES, makeKey, putObject, getObject, deleteObject, StorageError } from "./files/index.js";
 
 const MAX_JSON = 20 * 1024;
-const MAX_MULTIPART = ADMIN_MAX_FILE_BYTES + 1024 * 1024; // the file plus form overhead
+export const MAX_MULTIPART = ADMIN_MAX_FILE_BYTES + 1024 * 1024; // the file plus form overhead
 const NIL_ORG = "00000000-0000-4000-8000-000000000000"; // owns nothing: the storage check's own corner of the bucket
 
-const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers } });
-const err = (status, error, message) => json({ error, message }, status);
+export const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...headers } });
+export const err = (status, error, message) => json({ error, message }, status);
 
 /** Data-layer and file-service failure codes, as HTTP statuses. Anything unlisted is a bare 500: no internals reach the browser. */
 const STATUS = {
@@ -47,13 +47,13 @@ const STATUS = {
 };
 const fromFailure = (r) => (STATUS[r.error] ? err(STATUS[r.error], r.error, "The change was not made.") : err(500, "server_error", "Something went wrong. Nothing was changed."));
 
-function sameOriginWrite(request) {
+export function sameOriginWrite(request) {
   const origin = request.headers.get("Origin");
   if (!origin || origin !== new URL(request.url).origin) return false;
   return request.headers.get("X-Framework-Admin") === "1";
 }
 
-async function readJson(request, allowed) {
+export async function readJson(request, allowed) {
   const type = (request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
   if (type !== "application/json") return { response: err(415, "unsupported_media_type", "Send the request as application/json.") };
   const declared = Number(request.headers.get("Content-Length"));
@@ -68,7 +68,7 @@ async function readJson(request, allowed) {
 }
 
 /** multipart/form-data with exactly one `file` and an optional JSON `meta`. The declared size is checked BEFORE anything is read. */
-async function readUpload(request, { withMeta }) {
+export async function readUpload(request, { withMeta }) {
   const type = (request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
   if (type !== "multipart/form-data") return { response: err(415, "unsupported_media_type", "Send the file as a form upload.") };
   const declared = Number(request.headers.get("Content-Length"));

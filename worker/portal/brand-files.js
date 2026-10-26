@@ -16,6 +16,7 @@ import { recordActivity } from "./repo/activity.js";
 import { inspectUpload, makeKey, putObject, getObject, deleteObject, listOrganizationKeys, fileResponse, StorageError, ADMIN_MAX_FILE_BYTES, limitsFromEnv, parseKey } from "./files/index.js";
 import { isKnownBrandingService } from "./brand-services.js";
 import { getOrganizationById } from "./repo/orgs.js";
+import { listInvoiceStorageKeys } from "./repo/invoices.js";
 import { buildBrandFileName } from "../../admin/assets/brand-names.js";
 
 const denied = () => fail("forbidden");
@@ -235,7 +236,8 @@ export async function deleteOrganizationFiles(deps, { organizationId, actor }) {
     const keys = [];
     for await (const key of listOrganizationKeys(deps.bucket, organizationId)) keys.push(key); // everything under this organization's prefix, including orphans
     for (const key of keys) {
-      if (!parseKey(key)) continue;
+      const parsed = parseKey(key);
+      if (!parsed || parsed.area === "invoices") continue; // invoices are financial records kept for the retention period: never swept up here (CLIENT-SERVICES.md)
       try { await deleteObject(deps.bucket, { key, organizationId }); removed++; } catch { failed++; }
     }
   } catch (err) { return storageFail(err); }
@@ -245,7 +247,7 @@ export async function deleteOrganizationFiles(deps, { organizationId, actor }) {
 
 /** Read-only: stored objects of this organization that no live row refers to (left behind by an interrupted write). */
 export async function findOrphanObjects(deps, { organizationId }) {
-  const live = new Set(await brand.listLiveStorageKeys(deps.db, organizationId));
+  const live = new Set([...(await brand.listLiveStorageKeys(deps.db, organizationId)), ...(await listInvoiceStorageKeys(deps.db, organizationId))]);
   const orphans = [];
   for await (const key of listOrganizationKeys(deps.bucket, organizationId)) if (!live.has(key)) orphans.push(key);
   return orphans;
