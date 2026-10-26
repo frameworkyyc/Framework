@@ -93,7 +93,10 @@ export function home(vm) {
     const st = a.key === "branding" ? brandStatus(vm.brand) : vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : "";
     return `<li><a class="hub" href="${e(href(vm, a.path))}"><span class="hub__top"><span class="hub__title">${e(a.title)}</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">${e(HOME_BLURB[a.key])}</span>${st ? `<span class="hub__status">${st}</span>` : ""}</a></li>`;
   };
-  const active = AREAS.filter((a) => isLive(a.key)).map(card).join("");
+  const servicesCard = vm.services
+    ? `<li><a class="hub" href="${e(href(vm, "/services"))}"><span class="hub__top"><span class="hub__title">Client Services</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">Invoices, support requests and how to reach us</span>${vm.servicesStatus ? `<span class="hub__status">${vm.servicesStatus}</span>` : ""}</a></li>`
+    : "";
+  const active = AREAS.filter((a) => isLive(a.key)).map(card).join("") + servicesCard;
   const soon = AREAS.filter((a) => !isLive(a.key));
   return `<header class="page-head page-head--home">${vm.org && vm.org.name ? `<span class="eyebrow">${e(vm.org.name)}</span>` : ""}<h1 class="h1 h1--home">${e(welcomeFor(vm))}</h1></header>
 <nav aria-label="Your workspace"><ul class="hubs">${active}</ul></nav>

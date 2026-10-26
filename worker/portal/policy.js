@@ -24,6 +24,12 @@ const GRANTS = Object.freeze({
   "branding.upload": Object.freeze(["owner", "member"]),
   "branding.delete_upload": Object.freeze(["owner"]),
   "branding.request": Object.freeze(["owner"]),
+  // Client Services: everyone may open the hub, read the contact details, and send and follow support or change requests (a request never authorizes paid work).
+  // Invoices carry financial information: owners only, and read-only (Framework Admin enters, publishes and archives them).
+  "services.view": Object.freeze(["owner", "member"]),
+  "support.view": Object.freeze(["owner", "member"]),
+  "support.submit": Object.freeze(["owner", "member"]),
+  "invoices.view": Object.freeze(["owner"]),
 });
 
 export const ACTIONS = Object.freeze(Object.keys(GRANTS));

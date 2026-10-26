@@ -147,7 +147,7 @@ test("crypto: sealed payloads are tamper-proof, expiring and purpose-bound", asy
 /* ------------------------------------------------------------------ policy */
 test("policy: roles map to exactly the reviewed grants", () => {
   assert.deepEqual(permissionsFor("owner").sort(), [...ACTIONS].sort());
-  assert.deepEqual(permissionsFor("member").sort(), ["account.view", "activity.view", "branding.upload", "branding.view", "documents.view", "feedback.submit", "org.view", "profile.edit", "profile.view", "projects.view", "workspace.view"]);
+  assert.deepEqual(permissionsFor("member").sort(), ["account.view", "activity.view", "branding.upload", "branding.view", "documents.view", "feedback.submit", "org.view", "profile.edit", "profile.view", "projects.view", "services.view", "support.submit", "support.view", "workspace.view"]);
   assert.ok(can("owner", "members.view"));
   assert.ok(!can("member", "members.view"));
 });

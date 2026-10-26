@@ -620,3 +620,10 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .acc__group { margin: var(--space-3) 0 0; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--slate); }
 .acc__group:first-child { margin-top: 0; }
 .acc__body .logo-grid, .acc__body .swatches, .acc__body .types, .acc__body .file-list { margin-top: var(--space-2); }
+
+/* Client Services: a card that is not available yet is quiet text, never a link. Contact details are a plain definition list. */
+.hub--soon { color: var(--slate); }
+.hub--soon .hub__title { color: var(--slate); font-weight: 500; }
+.contact { margin: var(--space-4) 0 var(--space-3); display: grid; gap: 12px; max-width: 34em; }
+.contact > div { display: grid; grid-template-columns: 8em minmax(0, 1fr); gap: 12px; padding: 12px 0; border-top: 1px solid var(--hairline); }
+.contact dt { color: var(--slate); font-size: 14px; } .contact dd { margin: 0; overflow-wrap: anywhere; }

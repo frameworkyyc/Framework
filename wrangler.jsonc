@@ -105,7 +105,9 @@
       "PORTAL_INVITE_SENDING": "1",
       // Turns on the client-facing Branding section (view and download published brand assets, upload existing brand materials). STAGING ONLY, never at the top level.
       // Needs migrations 0005/0006 and the PORTAL_FILES binding below. Exactly "1" or absent: absent keeps Branding as a "Coming soon" page.
-      "PORTAL_BRANDING": "1"
+      "PORTAL_BRANDING": "1",
+      // Turns on the client-facing Client Services area (invoices, support & change requests, contact). STAGING ONLY, never at the top level. Needs migration 0007 for its data.
+      "PORTAL_SERVICES": "1"
     },
     "d1_databases": [
       {

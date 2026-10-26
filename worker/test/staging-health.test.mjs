@@ -26,6 +26,7 @@ const goodEnv = () => ({
   PORTAL_ENABLED: { type: "plain_text", text: "1" },
   PORTAL_DEMO: { type: "plain_text", text: "1" },
   PORTAL_BRANDING: { type: "plain_text", text: "1" },
+  PORTAL_SERVICES: { type: "plain_text", text: "1" },
   PORTAL_ADMIN_WRITES: { type: "plain_text", text: "1" },
   PORTAL_INVITE_SENDING: { type: "plain_text", text: "1" },
   ...Object.fromEntries(expected.secrets.required.map((n) => [n, { type: "secret_text" }])),
