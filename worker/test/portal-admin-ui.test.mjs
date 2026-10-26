@@ -170,7 +170,7 @@ test("the Business Profile review stays read-only and intact, and the navigation
   assert.match(read("admin/assets/clients.js"), /staff cannot edit them here/);
   for (const w of ["Complete", "Partial", "Missing"]) assert.ok(strip(read("admin/assets/client-dashboard.js")).includes(`"${w}"`), w);
   assert.ok(!/method: "(POST|PUT|PATCH|DELETE)"/.test(clients), "clients.js itself makes no write call");
-  assert.equal([...clients.matchAll(/\bapi\(/g)].length, 2, "the list and the detail reads");
+  assert.equal([...clients.matchAll(/\bapi\(/g)].length, 3, "the list, the detail and the Business Profile page reads");
   assert.match(read("admin/assets/modules.js"), /id: "clients", label: "Clients", path: "\/admin\/clients", enabled: true, load: \(\) => import\("\.\/clients\.js"\)/);
   assert.match(read("admin/assets/clients.js"), /from "\.\/clients-access\.js"/);
 });
