@@ -513,3 +513,79 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
   .tile--status .tile__status { grid-area: status; margin-top: 10px; }
   .tile--status .tile__arrow { grid-area: arrow; align-self: center; }
 }
+
+/* ---------------------------------------------------------------------------------------------------------------
+   Branding (client): logo cards, colour swatches, typefaces, downloadable files, the upload area and the empty state.
+   Mobile first: one column on phones, more as the screen allows. Tap targets are at least 44px.
+   --------------------------------------------------------------------------------------------------------------- */
+.brand-jump { margin: 0 0 var(--space-4); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--hairline); }
+.brand-jump ul { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.brand-jump a { display: inline-flex; align-items: center; min-height: 48px; padding: 0 14px; color: var(--slate); text-decoration: none; white-space: nowrap; font-weight: 500; }
+.brand-jump a:hover { color: var(--ink); background: var(--mist); }
+.brand-section { margin: 0 0 var(--space-5); }
+.brand-section .h2 { margin: 0 0 8px; }
+.brand-section__intro { max-width: 46em; margin: 0 0 var(--space-3); }
+
+.logo-grid, .swatches, .types, .file-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
+.logo-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+@media (min-width: 600px) { .logo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 960px) { .logo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.logo-card { display: flex; flex-direction: column; border: 1px solid var(--hairline); min-width: 0; }
+.logo-card__stage { display: flex; align-items: center; justify-content: center; aspect-ratio: 3 / 2; padding: 20px; background: var(--paper); border-bottom: 1px solid var(--hairline); }
+.logo-card__stage--dark { background: var(--ink); border-bottom-color: var(--ink); }
+.logo-card__stage--none { background: var(--mist); }
+.logo-card__stage img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.logo-card__body { display: flex; flex-direction: column; gap: 6px; padding: 16px; flex: 1; }
+.logo-card__body p { margin: 0; }
+.logo-card__title { font-family: var(--font-display); font-size: 18px; font-weight: 600; }
+.logo-card__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 10px; }
+.logo-card__actions .btn { min-height: 44px; }
+
+.swatches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-2); }
+@media (min-width: 700px) { .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .swatches { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.swatch { min-width: 0; }
+.swatch__chip { display: block; width: 100%; height: auto; aspect-ratio: 5 / 3; }
+.swatch__chip--edge { outline: 1px solid var(--hairline); outline-offset: -1px; }
+.swatch__body { padding-top: 10px; }
+.swatch__body p { margin: 0 0 2px; overflow-wrap: anywhere; }
+.swatch__name { font-family: var(--font-display); font-weight: 600; }
+.swatch__code code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; }
+.copy { min-height: 44px; min-width: 44px; margin-left: 4px; padding: 0 12px; border: 1px solid var(--field-edge); border-radius: 0; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.copy:hover { background: var(--ink); color: var(--paper); }
+.copy[hidden] { display: none; }
+
+.types { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; border-top: 1px solid var(--ink); }
+.type { padding: var(--space-2) 0; border-bottom: 1px solid var(--hairline); }
+.type p { margin: 0 0 4px; }
+.type__family { font-family: var(--font-display); font-size: 24px; font-weight: 600; line-height: 1.2; }
+
+.file-list { border-top: 1px solid var(--ink); }
+.file-row { display: flex; flex-direction: column; gap: 12px; padding: var(--space-2) 0; border-bottom: 1px solid var(--hairline); }
+.file-row__main { min-width: 0; }
+.file-row__main p { margin: 0 0 2px; overflow-wrap: anywhere; }
+.file-row__name { font-weight: 600; }
+.file-row__actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; }
+.file-row .btn { min-height: 44px; }
+@media (min-width: 700px) { .file-row { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-3); } }
+.btn--quiet { border-color: var(--field-edge); color: var(--slate); }
+
+.remove summary { list-style: none; cursor: pointer; }
+.remove summary::-webkit-details-marker { display: none; }
+.remove[open] { flex-basis: 100%; padding: 12px; border: 1px solid var(--hairline); background: var(--mist); }
+.remove form p { margin: 0 0 10px; }
+
+.brand-aside { margin-top: var(--space-5); padding: var(--space-3); border: 1px solid var(--hairline); background: var(--mist); max-width: 46em; }
+.brand-aside .h3 { margin: 0 0 6px; }
+.brand-aside p { margin: 0 0 12px; }
+.brand-aside p:last-child { margin-bottom: 0; }
+
+.brand-empty { max-width: 46em; padding: var(--space-4) 0; border-top: 1px solid var(--ink); }
+.brand-empty .h2 { margin: 12px 0 8px; }
+.brand-empty__list { margin: var(--space-2) 0 var(--space-3); padding-left: 1.2em; }
+.brand-empty__list li { margin-bottom: 8px; }
+
+.upload { max-width: 40em; margin-bottom: var(--space-5); }
+.upload input[type="file"] { display: block; width: 100%; min-height: 48px; padding: 10px; border: 1px solid var(--field-edge); background: var(--paper); font: inherit; }
+.upload input[type="file"]::file-selector-button { min-height: 36px; margin-right: 12px; padding: 0 14px; border: 1px solid var(--ink); background: var(--paper); font: inherit; cursor: pointer; }
+@media (max-width: 560px) { .upload .btn--primary { width: 100%; } .logo-card__actions .btn { flex: 1 1 auto; } }

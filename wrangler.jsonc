@@ -102,7 +102,10 @@
       // Sending is still limited server-side to the EXACT addresses in the Cloudflare secret PORTAL_INVITE_ALLOWLIST (this repository is public, so the addresses are not here).
       // Missing, empty or malformed means every invitation operation is refused. Setup and the add-an-address procedure: worker/portal/INVITATION-DELIVERY-PLAN.md and ADMIN-INVITATIONS-RUNBOOK.md.
       "PORTAL_ADMIN_WRITES": "1",
-      "PORTAL_INVITE_SENDING": "1"
+      "PORTAL_INVITE_SENDING": "1",
+      // Turns on the client-facing Branding section (view and download published brand assets, upload existing brand materials). STAGING ONLY, never at the top level.
+      // Needs migrations 0005/0006 and the PORTAL_FILES binding below. Exactly "1" or absent: absent keeps Branding as a "Coming soon" page.
+      "PORTAL_BRANDING": "1"
     },
     "d1_databases": [
       {
