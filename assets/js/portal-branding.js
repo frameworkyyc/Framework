@@ -3,13 +3,11 @@
 (function () {
   "use strict";
   if (typeof document === "undefined") return;
-  /* Accordion sections arrive closed (compact on a phone). On a wide screen open them all; a link to a section (#colours) opens that section on any screen. */
-  var sections = document.querySelectorAll("details.acc");
+  /* Accordion sections arrive closed on every screen; the client opens the ones they want. A link to a section (#colours) opens that section. */
   function openFromHash() {
     var id = (location.hash || "").slice(1), target = id && document.getElementById(id);
     if (target && target.tagName === "DETAILS") target.open = true;
   }
-  if (sections.length && window.matchMedia && window.matchMedia("(min-width: 900px)").matches) Array.prototype.forEach.call(sections, function (d) { d.open = true; });
   openFromHash();
   window.addEventListener("hashchange", openFromHash);
   var buttons = document.querySelectorAll("[data-copy]");

@@ -85,7 +85,7 @@ function docRow(vm, a) {
 
 /**
  * One accordion section: a native <details>, so it opens and closes with no script and is keyboard- and screen-reader-operable. It is rendered closed (compact on a
- * phone); /assets/js/portal-branding.js opens every section on a wide screen and opens the one a link points at. `summary` is the concise line shown while closed.
+ * phone); /assets/js/portal-branding.js only opens the one a link (#hash) points at. `summary` is the concise line shown while closed.
  */
 function section(id, title, summary, intro, inner) {
   return `<details class="acc" id="${id}"><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">${e(title)}</h2><span class="acc__sum">${e(summary)}</span></span><span class="acc__chev" aria-hidden="true"></span></summary><div class="acc__body">${intro ? `<p class="muted brand-section__intro">${e(intro)}</p>` : ""}${inner}</div></details>`;
