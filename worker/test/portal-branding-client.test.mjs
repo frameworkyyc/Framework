@@ -349,3 +349,37 @@ test("every Branding page is signed-in only, breadcrumbed, and free of inline sc
 test("fileSize prints plain sizes", () => {
   assert.equal(fileSize(0), "0 B"); assert.equal(fileSize(2048), "2 KB"); assert.equal(fileSize(5 * 1024 * 1024), "5.0 MB"); assert.equal(fileSize(25 * 1024 * 1024), "25 MB"); assert.equal(fileSize(-1), "");
 });
+
+/* ------------------------------------------------------------------ Home cards */
+
+test("Home: Business Profile and Branding are two matching whole-card links, each with title, description, status and an arrow; no welcome copy", async () => {
+  const { ann, mia, alpha, publishKit } = await setup();
+  let html = await (await ann.get("/portal/o/alpha")).text();
+  const cards = [...html.matchAll(/<a class="hub" href="([^"]+)">([\s\S]*?)<\/a>/g)];
+  assert.deepEqual(cards.map((c) => c[1]), ["/portal/o/alpha/profile", "/portal/o/alpha/branding"]);
+  for (const [, , inner] of cards) {
+    assert.match(inner, /class="hub__title"/); assert.match(inner, /class="hub__desc"/); assert.match(inner, /class="hub__status"/); assert.match(inner, /class="hub__arrow tile__arrow" aria-hidden="true">→</);
+  }
+  assert.match(cards[1][2], /Not published yet/); assert.match(cards[1][2], /Upload your existing brand materials/);
+  assert.ok(!/class="lead"|home-note|Start your Business Profile/.test(html));
+  assert.ok(!/<p class="soon-line">[\s\S]*Branding[\s\S]*<\/p>/.test(html), "Branding is no longer 'coming soon'");
+  await publishKit(alpha);
+  assert.match(await (await mia.get("/portal/o/alpha")).text(), /Brand system published/);
+  await upload(mia, "alpha", { csrf: await csrfFrom(mia, "alpha") });
+  assert.match(await (await ann.get("/portal/o/alpha")).text(), /1 file shared with Framework/);
+});
+
+test("Home with Branding off: only the Business Profile card, and Branding is listed as coming soon", async () => {
+  const { ann } = await setup({ flag: false });
+  const html = await (await ann.get("/portal/o/alpha")).text();
+  assert.equal([...html.matchAll(/<a class="hub"/g)].length, 1);
+  assert.match(/<p class="soon-line">[\s\S]*?<\/p>/.exec(html)[0], /Branding/);
+});
+
+test("Home stays up when branding data cannot be read: the Branding card says so and nothing else breaks", async () => {
+  const { w, ann } = await setup();
+  w.db.raw.exec("DROP TABLE service_requests; DROP TABLE brand_uploads; DROP TABLE brand_assets; DROP TABLE brand_kits");
+  const res = await ann.get("/portal/o/alpha");
+  assert.equal(res.status, 200);
+  assert.match(await res.text(), /Status unavailable right now/);
+});

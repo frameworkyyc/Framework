@@ -228,6 +228,19 @@ async function saveFeedback(ctx, a) {
 
 /* ------------------------------------------------------------------ Branding (Phase 3; only where PORTAL_BRANDING is on) */
 
+/** The Branding card on Home: published or not, and how many files the client has shared. null when Branding is not live; "unavailable" when it cannot be read. */
+async function brandCard(ctx, a) {
+  if (!brandingOn(ctx)) return null;
+  try {
+    const org = a.membership.organizationId;
+    const [kit, uploads] = await Promise.all([dbCall(() => getBrandKit(ctx.db, org)), dbCall(() => listClientUploads(ctx.db, org))]);
+    return { state: kit && kit.status === "published" ? "published" : "draft", uploads: uploads.length };
+  } catch (err) {
+    if (err instanceof Unavailable) return { state: "unavailable", uploads: 0 };
+    throw err;
+  }
+}
+
 const brandDeps = (ctx) => ({ db: ctx.db, bucket: ctx.env.PORTAL_FILES, env: ctx.env, now: ctx.now });
 const who = (a) => ({ role: a.membership.role, organizationId: a.membership.organizationId, userId: a.session.userId });
 /** Files leave through brand-files.js/fileResponse; the portal-wide headers it does not set itself are added here. */
@@ -313,7 +326,7 @@ const ORG_ROUTES = [
       // One read serves both the greeting's name fallback and the module progress. null (unreadable) shows "Progress unavailable", never 0%.
       const answers = await readAnswers(ctx, a);
       const shown = { ...withDisplayName(a, answers), returning: await returningVisitor(ctx, a) };
-      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }));
+      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }), await brandCard(ctx, a));
     },
   },
   { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, { ...a, returning: await returningVisitor(ctx, a) }, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },
