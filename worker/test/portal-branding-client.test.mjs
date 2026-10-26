@@ -386,7 +386,7 @@ test("Home stays up when branding data cannot be read: the Branding card says so
 
 /* ------------------------------------------------------------------ accordion */
 
-test("Branding is four native accordion sections, each with a concise summary, rendered closed (script opens them on wide screens); every download is still present", async () => {
+test("Branding is four native accordion sections, each with a concise summary, closed on every screen (script only opens a linked section); every download is still present", async () => {
   const { ann, alpha, deliver, publishKit } = await setup();
   const a = await deliver(alpha, logo, "a.png", S.png()), b = await deliver(alpha, logo, "a.svg", S.svg());
   const g = await deliver(alpha, { kind: "guideline", title: "Brand Guidelines" }, "g.pdf", S.pdf());
@@ -396,10 +396,10 @@ test("Branding is four native accordion sections, each with a concise summary, r
   const html = await (await ann.get(base("alpha"))).text();
   const secs = [...html.matchAll(/<details class="acc" id="(\w+)"><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">([^<]+)<\/h2><span class="acc__sum">([^<]+)<\/span>/g)].map((m) => m.slice(1));
   assert.deepEqual(secs, [["logos", "Logos", "1 logo variation · SVG, PNG"], ["colours", "Colours", "2 colours"], ["typography", "Typography & Fonts".replace("&", "&amp;"), "1 typeface · Switzer"], ["guidelines", "Brand Guidelines &amp; Documents", "2 files"]]);
-  assert.ok(!/<details[^>]* open/.test(html), "closed by default: compact on a phone, and correct without script");
+  assert.ok(!/<details[^>]* open/.test(html), "closed by default on every screen");
   assert.equal([...html.matchAll(/<summary/g)].length, 4);
   for (const id of [a, b, g, d, f]) assert.ok(html.includes(`/branding/files/${id}"`), "download link kept: " + id);
   assert.match(html, /aria-hidden="true"><\/span><\/summary>/, "the chevron is decorative");
   const js = (await import("node:fs")).readFileSync(new URL("../../assets/js/portal-branding.js", import.meta.url), "utf8");
-  assert.match(js, /min-width: 900px/); assert.match(js, /hashchange/);
+  assert.ok(!/matchMedia|min-width/.test(js), "no automatic expansion on any screen"); assert.match(js, /hashchange/);
 });

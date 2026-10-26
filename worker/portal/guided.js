@@ -91,7 +91,7 @@ export function home(vm) {
   // not built yet are a single quiet line, never a card, so nothing suggests they can be opened.
   const card = (a) => {
     const st = a.key === "branding" ? brandStatus(vm.brand) : vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : "";
-    return `<li><a class="hub" href="${e(href(vm, a.path))}"><span class="hub__main"><span class="hub__title">${e(a.title)}</span><span class="hub__desc">${e(HOME_BLURB[a.key])}</span></span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span>${st ? `<span class="hub__status">${st}</span>` : ""}</a></li>`;
+    return `<li><a class="hub" href="${e(href(vm, a.path))}"><span class="hub__top"><span class="hub__title">${e(a.title)}</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">${e(HOME_BLURB[a.key])}</span>${st ? `<span class="hub__status">${st}</span>` : ""}</a></li>`;
   };
   const active = AREAS.filter((a) => isLive(a.key)).map(card).join("");
   const soon = AREAS.filter((a) => !isLive(a.key));
