@@ -518,12 +518,6 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
    Branding (client): logo cards, colour swatches, typefaces, downloadable files, the upload area and the empty state.
    Mobile first: one column on phones, more as the screen allows. Tap targets are at least 44px.
    --------------------------------------------------------------------------------------------------------------- */
-.brand-jump { margin: 0 0 var(--space-4); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--hairline); }
-.brand-jump ul { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.brand-jump a { display: inline-flex; align-items: center; min-height: 48px; padding: 0 14px; color: var(--slate); text-decoration: none; white-space: nowrap; font-weight: 500; }
-.brand-jump a:hover { color: var(--ink); background: var(--mist); }
-.brand-section { margin: 0 0 var(--space-5); }
-.brand-section .h2 { margin: 0 0 8px; }
 .brand-section__intro { max-width: 46em; margin: 0 0 var(--space-3); }
 
 .logo-grid, .swatches, .types, .file-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; }

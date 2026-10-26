@@ -395,7 +395,7 @@ test("Branding is four native accordion sections, each with a concise summary, r
   await publishKit(alpha);
   const html = await (await ann.get(base("alpha"))).text();
   const secs = [...html.matchAll(/<details class="acc" id="(\w+)"><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">([^<]+)<\/h2><span class="acc__sum">([^<]+)<\/span>/g)].map((m) => m.slice(1));
-  assert.deepEqual(secs, [["logos", "Logos", "1 logo variation · PNG, SVG"], ["colours", "Colours", "2 colours"], ["typography", "Typography & Fonts".replace("&", "&amp;"), "1 typeface · Switzer"], ["guidelines", "Brand Guidelines &amp; Documents", "2 files"]]);
+  assert.deepEqual(secs, [["logos", "Logos", "1 logo variation · SVG, PNG"], ["colours", "Colours", "2 colours"], ["typography", "Typography & Fonts".replace("&", "&amp;"), "1 typeface · Switzer"], ["guidelines", "Brand Guidelines &amp; Documents", "2 files"]]);
   assert.ok(!/<details[^>]* open/.test(html), "closed by default: compact on a phone, and correct without script");
   assert.equal([...html.matchAll(/<summary/g)].length, 4);
   for (const id of [a, b, g, d, f]) assert.ok(html.includes(`/branding/files/${id}"`), "download link kept: " + id);
