@@ -5,7 +5,7 @@
  * Returns null (= "not mine"; worker/index.js then answers portalNotFound(), never the static site) when the portal is off, or the request is not for the portal or not on the
  * portal host. When it IS enabled but misconfigured it fails closed with a generic 503 for portal paths.
  */
-import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled } from "./config.js";
+import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled } from "./config.js";
 import { errorPage, newRef, redirect, checkSameSiteMutation } from "./http.js";
 import { handleLogin, handleCallback, handleLogout } from "./auth.js";
 import { requireSession, requireOrgAccess, dbCall, Unavailable, unavailablePage, notFoundPage } from "./guard.js";
@@ -25,9 +25,12 @@ import { hasPriorVisit } from "./repo/visits.js";
 import { stepById, PROFILE_STEPS, MULTI_SEP } from "./profile-schema.js";
 import { comingSoonKeys, LIVE_AREAS } from "./guided-data.js";
 import { moduleStatuses, nextActions } from "./module-status.js";
-import { readForm, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES } from "./form.js";
+import { readForm, readUpload, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES, UPLOAD_FORM_OVERHEAD } from "./form.js";
 import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
 import { checkCsrf } from "./sessions.js";
+import { can } from "./policy.js";
+import { getClientBrand, listClientUploads, uploadUsage, getBrandKit } from "./repo/brand.js";
+import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, limitsFor } from "./brand-files.js";
 
 /**
  * The answer for every /portal path when the portal is not serving this request (disabled, wrong host). Deliberately bare: no portal
@@ -79,6 +82,7 @@ async function noAccess(ctx) {
 /** Organization pages: every one goes through requireOrgAccess; queries use ONLY the membership's organization id. */
 /** The Coming Soon pages (members only, like every organization page) for each section that is not built yet; derived from the same list that drives Home. */
 const SOON = comingSoonKeys().join("|");
+const brandingOn = (ctx) => brandingEnabled(ctx.env);
 
 /** Save one questionnaire step. Every check below runs on the server for every save; the organization comes from the membership, never the form. */
 async function saveProfile(ctx, a, stepId) {
@@ -222,12 +226,94 @@ async function saveFeedback(ctx, a) {
   return pages.feedbackPage(ctx, a, { values: result.values || input, errors: result.errors || {}, status: 422 });
 }
 
+/* ------------------------------------------------------------------ Branding (Phase 3; only where PORTAL_BRANDING is on) */
+
+const brandDeps = (ctx) => ({ db: ctx.db, bucket: ctx.env.PORTAL_FILES, env: ctx.env, now: ctx.now });
+const who = (a) => ({ role: a.membership.role, organizationId: a.membership.organizationId, userId: a.session.userId });
+/** Files leave through brand-files.js/fileResponse; the portal-wide headers it does not set itself are added here. */
+function withPortalHeaders(response) {
+  response.headers.set("Strict-Transport-Security", "max-age=31536000");
+  response.headers.set("X-Frame-Options", "DENY");
+  return response;
+}
+/** A refused file request is always the same plain "not found", whatever the reason (another organization's, unpublished, held, deleted). */
+const fileProblem = (ctx, error) => (error === "forbidden" ? errorPage(403, { ref: ctx.ref }) : error === "not_found" ? notFoundPage(ctx) : errorPage(503, { ref: ctx.ref }));
+const NOTICE_KEYS = ["uploaded", "removed"];
+
+async function brandingUploadsView(ctx, a, o = {}) {
+  const org = a.membership.organizationId;
+  const [uploads, usage] = await Promise.all([dbCall(() => listClientUploads(ctx.db, org)), dbCall(() => uploadUsage(ctx.db, org))]);
+  const f = viewFilters(ctx.url);
+  return pages.brandingUploadsPage(ctx, a, { uploads, usage, limits: limitsFor(brandDeps(ctx)), canUpload: can(a.membership.role, "branding.upload"), canDelete: can(a.membership.role, "branding.delete_upload"), notice: NOTICE_KEYS.find((k) => f[k]) || "", ...o });
+}
+
+async function uploadBrandFile(ctx, a) {
+  const base = `/portal/o/${a.membership.slug}`;
+  const max = limitsFor(brandDeps(ctx)).maxFileBytes + UPLOAD_FORM_OVERHEAD;
+  const read = await readUpload(ctx.request, max);
+  if (read.error) return brandingUploadsView(ctx, a, { error: read.error === 413 ? "file_too_large" : "invalid", status: read.error });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) {
+    logEvent({ evt: "brand.upload", outcome: "rejected", reason: "csrf", status: 403, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return errorPage(403, { ref: ctx.ref });
+  }
+  if (!ctx.env.PORTAL_FILES) return brandingUploadsView(ctx, a, { error: "storage_unavailable", status: 503 });
+  if (!read.file) return brandingUploadsView(ctx, a, { error: "no_file", status: 422 });
+  const res = await clientUploadFile(brandDeps(ctx), { ...who(a), category: read.fields.get("category") || "", fontRightsAck: read.fields.get("font_rights") === "1", file: read.file });
+  if (!res.ok) {
+    const status = res.error === "forbidden" ? 403 : res.error.startsWith("storage_") ? 503 : 422;
+    logEvent({ evt: "brand.upload", outcome: "refused", reason: res.error, status, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return brandingUploadsView(ctx, a, { error: res.error, status });
+  }
+  logEvent({ evt: "brand.upload", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  return redirect(`${base}/branding/uploads?uploaded=1`);
+}
+
+async function removeBrandUpload(ctx, a, id) {
+  const read = await readForm(ctx.request, MAX_FEEDBACK_FORM_BYTES);
+  if (read.error) return errorPage(read.error, { ref: ctx.ref });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) return errorPage(403, { ref: ctx.ref });
+  if (!UUID.test(id)) return notFoundPage(ctx);
+  if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
+  const res = await clientDeleteUpload(brandDeps(ctx), { ...who(a), uploadId: id });
+  if (!res.ok) return res.error === "not_found" ? notFoundPage(ctx) : fileProblem(ctx, res.error);
+  logEvent({ evt: "brand.upload.remove", outcome: "removed", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  return redirect(`/portal/o/${a.membership.slug}/branding/uploads?removed=1`);
+}
+
+async function downloadBrandFile(ctx, a, id, kind) {
+  if (!UUID.test(id)) return notFoundPage(ctx);
+  if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
+  const deps = brandDeps(ctx);
+  const res = kind === "upload"
+    ? await clientDownloadUpload(deps, { ...who(a), uploadId: id })
+    : await clientDownloadAsset(deps, { ...who(a), assetId: id, inline: viewFilters(ctx.url).preview });
+  return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
+}
+
+const BRANDING_ROUTES = [
+  {
+    when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding$/, action: "branding.view",
+    run: async (ctx, a) => {
+      const org = a.membership.organizationId;
+      const brand = await getClientBrand(ctx.db, org);
+      const kit = brand.published ? await getBrandKit(ctx.db, org) : null;
+      const uploadCount = (await listClientUploads(ctx.db, org)).length;
+      return pages.brandingPage(ctx, a, brand, { canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "" });
+    },
+  },
+  { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads$/, action: "branding.view", postAction: "branding.upload", bucket: "branding", maxBody: (ctx) => limitsFor(brandDeps(ctx)).maxFileBytes + UPLOAD_FORM_OVERHEAD, run: (ctx, a) => brandingUploadsView(ctx, a), post: (ctx, a) => uploadBrandFile(ctx, a) },
+  { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads\/([^/]+)\/download$/, action: "branding.view", run: (ctx, a, id) => downloadBrandFile(ctx, a, id, "upload") },
+  { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads\/([^/]+)\/delete$/, action: "branding.view", postAction: "branding.delete_upload", bucket: "branding", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/branding/uploads`), post: (ctx, a, id) => removeBrandUpload(ctx, a, id) },
+  { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/files\/([^/]+)$/, action: "branding.view", run: (ctx, a, id) => downloadBrandFile(ctx, a, id, "asset") },
+];
+
 const ORG_ROUTES = [
+  ...BRANDING_ROUTES,
   { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => {
       // One read serves both the greeting's name fallback and the module progress. null (unreadable) shows "Progress unavailable", never 0%.
       const answers = await readAnswers(ctx, a);
       const shown = { ...withDisplayName(a, answers), returning: await returningVisitor(ctx, a) };
-      return pages.homePage(ctx, shown, moduleStatuses(LIVE_AREAS, { profile: answers }), nextActions(LIVE_AREAS, { profile: answers }));
+      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }));
     },
   },
   { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, { ...a, returning: await returningVisitor(ctx, a) }, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },
@@ -289,6 +375,7 @@ const ORG_ROUTES = [
 
 async function orgRoute(ctx, path) {
   for (const r of ORG_ROUTES) {
+    if (r.when && !r.when(ctx)) continue;
     const m = r.re.exec(path);
     if (!m) continue;
     const method = ctx.request.method;
@@ -298,7 +385,7 @@ async function orgRoute(ctx, path) {
     if (!slug) return notFoundPage(ctx);
     if (isPost) {
       // cheap checks first: an oversized or cross-site request costs no database work and its body is never read
-      const declared = declaredBodyProblem(ctx.request, r.bucket === "feedback" ? MAX_FEEDBACK_FORM_BYTES : MAX_PROFILE_FORM_BYTES);
+      const declared = declaredBodyProblem(ctx.request, r.maxBody ? r.maxBody(ctx) : r.bucket === "feedback" || r.bucket === "branding" ? MAX_FEEDBACK_FORM_BYTES : MAX_PROFILE_FORM_BYTES);
       if (declared) return errorPage(declared, { ref: ctx.ref });
       const same = checkSameSiteMutation(ctx.request, ctx.cfg.origin);
       if (!same.ok) {

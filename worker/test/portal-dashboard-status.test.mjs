@@ -235,7 +235,7 @@ test("styling: the red is the portal's one existing 'needs you' token, the bar i
 test("organization scoping in the code: Home reads answers only through the signed-in membership's organization, and no authentication, invitation or permission file was touched", () => {
   const router = strip(read("worker/portal/router.js"));
   assert.match(router, /async function readAnswers\(ctx, a\) \{[\s\S]*?getProfileAnswers\(ctx\.db, a\.membership\.organizationId\)/);
-  assert.match(router, /moduleStatuses\(LIVE_AREAS, \{ profile: answers \}\)/);
+  assert.match(router, /moduleStatuses\(pages\.liveAreasFor\(ctx\), \{ profile: answers \}\)/);
   assert.ok(!/ctx\.url\.searchParams[^;]*organization|request\.headers[^;]*organization/i.test(router.slice(router.indexOf("async function readAnswers"), router.indexOf("async function readAnswers") + 600)));
   const src = strip(read("worker/portal/module-status.js"));
   assert.ok(!/\bdb\b|fetch\(|prepare\(|process\.env|request/.test(src), "the calculator is pure: it takes data and returns a status");

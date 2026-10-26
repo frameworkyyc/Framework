@@ -49,3 +49,55 @@ export async function readForm(request, max = MAX_PROFILE_FORM_BYTES) {
   }
   return { fields };
 }
+
+/** Room for the multipart envelope (boundaries, headers, the small text fields) on top of the largest file a form may carry. */
+export const UPLOAD_FORM_OVERHEAD = 64 * 1024;
+
+/**
+ * Reads a multipart/form-data upload with the same discipline as readForm: the size limit is enforced while streaming (an oversized or chunked body is
+ * cancelled, never buffered whole), a repeated text field is refused, and exactly one file part is allowed. Nothing is parsed until the whole body is
+ * known to be within `max`.
+ * @returns {Promise<{ fields: Map<string,string>, file: { name: string, bytes: Uint8Array } | null } | { error: 400 | 413 }>}
+ */
+export async function readUpload(request, max) {
+  const type = request.headers.get("Content-Type") || "";
+  if (!/^multipart\/form-data;\s*boundary=/i.test(type)) return { error: 400 };
+  if (!request.body) return { error: 400 };
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel().catch(() => {});
+      return { error: 413 };
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    bytes.set(c, at);
+    at += c.byteLength;
+  }
+  let form;
+  try {
+    form = await new Response(bytes, { headers: { "Content-Type": type } }).formData();
+  } catch {
+    return { error: 400 };
+  }
+  const fields = new Map();
+  let file = null;
+  for (const [k, v] of form.entries()) {
+    if (typeof v === "string") {
+      if (fields.has(k)) return { error: 400 };
+      fields.set(k, v);
+    } else {
+      if (k !== "file" || file) return { error: 400 };
+      file = { name: v.name || "", bytes: new Uint8Array(await v.arrayBuffer()) };
+    }
+  }
+  return { fields, file };
+}

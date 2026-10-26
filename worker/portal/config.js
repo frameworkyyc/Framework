@@ -69,6 +69,11 @@ export function demoEnabled(env, cfg) {
   return !!env && !!cfg && text(env.PORTAL_DEMO) === "1" && !PRODUCTION_HOSTS.includes(cfg.host);
 }
 
+/** The client-facing Branding section is live only where PORTAL_BRANDING is exactly "1" (Staging). Everywhere else Branding stays a "Coming soon" page. */
+export function brandingEnabled(env) {
+  return !!env && text(env.PORTAL_BRANDING) === "1";
+}
+
 /** The validated configuration, or null unless the portal is enabled AND completely, correctly configured. */
 export function readPortalConfig(env) {
   if (portalConfigProblems(env).length) return null;
