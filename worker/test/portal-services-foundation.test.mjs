@@ -89,7 +89,8 @@ test("invoices: numbers are unique per organization, amounts and dates are valid
 
 test("invoices are archived, never routinely deleted: there is no delete function, archived and void invoices leave the client's view, and the row and file are kept", async () => {
   const { db, a } = await dbWorld();
-  const make = async (n) => { const c = await inv.createInvoice(db, a.id, { invoiceNumber: n, issueDate: "2026-10-01", amount: "5" }, ADMIN); await inv.setInvoiceFile(db, a.id, c.id, FILE(n.length + c.id.charCodeAt(0)), ADMIN); await inv.publishInvoice(db, a.id, c.id, ADMIN); return c.id; };
+  let fileSeq = 100;
+  const make = async (n) => { const c = await inv.createInvoice(db, a.id, { invoiceNumber: n, issueDate: "2026-10-01", amount: "5" }, ADMIN); await inv.setInvoiceFile(db, a.id, c.id, FILE(++fileSeq), ADMIN); await inv.publishInvoice(db, a.id, c.id, ADMIN); return c.id; };
   const [x, y] = [await make("X-1"), await make("Y-1")];
   assert.equal((await inv.listClientInvoices(db, a.id, { now: NOW })).length, 2);
   assert.ok((await inv.archiveInvoice(db, a.id, x, ADMIN)).ok);
@@ -233,8 +234,8 @@ test("with the flag on: Home links Client Services; the hub shows Invoices only 
   const o = await owner.text();
   assert.match(o, /<h1 class="h1 h1--section">Client Services<\/h1>/);
   assert.deepEqual([...o.matchAll(/class="hub__title">([^<]+)</g)].map((m) => m[1].replace(/&amp;/g, "&")), ["Invoices", "Support & Change Requests", "Contact"]);
-  assert.equal([...o.matchAll(/<a class="hub"/g)].length, 1, "only Contact is a link in Phase 1");
-  assert.match(o, /href="\/portal\/o\/alpha\/services\/contact"/); assert.equal([...o.matchAll(/Coming soon/g)].length, 2);
+  assert.equal([...o.matchAll(/<a class="hub"/g)].length, 2, "Invoices (live since Phase 2) and Contact are links; Support is still coming");
+  assert.match(o, /href="\/portal\/o\/alpha\/services\/contact"/); assert.equal([...o.matchAll(/Coming soon/g)].length, 1); assert.match(o, /href="\/portal\/o\/alpha\/services\/invoices"/);
   const m = await (await mia.get("/portal/o/alpha/services")).text();
   assert.deepEqual([...m.matchAll(/class="hub__title">([^<]+)</g)].map((x) => x[1].replace(/&amp;/g, "&")), ["Support & Change Requests", "Contact"], "members do not see Invoices");
   const c = await mia.get("/portal/o/alpha/services/contact");

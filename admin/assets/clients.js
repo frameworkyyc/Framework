@@ -9,8 +9,9 @@ const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 
 export async function render(ctx) {
-  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding|\/profile)?$/);
+  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding|\/profile|\/invoices)?$/);
   if (m && m[2] === "/branding") return (await import("./branding.js")).render(decodeURIComponent(m[1]), ctx);
+  if (m && m[2] === "/invoices") return (await import("./invoices.js")).render(decodeURIComponent(m[1]), ctx);
   if (m && m[2] === "/profile") return renderProfile(decodeURIComponent(m[1]), ctx);
   return m ? renderDetail(decodeURIComponent(m[1]), ctx) : renderList(ctx);
 }
@@ -73,12 +74,23 @@ function brandingRow(orgId, b) {
     h("p", { class: "adm-brandrow__chips" }, chips));
 }
 
+/** A quiet row that opens the client's Invoices page: drafts waiting to be published and invoices past due. Not shown on a database without invoices. */
+function invoicesRow(orgId, s) {
+  if (!s) return null;
+  const chips = [chip("plain", s.total ? plural(s.total, "invoice") : "No invoices yet")];
+  if (s.drafts) chips.push(chip("pending", plural(s.drafts, "draft") + " to publish", "info"));
+  if (s.overdue) chips.push(chip("warn", `${s.overdue} past due`, "warn"));
+  return h("section", { class: "adm-section adm-brandrow", "aria-labelledby": "adm-invrow-h" },
+    h("div", { class: "adm-section-title" }, h("h2", { id: "adm-invrow-h", text: "Invoices" }), h("a", { class: "btn btn--secondary adm-small", href: `/admin/clients/${encodeURIComponent(orgId)}/invoices`, "data-link": "" }, "Manage invoices")),
+    h("p", { class: "adm-brandrow__chips" }, chips));
+}
+
 async function renderDetail(id, ctx) {
   const data = await api("/clients/" + encodeURIComponent(id));
   const o = data.organization;
   const p = data.profile;
   const welcome = ctx.url.searchParams.get("welcome") === "1";
-  const dash = dashboard({ org: o, profile: data.profile_available ? p : null, members: data.members, invitations: data.invitations, branding: data.branding });
+  const dash = dashboard({ org: o, profile: data.profile_available ? p : null, members: data.members, invitations: data.invitations, branding: data.branding, invoices: data.invoices });
 
   const info = disclosure({
     id: "org-details", title: "Organization details", className: "adm-acc--quiet",
@@ -98,6 +110,7 @@ async function renderDetail(id, ctx) {
     dash.header,
     dash.overview,
     brandingRow(o.id, data.branding),
+    invoicesRow(o.id, data.invoices),
     access,
     info,
   );

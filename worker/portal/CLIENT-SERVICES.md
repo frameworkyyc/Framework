@@ -1,10 +1,10 @@
 # Client Services (Invoices, Support & Change Requests, Contact)
 
-Status: **Phase 1 (foundation) on Staging.** Switched on only where `PORTAL_SERVICES = "1"` (Staging `previews.vars`; never the top-level vars, so never Production).
+Status: **Phases 1 (foundation) and 2 (Invoices) on Staging.** Switched on only where `PORTAL_SERVICES = "1"` (Staging `previews.vars`; never the top-level vars, so never Production).
 
 ## Phases
-1. **Foundation** (this change): migration 0007 (written, **not yet applied**), data layers, permissions, the flag, the hub and Contact page, Home card, privacy draft.
-2. Invoices: Admin entry/publish/archive, PDF storage, owner-only list and download.
+1. **Foundation** (done): migration 0007, data layers, permissions, the flag, the hub and Contact page, Home card, privacy draft.
+2. **Invoices** (done, below): Admin entry/publish/payment/archive, PDF storage, owner-only list and download.
 3. Support & Change Requests: client flow with attachments, Admin review/reply/status.
 4. Notifications (Resend), Home/Admin badges, polish, end-to-end tests.
 
@@ -18,7 +18,13 @@ Status: **Phase 1 (foundation) on Staging.** Switched on only where `PORTAL_SERV
 | Pages | `/portal/o/:slug/services` (hub), `/services/contact`; `services-live.js` |
 | Flag | `servicesEnabled(env)` in `config.js` |
 
-Invoices and requests have **no routes yet**. On the hub they are quiet "Coming soon" cards (not links).
+Support requests have **no routes yet**: on the hub they are a quiet "Coming soon" card (not a link).
+
+## Phase 2: Invoices
+- **Admin** (`/admin/clients/:id/invoices`, API `worker/portal/admin-invoices.js`): enter number, dates, amount (typed in dollars, stored as cents, CAD), description (client-visible) and an internal note; attach a PDF (PDF only: type, content and active-content checks); publish (needs the PDF; queues the client notice); record payment (unpaid / paid with date / void); archive and restore. Drafts are staff-only. There is no delete control and no delete route. The client page shows drafts waiting to publish and invoices past due.
+- **Client** (`/portal/o/:slug/services/invoices`, owners only): list with number, dates, amount, status (Unpaid / Overdue / Paid; overdue is derived from the due date) and a Download PDF button; downloads are attachments with hardened headers and are recorded. Members and other organizations never see the card or the page.
+- **Files:** private R2 under `org/<id>/invoices/<uuid>`. Replacing a PDF removes the old object only after the new one is recorded. Organization-wide file removal and orphan housekeeping **skip invoice files** (retention).
+- Emails are not sent yet (Phase 4); publishing only queues the notice.
 
 ## Decisions (approved)
 - CAD only. Amounts are typed in by staff and stored as whole cents; nothing is calculated (no tax). The PDF is only a file.

@@ -276,3 +276,9 @@ export async function adminInvoiceSummary(db, organizationId, { now = new Date()
   const r = await db.prepare("SELECT COALESCE(sum(published_at IS NULL), 0) AS drafts, COALESCE(sum(published_at IS NOT NULL AND payment_status = 'unpaid' AND due_date IS NOT NULL AND due_date < ?), 0) AS overdue, count(*) AS total FROM invoices WHERE organization_id = ? AND archived_at IS NULL").bind(todayOf(now), organizationId).first();
   return { total: r.total, drafts: r.drafts, overdue: r.overdue };
 }
+
+/** Every storage key of an organization's invoice PDFs, archived ones included (they are kept). Used so housekeeping never mistakes an invoice file for an orphan. */
+export async function listInvoiceStorageKeys(db, organizationId) {
+  requireOrgId(organizationId);
+  return (await db.prepare("SELECT storage_key FROM invoices WHERE organization_id = ? AND storage_key IS NOT NULL").bind(organizationId).all()).results.map((r) => r.storage_key);
+}
