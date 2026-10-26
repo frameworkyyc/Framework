@@ -11,7 +11,8 @@ import * as views from "./views.js";
 import * as guided from "./guided.js";
 import * as live from "./profile-live.js";
 import * as brandingLive from "./branding-live.js";
-import { brandingEnabled } from "./config.js";
+import * as servicesLive from "./services-live.js";
+import { brandingEnabled, servicesEnabled } from "./config.js";
 import { LIVE_AREAS } from "./guided-data.js";
 
 /** The one portal script: tidies website fields and warns about unsaved Business Profile changes, and moves keyboard focus to a form's error summary after a refused save. Loaded only where it has a job. */
@@ -39,7 +40,7 @@ function liveModel(ctx, { session, membership: m, returning }, data = {}) {
     return { type: views.activityType(a.action), title: views.actionTitle(a.action), detail, at: a.created_at, projectId: a.entity_type === "project" ? a.entity_id : undefined };
   });
   return {
-    mode: "live", base: `/portal/o/${m.slug}`, now: ctx.now, liveAreas: liveAreasFor(ctx), returning: Boolean(returning),
+    mode: "live", base: `/portal/o/${m.slug}`, now: ctx.now, liveAreas: liveAreasFor(ctx), services: servicesEnabled(ctx.env), returning: Boolean(returning),
     org: { name: m.name, website: m.websiteUrl, role: m.role },
     user: { name: session.name || "", email: session.email },
     projects, activity, updates: [], actions: [], documents: [], team: data.team || [], has: OFF,
@@ -147,4 +148,14 @@ export async function brandingUploadsPage(ctx, a, o = {}) {
   const vm = liveModel(ctx, a, {});
   const csrf = await csrfFor(ctx.cfg, a.session);
   return shell(ctx, a, { title: "Your brand materials", active: "home", body: brandingLive.brandingUploads(vm, { ...o, csrf }), vm, status: o.status || 200, script: o.error ? FOCUS_SCRIPT : null, ref: "branding-uploads" });
+}
+
+/** The Client Services hub. `live`: which parts have data behind them (see services-live.js). */
+export async function servicesPage(ctx, a, live = {}) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Client Services", active: "home", body: servicesLive.servicesHub(vm, a.membership.role, live), vm, ref: "services" });
+}
+export async function contactPage(ctx, a) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Contact", active: "home", body: servicesLive.contactPage(vm), vm, ref: "services-contact" });
 }

@@ -175,8 +175,8 @@ test("script: every expected table, index and migration file is exactly what the
   const dir = new URL("migrations/portal/", root);
   const files = readdirSync(dir).filter((f) => /^\d{4}_.*\.sql$/.test(f)).sort();
   // 0005 (Branding) is approved for Staging only: it is in the folder but NOT in the Production workflow's expected list, so a pending 0005 makes that workflow fail closed.
-  assert.deepEqual(files.filter((f) => !["0005_branding.sql", "0006_brand_name.sql"].includes(f)), EXPECTED.migrations, "the migration folder and the expected list are the same files, in order (plus the Staging-only 0005 and 0006)");
-  assert.deepEqual(files.length, EXPECTED.migrations.length + 2);
+  assert.deepEqual(files.filter((f) => !["0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql"].includes(f)), EXPECTED.migrations, "the migration folder and the expected list are the same files, in order (plus the Staging-only 0005, 0006 and 0007)");
+  assert.deepEqual(files.length, EXPECTED.migrations.length + 3);
   throwsFail(() => checkPendingBefore(listOf("0006_brand_name.sql"), "apply"), /unexpected pending/);
   throwsFail(() => checkPendingBefore(listOf("0005_branding.sql", "0006_brand_name.sql"), "apply"), /unexpected pending/);
   for (const st of STAGES) {

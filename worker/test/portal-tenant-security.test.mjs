@@ -236,7 +236,7 @@ test("scan: organization-scoped data is only ever fetched with the membership's 
 test("scan: every organization route goes through requireOrgAccess with a reviewed policy action", () => {
   const router = src("../portal/router.js");
   const routes = [...router.matchAll(/action: "([a-z.]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(routes.sort(), ["account.view", "activity.view", "branding.view", "branding.view", "branding.view", "branding.view", "branding.view", "documents.view", "feedback.submit", "members.view", "org.view", "org.view", "profile.view", "profile.view", "projects.view", "projects.view", "workspace.view"]);
+  assert.deepEqual(routes.sort(), ["account.view", "activity.view", "branding.view", "branding.view", "branding.view", "branding.view", "branding.view", "documents.view", "feedback.submit", "members.view", "org.view", "org.view", "profile.view", "profile.view", "projects.view", "projects.view", "services.view", "services.view", "workspace.view"]);
   assert.equal([...router.matchAll(/requireOrgAccess\(/g)].length, 1, "one choke point");
   assert.ok(!/getActiveMembership|listActiveMembershipsForUser\(ctx\.db, (?!got\.session\.userId)/.test(router.replace(/import[^\n]*\n/g, "")), "memberships are only resolved for the signed-in user");
   const pages = src("../portal/pages.js");

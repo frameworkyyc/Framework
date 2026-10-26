@@ -5,7 +5,7 @@
  * Returns null (= "not mine"; worker/index.js then answers portalNotFound(), never the static site) when the portal is off, or the request is not for the portal or not on the
  * portal host. When it IS enabled but misconfigured it fails closed with a generic 503 for portal paths.
  */
-import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled } from "./config.js";
+import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled, servicesEnabled } from "./config.js";
 import { errorPage, newRef, redirect, checkSameSiteMutation } from "./http.js";
 import { handleLogin, handleCallback, handleLogout } from "./auth.js";
 import { requireSession, requireOrgAccess, dbCall, Unavailable, unavailablePage, notFoundPage } from "./guard.js";
@@ -83,6 +83,7 @@ async function noAccess(ctx) {
 /** The Coming Soon pages (members only, like every organization page) for each section that is not built yet; derived from the same list that drives Home. */
 const SOON = comingSoonKeys().join("|");
 const brandingOn = (ctx) => brandingEnabled(ctx.env);
+const servicesOn = (ctx) => servicesEnabled(ctx.env);
 
 /** Save one questionnaire step. Every check below runs on the server for every save; the organization comes from the membership, never the form. */
 async function saveProfile(ctx, a, stepId) {
@@ -320,8 +321,15 @@ const BRANDING_ROUTES = [
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/files\/([^/]+)$/, action: "branding.view", run: (ctx, a, id) => downloadBrandFile(ctx, a, id, "asset") },
 ];
 
+/* Client Services (only where PORTAL_SERVICES is on). Phase 1: the hub and the Contact page; invoices and support requests follow. */
+const SERVICES_ROUTES = [
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services$/, action: "services.view", run: (ctx, a) => pages.servicesPage(ctx, a, {}) },
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/contact$/, action: "services.view", run: (ctx, a) => pages.contactPage(ctx, a) },
+];
+
 const ORG_ROUTES = [
   ...BRANDING_ROUTES,
+  ...SERVICES_ROUTES,
   { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => {
       // One read serves both the greeting's name fallback and the module progress. null (unreadable) shows "Progress unavailable", never 0%.
       const answers = await readAnswers(ctx, a);
