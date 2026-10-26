@@ -187,7 +187,7 @@ test("the Clients entry is live in the admin navigation, and the Business Profil
   assert.match(read("admin/assets/modules.js"), /id: "clients", label: "Clients", path: "\/admin\/clients", enabled: true, load: \(\) => import\("\.\/clients\.js"\)/);
   const ui = read("admin/assets/clients.js");
   assert.ok(!/method: "(POST|PUT|PATCH|DELETE)"|<form|"input"|"textarea"|"select"|onsubmit|impersonat|sign in as/i.test(ui), "no write, form or impersonation");
-  assert.equal([...ui.matchAll(/api\(/g)].length, 2, "two read calls");
+  assert.equal([...ui.matchAll(/api\(/g)].length, 3, "three read calls: the list, the client, and the Business Profile page");
   const dash = read("admin/assets/client-dashboard.js");
   for (const w of ["Complete", "Partial", "Missing"]) assert.ok(dash.includes(`"${w}"`), w);
   assert.ok(!/method: "(POST|PUT|PATCH|DELETE)"|<form|"input"|"textarea"|onsubmit|fetch\(/i.test(dash), "the dashboard module only presents");

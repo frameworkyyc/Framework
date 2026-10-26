@@ -3,14 +3,15 @@
 
 import { h, api, fmtDate, stateBlock } from "./ui.js";
 import { newClientPanel, accessSections } from "./clients-access.js";
-import { dashboard, sectionMap, stepAccordion, disclosure, chip } from "./client-dashboard.js";
+import { dashboard, sectionMap, stepAccordion, disclosure, chip, icon, STATE_TEXT } from "./client-dashboard.js";
 
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 
 export async function render(ctx) {
-  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding)?$/);
-  if (m && m[2]) return (await import("./branding.js")).render(decodeURIComponent(m[1]), ctx);
+  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding|\/profile)?$/);
+  if (m && m[2] === "/branding") return (await import("./branding.js")).render(decodeURIComponent(m[1]), ctx);
+  if (m && m[2] === "/profile") return renderProfile(decodeURIComponent(m[1]), ctx);
   return m ? renderDetail(decodeURIComponent(m[1]), ctx) : renderList(ctx);
 }
 
@@ -79,20 +80,6 @@ async function renderDetail(id, ctx) {
   const welcome = ctx.url.searchParams.get("welcome") === "1";
   const dash = dashboard({ org: o, profile: data.profile_available ? p : null, members: data.members, invitations: data.invitations, branding: data.branding });
 
-  const allOpen = () => [...document.querySelectorAll(".adm-acc--step")].every((d) => d.open);
-  const toggleAll = h("button", { class: "adm-linkbtn", type: "button", "aria-live": "polite", text: "Expand all", onclick: () => {
-    const open = !allOpen();
-    document.querySelectorAll(".adm-acc--step").forEach((d) => { d.open = open; });
-    toggleAll.textContent = open ? "Collapse all" : "Expand all";
-  } });
-
-  const profile = !data.profile_available
-    ? h("p", { class: "adm-banner" }, "Business Profile data isn’t available on this deployment.")
-    : [
-        p.steps.every((s) => s.answered === 0) ? h("p", { class: "adm-muted" }, "This organization hasn’t saved any Business Profile answers yet.") : null,
-        h("div", { class: "adm-accgroup" }, p.steps.map(stepAccordion)),
-      ];
-
   const info = disclosure({
     id: "org-details", title: "Organization details", className: "adm-acc--quiet",
     meta: o.status === "active" ? "Active" : cap(o.status),
@@ -110,13 +97,45 @@ async function renderDetail(id, ctx) {
     h("a", { class: "adm-back", href: "/admin/clients", "data-link": "" }, "← All clients"),
     dash.header,
     dash.overview,
-    data.profile_available ? h("section", { class: "adm-section adm-mapsec", "aria-labelledby": "adm-map-h" }, h("div", { class: "adm-section-title" }, h("h2", { id: "adm-map-h", text: "Business Profile sections" }), h("span", { class: "adm-sub" }, `${p.done} of ${p.total} complete`)), sectionMap(p.steps)) : null,
     brandingRow(o.id, data.branding),
     access,
-    h("section", { class: "adm-section", id: "adm-profile", tabindex: "-1", "aria-labelledby": "adm-prof-h" },
-      h("div", { class: "adm-section-title" }, h("h2", { id: "adm-prof-h", text: "Saved answers" }), data.profile_available ? toggleAll : null),
-      h("p", { class: "adm-sub" }, "Answers are shown as the client saved them; staff cannot edit them here."), profile),
     info,
   );
   return { title: o.name + " — Clients", node };
+}
+
+/* ---------- Business Profile detail: /admin/clients/:id/profile ---------- */
+
+/** All seven sections as collapsed accordions, each with its completion state and answered count, so missing information is visible without opening anything. Read-only. */
+async function renderProfile(id, ctx) {
+  const data = await api("/clients/" + encodeURIComponent(id));
+  const o = data.organization;
+  const p = data.profile;
+  const back = h("a", { class: "adm-back", href: "/admin/clients/" + encodeURIComponent(o.id), "data-link": "" }, "← " + o.name);
+  if (!data.profile_available) {
+    return { title: "Business Profile — " + o.name, node: h("div", { class: "adm-page adm-detail" }, back, h("h1", { class: "adm-title", tabindex: "-1" }, "Business Profile"), h("p", { class: "adm-banner" }, "Business Profile data isn’t available on this deployment.")) };
+  }
+  const pct = Math.max(0, Math.min(100, Number(p.percent) || 0));
+  const allOpen = () => [...document.querySelectorAll(".adm-acc--step")].every((d) => d.open);
+  const toggleAll = h("button", { class: "adm-linkbtn", type: "button", "aria-live": "polite", text: "Expand all", onclick: () => {
+    const open = !allOpen();
+    document.querySelectorAll(".adm-acc--step").forEach((d) => { d.open = open; });
+    toggleAll.textContent = open ? "Collapse all" : "Expand all";
+  } });
+  const missing = p.steps.filter((s) => s.state !== "complete");
+  const node = h("div", { class: "adm-page adm-detail" },
+    back,
+    h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, o.name), h("h1", { class: "adm-title", tabindex: "-1" }, "Business Profile"),
+      h("p", { class: "adm-sub" }, "Answers are shown as the client saved them; staff cannot edit them here."))),
+    h("div", { class: "adm-tile adm-tile--profile adm-tile--" + (p.done === p.total ? "ok" : p.steps.every((s) => s.answered === 0) ? "plain" : "pending") },
+      h("p", { class: "adm-tile__label" }, "Completion"),
+      h("p", { class: "adm-tile__big" }, `${p.percent}%`, h("span", { class: "adm-tile__unit", text: "complete" })),
+      h("progress", { class: "adm-meter adm-meter--lg", max: 100, value: pct, "aria-label": `Business Profile ${p.percent} percent complete` }),
+      h("p", { class: "adm-tile__note" }, `${p.done} of ${p.total} sections complete` + (p.last_saved ? ` · last saved ${fmtDate(p.last_saved)}` : " · nothing saved yet")),
+      missing.length ? h("p", { class: "adm-tile__note" }, "Needs answers: " + missing.map((s) => s.title).join(", ")) : h("p", { class: "adm-tile__note" }, "Every section is complete.")),
+    h("section", { class: "adm-section", "aria-labelledby": "adm-prof-h" },
+      h("div", { class: "adm-section-title" }, h("h2", { id: "adm-prof-h", text: "Sections and saved answers" }), toggleAll),
+      p.steps.every((s) => s.answered === 0) ? h("p", { class: "adm-muted" }, "This organization hasn’t saved any Business Profile answers yet.") : null,
+      h("div", { class: "adm-accgroup" }, p.steps.map(stepAccordion))));
+  return { title: "Business Profile — " + o.name, node };
 }

@@ -266,7 +266,7 @@ test("Branding Admin UI: built the safe way, uploads only through api(), confirm
   for (const title of ["Replace this file?", "Delete this file?", "Delete this client file?", "Hold this file?", "Unpublish this file?", "Unpublish the brand kit?", "Publish the brand kit?"]) assert.ok(ui.includes(`title: "${title}"`), title);
   for (const [visible, aria] of [["Delete", "Delete ${a.originalName}"], ["Download", "Download ${a.originalName}"], ["Edit", "Edit ${a.originalName}"], ["Replace file", "Replace file for ${a.originalName}"], ["Remove", "Remove colour ${i + 1}"]]) assert.ok(ui.includes(visible) && ui.includes(aria), visible);
   assert.match(ui, /download: ""/);
-  assert.match(read("admin/assets/clients.js"), /\(\\\/branding\)\?\$/, "the client route has a branding sub-page");
+  assert.match(read("admin/assets/clients.js"), /\(\\\/branding\|\\\/profile\)\?\$/, "the client route has branding and profile sub-pages");
   assert.match(read("admin/assets/ui.js"), /instanceof FormData/);
   const router = strip(read("worker/admin/router.js"));
   assert.match(router, /handleBrandingApi, handleAccessApi/);
