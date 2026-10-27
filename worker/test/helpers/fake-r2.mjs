@@ -26,7 +26,7 @@ export function fakeR2() {
       const start = cursor ? Number(cursor) : 0;
       const slice = keys.slice(start, start + limit);
       const next = start + limit < keys.length;
-      return { objects: slice.map((key) => ({ key, size: store.get(key).bytes.length })), truncated: next, cursor: next ? String(start + limit) : undefined };
+      return { objects: slice.map((key) => ({ key, size: store.get(key).bytes.length, etag: createHash("md5").update(store.get(key).bytes).digest("hex") })), truncated: next, cursor: next ? String(start + limit) : undefined };
     },
   };
 }

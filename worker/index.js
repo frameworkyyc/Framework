@@ -24,6 +24,7 @@ import { combinedRevenue } from "./revenue.js";
 import { handleAssessmentSubmit, handleAssessmentConfig } from "./assessment.js";
 import { handleCardPage } from "./card.js";
 import { handlePortal, portalNotFound } from "./portal/router.js";
+import { runScheduled } from "./portal/scheduled.js";
 
 const MAX_BODY_BYTES = 24 * 1024;
 const MAX_RECENT_SUBMISSIONS = 40; // flood guard: max stored submissions per 10 minutes, site-wide
@@ -278,6 +279,11 @@ async function handleExport(request, env) {
 }
 
 export default {
+  // Cron Trigger (wrangler.jsonc `triggers.crons`, Production only): background email retries and the client-file backup. See portal/scheduled.js.
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(runScheduled(env));
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const deps = ctx && typeof ctx.waitUntil === "function" ? { waitUntil: (p) => ctx.waitUntil(p) } : {}; // lets emails be sent after the response without holding it up

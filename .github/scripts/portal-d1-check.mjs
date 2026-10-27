@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 
 // The migrations Production may receive, IN ORDER, with exactly the tables and indexes each one creates. A run is allowed only when the pending list is a tail of this
 // list (for example 0002, 0003, 0004 on a database that already has 0001), and the tables already in the database must equal what the already-applied migrations create.
-// 0004 only adds columns to `invitations` (no table or index). Anything else fails closed.
+// 0004 only adds columns to `invitations`, 0006 one column to `brand_kits` (no table or index). 0005-0008 are all additive. Anything else fails closed.
 export const STAGES = Object.freeze([
   {
     file: "0001_portal_foundation.sql",
@@ -20,6 +20,14 @@ export const STAGES = Object.freeze([
   { file: "0002_business_profile.sql", tables: ["business_profile_answers"], indexes: [] },
   { file: "0003_portal_feedback.sql", tables: ["portal_feedback"], indexes: ["idx_portal_feedback_created", "idx_portal_feedback_user"] },
   { file: "0004_invitation_delivery.sql", tables: [], indexes: [] },
+  { file: "0005_branding.sql", tables: ["brand_assets", "brand_kits", "brand_uploads", "service_requests"], indexes: ["idx_brand_assets_org", "idx_brand_uploads_org", "idx_service_requests_open", "idx_service_requests_org"] },
+  { file: "0006_brand_name.sql", tables: [], indexes: [] }, // one nullable column on brand_kits
+  {
+    file: "0007_client_services.sql",
+    tables: ["invoices", "service_notifications", "support_attachments", "support_messages", "support_requests"],
+    indexes: ["idx_invoices_org", "idx_service_notifications_pending", "idx_support_attachments_request", "idx_support_messages_request", "idx_support_requests_org"],
+  },
+  { file: "0008_approved_emails.sql", tables: ["approved_emails"], indexes: [] },
 ]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",
