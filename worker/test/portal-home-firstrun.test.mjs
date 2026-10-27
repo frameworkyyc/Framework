@@ -131,66 +131,39 @@ test("wording is consistent across portal pages: the legacy progress page greets
 
 /* ------------------------------------------------------------------ the next action */
 
-test("next action: NEW client gets 'Start your Business Profile' to the first step; the overview offers the same step", async () => {
+test("Home, NEW client: a short greeting under the organization name, one Business Profile card with its progress, and the overview still offers the first step", async () => {
   const { br } = await setup();
   const html = await home(br.ann);
-  assert.match(action(html), /<a class="btn btn--primary" href="\/portal\/o\/alpha\/profile\/business">Start your Business Profile <span aria-hidden="true">→<\/span><\/a>/);
-  assert.match(html, /<p class="lead">Start with your Business Profile\. It helps Framework understand your business\.<\/p>/);
-  assert.equal([...html.matchAll(/class="btn btn--primary"/g)].length, 1, "exactly one prominent action");
-  // the first-run expectations (approved wording): the time it takes, that progress is saved, and what happens after
-  assert.match(html, /<p class="home-note">It takes about 20–30 minutes\. Your progress is saved as you go, so you can stop and come back whenever you like\. When you finish, the Framework team will review your answers and follow up with you\.<\/p>/);
   assert.match(html, /<span class="eyebrow">Alpha Co<\/span><h1 class="h1 h1--home">/, "the organization's name sits above the greeting");
+  assert.match(html, /<a class="hub" href="\/portal\/o\/alpha\/profile">/);
+  assert.ok(!/btn btn--primary|home-note|class="lead"|20–30|Your progress is saved/.test(html), "no extra button, instructions or lead text");
+  assert.match(html, /0% complete/); assert.match(html, /required answers left/);
   const overview = await (await br.ann.get("/portal/o/alpha/profile")).text();
   assert.match(overview, /href="\/portal\/o\/alpha\/profile\/business">Start: Your business/);
 });
 
-test("next action: PARTIAL profile gets 'Continue your Business Profile' to the first step still missing a required answer, skipping complete steps", async () => {
-  const { w, alpha, br, save } = await setup();
+test("Home, PARTIAL and COMPLETE: only the card's progress changes; the overview points at the first step still missing a required answer", async () => {
+  const { alpha, br, save } = await setup();
   await save(alpha, "ann@alpha.test", ALL.filter((f) => f.step === "business"));
   let html = await home(br.ann);
-  assert.match(action(html), /href="\/portal\/o\/alpha\/profile\/location">Continue your Business Profile /);
-  assert.match(html, /Pick up where you left off\./);
-  assert.match(html, /<p class="home-note">Your progress is saved, so you can finish later\. When you finish, the Framework team will review your answers and follow up with you\.<\/p>/);
-  assert.ok(!/20–30 minutes/.test(html), "the time estimate is for the first visit only");
-  // a step with a required answer saved and another missing is still "the first missing"
-  await save(alpha, "ann@alpha.test", ALL.filter((f) => f.step === "location" && f.id === "city"));
-  assert.match(action(await home(br.ann)), /profile\/location">Continue/);
-  await save(alpha, "ann@alpha.test", ALL.filter((f) => f.step === "location"));
-  await save(alpha, "ann@alpha.test", ALL.filter((f) => f.step === "contact" && f.required));
-  html = await home(br.ann);
-  assert.match(action(html), /profile\/offering">Continue/, "the first step still missing REQUIRED answers, in schema order");
+  assert.match(html, /\d+% complete/); assert.ok(!/Pick up where you left off|Continue your/.test(html));
   const overview = await (await br.ann.get("/portal/o/alpha/profile")).text();
-  assert.match(overview, /href="\/portal\/o\/alpha\/profile\/offering">Continue: Products, services and customers/, "Home and the overview agree");
-  assert.ok(w);
-});
-
-test("next action: when every REQUIRED answer is in, Home acknowledges it and does not demand optional work; at 100% it just says complete", async () => {
-  const { alpha, br, save } = await setup();
+  assert.match(overview, /href="\/portal\/o\/alpha\/profile\/location">Continue: /);
   await save(alpha, "ann@alpha.test", REQUIRED);
-  let html = await home(br.ann);
-  assert.ok(!/btn btn--primary/.test(html), "no primary action once nothing required remains");
-  assert.match(html, /Your Business Profile is complete\. The Framework team will review your information and follow up with you about the next steps\./);
-  assert.match(html, /<p class="home-note">Optional details can be added any time, and you can change your answers whenever you like\.<\/p>/);
-  assert.match(action(html), /<a class="text-link" href="\/portal\/o\/alpha\/profile">Review your Business Profile /);
-  assert.ok(!/required answers? left|Start your|Continue your/.test(html));
-  assert.match(html, /86% complete/);
-  assert.match(html, /All required answers are complete/, "the module status says the same");
-  await save(alpha, "ann@alpha.test", ALL);
   html = await home(br.ann);
-  assert.match(html, /Your Business Profile is complete\. The Framework team will review your information and follow up with you about the next steps\./);
-  assert.match(html, /<p class="home-note">You can change your answers any time\.<\/p>/);
-  assert.match(html, /100% complete/);
-  assert.ok(!/optional details/i.test(html));
+  assert.match(html, /86% complete/); assert.match(html, /All required answers are complete/);
+  assert.ok(!/required answers? left|Your Business Profile is complete|home-note/.test(html));
+  await save(alpha, "ann@alpha.test", ALL);
+  assert.match(await home(br.ann), /100% complete/);
 });
 
-test("next action: unreadable data makes no claim about what is next", async () => {
+test("Home, unreadable data makes no claim: 'Progress unavailable', no percentage, and the card still links", async () => {
   const { w, br } = await setup();
   w.db.raw.exec("DROP TABLE business_profile_answers");
   const html = await home(br.ann);
-  assert.ok(action(html) === "", "no action");
-  assert.match(html, /What would you like to work on\?/);
   assert.match(html, /Progress unavailable right now/);
-  assert.ok(!/Start your|Continue your|required answers? left/.test(html));
+  assert.match(html, /class="hub" href="\/portal\/o\/alpha\/profile"/);
+  assert.ok(!/required answers? left|% complete/.test(html));
 });
 
 test("NEXT_ACTION is pure and uses the existing profile logic: states, targets and counts", () => {
@@ -240,20 +213,16 @@ test("the red indicator appears only beside real required work and always with w
   assert.ok(!/Action required/.test(await home(br.ann)), "the vague old wording is gone");
 });
 
-test("unavailable modules are plain text under one quiet heading: no link, no focus stop, no card, no badge, no number, no progress", async () => {
+test("unavailable modules are one quiet line: no link, no focus stop, no card, no badge, no progress; the live module is one whole-card link with a decorative arrow", async () => {
   const { br } = await setup();
   const html = await home(br.ann);
-  const soon = html.slice(html.indexOf('<section class="soon-list"'), html.indexOf("</section>", html.indexOf('<section class="soon-list"')) + 10);
-  assert.match(soon, /<h2 id="h-soon" class="soon-list__title">Coming soon<\/h2>/);
-  assert.equal([...soon.matchAll(/<li>/g)].length, 5);
-  assert.ok(!/<a |href|tabindex|role=|tile|tag|<progress|dot|\b0[1-6]\b/.test(soon));
-  assert.equal([...html.matchAll(/<a class="focus"/g)].length, 1, "one module link");
-  assert.ok(!/focus__arrow|tile__arrow|→<\/span><\/a><\/li>/.test(html.slice(html.indexOf('<ul class="focus-list">'), html.indexOf("</ul>", html.indexOf('<ul class="focus-list">')))), "the module block has no standalone arrow; the whole block is the link");
-  // keyboard: header links, the one action, the module, then the footer; nothing from the unavailable list
+  const line = /<p class="soon-line">[\s\S]*?<\/p>/.exec(html)[0];
+  assert.ok(!/<a |href|tabindex|role=|tile|<progress|dot/.test(line));
+  assert.equal([...html.matchAll(/<a class="hub"/g)].length, 1, "one module link");
+  const card = /<a class="hub"[\s\S]*?<\/a>/.exec(html)[0];
+  assert.match(card, /class="hub__title">Business Profile</); assert.match(card, /class="hub__desc">/); assert.match(card, /hub__arrow tile__arrow" aria-hidden="true">→</);
   const body = html.slice(html.indexOf('<main'), html.indexOf("</main>"));
-  assert.equal([...body.matchAll(/<a [^>]*href=/g)].length, 2, "the next action and the Business Profile block are the only links in the page body");
-  assert.match(css, /\.soon-list li \{[^}]*color: var\(--slate\)/);
-  assert.ok(!/\.soon-list[^{]*\{[^}]*(border|box-shadow|background)/.test(css), "no boxes, borders or fills on the list");
+  assert.equal([...body.matchAll(/<a [^>]*href=/g)].length, 1, "the Business Profile card is the only link in the page body");
 });
 
 /* ------------------------------------------------------------------ owner / member, isolation, security */
@@ -266,7 +235,6 @@ test("Owner and Member see the same dashboard (their own greeting); only the Own
   assert.deepEqual(nav(member), ["Home", "Account"]);
   const main = (h) => h.slice(h.indexOf("<main"), h.indexOf("</main>")).replace(/<form method="post" action="\/portal\/logout"[\s\S]*?<\/form>/, "");
   assert.equal(main(owner), main(member), "same dashboard content");
-  assert.match(action(member), /profile\/business">Start your Business Profile/);
   assert.equal(h1(member), "Welcome, Test.");
 });
 
@@ -275,7 +243,6 @@ test("a member sees the organization's progress and next step, never another org
   await save(alpha, "ann@alpha.test", ALL.filter((f) => f.step === "business"));
   await save(beta, "bob@beta.test", REQUIRED);
   const m = await home(br.mia);
-  assert.match(action(m), /profile\/location">Continue/);
   assert.ok(!/86%/.test(m));
   assert.match(await home(br.bob, "beta"), /86% complete/);
   assert.equal((await br.bob.get("/portal/o/alpha")).status, 404);

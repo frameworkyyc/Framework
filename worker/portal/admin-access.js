@@ -22,6 +22,8 @@
  * Routes (path after /api/admin):
  *   GET  /clients/:org/access                         organization, members, invitations
  *   POST /clients                                     {name, websiteUrl?, slug?}   create an organization; with no slug it is made from the name and made unique (-2, -3, ...)
+ *   POST /clients/:org/delete                         {confirm:"DELETE"}          delete (archive) a client: portal access stops, every record is kept; reversible
+ *   POST /clients/:org/restore                        {}                           bring a deleted client back
  *   POST /clients/:org/invitations                    {email, role}                create a pending invitation (7 days), not sent
  *   POST /clients/:org/invitations/:id/revoke         {}                           revoke in D1 first, then cancel the WorkOS invitation (partial failure is reported; repeat to retry WorkOS)
  *   POST /clients/:org/invitations/:id/replace        {role?}                      replace an expired or revoked invitation with a fresh 7-day one
@@ -33,7 +35,7 @@
  * Errors are { error: <code>, message: <sentence> } (plus invitationId for a duplicate); unexpected failures answer a bare server_error.
  */
 import { readOnlyDb } from "./admin-clients.js";
-import { createOrganizationAudited, getOrganizationById } from "./repo/orgs.js";
+import { createOrganizationAudited, archiveOrganizationAudited, restoreOrganizationAudited, getOrganizationById } from "./repo/orgs.js";
 import { createInvitation, replaceInvitation, revokeInvitation, getInvitation } from "./repo/invitations.js";
 import { setMemberRole, revokeMembership } from "./repo/memberships.js";
 import { validateSlug, validateName, validateHttpsUrl, normalizeEmail, validateEnum, ROLES } from "./repo/validate.js";
@@ -42,6 +44,7 @@ import { createWorkosAdminClient } from "./workos-admin.js";
 import { deliverInvitation, revokeInvitationEverywhere } from "./invite-delivery.js";
 import { sendEmail } from "../assessment.js";
 import { checkRecipient, allowlistStatus } from "./invite-recipients.js";
+import { loadApproved, addApproved } from "./repo/approved-emails.js";
 
 const MAX_BODY = 2048;
 const json = (body, status = 200, headers = {}) =>
@@ -54,7 +57,7 @@ const STATUS = {
   slug_taken: 409, slug_unavailable: 409, revenue_client_taken: 409, already_pending: 409, already_member: 409, last_owner: 409, still_pending: 409, already_revoked: 409,
   already_expired: 409, already_accepted: 409, not_revoked: 409, organization_inactive: 409,
   expired_replace_required: 409, already_submitted: 409, not_yet_submitted: 409, invitation_revoked: 409, send_in_progress: 409,
-  delivery_unrecorded: 500, recipient_not_allowed: 403, recipient_allowlist_missing: 403,
+  delivery_unrecorded: 500, recipient_not_allowed: 403, recipient_allowlist_missing: 403, list_full: 409, invalid_note: 422,
 };
 
 /** The data layer's structured failure, as a safe HTTP response. Anything it does not know about becomes a bare 500. */
@@ -133,6 +136,7 @@ const DELIVERY_COLUMNS = ", delivery_status, delivery_channel, delivery_attempte
 
 async function readAccess(env, org, now) {
   const rdb = readOnlyDb(env.PORTAL_DB);
+  const stored = await loadApproved(rdb);
   const members = (
     await rdb
       .prepare(
@@ -161,7 +165,7 @@ async function readAccess(env, org, now) {
     invitations: invitations.map((i) => publicInvitation(i, nowIso)),
     delivery_tracking: invitations.length === 0 ? undefined : invitations[0].delivery_status !== undefined,
     // Whether this deployment accepts changes, and whether it may contact providers. Booleans only: lets the interface explain itself instead of failing on click.
-    capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", sending: env.PORTAL_ADMIN_WRITES === "1" && env.PORTAL_INVITE_SENDING === "1", recipients: allowlistStatus(env) }, // "configured" | "missing": never the addresses
+    capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", sending: env.PORTAL_ADMIN_WRITES === "1" && env.PORTAL_INVITE_SENDING === "1", recipients: allowlistStatus(env, stored) }, // "configured" | "missing": never the addresses
   };
 }
 
@@ -175,7 +179,7 @@ function workosClient(env, deps) {
 }
 
 /** Providers for a send or resend. Missing configuration answers 503 BEFORE anything is attempted or recorded. */
-function deliveryContext(env, deps, db, now) {
+function deliveryContext(env, deps, db, now, stored) {
   const wk = workosClient(env, deps);
   if (!wk.client) return { error: err(503, "provider_not_configured", "WorkOS is not configured on this deployment. Nothing was sent.") };
   let base;
@@ -185,19 +189,19 @@ function deliveryContext(env, deps, db, now) {
     return { error: err(503, "provider_not_configured", "The portal address is not configured on this deployment. Nothing was sent.") };
   }
   const f = deps.fetch || fetch;
-  return { db, workos: wk.client, sendEmail: (m) => sendEmail(env, m, f), baseUrl: base, now, checkRecipient: (email) => checkRecipient(env, email) };
+  return { db, workos: wk.client, sendEmail: (m) => sendEmail(env, m, f), baseUrl: base, now, checkRecipient: (email) => checkRecipient(env, email, stored) };
 }
 
 /**
  * The allowlist check for an operation on an existing invitation. Returns a Response to answer with, or null to carry on.
  * Order: a locked allowlist answers first (nothing is looked at); an unknown invitation is the usual 404; otherwise its stored address must be approved.
  */
-async function gateStoredInvitation(env, db, organizationId, invitationId) {
-  const locked = checkRecipient(env, null);
+async function gateStoredInvitation(env, db, organizationId, invitationId, stored) {
+  const locked = checkRecipient(env, null, stored);
   if (locked.error === "recipient_allowlist_missing") return err(403, locked.error, locked.message);
   const row = await db.prepare("SELECT email FROM invitations WHERE id = ? AND organization_id = ?").bind(invitationId, organizationId).first();
   if (!row) return err(404, "not_found", "No such invitation in this organization.");
-  const gate = checkRecipient(env, row.email);
+  const gate = checkRecipient(env, row.email, stored);
   return gate.ok ? null : err(403, gate.error, gate.message);
 }
 
@@ -235,6 +239,7 @@ export async function handleAccessApi(request, env, principal, path, deps = {}) 
     if (method !== "POST") return null; // GET /clients (and others) belong to the read-only Clients handler
     route = { kind: "create_org" };
   } else if (seg.length === 3 && seg[2] === "access") route = { kind: "access", org: seg[1] };
+  else if (seg.length === 3 && (seg[2] === "delete" || seg[2] === "restore")) route = { kind: "org_" + seg[2], org: seg[1] };
   else if (seg.length === 3 && seg[2] === "invitations") route = { kind: "invite", org: seg[1] };
   else if (seg.length === 5 && seg[2] === "invitations" && (seg[4] === "revoke" || seg[4] === "replace" || seg[4] === "send" || seg[4] === "resend")) route = { kind: "invitation_" + seg[4], org: seg[1], target: seg[3] };
   else if (seg.length === 5 && seg[2] === "members" && (seg[4] === "role" || seg[4] === "remove")) route = { kind: "member_" + seg[4], org: seg[1], target: seg[3] };
@@ -258,7 +263,7 @@ export async function handleAccessApi(request, env, principal, path, deps = {}) 
     const db = env.PORTAL_DB;
     const actor = principal && principal.email;
     const fields = {
-      create_org: ["name", "slug", "websiteUrl"], invite: ["email", "role"], invitation_revoke: [], invitation_replace: ["role"], invitation_send: [], invitation_resend: [], member_role: ["role"], member_remove: [],
+      create_org: ["name", "slug", "websiteUrl"], invite: ["email", "role", "approve"], invitation_revoke: [], invitation_replace: ["role"], invitation_send: [], invitation_resend: [], member_role: ["role"], member_remove: [], org_delete: ["confirm"], org_restore: [],
     }[route.kind];
     let body = {};
     if (wanted === "POST") {
@@ -291,24 +296,46 @@ export async function handleAccessApi(request, env, principal, path, deps = {}) 
 
     if (route.kind === "access") return json(await readAccess(env, org, now));
 
+    // Delete = reversible archive (see archiveOrganizationAudited): the server insists on the typed word, whatever the interface did.
+    if (route.kind === "org_delete") {
+      if (body.confirm !== "DELETE") return err(422, "confirmation_required", "Type DELETE to confirm. Nothing was changed.");
+      const r = await archiveOrganizationAudited(db, org.id, actor, { now });
+      return r.ok ? json({ deleted: true, changed: r.changed, organization: publicOrg(r.organization) }) : fromFailure(r);
+    }
+    if (route.kind === "org_restore") {
+      const r = await restoreOrganizationAudited(db, org.id, actor, { now });
+      return r.ok ? json({ restored: true, changed: r.changed, organization: publicOrg(r.organization) }) : fromFailure(r);
+    }
+
+    const stored = route.kind === "invite" || route.kind.startsWith("invitation_") ? await loadApproved(db) : undefined;
+
     if (route.kind === "invite") {
       if (typeof body.email !== "string" || !normalizeEmail(body.email)) return err(422, "invalid_email", "Enter a valid email address.");
       if (!validateEnum(body.role, ROLES)) return err(422, "invalid_role", "The role must be owner or member.");
-      const gate = checkRecipient(env, body.email);
-      if (!gate.ok) return err(403, gate.error, gate.message); // before any write
+      if (body.approve !== undefined && typeof body.approve !== "boolean") return err(422, "invalid_approve", "approve must be true or false.");
+      let gate = checkRecipient(env, body.email, stored);
+      let approvedNow = false;
+      if (!gate.ok && body.approve === true) {
+        // "Also approve this address": the one-step version of Approved Emails -> Add. Audited there; the invitation below is still only created, never sent.
+        const a = await addApproved(db, body.email, actor, { now, source: "invite" });
+        if (!a.ok) return fromFailure(a);
+        approvedNow = a.changed;
+        gate = { ok: true };
+      }
+      if (!gate.ok) return err(403, gate.error, gate.message); // before any invitation is written
       const r = await createInvitation(db, org.id, { email: body.email, role: body.role, createdBy: actor }, { now });
-      return r.ok ? json({ invitation: fresh(r.invitation, now.toISOString()) }, 201) : fromFailure(r);
+      return r.ok ? json({ invitation: fresh(r.invitation, now.toISOString()), ...(approvedNow ? { approved: true } : {}) }, 201) : fromFailure(r);
     }
 
     // Send, resend and replace act on a STORED invitation: its own address must be approved (an invitation made earlier for another address can never be sent).
     if (route.kind === "invitation_send" || route.kind === "invitation_resend" || route.kind === "invitation_replace") {
-      const gate = await gateStoredInvitation(env, db, org.id, route.target);
+      const gate = await gateStoredInvitation(env, db, org.id, route.target, stored);
       if (gate) return gate;
     }
 
     if (route.kind === "invitation_send" || route.kind === "invitation_resend") {
       if (!(await hasDeliveryColumns(db))) return err(503, "delivery_tracking_unavailable", "Invitation delivery tracking is not available on this database. Nothing was sent.");
-      const ctx = deliveryContext(env, deps, db, now);
+      const ctx = deliveryContext(env, deps, db, now, stored);
       if (ctx.error) return ctx.error;
       const r = await deliverInvitation(ctx, { organizationId: org.id, invitationId: route.target, actor, mode: route.kind === "invitation_send" ? "send" : "resend" });
       const row = await readInvitationRow(db, org.id, route.target);

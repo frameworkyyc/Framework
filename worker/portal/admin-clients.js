@@ -10,6 +10,9 @@
  * SELECT statement. Client answers are never logged; errors answer with a generic code.
  */
 import { PROFILE_STEPS, profileProgress, stepStatus } from "./profile-schema.js";
+import { brandingSummary } from "./repo/brand.js";
+import { adminInvoiceSummary } from "./repo/invoices.js";
+import { adminSupportSummary } from "./repo/support.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const LIST_LIMIT = 500;
@@ -66,7 +69,7 @@ async function answersFor(rdb, organizationId) {
 async function list(rdb, now, capabilities) {
   const t = now.toISOString();
   const orgs = (await rdb.prepare(
-    `SELECT o.id, o.name, o.slug, o.status, o.created_at,
+    `SELECT o.id, o.name, o.slug, o.status, o.created_at, o.archived_at,
        (SELECT count(*) FROM memberships m JOIN portal_users u ON u.id = m.user_id WHERE m.organization_id = o.id AND m.status = 'active' AND u.status = 'active') AS active_members,
        (SELECT count(*) FROM invitations i WHERE i.organization_id = o.id AND i.status = 'pending' AND i.expires_at > ?) AS pending,
        (SELECT count(*) FROM invitations i WHERE i.organization_id = o.id AND i.status = 'pending' AND i.expires_at <= ?) AS lapsed,
@@ -81,15 +84,30 @@ async function list(rdb, now, capabilities) {
     profile_available: ans.ok,
     capabilities, // booleans only: whether this deployment accepts access changes (so the interface can explain itself)
     clients: orgs.map((o) => ({
-      id: o.id, name: o.name, slug: o.slug, status: o.status, created_at: o.created_at, active_members: o.active_members,
+      id: o.id, name: o.name, slug: o.slug, status: o.status, created_at: o.created_at, archived_at: o.archived_at, active_members: o.active_members,
       invitations: { pending: o.pending, accepted: o.accepted, revoked: o.revoked, lapsed: o.lapsed },
       profile: ans.ok ? profileFor(byOrg.get(o.id) || []) : null,
     })),
   });
 }
 
-async function one(rdb, id, now) {
-  const org = await rdb.prepare("SELECT id, name, slug, status, website_url, created_at FROM organizations WHERE id = ?").bind(id).first();
+/** Branding counts for the client page, or null on a database without migration 0005 (so older databases keep working). */
+async function brandingFor(rdb, id) {
+  try { return await brandingSummary(rdb, id); } catch { return null; }
+}
+
+/** Invoice counts (drafts waiting, past due) for the client page, or null on a database without migration 0007. */
+async function invoicesFor(rdb, id, now) {
+  try { return await adminInvoiceSummary(rdb, id, { now }); } catch { return null; }
+}
+
+/** Support request counts (unseen, open) for the client page, or null on a database without migration 0007. */
+async function supportFor(rdb, id) {
+  try { return await adminSupportSummary(rdb, id); } catch { return null; }
+}
+
+async function one(rdb, id, now, writes) {
+  const org = await rdb.prepare("SELECT id, name, slug, status, website_url, created_at, archived_at FROM organizations WHERE id = ?").bind(id).first();
   if (!org) return json({ error: "not_found" }, 404);
   const members = (await rdb.prepare(
     `SELECT u.email, u.name, u.status AS user_status, m.role, m.status, m.created_at, u.last_login_at
@@ -99,7 +117,7 @@ async function one(rdb, id, now) {
   const invitations = (await rdb.prepare("SELECT email, role, status, created_at, created_by, expires_at, accepted_at, revoked_at FROM invitations WHERE organization_id = ? ORDER BY created_at DESC LIMIT 100").bind(id).all()).results
     .map((i) => ({ ...i, past_expiry: i.status === "pending" && i.expires_at <= t })); // the stored status is reported as it is; "past_expiry" is only a fact about the date
   const ans = await answersFor(rdb, id);
-  return json({ organization: org, members, invitations, profile_available: ans.ok, profile: ans.ok ? profileFor(ans.rows, { withAnswers: true }) : null });
+  return json({ organization: org, capabilities: { writes }, members, invitations, profile_available: ans.ok, profile: ans.ok ? profileFor(ans.rows, { withAnswers: true }) : null, branding: await brandingFor(rdb, id), invoices: await invoicesFor(rdb, id, now), support: await supportFor(rdb, id) });
 }
 
 /**
@@ -115,7 +133,7 @@ export async function handleClientsApi(request, env, principal, path, deps = {})
   try {
     if (!m[1]) return await list(rdb, now, { writes: env.PORTAL_ADMIN_WRITES === "1" });
     if (!UUID.test(m[1])) return json({ error: "not_found" }, 404);
-    return await one(rdb, m[1], now);
+    return await one(rdb, m[1], now, env.PORTAL_ADMIN_WRITES === "1");
   } catch (err) {
     console.error("admin clients api error:", err && err.name); // never the message: it can carry SQL text or values
     return json({ error: "portal_unavailable" }, 503);

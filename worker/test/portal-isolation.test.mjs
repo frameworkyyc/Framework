@@ -142,7 +142,7 @@ test("hostile input is data, never SQL: names, slugs, emails and urls with SQL m
 
 const REPO_DIR = new URL("../portal/repo/", import.meta.url);
 const files = readdirSync(REPO_DIR).filter((f) => f.endsWith(".js"));
-const TENANT_TABLES = ["memberships", "invitations", "projects", "activity_log"];
+const TENANT_TABLES = ["memberships", "invitations", "projects", "activity_log", "brand_kits", "brand_assets", "brand_uploads", "service_requests"];
 
 /** Every SQL string literal (backtick, double- or single-quoted) that starts with a SQL verb. */
 function sqlStrings() {
@@ -187,6 +187,10 @@ test("SQL scan: values are always bound; the only interpolations into SQL are th
     // Access-management statements (memberships.js, invitations.js): module-level string constants, never built from input. They are the audit INSERT header,
     // the shared guard predicates ("another active owner remains", "already an active member") and the per-operation guard that the audit entry and the change share.
     "AUDIT", "ACTIVE_MEMBER", "ACTIVE_MEMBER_OF_OLD", "OTHER_ACTIVE_OWNER", "cond",
+    "VISIBLE", "ASSET_COLUMNS", "UPLOAD_COLUMNS", "UPLOAD_COLUMNS_U", "REQUEST_COLUMNS", // brand.js: module-level constants (the column lists, and the "kit published AND asset published AND not deleted" predicate whose every value is bound)
+    "VISIBLE", "ASSET_COLUMNS", "UPLOAD_COLUMNS", "UPLOAD_COLUMNS_U", "REQUEST_COLUMNS", // brand.js: module-level constants (column lists and the "kit published AND asset published AND not deleted" predicate; every value in them is bound)
+    "COLS", "CLIENT_VISIBLE", "REQ", 'includeArchived ? "" : "AND archived_at IS NULL"', // invoices.js and support.js: module-level column lists and the "published, not archived, not void" predicate (every value in them is bound)
+    "REQ_R", "where", // support.js: the module-level, fixed column list and the looked-up scope predicate of the Admin-only cross-tenant list (no value in them comes from a request)
     "REVISION", // business-profile.js: the module-level, organization-scoped "newest profile.updated entry of this step" subquery (a fixed constant; every value in it is bound)
   ]);
   const used = new Set();

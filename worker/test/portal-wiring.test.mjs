@@ -12,8 +12,9 @@ const MODULES = ["config", "crypto", "policy", "http", "log", "claims", "session
 test("worker/index.js imports only the portal router, and routes /portal and /portal/* to it with an explicit 404 fallback", () => {
   const idx = code("worker/index.js");
   assert.match(idx, /import \{ handlePortal, portalNotFound \} from "\.\/portal\/router\.js";/);
-  assert.equal([...idx.matchAll(/from "\.\/portal\//g)].length, 1, "one portal import");
-  assert.match(idx, /if \(path === "\/portal" \|\| path\.startsWith\("\/portal\/"\)\) \{\s*return \(await handlePortal\(request, env\)\) \|\| portalNotFound\(\);\s*\}/);
+  assert.match(idx, /import \{ runScheduled \} from "\.\/portal\/scheduled\.js";/, "and the scheduled (Cron Trigger) work");
+  assert.equal([...idx.matchAll(/from "\.\/portal\//g)].length, 2, "two portal imports: the router and the scheduled work");
+  assert.match(idx, /if \(path === "\/portal" \|\| path\.startsWith\("\/portal\/"\)\) \{\s*return \(await handlePortal\(request, env, deps\)\) \|\| portalNotFound\(\);\s*\}/);
   assert.ok(!/probe/i.test(idx));
 });
 test("the Phase 0 probe is gone everywhere in code and config (jwt.js stays: the new WorkOS client uses it)", () => {
@@ -29,7 +30,7 @@ test("only the Worker entry point and portal modules import the portal modules",
       const p = dir + e.name;
       if (e.isDirectory()) { walk(p + "/"); continue; }
       if (!/\.(m?js)$/.test(e.name) || p.startsWith("worker/portal/") || p.startsWith("worker/test/") || p === "worker/index.js") continue;
-      if (p === "worker/admin/router.js") { assert.deepEqual([...read(p).matchAll(/from "\.\.\/portal\/([^"]+)"/g)].map((m) => m[1]), ["admin-clients.js", "admin-access.js", "admin-feedback.js"], "the admin router imports exactly the two reviewed admin read modules"); continue; }
+      if (p === "worker/admin/router.js") { assert.deepEqual([...read(p).matchAll(/from "\.\.\/portal\/([^"]+)"/g)].map((m) => m[1]), ["admin-clients.js", "admin-access.js", "admin-branding.js", "admin-invoices.js", "admin-support.js", "admin-approved-emails.js", "admin-dashboard.js", "admin-feedback.js"], "the admin router imports exactly the two reviewed admin read modules"); continue; }
       if (/portal\//.test(read(p))) offenders.push(p);
     }
   };
@@ -57,5 +58,5 @@ test("portal modules do no work at import time, read no environment, and make no
   }
 });
 test("only the reviewed set of modules exists under worker/portal", () => {
-  assert.deepEqual(readdirSync(new URL("worker/portal/", root)).filter((f) => f.endsWith(".js")).sort(), ["admin-access.js", "admin-clients.js", "admin-feedback.js", "auth.js", "claims.js", "config.js", "crypto.js", "demo-data.js", "demo.js", "filters.js", "form.js", "frame.js", "guard.js", "guided-data.js", "guided.js", "http.js", "invite-delivery.js", "invite-recipients.js", "jwt.js", "log.js", "module-status.js", "pages.js", "policy.js", "profile-live.js", "profile-schema.js", "ratelimit.js", "router.js", "sessions.js", "ui.js", "views.js", "welcome.js", "workos-admin.js", "workos.js"]);
+  assert.deepEqual(readdirSync(new URL("worker/portal/", root)).filter((f) => f.endsWith(".js")).sort(), ["admin-access.js", "admin-approved-emails.js", "admin-branding.js", "admin-clients.js", "admin-dashboard.js", "admin-feedback.js", "admin-invoices.js", "admin-support.js", "auth.js", "brand-files.js", "brand-services.js", "branding-live.js", "claims.js", "config.js", "crypto.js", "demo-data.js", "demo.js", "file-backup.js", "filters.js", "form.js", "frame.js", "guard.js", "guided-data.js", "guided.js", "http.js", "invite-delivery.js", "invite-recipients.js", "invoice-files.js", "jwt.js", "log.js", "module-status.js", "pages.js", "policy.js", "profile-live.js", "profile-schema.js", "ratelimit.js", "router.js", "scheduled.js", "service-notifications.js", "services-live.js", "sessions.js", "support-files.js", "ui.js", "views.js", "welcome.js", "workos-admin.js", "workos.js"]);
 });

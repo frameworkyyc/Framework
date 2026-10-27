@@ -57,9 +57,9 @@ export function teamFacts(members, invitations) {
 const RANK = { bad: 0, warn: 1, info: 2 };
 
 /** Most urgent first. Each item: tone (bad = something failed, warn = needs action, info = waiting on the client), text, and where "Review" goes. */
-export function attention({ org, profile, facts }) {
+export function attention({ org, profile, facts, branding = null, invoices = null, support = null }) {
   const out = [];
-  const add = (tone, text, go, label) => out.push({ tone, text, go, label });
+  const add = (tone, text, go, label, href = null) => out.push({ tone, text, go, label, href });
   if (org.status !== "active") add("bad", `This organization is ${org.status}, so it can’t receive invitations.`, "org-details", "See details");
   if (facts.failed) add("bad", `${plural(facts.failed, "invitation")} failed to send. Nothing was emailed.`, "team-invitations", "Review invitations");
   if (facts.lapsed) add("warn", `${plural(facts.lapsed, "invitation")} expired. Replace ${facts.lapsed === 1 ? "it" : "them"} to invite again.`, "team-invitations", "Review invitations");
@@ -67,10 +67,15 @@ export function attention({ org, profile, facts }) {
   if (facts.cleanup) add("warn", `${plural(facts.cleanup, "revoked invitation")} still to be cancelled at WorkOS.`, "team-invitations", "Review invitations");
   if (org.status === "active" && facts.members === 0 && facts.pending === 0 && !facts.lapsed) add("warn", "No one has access yet. Invite the first owner.", "team-invitations", "Invite an owner");
   else if (facts.members > 0 && facts.owners === 0) add("warn", "No active owner. Make someone an owner.", "team-members", "Review members");
+  if (branding && branding.requestsNew) add("warn", `${plural(branding.requestsNew, "new service request")} to follow up.`, null, "Open Branding", "__BRANDING__");
+  if (branding && branding.uploadsNew) add("warn", `${plural(branding.uploadsNew, "new client upload")} to review.`, null, "Open Branding", "__BRANDING__");
+  if (support && support.unseen) add("warn", `${plural(support.unseen, "support request")} with new activity.`, null, "Open requests", "__SUPPORT__");
+  if (invoices && invoices.overdue) add("warn", `${plural(invoices.overdue, "published invoice")} past due.`, null, "Open Invoices", "__INVOICES__");
+  if (invoices && invoices.drafts) add("info", `${plural(invoices.drafts, "draft invoice")} not published yet.`, null, "Open Invoices", "__INVOICES__");
   if (profile) {
     const firstOpen = profile.steps.find((s) => s.state !== "complete");
-    if (profile.steps.every((s) => s.answered === 0)) add("info", "The client hasn’t started their Business Profile.", "adm-profile", "See sections");
-    else if (firstOpen) add("info", `${profile.total - profile.done} of ${profile.total} Business Profile sections still need answers.`, "profile-" + firstOpen.id, "Show first");
+    if (profile.steps.every((s) => s.answered === 0)) add("info", "The client hasn’t started their Business Profile.", null, "Open Business Profile", "__PROFILE__");
+    else if (firstOpen) add("info", `${profile.total - profile.done} of ${profile.total} Business Profile sections still need answers.`, null, "Open Business Profile", "__PROFILE__");
   }
   if (facts.members === 0 && facts.pending > 0 && !facts.failed && !facts.unsent) add("info", `Waiting for ${plural(facts.pending, "invitation")} to be accepted.`, "team-invitations", "View invitations");
   return out.sort((a, b) => RANK[a.tone] - RANK[b.tone]);
@@ -99,10 +104,15 @@ export function goTo(key) {
 
 /* ---------- Dashboard ---------- */
 
-const dashButton = (label, go) => h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => go(), text: label });
+const dashButton = (label, go, href) => (href ? h("a", { class: "btn btn--secondary adm-small", href, "data-link": "", text: label }) : h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => go(), text: label }));
+const linkFor = (it, brandingHref, profileHref, invoicesHref, supportHref) => (it.href === "__SUPPORT__" ? supportHref : it.href === "__BRANDING__" ? brandingHref : it.href === "__PROFILE__" ? profileHref : it.href === "__INVOICES__" ? invoicesHref : it.href);
 
 /** Header, "next step" card and the two overview tiles. `update(members, invitations)` refreshes the team-dependent parts after the access panel loads or changes. */
-export function dashboard({ org, profile, members, invitations }) {
+export function dashboard({ org, profile, members, invitations, branding = null, invoices = null, support = null }) {
+  const supportHref = `/admin/clients/${encodeURIComponent(org.id)}/support`;
+  const brandingHref = `/admin/clients/${encodeURIComponent(org.id)}/branding`;
+  const invoicesHref = `/admin/clients/${encodeURIComponent(org.id)}/invoices`;
+  const profileHref = `/admin/clients/${encodeURIComponent(org.id)}/profile`;
   const next = h("section", { class: "adm-next", "aria-labelledby": "adm-next-h" });
   const team = h("div", { class: "adm-tile adm-tile--team" });
   const header = h("div", { class: "adm-idhead" },
@@ -110,21 +120,21 @@ export function dashboard({ org, profile, members, invitations }) {
     h("div", { class: "adm-idhead__text" },
       h("span", { class: "eyebrow" }, "Client"),
       h("h1", { class: "adm-title", tabindex: "-1" }, org.name),
-      org.status !== "active" ? h("p", { class: "adm-idhead__chips" }, chip("bad", org.status[0].toUpperCase() + org.status.slice(1), "warn")) : null));
+      org.status !== "active" ? h("p", { class: "adm-idhead__chips" }, chip("bad", org.status === "archived" ? "Deleted" : org.status[0].toUpperCase() + org.status.slice(1), "warn")) : null));
 
   function paint(facts) {
-    const items = attention({ org, profile, facts });
+    const items = attention({ org, profile, facts, branding, invoices, support });
     const lead = items[0];
     next.className = "adm-next adm-next--" + (lead ? lead.tone : "ok");
     next.replaceChildren(...[
       h("h2", { id: "adm-next-h", class: "adm-next__label" }, lead ? "Next step" : "All clear"),
       lead
-        ? h("div", { class: "adm-next__lead" }, icon(lead.tone === "info" ? "info" : "warn"), h("p", { class: "adm-next__text", text: lead.text }), dashButton(lead.label, () => goTo(lead.go)))
+        ? h("div", { class: "adm-next__lead" }, icon(lead.tone === "info" ? "info" : "warn"), h("p", { class: "adm-next__text", text: lead.text }), dashButton(lead.label, () => goTo(lead.go), linkFor(lead, brandingHref, profileHref, invoicesHref, supportHref)))
         : h("div", { class: "adm-next__lead" }, icon("complete"), h("p", { class: "adm-next__text" }, "Nothing needs your attention right now.")),
       items.length > 1
         ? h("details", { class: "adm-next__morebox" },
             h("summary", null, `${items.length - 1} more to review`),
-            h("ul", { class: "adm-next__more" }, items.slice(1).map((it) => h("li", null, icon(it.tone === "info" ? "info" : "warn"), h("span", { text: it.text }), h("button", { class: "adm-linkbtn", type: "button", onclick: () => goTo(it.go), text: it.label })))))
+            h("ul", { class: "adm-next__more" }, items.slice(1).map((it) => h("li", null, icon(it.tone === "info" ? "info" : "warn"), h("span", { text: it.text }), it.href ? h("a", { class: "adm-linkbtn", href: linkFor(it, brandingHref, profileHref, invoicesHref, supportHref), "data-link": "", text: it.label }) : h("button", { class: "adm-linkbtn", type: "button", onclick: () => goTo(it.go), text: it.label })))))
         : null].filter(Boolean));
     const withAccess = facts.members === 1 ? "person has access" : "people have access";
     team.replaceChildren(
@@ -139,20 +149,42 @@ export function dashboard({ org, profile, members, invitations }) {
 
   const pct = profile ? Math.max(0, Math.min(100, Number(profile.percent) || 0)) : 0;
   const tone = !profile ? "plain" : profile.done === profile.total ? "ok" : profile.steps.every((s) => s.answered === 0) ? "plain" : "pending";
-  const prof = h("div", { class: "adm-tile adm-tile--profile adm-tile--" + tone },
-    h("p", { class: "adm-tile__label" }, "Business Profile"),
+  // The one Business Profile card on the dashboard: completion and progress only. The whole card opens the Business Profile page (sections and saved answers).
+  const prof = h(profile ? "a" : "div", { class: "adm-tile adm-tile--profile adm-tile--" + tone + (profile ? " adm-tile--link" : ""), ...(profile ? { href: profileHref, "data-link": "" } : {}) },
+    h("p", { class: "adm-tile__label" }, "Business Profile", profile ? h("span", { class: "adm-tile__go", "aria-hidden": "true" }, "→") : null),
     profile
       ? [
           h("p", { class: "adm-tile__big", }, `${profile.percent}%`, h("span", { class: "adm-tile__unit", text: "complete" })),
           h("progress", { class: "adm-meter adm-meter--lg", max: 100, value: pct, "aria-label": `Business Profile ${profile.percent} percent complete` }),
           h("p", { class: "adm-tile__note" }, `${profile.done} of ${profile.total} sections complete` + (profile.last_saved ? ` · last saved ${fmtDate(profile.last_saved)}` : " · nothing saved yet")),
+          h("span", { class: "visually-hidden" }, "Open the Business Profile"),
         ]
       : h("p", { class: "adm-tile__note" }, "Not available on this deployment."));
+
+  /** A whole-card link in the same style as Business Profile: label and arrow, one big figure, a note and status chips. */
+  const linkTile = ({ href, label, big, unit, note, chips }) => h("a", { class: "adm-tile adm-tile--link", href, "data-link": "" },
+    h("p", { class: "adm-tile__label" }, label, h("span", { class: "adm-tile__go", "aria-hidden": "true" }, "→")),
+    h("p", { class: "adm-tile__big" }, big, unit ? h("span", { class: "adm-tile__unit", text: unit }) : null),
+    note ? h("p", { class: "adm-tile__note", text: note }) : null,
+    h("p", { class: "adm-tile__chips" }, chips.filter(Boolean)),
+    h("span", { class: "visually-hidden" }, `Open ${label}`));
+  const brandingTile = branding && linkTile({
+    href: brandingHref, label: "Branding", big: branding.kitStatus === "published" ? "Published" : branding.kitStatus === "draft" ? "Draft" : "No kit yet", unit: branding.kitStatus ? "brand kit" : "",
+    note: branding.assets ? `${branding.assetsPublished} of ${branding.assets} files published` : "No files yet",
+    chips: [branding.uploadsNew ? chip("pending", plural(branding.uploadsNew, "new upload"), "info") : null, branding.requestsOpen ? chip(branding.requestsNew ? "pending" : "warn", plural(branding.requestsOpen, "open request"), "info") : null, branding.kitStatus === "published" ? chip("ok", "Visible to the client", "complete") : null] });
+  const invoicesTile = invoices && linkTile({
+    href: invoicesHref, label: "Invoices", big: String(invoices.total), unit: invoices.total === 1 ? "invoice" : "invoices",
+    note: invoices.total ? "Archived invoices are kept, not shown here." : "None entered yet.",
+    chips: [invoices.drafts ? chip("pending", plural(invoices.drafts, "draft") + " to publish", "info") : null, invoices.overdue ? chip("warn", `${invoices.overdue} past due`, "warn") : null, !invoices.drafts && !invoices.overdue ? chip("plain", invoices.total ? "Nothing to do" : "No invoices yet") : null] });
+  const supportTile = support && linkTile({
+    href: supportHref, label: "Support & Change Requests", big: String(support.open), unit: "open",
+    note: support.total ? `of ${plural(support.total, "request")} in all` : "No requests yet.",
+    chips: [support.unseen ? chip("pending", plural(support.unseen, "request") + " with new activity", "info") : support.total ? chip("plain", "All seen") : null] });
 
   paint(teamFacts(members, invitations));
   return {
     header,
-    overview: h("div", { class: "adm-dash" }, next, h("div", { class: "adm-tiles" }, prof, team)),
+    overview: h("div", { class: "adm-dash" }, next, h("div", { class: "adm-tiles" }, prof, team, brandingTile, invoicesTile, supportTile)),
     update: (m, i) => paint(teamFacts(m, i)),
   };
 }

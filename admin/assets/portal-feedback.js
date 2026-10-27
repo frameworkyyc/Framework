@@ -1,6 +1,7 @@
-/* Framework Admin — Portal Feedback module (read-only): /admin/portal-feedback. Messages sent by signed-in portal clients.
+/* Framework Admin — Portal Feedback module (read-only): the second tab of Feedback (/admin/feedback/portal). Messages sent by signed-in portal clients.
    Separate from the website project "Client Feedback" survey. Client text is only ever inserted as text. */
 
+import { feedbackTabs } from "./feedback-tabs.js";
 import { h, api, fmtDateTime, stateBlock } from "./ui.js";
 
 export async function render() {
@@ -17,11 +18,12 @@ export async function render() {
     ))),
   );
   const node = h("div", { class: "adm-page" },
-    h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Portal Feedback"),
+    h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Feedback"),
       h("p", { class: "adm-sub" }, "Messages from signed-in portal clients, newest first. Read-only."))),
+    feedbackTabs("portal"),
     data.available ? null : h("p", { class: "adm-banner" }, "Portal feedback isn’t available on this deployment yet (its database migration hasn’t been applied)."),
     rows.length ? table : data.available ? stateBlock({ title: "No portal feedback yet", body: "Messages appear here when a client uses “Send feedback” in the portal." }) : null,
     rows.length ? h("p", { class: "adm-sub", role: "status" }, `${rows.length} ${rows.length === 1 ? "message" : "messages"}.` + (data.truncated ? " Only the newest 500 are shown." : "")) : null,
   );
-  return { title: "Portal Feedback", node };
+  return { title: "Feedback · Portal feedback", node };
 }

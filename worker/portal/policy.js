@@ -18,6 +18,18 @@ const GRANTS = Object.freeze({
   "profile.edit": Object.freeze(["owner", "member"]),
   "workspace.view": Object.freeze(["owner", "member"]),
   "feedback.submit": Object.freeze(["owner", "member"]),
+  // Branding (files): everyone in the organization may see and download the published brand and upload their own materials; only owners may delete a shared
+  // upload or ask for a quote. Official deliverables and publication belong to Framework Admin alone: there is deliberately no client action for them.
+  "branding.view": Object.freeze(["owner", "member"]),
+  "branding.upload": Object.freeze(["owner", "member"]),
+  "branding.delete_upload": Object.freeze(["owner"]),
+  "branding.request": Object.freeze(["owner"]),
+  // Client Services: everyone may open the hub, read the contact details, and send and follow support or change requests (a request never authorizes paid work).
+  // Invoices carry financial information: owners only, and read-only (Framework Admin enters, publishes and archives them).
+  "services.view": Object.freeze(["owner", "member"]),
+  "support.view": Object.freeze(["owner", "member"]),
+  "support.submit": Object.freeze(["owner", "member"]),
+  "invoices.view": Object.freeze(["owner"]),
 });
 
 export const ACTIONS = Object.freeze(Object.keys(GRANTS));

@@ -10,3 +10,4 @@ export * from "./activity.js";
 export * from "./offboarding.js";
 export * from "./business-profile.js";
 export * from "./portal-feedback.js";
+export * from "./brand.js";

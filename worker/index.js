@@ -24,6 +24,7 @@ import { combinedRevenue } from "./revenue.js";
 import { handleAssessmentSubmit, handleAssessmentConfig } from "./assessment.js";
 import { handleCardPage } from "./card.js";
 import { handlePortal, portalNotFound } from "./portal/router.js";
+import { runScheduled } from "./portal/scheduled.js";
 
 const MAX_BODY_BYTES = 24 * 1024;
 const MAX_RECENT_SUBMISSIONS = 40; // flood guard: max stored submissions per 10 minutes, site-wide
@@ -278,13 +279,19 @@ async function handleExport(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  // Cron Trigger (wrangler.jsonc `triggers.crons`, Production only): background email retries and the client-file backup. See portal/scheduled.js.
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(runScheduled(env));
+  },
+
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const deps = ctx && typeof ctx.waitUntil === "function" ? { waitUntil: (p) => ctx.waitUntil(p) } : {}; // lets emails be sent after the response without holding it up
     const path = url.pathname.replace(/\/+$/, "");
 
     // Admin area: authenticated inside handleAdmin; nothing under these paths is served without it.
     if (path === "/admin" || path.startsWith("/admin/") || path === "/api/admin" || path.startsWith("/api/admin/")) {
-      return handleAdmin(request, env);
+      return handleAdmin(request, env, deps);
     }
 
     // Digital business card: static page, link-preview URLs follow the host (worker/card.js).
@@ -294,7 +301,7 @@ export default {
     // portal's own host. In every other case (Production, other hosts, portal off) each /portal path is an explicit, non-cacheable 404
     // from here: it never reaches the static site.
     if (path === "/portal" || path.startsWith("/portal/")) {
-      return (await handlePortal(request, env)) || portalNotFound();
+      return (await handlePortal(request, env, deps)) || portalNotFound();
     }
 
     // Public: the ONE combined, rounded-down client revenue figure. Individual figures stay in D1.

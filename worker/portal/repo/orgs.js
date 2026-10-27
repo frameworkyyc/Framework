@@ -124,3 +124,34 @@ export async function setOrganizationStatus(db, id, status, { now = new Date() }
   const res = await db.prepare("UPDATE organizations SET status = ?, archived_at = CASE WHEN ? = 'archived' THEN ? ELSE NULL END, updated_at = ? WHERE id = ?").bind(status, status, t, t, id).run();
   return res.meta.changes === 1 ? ok({ organization: await getOrganizationById(db, id) }) : fail("not_found");
 }
+
+/**
+ * "Delete" a client = archive it, reversibly. Nothing is removed: invoices, support requests, brand files and profile answers stay (retention), and
+ * memberships are kept so a restore brings people straight back. Portal access stops because every membership lookup requires the organization to be
+ * active. The audit entry is written in the same batch and only if the status really changed, so a repeated request leaves one entry.
+ */
+export async function archiveOrganizationAudited(db, id, actor, { now = new Date() } = {}) {
+  return changeLifecycle(db, id, actor, now, { from: "active", to: "archived", action: "org.deleted" });
+}
+
+/** Bring a deleted client back (status active again). Same audit rules as deleting. */
+export async function restoreOrganizationAudited(db, id, actor, { now = new Date() } = {}) {
+  return changeLifecycle(db, id, actor, now, { from: "archived", to: "active", action: "org.restored" });
+}
+
+async function changeLifecycle(db, id, actor, now, { from, to, action }) {
+  requireOrgId(id);
+  if (!validActor(actor)) return fail("invalid_actor", { message: "An administrator must be named for this change." });
+  const t = isoTime(now);
+  // Deleting acts on any live client (active or suspended); restoring only on a deleted one.
+  const guard = from === "active" ? "status <> 'archived'" : "status = 'archived'";
+  await db.batch([
+    db.prepare(`UPDATE organizations SET status = ?, archived_at = CASE WHEN ? = 'archived' THEN ? ELSE NULL END, updated_at = ? WHERE id = ? AND ${guard}`).bind(to, to, t, t, id),
+    db
+      .prepare(`INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, visibility, created_at) SELECT ?, ?, 'admin', ?, ?, 'organization', ?, 'internal', ? WHERE changes() > 0`)
+      .bind(newId(), id, actor.trim(), action, id, t),
+  ]);
+  const organization = await getOrganizationById(db, id);
+  if (!organization) return fail("not_found");
+  return ok({ organization, changed: organization.status === to && organization.updated_at === t });
+}

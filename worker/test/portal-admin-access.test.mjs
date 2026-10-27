@@ -345,7 +345,7 @@ test("methods and paths: wrong methods get 405 with Allow; unknown paths are 404
   assert.equal((await s.call(`${base}/members/${ann}/remove`, { method: "DELETE" })).headers.get("Allow"), "POST");
   assert.equal((await s.call(`${base}/members/${ann}/remove`, { method: "PUT", json: {} })).status, 405);
   const before = s.snap();
-  for (const p of [`${base}/members/${ann}`, `${base}/members/${ann}/offboard`, `${base}/members/${ann}/disable`, `/api/admin/users/${ann}/offboard`, `/api/admin/users/${ann}/disable`, `${base}/delete`, `${base}/status`]) {
+  for (const p of [`${base}/members/${ann}`, `${base}/members/${ann}/offboard`, `${base}/members/${ann}/disable`, `/api/admin/users/${ann}/offboard`, `/api/admin/users/${ann}/disable`, `${base}/status`]) {
     const r = await s.post(p, {});
     assert.ok([404, 503].includes(r.status), `${p} -> ${r.status}`); // 503 = the feedback modules' own "no feedback database" answer in this harness; never a success
     assert.ok(r.status !== 200 && r.status !== 201);
@@ -370,7 +370,7 @@ test("failures are safe: a database error answers 500 server_error with no SQL, 
 test("the module imports exactly the reviewed modules, and no other file imports the delivery code", () => {
   const src = read("worker/portal/admin-access.js");
   const imports = [...src.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(imports, ["./admin-clients.js", "./repo/orgs.js", "./repo/invitations.js", "./repo/memberships.js", "./repo/validate.js", "./repo/common.js", "./workos-admin.js", "./invite-delivery.js", "../assessment.js", "./invite-recipients.js"]);
+  assert.deepEqual(imports, ["./admin-clients.js", "./repo/orgs.js", "./repo/invitations.js", "./repo/memberships.js", "./repo/validate.js", "./repo/common.js", "./workos-admin.js", "./invite-delivery.js", "../assessment.js", "./invite-recipients.js", "./repo/approved-emails.js"]);
   for (const f of ["worker/index.js", "worker/admin/router.js", "worker/portal/router.js", "worker/portal/auth.js", "worker/portal/admin-clients.js", "worker/portal/admin-feedback.js"]) {
     assert.ok(!/invite-delivery|workos-admin|invitation-delivery/.test(read(f)), f + " does not import the unwired delivery code");
   }

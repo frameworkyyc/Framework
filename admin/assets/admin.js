@@ -24,17 +24,13 @@ function brand() {
 }
 
 function navItem(m) {
-  if (!m.enabled) {
-    return h("li", null, h("span", { class: "adm-nav__link is-disabled", "aria-disabled": "true" }, m.label, h("span", { class: "adm-nav__later" }, "Later")));
-  }
   const a = h("a", { class: "adm-nav__link", href: m.path, "data-link": "", "data-module": m.id }, m.label);
   navLinks.push(a);
   return h("li", null, a);
 }
 
 function buildShell() {
-  const live = MODULES.filter((m) => m.enabled);
-  const later = MODULES.filter((m) => !m.enabled);
+  const live = MODULES.filter((m) => m.enabled); // a module that is not built yet (enabled: false) is not shown at all
 
   toggle = h("button", { class: "menu-toggle", type: "button", "aria-expanded": "false", "aria-controls": "adm-side" }, "Menu");
   const bar = h("header", { class: "adm-bar" }, brand(), toggle);
@@ -48,9 +44,6 @@ function buildShell() {
       "nav",
       { class: "adm-nav", "aria-label": "Admin" },
       h("div", { class: "adm-nav__group" }, h("ul", null, live.map(navItem))),
-      later.length
-        ? h("div", { class: "adm-nav__group" }, h("p", { class: "adm-side__label adm-nav__group-label" }, "Coming later"), h("ul", null, later.map(navItem)))
-        : null,
     ),
     h("div", { class: "adm-side__foot" }, userLine, h("a", { href: "/", target: "_blank", rel: "noopener" }, "View website"), h("a", { href: "/cdn-cgi/access/logout" }, "Sign out")),
   );
@@ -98,8 +91,21 @@ export function notify(message) {
   notify.timer = window.setTimeout(() => { notice.hidden = true; }, 7000);
 }
 
+/** The count of requests needing attention, shown beside "Support Requests" in the navigation. A courtesy: any failure simply shows no badge. */
+async function refreshBadge() {
+  const link = navLinks.find((a) => a.dataset.module === "support");
+  if (!link) return;
+  try {
+    const a = await api("/services/attention");
+    link.querySelectorAll(".adm-nav__badge, .adm-nav__sr").forEach((el) => el.remove());
+    const n = a && a.available && a.support ? a.support.attention : 0;
+    if (n > 0) link.append(h("span", { class: "adm-nav__badge", "aria-hidden": "true", text: String(n) }), h("span", { class: "visually-hidden adm-nav__sr", text: `, ${n} need attention` }));
+  } catch { /* no badge */ }
+}
+
 async function route() {
   const token = ++routeToken;
+  if (clean(location.pathname) === "/admin/portal-feedback") history.replaceState(null, "", "/admin/feedback/portal" + location.search); // the old address now lives under the Feedback tabs
   const url = new URL(location.href);
   const module = resolve(url.pathname);
   navLinks.forEach((a) => (a.dataset.module === (module && module.id) ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
@@ -131,6 +137,7 @@ async function route() {
   const heading = main.querySelector(".adm-title");
   (heading || main).focus({ preventScroll: true });
   window.scrollTo(0, 0);
+  refreshBadge();
 }
 
 document.addEventListener("click", (e) => {

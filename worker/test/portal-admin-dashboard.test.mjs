@@ -40,7 +40,7 @@ test("what needs attention: most urgent first, each with a place to go; a health
   const none = { members: 2, owners: 1, pending: 0, lapsed: 0, failed: 0, unsent: 0, cleanup: 0 };
   assert.deepEqual(attention({ org, profile: profile(Array(7).fill("complete")), facts: none }), [], "complete profile, healthy team: nothing to do");
   const all = attention({ org: { ...org, status: "suspended" }, profile: profile(["complete", "partial", ...Array(5).fill("missing")]), facts: { ...none, failed: 1, lapsed: 2, unsent: 1, cleanup: 1 } });
-  assert.deepEqual(kinds(all), ["bad:org-details", "bad:team-invitations", "warn:team-invitations", "warn:team-invitations", "warn:team-invitations", "info:profile-s1"]);
+  assert.deepEqual(kinds(all), ["bad:org-details", "bad:team-invitations", "warn:team-invitations", "warn:team-invitations", "warn:team-invitations", "info:null"]);
   assert.match(all[1].text, /1 invitation failed to send\. Nothing was emailed\./);
   assert.match(all[2].text, /2 invitations expired/);
   assert.match(all.at(-1).text, /6 of 7 Business Profile sections still need answers/, "the profile count agrees with the section states");
@@ -56,26 +56,33 @@ test("what needs attention: most urgent first, each with a place to go; a health
 test("the dashboard module only presents: text nodes, no network, no storage, no writes, and shows nothing it cannot compute from the data", () => {
   const src = strip(read("admin/assets/client-dashboard.js"));
   assert.ok(!/innerHTML|fetch\(|api\(|localStorage|sessionStorage|\.style\b|method:/.test(src));
-  assert.ok(!/logo|upload|<img|"img"/i.test(src), "no logo or image infrastructure: the monogram is the only mark");
+  assert.ok(!/logo_url|logoUrl|<img|"img"|FormData|multipart/i.test(src), "no logo or image infrastructure: the monogram is the only mark");
   for (const w of ["Complete", "Partial", "Missing"]) assert.ok(src.includes(`"${w}"`), w);
 });
 
-test("client detail structure: header with monogram, next step, two metric tiles, a seven-section map, collapsed accordions, quiet organization details last", () => {
+test("client detail structure: header, next step, a single clickable Business Profile card and team tile, Branding, team access, quiet organization details last; the duplicated profile sections are gone", () => {
   const src = strip(read("admin/assets/clients.js")), dash = strip(read("admin/assets/client-dashboard.js"));
-  const detail = src.slice(src.indexOf("async function renderDetail"));
-  assert.match(detail, /dash\.header,\s*dash\.overview,/, "header then overview first");
-  assert.match(detail, /sectionMap\(p\.steps\)/);
-  assert.match(detail, /p\.steps\.map\(stepAccordion\)/, "every section is an accordion item");
-  assert.ok(detail.indexOf("access,") < detail.indexOf('id: "adm-profile"') && detail.indexOf('id: "adm-profile"') < detail.lastIndexOf("info,"), "order: team, saved answers, organization details last");
+  const start = src.indexOf("async function renderDetail"), end = src.indexOf("async function renderProfile");
+  const detail = src.slice(start, end > start ? end : undefined);
+  assert.match(detail, /dash\.header,\s*deletedBanner,\s*dash\.overview,/, "header then overview first");
+  assert.ok(!/sectionMap\(|stepAccordion|Saved answers|adm-mapsec|id: "adm-profile"/.test(detail), "no section map or saved answers on the dashboard");
+  assert.ok(!/brandingRow|invoicesRow|supportRow/.test(detail), "Branding, Invoices and Support are cards in the dashboard overview, not separate rows");
+  assert.match(dash, /brandingTile, invoicesTile, supportTile/, "all five areas share one tile grid");
+  assert.ok(detail.indexOf("dash.overview") < detail.indexOf("access,") && detail.indexOf("access,") < detail.lastIndexOf("info,"), "order: overview cards, team access, organization details last");
   assert.match(detail, /id: "org-details"[\s\S]*?"Portal address"[\s\S]*?"Website"[\s\S]*?"Created"/, "the low-priority details stay available inside a collapsed section");
   assert.ok(!/open: true/.test(detail), "nothing in the detail page is open by default");
-  assert.match(detail, /staff cannot edit them here/, "answers stay read-only");
-  assert.match(dash, /h\("details", \{ class: "adm-acc "/, "native details/summary: keyboard and expanded state come from the platform");
-  assert.match(dash, /h\("summary", \{ class: "adm-acc__sum" \}/);
-  assert.match(dash, /Nothing saved here yet\. The client hasn’t answered this section\./, "a missing section explains itself in one line");
+  assert.match(dash, /profile \? "a" : "div"[\s\S]*?href: profileHref, "data-link": ""/, "the whole Business Profile card is one link to its page");
   assert.match(dash, /h\("progress", \{ class: "adm-meter adm-meter--lg", max: 100, value: pct/, "the percentage is the existing server figure on a native progress element");
   assert.match(dash, /`\$\{profile\.done\} of \$\{profile\.total\} sections complete/, "x of 7 comes from the existing completion logic");
-  assert.equal([...src.matchAll(/\bapi\(/g)].length, 2, "no extra requests: the list and the detail reads");
+  // the new page: seven collapsed accordions with state, read-only
+  const page = src.slice(src.indexOf("async function renderProfile"));
+  assert.match(page, /p\.steps\.map\(stepAccordion\)/, "every section is an accordion item");
+  assert.ok(!/open: true/.test(page), "collapsed by default");
+  assert.match(page, /staff cannot edit them here/, "answers stay read-only");
+  assert.match(page, /Needs answers: /, "missing sections are named without opening anything");
+  assert.match(dash, /h\("details", \{ class: "adm-acc "/, "native details/summary: keyboard and expanded state come from the platform");
+  assert.match(dash, /Nothing saved here yet\. The client hasn’t answered this section\./, "a missing section explains itself in one line");
+  assert.equal([...src.matchAll(/\bapi\(/g)].length, 3, "the list, the detail and the Business Profile page reads");
 });
 
 test("team and invitations: summary chips first, details inside labelled expandable sections, every management control still there", () => {

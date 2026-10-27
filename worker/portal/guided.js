@@ -43,7 +43,7 @@ const backLink = (vm, from) => (from ? `<p class="backlink"><a class="text-link"
 
 /* ------------------------------------------------------------------ home */
 
-const HOME_BLURB = { profile: "Your business, customers and goals", branding: "Logo and brand assets", website: "Plan or improve your site", marketing: "Goals, audience and channels", content: "Photos, video and creative", files: "Shared files and approvals" };
+const HOME_BLURB = { profile: "Your business, customers and goals", branding: "Logos, colours, fonts and brand guidelines", website: "Plan or improve your site", marketing: "Goals, audience and channels", content: "Photos, video and creative", files: "Shared files and approvals" };
 
 /**
  * The home screen is a navigation hub: a short greeting and the six areas. Progress and status live inside each area.
@@ -70,22 +70,13 @@ export function tileStatus(s) {
   return `<div class="tile__status"><progress class="meter" max="100" value="${s.percent}" aria-hidden="true">${s.percent}%</progress><p class="tile__pct">${s.percent}% complete</p>${note}</div>`;
 }
 
-/**
- * The lead line, the one next action and a short note under the greeting. Only what the data supports. The time estimate and the "what happens next" wording are
- * deliberate and plain: about 20 to 30 minutes, progress is saved, and Framework reviews the answers and follows up. Nothing optional is presented as required.
- */
-const FOLLOW_UP = "When you finish, the Framework team will review your answers and follow up with you.";
-function homeNext(vm) {
-  const n = vm.nextAction && vm.nextAction.profile;
-  const link = (label, path, cls) => `<p class="home-action"><a class="${cls}" href="${e(href(vm, path))}">${e(label)} <span aria-hidden="true">→</span></a></p>`;
-  if (!n || n.state === "unavailable") return { lead: "What would you like to work on?", action: "", note: "" };
-  if (n.state === "start") return { lead: "Start with your Business Profile. It helps Framework understand your business.", action: link("Start your Business Profile", n.path, "btn btn--primary"), note: `It takes about 20–30 minutes. Your progress is saved as you go, so you can stop and come back whenever you like. ${FOLLOW_UP}` };
-  if (n.state === "continue") return { lead: "Pick up where you left off.", action: link("Continue your Business Profile", n.path, "btn btn--primary"), note: `Your progress is saved, so you can finish later. ${FOLLOW_UP}` };
-  return {
-    lead: "Your Business Profile is complete. The Framework team will review your information and follow up with you about the next steps.",
-    action: link("Review your Business Profile", "/profile", "text-link"),
-    note: n.optionalRemain ? "Optional details can be added any time, and you can change your answers whenever you like." : "You can change your answers any time.",
-  };
+/** The Branding card's status: whether a brand system is published, and how many files the client has shared. Words carry the meaning; the square is decoration. */
+export function brandStatus(b) {
+  if (!b || b.state === "unavailable") return b ? `<div class="tile__status"><p class="tile__pct tile__pct--muted">Status unavailable right now</p></div>` : "";
+  const shared = b.uploads > 0 ? `<p class="tile__note">${plural(b.uploads, "file")} shared with Framework</p>` : "";
+  return b.state === "published"
+    ? `<div class="tile__status"><p class="tile__pct"><span class="status status--live">Brand system published</span></p>${shared}</div>`
+    : `<div class="tile__status"><p class="tile__pct"><span class="status status--idle">Not published yet</span></p>${shared || `<p class="tile__note">Upload your existing brand materials</p>`}</div>`;
 }
 
 export function home(vm) {
@@ -96,17 +87,20 @@ export function home(vm) {
     return `<header class="page-head page-head--home"><h1 class="h1 h1--home">${e(welcomeFor(vm))}</h1><p class="lead">What would you like to work on?</p></header>
 <nav aria-label="Your workspace"><ul class="tiles">${tiles}</ul></nav>`;
   }
-  // The signed-in home: one greeting, one next action, the available module(s) as the clear focus, and the unfinished ones as a quiet list.
-  // The unavailable modules are plain text (no link, no card, no badge) so nothing suggests they can be opened.
-  const { lead, action, note } = homeNext(vm);
-  const active = AREAS.filter((a) => isLive(a.key)).map((a) => {
-    const st = vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : "";
-    return `<li><a class="focus" href="${e(href(vm, a.path))}"><span class="focus__title">${e(a.title)}</span><span class="focus__desc">${e(HOME_BLURB[a.key])}</span>${st}</a></li>`;
-  }).join("");
+  // The signed-in home: a short greeting and one card per built section. Each card is one link (title, short description, status, arrow). Sections that are
+  // not built yet are a single quiet line, never a card, so nothing suggests they can be opened.
+  const card = (a) => {
+    const st = a.key === "branding" ? brandStatus(vm.brand) : vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : "";
+    return `<li><a class="hub" href="${e(href(vm, a.path))}"><span class="hub__top"><span class="hub__title">${e(a.title)}</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">${e(HOME_BLURB[a.key])}</span>${st ? `<span class="hub__status">${st}</span>` : ""}</a></li>`;
+  };
+  const servicesCard = vm.services
+    ? `<li><a class="hub" href="${e(href(vm, "/services"))}"><span class="hub__top"><span class="hub__title">Client Services</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">Invoices, support requests and how to reach us</span>${vm.servicesAttention && vm.servicesAttention.length ? `<span class="hub__status"><span class="tile__status"><span class="tile__action"><span class="dot dot--attention" aria-hidden="true"></span>${e(vm.servicesAttention.join(" · "))}</span></span></span>` : ""}</a></li>`
+    : "";
+  const active = AREAS.filter((a) => isLive(a.key)).map(card).join("") + servicesCard;
   const soon = AREAS.filter((a) => !isLive(a.key));
-  return `<header class="page-head page-head--home">${vm.org && vm.org.name ? `<span class="eyebrow">${e(vm.org.name)}</span>` : ""}<h1 class="h1 h1--home">${e(welcomeFor(vm))}</h1><p class="lead">${e(lead)}</p>${action}${note ? `<p class="home-note">${e(note)}</p>` : ""}</header>
-<nav aria-label="Your workspace"><ul class="focus-list">${active}</ul></nav>
-${soon.length ? `<section class="soon-list" aria-labelledby="h-soon"><h2 id="h-soon" class="soon-list__title">Coming soon</h2><ul>${soon.map((a) => `<li><span class="soon-list__name">${e(a.title)}</span><span class="soon-list__desc">${e(HOME_BLURB[a.key])}</span></li>`).join("")}</ul></section>` : ""}`;
+  return `<header class="page-head page-head--home">${vm.org && vm.org.name ? `<span class="eyebrow">${e(vm.org.name)}</span>` : ""}<h1 class="h1 h1--home">${e(welcomeFor(vm))}</h1></header>
+<nav aria-label="Your workspace"><ul class="hubs">${active}</ul></nav>
+${soon.length ? `<p class="soon-line"><span class="soon-line__label">Coming soon</span> ${soon.map((a) => e(a.title)).join(" · ")}</p>` : ""}`;
 }
 
 /* ------------------------------------------------------------------ standard workspace overview (shared) */

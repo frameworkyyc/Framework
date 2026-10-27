@@ -44,42 +44,34 @@ const goals = PROFILE_STEPS.find((s) => s.id === "goals");
 
 /* ------------------------------------------------------------------ 1. dashboard messaging */
 
-test("dashboard, brand-new client: organization name, welcome, one prominent action, ~20-30 minutes, progress is saved, what happens next", async () => {
+test("dashboard, brand-new client: organization name and a short greeting, then one card for the Business Profile with its progress; no instructions or time estimate", async () => {
   const s = await setup();
   const html = await s.get(s.ann, "/portal/o/alpha");
   assert.match(html, /<span class="eyebrow">Alpha Co<\/span><h1 class="h1 h1--home">/);
-  assert.match(html, /Start your Business Profile/);
-  assert.equal([...html.matchAll(/class="btn btn--primary"/g)].length, 1);
-  const note = (/<p class="home-note">([^<]*)<\/p>/.exec(html) || [])[1];
-  assert.equal(note, "It takes about 20–30 minutes. Your progress is saved as you go, so you can stop and come back whenever you like. When you finish, the Framework team will review your answers and follow up with you.");
+  assert.match(html, /<a class="hub" href="\/portal\/o\/alpha\/profile">/, "the whole card is one link");
+  assert.equal([...html.matchAll(/class="btn btn--primary"/g)].length, 0, "no separate call-to-action button");
+  assert.ok(!/home-note|20–30|Start your Business Profile|Your progress is saved|will review your answers/.test(html), "the welcome text and instructions are gone");
   assert.match(html, /0% complete/);
   assert.match(html, /12 required answers left/, "the existing progress indicator is unchanged");
-  assert.match(html, /<h2 id="h-soon"[^>]*>Coming soon<\/h2>/, "the other modules stay a plain Coming soon list");
+  assert.match(html, /<p class="soon-line">/, "the other modules are one quiet line");
 });
 
-test("dashboard, in progress: resume wording, progress is saved, what happens next; no time estimate on a return visit", async () => {
+test("dashboard, in progress: the card carries the progress and what is left, with no resume copy", async () => {
   const s = await setup();
   await s.saveFields(s.ann, "alpha", ALL.filter((f) => f.step === "business"));
   const html = await s.get(s.ann, "/portal/o/alpha");
-  assert.match(html, /Pick up where you left off\./);
-  assert.match(html, /Continue your Business Profile/);
-  assert.match(html, /<p class="home-note">Your progress is saved, so you can finish later\. When you finish, the Framework team will review your answers and follow up with you\.<\/p>/);
-  assert.ok(!/20–30/.test(html));
+  assert.ok(!/Pick up where you left off|Continue your Business Profile/.test(html));
+  assert.match(html, /\d+% complete/); assert.match(html, /required answers? left/);
 });
 
-test("dashboard, complete: the approved acknowledgement, the review link stays, editing stays possible; the same for 'required done, optional left'", async () => {
+test("dashboard, complete: the card shows the finished state and links to the overview; every step stays reachable and editable", async () => {
   const s = await setup();
   await s.saveFields(s.ann, "alpha", REQUIRED);
   let html = await s.get(s.ann, "/portal/o/alpha");
-  const MSG = "Your Business Profile is complete. The Framework team will review your information and follow up with you about the next steps.";
-  assert.ok(text(html).includes(MSG));
-  assert.match(html, /<a class="text-link" href="\/portal\/o\/alpha\/profile">Review your Business Profile/);
-  assert.match(html, /<p class="home-note">Optional details can be added any time, and you can change your answers whenever you like\.<\/p>/);
-  assert.ok(!/btn btn--primary/.test(html), "nothing is demanded once the required answers are in");
+  assert.match(html, /All required answers are complete/);
+  assert.ok(!/Review your Business Profile|home-note/.test(html));
   await s.saveFields(s.ann, "alpha", ALL);
   html = await s.get(s.ann, "/portal/o/alpha");
-  assert.ok(text(html).includes(MSG));
-  assert.match(html, /<p class="home-note">You can change your answers any time\.<\/p>/);
   assert.match(html, /100% complete/);
   const overview = await s.get(s.ann, "/portal/o/alpha/profile");
   assert.match(overview, /href="\/portal\/o\/alpha\/profile\/business"/, "every step remains reachable and editable");
@@ -90,7 +82,7 @@ test("dashboard: the organization name is escaped, and a member sees the same Ho
   const html = await s.get(s.mia, "/portal/o/alpha");
   assert.ok(!html.includes("<img src=x"), "no markup from the name");
   assert.match(html, /<span class="eyebrow">&lt;img src=x onerror=alert\(1\)&gt; &amp; Co<\/span>/);
-  assert.match(html, /Start your Business Profile/);
+  assert.match(html, /class="hub" href="\/portal\/o\/alpha\/profile"/);
 });
 
 /* ------------------------------------------------------------------ 2. the four optional questions */

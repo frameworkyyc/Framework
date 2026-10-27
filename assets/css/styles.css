@@ -181,6 +181,7 @@ h1, h2, h3, h4 {
 .section--ink .btn--secondary:hover { background: var(--paper); color: var(--ink); }
 
 .btn-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 40px; }
+.btn-row--center { align-items: center; gap: 12px 28px; }
 
 .text-link {
   display: inline-block;
@@ -239,6 +240,12 @@ h1, h2, h3, h4 {
 .nav__link[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink); }
 .nav .btn { min-height: 44px; padding: 0 20px; }
 
+/* Client Login: a quiet text link in the nav on desktop, and in the header bar next to Menu on small screens (always visible, never hidden in the menu). */
+.nav__login { font-size: 15px; font-weight: 600; color: var(--ink); text-decoration: none; padding: 6px 0; border-bottom: 1px solid var(--ink); }
+.nav__login:hover { border-bottom-width: 2px; padding-bottom: 5px; }
+.client-login { display: none; font-size: 14px; font-weight: 600; color: var(--ink); text-decoration: none; padding: 6px 0; border-bottom: 1px solid var(--ink); white-space: nowrap; margin-left: auto; }
+.nav__login:focus-visible, .client-login:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+
 .menu-toggle {
   display: none;
   min-height: 44px;
@@ -252,6 +259,14 @@ h1, h2, h3, h4 {
 }
 
 @media (max-width: 960px) {
+  .client-login { display: inline-block; }
+  .site-header__inner { gap: 16px; }
+  /* in the open menu it is a full item, like the pages above it */
+  .nav__login {
+    display: block; padding: 18px 0; border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-display); font-weight: 600; font-size: 26px; letter-spacing: -0.01em; color: var(--ink);
+  }
+  .nav__login:hover { border-bottom-width: 1px; padding-bottom: 18px; }
   .menu-toggle { display: inline-flex; align-items: center; }
   .nav {
     position: fixed;
@@ -279,6 +294,13 @@ h1, h2, h3, h4 {
   .nav__link[aria-current="page"] { border-bottom-color: var(--ink); }
   .nav .btn { margin-top: 28px; min-height: 56px; }
   body.nav-open { overflow: hidden; }
+}
+
+@media (max-width: 520px) { .client-login__prefix { display: none; } } /* the full name stays in the accessible label; the bar keeps room for the Menu button */
+@media (max-width: 360px) {
+  .site-header__inner { gap: 10px; }
+  .brand { gap: 10px; }
+  .brand__word { letter-spacing: 0.12em; }
 }
 
 /* ---------- Page heads & section heads ---------- */

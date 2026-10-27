@@ -9,11 +9,11 @@ const ID = /^[A-Za-z0-9-]{1,40}$/;
 /** @returns {{type: string|undefined, project: string|undefined, from: string|undefined}} `from` is a service-request id the caller then checks against its own list */
 export function viewFilters(url) {
   const q = url && url.searchParams;
-  if (!q) return { type: undefined, project: undefined, from: undefined, saved: false, nochange: false, sent: false };
+  if (!q) return { type: undefined, project: undefined, from: undefined, saved: false, nochange: false, sent: false, uploaded: false, removed: false, preview: false, flash: "" };
   const type = q.get("type");
   const project = q.get("project");
   const from = q.get("from");
   const saved = q.get("saved");
   const sent = q.get("sent");
-  return { type: TYPES.has(type) ? type : undefined, project: typeof project === "string" && ID.test(project) ? project : undefined, from: typeof from === "string" && ID.test(from) ? from : undefined, saved: saved === "1", nochange: saved === "0", sent: sent === "1" };
+  return { type: TYPES.has(type) ? type : undefined, project: typeof project === "string" && ID.test(project) ? project : undefined, from: typeof from === "string" && ID.test(from) ? from : undefined, saved: saved === "1", nochange: saved === "0", sent: sent === "1", uploaded: q.get("uploaded") === "1", removed: q.get("removed") === "1", preview: q.get("preview") === "1", flash: ["sent", "replied", "partial"].includes(q.get("flash")) ? q.get("flash") : "" };
 }

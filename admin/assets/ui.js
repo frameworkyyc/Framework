@@ -29,13 +29,14 @@ export class ApiError extends Error {
 /** Calls /api/admin<path>. Never exposes raw server text; throws ApiError with a coarse code. */
 export async function api(path, { method = "GET", body } = {}) {
   const headers = { Accept: "application/json" };
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData; // a file upload: the browser sets the multipart type itself
   if (method !== "GET") {
-    headers["Content-Type"] = "application/json";
+    if (!isForm) headers["Content-Type"] = "application/json";
     headers["X-Framework-Admin"] = "1"; // required by the server for writes (CSRF defence)
   }
   let res;
   try {
-    res = await fetch("/api/admin" + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), credentials: "same-origin", redirect: "manual" });
+    res = await fetch("/api/admin" + path, { method, headers, body: body === undefined ? undefined : isForm ? body : JSON.stringify(body), credentials: "same-origin", redirect: "manual" });
   } catch {
     throw new ApiError(0, "network");
   }
@@ -58,7 +59,8 @@ export async function api(path, { method = "GET", body } = {}) {
   if (res.status === 422) throw fail(422, data.error || "invalid");
   if (res.status === 502 && data.error === "delivery_failed") throw fail(502, "delivery_failed");
   if (res.status === 500 && data.error === "delivery_unrecorded") throw fail(500, "delivery_unrecorded");
-  if (res.status === 503) throw fail(503, ["provider_not_configured", "delivery_tracking_unavailable"].includes(data.error) ? data.error : "unavailable");
+  if (res.status === 503) throw fail(503, ["provider_not_configured", "delivery_tracking_unavailable", "storage_unavailable"].includes(data.error) ? data.error : "unavailable");
+  if ([400, 411, 413, 415, 502].includes(res.status) && typeof data.error === "string" && /^[a-z_]{3,40}$/.test(data.error)) throw fail(res.status, data.error); // upload refusals and storage errors: a short code, never server text
   throw fail(res.status, "error");
 }
 

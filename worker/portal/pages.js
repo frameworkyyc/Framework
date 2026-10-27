@@ -10,6 +10,9 @@ import { appPage } from "./ui.js";
 import * as views from "./views.js";
 import * as guided from "./guided.js";
 import * as live from "./profile-live.js";
+import * as brandingLive from "./branding-live.js";
+import * as servicesLive from "./services-live.js";
+import { brandingEnabled, servicesEnabled } from "./config.js";
 import { LIVE_AREAS } from "./guided-data.js";
 
 /** The one portal script: tidies website fields and warns about unsaved Business Profile changes, and moves keyboard focus to a form's error summary after a refused save. Loaded only where it has a job. */
@@ -20,6 +23,9 @@ async function signOutForm(ctx, session) {
   const token = await csrfFor(ctx.cfg, session);
   return `<form method="post" action="/portal/logout" class="signout"><input type="hidden" name="csrf" value="${e(token)}"><button class="btn" type="submit">Sign out</button></form>`;
 }
+
+/** The sections that are built for signed-in clients: Branding joins them only where PORTAL_BRANDING is on (Staging). */
+export const liveAreasFor = (ctx) => (brandingEnabled(ctx.env) ? [...LIVE_AREAS, "branding"] : LIVE_AREAS);
 
 /** The view-model of the connected portal: only what the database holds for the member's own organization. */
 function liveModel(ctx, { session, membership: m, returning }, data = {}) {
@@ -34,7 +40,7 @@ function liveModel(ctx, { session, membership: m, returning }, data = {}) {
     return { type: views.activityType(a.action), title: views.actionTitle(a.action), detail, at: a.created_at, projectId: a.entity_type === "project" ? a.entity_id : undefined };
   });
   return {
-    mode: "live", base: `/portal/o/${m.slug}`, now: ctx.now, liveAreas: LIVE_AREAS, returning: Boolean(returning),
+    mode: "live", base: `/portal/o/${m.slug}`, now: ctx.now, liveAreas: liveAreasFor(ctx), services: servicesEnabled(ctx.env), returning: Boolean(returning),
     org: { name: m.name, website: m.websiteUrl, role: m.role },
     user: { name: session.name || "", email: session.email },
     projects, activity, updates: [], actions: [], documents: [], team: data.team || [], has: OFF,
@@ -73,8 +79,8 @@ export async function pickerPage(ctx, session, memberships) {
 }
 
 /** The home of the connected portal: the six workspace blocks. Nothing from the demonstration is shown. */
-export async function homePage(ctx, a, moduleStatus = {}, nextAction = {}) {
-  const vm = { ...liveModel(ctx, a, {}), moduleStatus, nextAction };
+export async function homePage(ctx, a, moduleStatus = {}, nextAction = {}, brand = null, servicesAttention = []) {
+  const vm = { ...liveModel(ctx, a, {}), moduleStatus, nextAction, brand, servicesAttention };
   return shell(ctx, a, { title: "Home", active: "home", body: guided.home(vm), vm, ref: "home" });
 }
 export async function overviewPage(ctx, a, data) {
@@ -129,4 +135,45 @@ export async function feedbackPage(ctx, a, o = {}) {
   const vm = liveModel(ctx, a, {});
   const csrf = await csrfFor(ctx.cfg, a.session);
   return shell(ctx, a, { title: "Send feedback", active: "home", body: live.feedbackForm(vm, { ...o, csrf }), vm, status: o.status || 200, script: o.errors && Object.keys(o.errors).length ? FOCUS_SCRIPT : null });
+}
+
+const BRANDING_SCRIPT = "/assets/js/portal-branding.js";
+/** The Branding page: the published brand system, or the empty state. `o`: { canUpload, uploadCount, brandName }. */
+export async function brandingPage(ctx, a, brand, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, o), vm, script: brand.published ? BRANDING_SCRIPT : null, ref: "branding" });
+}
+/** The separate area for the client's own brand materials. `o`: see branding-live.js brandingUploads; `status` is the HTTP status (4xx for a refused upload). */
+export async function brandingUploadsPage(ctx, a, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  return shell(ctx, a, { title: "Your brand materials", active: "home", body: brandingLive.brandingUploads(vm, { ...o, csrf }), vm, status: o.status || 200, script: o.error ? FOCUS_SCRIPT : null, ref: "branding-uploads" });
+}
+
+/** The Client Services hub. `live`: which parts have data behind them (see services-live.js). */
+export async function servicesPage(ctx, a, live = {}) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Client Services", active: "home", body: servicesLive.servicesHub(vm, a.membership.role, live), vm, ref: "services" });
+}
+export async function invoicesPage(ctx, a, items) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Invoices", active: "home", body: servicesLive.invoicesPage(vm, items), vm, ref: "services-invoices" });
+}
+export async function requestsPage(ctx, a, items) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Support & Change Requests", active: "home", body: servicesLive.requestsList(vm, items), vm, ref: "services-requests" });
+}
+export async function requestFormPage(ctx, a, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  return shell(ctx, a, { title: "New request", active: "home", body: servicesLive.requestForm(vm, { ...o, csrf }), vm, status: o.status || 200, script: o.error ? FOCUS_SCRIPT : null, ref: "services-requests" });
+}
+export async function requestThreadPage(ctx, a, thread, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  return shell(ctx, a, { title: thread.request.title, active: "home", body: servicesLive.requestThread(vm, thread, { ...o, csrf }), vm, status: o.status || 200, script: o.error ? FOCUS_SCRIPT : null, ref: "services-requests" });
+}
+export async function contactPage(ctx, a) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Contact", active: "home", body: servicesLive.contactPage(vm), vm, ref: "services-contact" });
 }

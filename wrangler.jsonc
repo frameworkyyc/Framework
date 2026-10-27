@@ -9,6 +9,8 @@
   // block; Staging has its own copy in previews.vars below. Never put secrets (API keys, tokens, admin emails) in this file.
   "vars": {
     "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>",
+    // Staff recipient for assessment and client-service notifications, pinned explicitly (it is also the code's default). Not a secret.
+    "ASSESSMENT_NOTIFY_TO": "hello@frameworkco.ca",
     // Public Turnstile site key (safe to expose; it is rendered in the page). The matching TURNSTILE_SECRET is an
     // encrypted runtime secret stored in Cloudflare, never in this file. Both must be set for the check to be enforced.
     "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss",
@@ -59,6 +61,13 @@
       "migrations_dir": "migrations/portal"
     }
   ],
+  // Client files (PRODUCTION rollout Stage 3): two PRIVATE R2 buckets, no public access and no custom domain. PORTAL_FILES holds the files; PORTAL_FILES_BACKUP holds
+  // copies (worker/portal/file-backup.js; it has a retain-everything bucket lock, and the application never deletes there). Bound here, but nothing uses them for clients until
+  // PORTAL_BRANDING / PORTAL_SERVICES are switched on (Stage 4), and there is no cron yet (Stage 5). Admin -> Branding -> Storage can check, back up and restore.
+  "r2_buckets": [
+    { "binding": "PORTAL_FILES", "bucket_name": "framework-portal-files" },
+    { "binding": "PORTAL_FILES_BACKUP", "bucket_name": "framework-portal-files-backup" }
+  ],
   // Portal abuse limiter (worker/portal/ratelimit.js): 20 requests / 60 s per client network on sign-in start, callback and sign-out. Inert while
   // the portal is off. namespace_id must be unique in the account: 4201 is Production's, Staging uses 4101 in previews.ratelimits.
   "ratelimits": [
@@ -102,7 +111,12 @@
       // Sending is still limited server-side to the EXACT addresses in the Cloudflare secret PORTAL_INVITE_ALLOWLIST (this repository is public, so the addresses are not here).
       // Missing, empty or malformed means every invitation operation is refused. Setup and the add-an-address procedure: worker/portal/INVITATION-DELIVERY-PLAN.md and ADMIN-INVITATIONS-RUNBOOK.md.
       "PORTAL_ADMIN_WRITES": "1",
-      "PORTAL_INVITE_SENDING": "1"
+      "PORTAL_INVITE_SENDING": "1",
+      // Turns on the client-facing Branding section (view and download published brand assets, upload existing brand materials). STAGING ONLY, never at the top level.
+      // Needs migrations 0005/0006 and the PORTAL_FILES binding below. Exactly "1" or absent: absent keeps Branding as a "Coming soon" page.
+      "PORTAL_BRANDING": "1",
+      // Turns on the client-facing Client Services area (invoices, support & change requests, contact). STAGING ONLY, never at the top level. Needs migration 0007 for its data.
+      "PORTAL_SERVICES": "1"
     },
     "d1_databases": [
       {
@@ -122,6 +136,12 @@
       {
         "binding": "PORTAL_FILES",
         "bucket_name": "framework-portal-files-staging"
+      },
+      // A second private bucket for copies of the files (worker/portal/file-backup.js). Staging has no cron, so here it is exercised from Admin -> Branding -> Storage
+      // ("Run backup check", "Back up now", "Restore missing files"). Production gets its own pair in the Production rollout (Stage 3).
+      {
+        "binding": "PORTAL_FILES_BACKUP",
+        "bucket_name": "framework-portal-files-staging-backup"
       }
     ],
     // Application-level abuse limiter for the portal's unauthenticated endpoints (worker/portal/ratelimit.js): sign-in start, callback and
