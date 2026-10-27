@@ -138,7 +138,7 @@ test("client isolation: one organization's detail never contains another's answe
 });
 test("invitations: only statuses the portal database records are shown, plus the fact that a pending one is past its expiry date", async () => {
   const { w, call, alpha, uid } = await setup();
-  const t0 = new Date(w.clock.now());
+  const t0 = new Date(); // the Admin API compares expiry with the real current time, so the invitations are made at the real current time (a fixed past date would expire and fail this test on a later day)
   const a = await createInvitation(w.db, alpha.id, { email: "new1@alpha.test", role: "member", createdBy: "owner@frameworkco.ca" }, { now: t0 });
   await createInvitation(w.db, alpha.id, { email: "new2@alpha.test", role: "member", createdBy: "owner@frameworkco.ca" }, { now: t0 });
   await revokeInvitation(w.db, alpha.id, a.invitation.id, "owner@frameworkco.ca", { now: t0 });
