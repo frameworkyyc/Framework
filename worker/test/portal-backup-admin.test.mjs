@@ -96,6 +96,8 @@ test("Admin backup run, status and restore: counts only; restore needs the typed
   assert.deepEqual([run.ok, run.copied, run.remaining], [true, 3, 0]);
   st = await (await s.call("/api/admin/branding/backup", { method: "GET" })).json();
   assert.deepEqual([st.primary, st.backup, st.missingFromBackup, st.changed, st.missingFromPrimary], [3, 3, 0, 0, 0]);
+  const org = await s.w.org("restore-co", "Restore Co");
+  s.w.db.raw.prepare("INSERT INTO invoices (id, organization_id, invoice_number, issue_date, amount_cents, created_by, updated_by, format, content_type, size_bytes, sha256, storage_key) VALUES (?, ?, 'R-1', '2026-01-01', 100, 'owner@frameworkco.ca', 'owner@frameworkco.ca', 'pdf', 'application/pdf', 6, ?, ?)").run("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", org.id, "a".repeat(64), KEYS(2));
   await s.primary.delete(KEYS(2));
   const refused = await s.call("/api/admin/branding/backup-restore", { json: {} });
   assert.deepEqual([refused.status, (await refused.json()).error], [422, "confirmation_required"]);

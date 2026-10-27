@@ -430,12 +430,12 @@ export async function render(orgId, ctx) {
       h("h2", { class: "adm-approved__h", text: "Backup" }),
       h("p", { class: "adm-sub", text: "New files are copied to a second private bucket (copy only: nothing is ever deleted there). Restoring copies back only files that are missing, and never overwrites one that exists." }),
       h("div", { class: "adm-actions" },
-        run("Backup status", () => api("/branding/backup"), (r) => (r.configured ? `Files: ${r.primary}. Backup: ${r.backup}. Not yet backed up: ${r.missingFromBackup + r.changed}. Only in the backup: ${r.missingFromPrimary}.` : "File backup isn’t set up on this site.")),
+        run("Backup status", () => api("/branding/backup"), (r) => (r.configured ? `Files: ${r.primary}. Backup: ${r.backup}. Not yet backed up: ${r.missingFromBackup + r.changed}. Only in the backup: ${r.missingFromPrimary}.` + (r.retention ? ` Deleted files kept for 90 days: ${r.retention.waiting} waiting, ${r.retention.due} due for removal (${r.retention.enabled ? "automatic removal is on" : "automatic removal is off"}).` : "") : "File backup isn’t set up on this site.")),
         canWrite() ? run("Run backup check", () => api("/branding/backup-check", { method: "POST", body: {} }), (r) => (r.ok ? "Backup works: " + r.steps.map((x) => STEP[x.name] || x.name).join("; ") + "." : "Backup check failed at: " + r.steps.filter((x) => !x.ok).map((x) => STEP[x.name] || x.name).join(", ") + ".")) : null,
         canWrite() ? run("Back up now", () => api("/branding/backup-run", { method: "POST", body: {} }), (r) => (r.ok ? "Done: " : "Finished with problems: ") + counts(r)) : null,
         canWrite() ? button("Restore missing files…", { onclick: async (ev) => {
           const btn = ev.currentTarget; // read before any await: the event's target is cleared afterwards
-          if (!(await confirmDialog({ title: "Restore missing files?", body: "This copies back, from the backup, only files that are missing from the main bucket. Files that exist are never overwritten.", confirmLabel: "Restore" }))) return;
+          if (!(await confirmDialog({ title: "Restore missing files?", body: "This copies back, from the backup, only files that are missing from the main bucket and still in use. Files that exist are never overwritten, and files that were deleted are not restored.", confirmLabel: "Restore" }))) return;
           btn.disabled = true; say("Working…");
           try { const r = await api("/branding/backup-restore", { method: "POST", body: { confirm: "RESTORE" } }); say((r.ok ? "Done: " : "Finished with problems: ") + counts(r)); } catch { say("That didn’t work and nothing was changed. Please try again."); }
           btn.disabled = false;

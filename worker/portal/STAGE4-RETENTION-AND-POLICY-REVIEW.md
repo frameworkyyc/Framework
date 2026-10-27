@@ -42,3 +42,21 @@ New plain-language disclosures: uploaded files (and that they may contain person
 - The backup lock change (A) and the purge code (B, C, D): approve the design before I write any code. Code would go to Staging first, with tests; the Production lock change and enabling the purge are separate approvals.
 - Quote request retention (item 6) and the tombstone wording (item 7).
 - Professional review of section 4, then a separate approval to publish: set the effective date, run `PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`, promote to `main`. Nothing client-facing is enabled before the policy is published.
+
+## 6. Built on Staging (owner approved development and testing; Production unchanged)
+- `worker/portal/backup-purge.js` (new): `backupPurge` (dry run by default; removes a backup copy only when the object is in the backup but not the main bucket, every database row pointing to its key is a tombstone and the newest is 90+ days old, and it is outside the reserved test corner; protects keys a live row points to, leaves unreferenced objects alone, fails closed if the database cannot be read, bounded to 10 deletions per run) and `restorableKeys` (the restore filter).
+- **Off by default:** the Worker schedule deletes only when `PORTAL_BACKUP_PURGE` is exactly `"1"`. The setting exists nowhere in the repository, so it is off on Staging and Production; a test pins that.
+- "Restore missing files" now copies back only files a LIVE row still points to (a deleted file stays deleted; so does an object nothing refers to). The proof-of-backup check is unaffected.
+- Deleting a file (single delete, Admin delete, whole-organization offboarding) now overwrites the record's original file name, content hash and free-text notes with neutral values in the same statement. Type, size, key, who and when remain.
+- Admin: `GET /branding/backup` adds retention counts (waiting, due, protected, unreferenced, switch state); `POST /branding/backup-purge` is a dry run unless `{confirm:"PURGE"}` and refuses (409) while the switch is off; real runs are audited with counts only.
+- `file-backup.js` is still copy-only (a test pins that it has no delete call).
+
+## 7. Lock and rollout steps still to do (Production needs your separate approval)
+Cloudflare does not let this session read or change bucket locks, so these are dashboard steps for you:
+1. **Staging first (optional but recommended):** R2 > `framework-portal-files-staging-backup` > Settings > Bucket lock rules: replace any indefinite rule with one named `retain-90-days`, prefix empty, age 90 days. Then run "Run backup check" and "Back up now" on Staging: both must still pass (new objects are only ever added).
+2. **Production, after approval:** the same change on `framework-portal-files-backup`. Only after that, and only with your approval, add `"PORTAL_BACKUP_PURGE": "1"` to the top-level vars in a small PR.
+3. Before enabling the purge on Production, run the Admin purge as a dry run and compare the counts with what you expect.
+Note: a 90-day age lock blocks deleting or overwriting a backup copy for 90 days after it was created. The purge only acts 90 days after deletion, which is always later, so the two never conflict. Overwrites of a backup object are also blocked by the lock; files are never edited in place (replacements get a new key), so this does not affect normal operation.
+
+## 8. Remaining risks
+Lock and switch changes are manual and outside this repository's tests; the purge is exercised only against fake buckets until you run the dry run on Staging; tombstone rows older than 24 months are still deleted by hand (no automation); records that existed before this change keep their original file names until deleted again (Production has none yet).
