@@ -18,6 +18,7 @@ import { getOrganizationById } from "./repo/orgs.js";
 import { UUID } from "./repo/common.js";
 import * as inv from "./repo/invoices.js";
 import * as files from "./invoice-files.js";
+import { dispatchNotifications } from "./service-notifications.js";
 import { json, err, sameOriginWrite, readJson, readUpload } from "./admin-branding.js";
 
 const STATUS = {
@@ -100,6 +101,7 @@ export async function handleInvoicesApi(request, env, principal, path, deps = {}
     }
     if (route.kind === "publish") {
       const r = await inv.publishInvoice(db, org.id, route.target, actor, { now });
+      if (r.ok && r.changed) await dispatchNotifications(env, { ...deps, now });
       return r.ok ? json({ ok: true, changed: r.changed }) : fromFailure(r);
     }
     if (route.kind === "payment") {

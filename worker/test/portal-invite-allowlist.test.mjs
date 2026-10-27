@@ -358,7 +358,10 @@ test("every path that can email an invitation is behind the check: only admin-ac
   const files = readdirSync(portalDir).filter((f) => f.endsWith(".js"));
   const users = (re) => files.filter((f) => re.test(strip(readFileSync(new URL(f, portalDir), "utf8")))).sort();
   const importsRepo = /import\s*\{[^}]*\b(createInvitation|replaceInvitation)\b[^}]*\}\s*from/;
-  assert.deepEqual(users(/\bsendEmail\b/), ["admin-access.js", "invite-delivery.js"], "only the admin API wires email, and the delivery code only calls what it is given");
+  assert.deepEqual(users(/\bsendEmail\b/), ["admin-access.js", "invite-delivery.js", "service-notifications.js"], "the admin API wires invitation email, the delivery code only calls what it is given, and the Client Services notifier (below) sends only notices of its own");
+  const notifier = strip(read("worker/portal/service-notifications.js"));
+  assert.match(notifier, /filter\(\(e\) => checkRecipient\(env, e\)\.ok\)/, "client notices only go to approved recipients");
+  assert.ok(!/createInvitation|replaceInvitation|deliverInvitation/.test(notifier), "the notifier cannot create or send an invitation");
   assert.deepEqual(users(importsRepo), ["admin-access.js"], "no other module imports the invitation creation or replacement functions");
   assert.deepEqual(users(/\bdeliverInvitation\b/), ["admin-access.js", "invite-delivery.js"]);
   const src = strip(read("worker/portal/admin-access.js"));

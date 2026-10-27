@@ -198,7 +198,7 @@ export async function publishInvoice(db, organizationId, invoiceId, actor, { now
   const res = await db.batch([
     db.prepare("UPDATE invoices SET published_at = ?, published_by = ?, updated_at = ?, updated_by = ? WHERE id = ? AND organization_id = ? AND published_at IS NULL AND archived_at IS NULL AND storage_key IS NOT NULL").bind(at, actor.trim(), at, actor.trim(), invoiceId, organizationId),
     after(db, { organizationId, actor, action: "invoice.published", entityId: invoiceId, at, visibility: "client" }),
-    db.prepare("INSERT INTO service_notifications (id, organization_id, audience, event, entity_type, entity_id, created_at) SELECT ?, ?, 'client', 'invoice_published', 'invoice', ?, ? WHERE changes() > 0").bind(newId(), organizationId, invoiceId, at),
+    db.prepare("INSERT INTO service_notifications (id, organization_id, audience, event, entity_type, entity_id, created_at) SELECT ?, ?, 'client', 'invoice_published', 'invoice', ?, ? WHERE changes() > 0 AND NOT EXISTS (SELECT 1 FROM service_notifications n WHERE n.organization_id = ? AND n.audience = 'client' AND n.event = 'invoice_published' AND n.entity_id = ?)").bind(newId(), organizationId, invoiceId, at, organizationId, invoiceId),
   ]);
   return ok({ changed: res[0].meta.changes === 1 });
 }
@@ -281,4 +281,10 @@ export async function adminInvoiceSummary(db, organizationId, { now = new Date()
 export async function listInvoiceStorageKeys(db, organizationId) {
   requireOrgId(organizationId);
   return (await db.prepare("SELECT storage_key FROM invoices WHERE organization_id = ? AND storage_key IS NOT NULL").bind(organizationId).all()).results.map((r) => r.storage_key);
+}
+
+/** Counts across every organization for the Admin dashboard: drafts waiting to be published and published invoices past due. */
+export async function adminInvoiceTotals(db, { now = new Date() } = {}) {
+  const r = await db.prepare("SELECT COALESCE(sum(published_at IS NULL), 0) AS drafts, COALESCE(sum(published_at IS NOT NULL AND payment_status = 'unpaid' AND due_date IS NOT NULL AND due_date < ?), 0) AS overdue FROM invoices WHERE archived_at IS NULL").bind(todayOf(now)).first();
+  return { drafts: r.drafts, overdue: r.overdue };
 }

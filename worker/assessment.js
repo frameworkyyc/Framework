@@ -362,7 +362,7 @@ const oneLine = (v, max = 200) => String(v == null ? "" : v).replace(/[\u0000-\u
  * Send one email through Resend. Never throws. Resolves { ok: true } or { ok: false, error } where `error` is a short,
  * secret-free reason that is stored with the request: 'config:<reason>', 'provider <status>: <message>', 'network:<name>'.
  */
-export async function sendEmail(env, { to, replyTo, subject, text, html }, fetchImpl = fetch) {
+export async function sendEmail(env, { to, replyTo, subject, text, html, idempotencyKey }, fetchImpl = fetch) {
   const config = emailConfig(env);
   if (!config.ok) {
     console.warn("assessment email not sent: not configured:", config.reason);
@@ -371,7 +371,7 @@ export async function sendEmail(env, { to, replyTo, subject, text, html }, fetch
   try {
     const res = await fetchImpl("https://api.resend.com/emails", {
       method: "POST",
-      headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json", ...(idempotencyKey ? { "Idempotency-Key": String(idempotencyKey).slice(0, 256) } : {}) }, // the provider ignores a repeat with the same key, so a retry can never double-send
       body: JSON.stringify({ from: config.from, to: [to], reply_to: replyTo, subject, text, html }),
       signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
     });

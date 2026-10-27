@@ -98,6 +98,18 @@ export function notify(message) {
   notify.timer = window.setTimeout(() => { notice.hidden = true; }, 7000);
 }
 
+/** The count of requests needing attention, shown beside "Support Requests" in the navigation. A courtesy: any failure simply shows no badge. */
+async function refreshBadge() {
+  const link = navLinks.find((a) => a.dataset.module === "support");
+  if (!link) return;
+  try {
+    const a = await api("/services/attention");
+    link.querySelectorAll(".adm-nav__badge, .adm-nav__sr").forEach((el) => el.remove());
+    const n = a && a.available && a.support ? a.support.attention : 0;
+    if (n > 0) link.append(h("span", { class: "adm-nav__badge", "aria-hidden": "true", text: String(n) }), h("span", { class: "visually-hidden adm-nav__sr", text: `, ${n} need attention` }));
+  } catch { /* no badge */ }
+}
+
 async function route() {
   const token = ++routeToken;
   const url = new URL(location.href);
@@ -131,6 +143,7 @@ async function route() {
   const heading = main.querySelector(".adm-title");
   (heading || main).focus({ preventScroll: true });
   window.scrollTo(0, 0);
+  refreshBadge();
 }
 
 document.addEventListener("click", (e) => {

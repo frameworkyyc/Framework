@@ -134,7 +134,7 @@ test("support: a request and its first message are written together; the convers
   assert.ok(!JSON.stringify(client).includes("Check availability"), "a private note never reaches the client");
   assert.equal(admin.messages.length, 5); assert.ok(admin.messages.some((m) => m.visibility === "internal"));
   assert.equal(client.messages[3].statusTo, "in_review");
-  assert.equal(sql(db, "SELECT count(*) n FROM service_notifications WHERE audience = 'client'")[0].n, 2, "a Framework reply and a status change notify the client; a private note does not");
+  assert.equal(sql(db, "SELECT count(*) n FROM service_notifications WHERE audience = 'client'")[0].n, 1, "a Framework reply notifies the client; a routine status change and a private note do not");
   assert.equal(sql(db, "SELECT count(*) n FROM service_notifications WHERE audience = 'staff'")[0].n, 2, "a submit and a client reply notify the staff");
   assert.equal(await sup.getClientThread(db, b.id, r.id), null, "another organization cannot read the thread");
   assert.equal((await sup.addClientMessage(db, b.id, ann.id, r.id, "x")).error, "not_found");

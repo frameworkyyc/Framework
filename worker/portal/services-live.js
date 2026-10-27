@@ -14,9 +14,9 @@ export const CONTACT_EMAIL = "hello@frameworkco.ca";
 const href = (vm, p) => `${vm.base}${p}`;
 
 /** One hub card. `to` makes the whole card a link; without it the card is quiet text with a "Coming soon" tag. */
-function card(vm, { title, desc, status = "", to = null }) {
+function card(vm, { title, desc, status = "", to = null, attention = false }) {
   const body = to
-    ? `<span class="hub__top"><span class="hub__title">${e(title)}</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">${e(desc)}</span>${status ? `<span class="hub__status"><span class="tile__status"><span class="tile__note">${e(status)}</span></span></span>` : ""}`
+    ? `<span class="hub__top"><span class="hub__title">${e(title)}</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">${e(desc)}</span>${status ? `<span class="hub__status"><span class="tile__status">${attention ? `<span class="tile__action"><span class="dot dot--attention" aria-hidden="true"></span>${e(status)}</span>` : `<span class="tile__note">${e(status)}</span>`}</span></span>` : ""}`
     : `<span class="hub__top"><span class="hub__title">${e(title)}</span><span class="tag">Coming soon</span></span><span class="hub__desc">${e(desc)}</span>`;
   return to ? `<li><a class="hub" href="${e(href(vm, to))}">${body}</a></li>` : `<li><div class="hub hub--soon">${body}</div></li>`;
 }
@@ -24,8 +24,8 @@ function card(vm, { title, desc, status = "", to = null }) {
 /** The hub. Invoices appear only for roles that may see them (owners). `live` says which parts have data behind them. */
 export function servicesHub(vm, role, live = {}) {
   const cards = [];
-  if (can(role, "invoices.view")) cards.push(card(vm, { title: "Invoices", desc: "View and download your Framework invoices.", status: live.invoices || "", to: live.invoices ? "/services/invoices" : null }));
-  cards.push(card(vm, { title: "Support & Change Requests", desc: "Ask for a website change, a logo or design revision, or technical help.", status: live.support || "", to: live.support ? "/services/requests" : null }));
+  if (can(role, "invoices.view")) cards.push(card(vm, { title: "Invoices", desc: "View and download your Framework invoices.", status: live.invoices ? live.invoices.line : "", attention: Boolean(live.invoices && live.invoices.attention), to: live.invoices ? "/services/invoices" : null }));
+  cards.push(card(vm, { title: "Support & Change Requests", desc: "Ask for a website change, a logo or design revision, or technical help.", status: live.support ? live.support.line : "", attention: Boolean(live.support && live.support.attention), to: live.support ? "/services/requests" : null }));
   cards.push(card(vm, { title: "Contact", desc: "How to reach Framework.", status: CONTACT_EMAIL, to: "/services/contact" }));
   return `<header class="page-head page-head--compact">${crumb(vm, [["Client Services"]])}<h1 class="h1 h1--section">Client Services</h1></header>
 <nav aria-label="Client Services"><ul class="hubs">${cards.join("")}</ul></nav>`;

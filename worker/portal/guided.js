@@ -94,7 +94,7 @@ export function home(vm) {
     return `<li><a class="hub" href="${e(href(vm, a.path))}"><span class="hub__top"><span class="hub__title">${e(a.title)}</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">${e(HOME_BLURB[a.key])}</span>${st ? `<span class="hub__status">${st}</span>` : ""}</a></li>`;
   };
   const servicesCard = vm.services
-    ? `<li><a class="hub" href="${e(href(vm, "/services"))}"><span class="hub__top"><span class="hub__title">Client Services</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">Invoices, support requests and how to reach us</span>${vm.servicesStatus ? `<span class="hub__status">${vm.servicesStatus}</span>` : ""}</a></li>`
+    ? `<li><a class="hub" href="${e(href(vm, "/services"))}"><span class="hub__top"><span class="hub__title">Client Services</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">Invoices, support requests and how to reach us</span>${vm.servicesAttention && vm.servicesAttention.length ? `<span class="hub__status"><span class="tile__status"><span class="tile__action"><span class="dot dot--attention" aria-hidden="true"></span>${e(vm.servicesAttention.join(" · "))}</span></span></span>` : ""}</a></li>`
     : "";
   const active = AREAS.filter((a) => isLive(a.key)).map(card).join("") + servicesCard;
   const soon = AREAS.filter((a) => !isLive(a.key));

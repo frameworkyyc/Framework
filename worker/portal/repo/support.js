@@ -47,7 +47,10 @@ function audit(db, { organizationId, actorType, actorRef, action, entityId, at, 
     .bind(newId(), organizationId, actorType, actorRef, action, entityId, visibility, at);
 }
 function notify(db, { organizationId, audience, event, entityId, at }) {
-  return db.prepare("INSERT INTO service_notifications (id, organization_id, audience, event, entity_type, entity_id, created_at) SELECT ?, ?, ?, ?, 'support_request', ?, ? WHERE changes() > 0").bind(newId(), organizationId, audience, event, entityId, at);
+  // One pending notice per (organization, audience, event, request): a burst of replies before the first email goes out is one email, not many.
+  return db
+    .prepare("INSERT INTO service_notifications (id, organization_id, audience, event, entity_type, entity_id, created_at) SELECT ?, ?, ?, ?, 'support_request', ?, ? WHERE changes() > 0 AND NOT EXISTS (SELECT 1 FROM service_notifications n WHERE n.organization_id = ? AND n.audience = ? AND n.event = ? AND n.entity_id = ? AND n.status = 'pending')")
+    .bind(newId(), organizationId, audience, event, entityId, at, organizationId, audience, event, entityId);
 }
 
 /* ------------------------------------------------------------------ client */
@@ -231,7 +234,8 @@ export async function setRequestStatus(db, organizationId, requestId, status, ac
       db.prepare("UPDATE support_requests SET status = ?, status_changed_at = ?, last_message_at = ?, last_message_by = 'staff', admin_seen_at = ? WHERE id = ? AND organization_id = ? AND status = ?").bind(status, at, at, at, requestId, organizationId, cur.status),
       db.prepare("INSERT INTO support_messages (id, organization_id, request_id, kind, author_type, author_label, visibility, body, status_to, created_at) SELECT ?, ?, ?, 'status', 'staff', ?, 'client', ?, ?, ? WHERE changes() > 0").bind(mid, organizationId, requestId, actor.trim(), n || "", status, at),
       audit(db, { organizationId, actorType: "admin", actorRef: actor.trim(), action: "support.status." + status, entityId: requestId, at, visibility: "client" }),
-      notify(db, { organizationId, audience: "client", event: "request_status", entityId: requestId, at }),
+      // Only a QUOTE is worth an email. Routine status changes (in review, in progress, completed...) are visible in the portal and are not emailed.
+      ...(status === "quoted" ? [notify(db, { organizationId, audience: "client", event: "request_status", entityId: requestId, at })] : []),
     ]);
   } catch (err) {
     if (isConstraintViolation(err)) return fail("invalid_status");
@@ -274,4 +278,38 @@ export async function getRequest(db, organizationId, requestId) {
   requireOrgId(organizationId); requireId(requestId, "request_id");
   const r = await db.prepare(`SELECT ${REQ} FROM support_requests WHERE id = ? AND organization_id = ?`).bind(requestId, organizationId).first();
   return r ? request(r) : null;
+}
+
+/* ------------------------------------------------------------------ Framework Admin, across every client */
+
+/**
+ * Why a request needs staff attention, or null: "new" (nobody on staff has opened it) or "reply" (the client wrote after staff last looked). Closed requests never do.
+ * A pure function of the row, so the list and the counts agree.
+ */
+export function attentionReason(r) {
+  if (CLOSED.includes(r.status)) return null;
+  if (r.admin_seen_at && r.admin_seen_at >= r.last_message_at) return null;
+  return r.admin_seen_at ? "reply" : "new";
+}
+
+const REQ_R = REQ.split(", ").map((c) => "r." + c).join(", ");
+const SCOPE_WHERE = Object.freeze({ attention: "r.status NOT IN ('completed', 'declined')", open: "r.status NOT IN ('completed', 'declined')", closed: "r.status IN ('completed', 'declined')", all: "1 = 1" }); // fixed fragments: the scope is looked up, never interpolated
+
+/**
+ * Requests of EVERY organization for the global Admin list. This is deliberately cross-tenant: only Framework Admin (behind Cloudflare Access) reaches it, and it
+ * returns what the per-client page returns, plus the organization's name. scope: attention | open | closed | all.
+ */
+export async function listRequestsAllAdmin(db, { scope = "attention", limit = 200 } = {}) {
+  const where = SCOPE_WHERE[scope] || SCOPE_WHERE.open;
+  const rows = (await db
+    .prepare(`SELECT ${REQ_R}, o.name AS org_name FROM support_requests r JOIN organizations o ON o.id = r.organization_id WHERE ${where} ORDER BY r.last_message_at DESC, r.id LIMIT ?`)
+    .bind(Math.min(Math.max(1, limit), 500)).all()).results;
+  const list = rows.map((r) => ({ ...request(r), orgName: r.org_name, reason: attentionReason(r) }));
+  return scope === "attention" ? list.filter((r) => r.reason) : list;
+}
+
+/** Counts across every organization for the Admin dashboard and navigation badge. */
+export async function adminSupportTotals(db) {
+  const r = await db.prepare("SELECT count(*) AS total, COALESCE(sum(status NOT IN ('completed', 'declined')), 0) AS open, COALESCE(sum(status NOT IN ('completed', 'declined') AND (admin_seen_at IS NULL OR admin_seen_at < last_message_at)), 0) AS attention FROM support_requests").first();
+  return { total: r.total, open: r.open, attention: r.attention };
 }

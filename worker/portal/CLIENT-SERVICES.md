@@ -1,12 +1,12 @@
 # Client Services (Invoices, Support & Change Requests, Contact)
 
-Status: **Phases 1 (foundation), 2 (Invoices) and 3 (Support & Change Requests) on Staging.** Switched on only where `PORTAL_SERVICES = "1"` (Staging `previews.vars`; never the top-level vars, so never Production).
+Status: **All four phases on Staging** (foundation, Invoices, Support & Change Requests, notifications and indicators). Switched on only where `PORTAL_SERVICES = "1"` (Staging `previews.vars`; never the top-level vars, so never Production).
 
 ## Phases
 1. **Foundation** (done): migration 0007, data layers, permissions, the flag, the hub and Contact page, Home card, privacy draft.
 2. **Invoices** (done, below): Admin entry/publish/payment/archive, PDF storage, owner-only list and download.
 3. **Support & Change Requests** (done, below): client flow with attachments, Admin review/reply/status.
-4. Notifications (Resend), Home/Admin badges, polish, end-to-end tests.
+4. **Notifications and indicators** (done, below).
 
 ## What exists in Phase 1
 | Piece | Where |
@@ -49,4 +49,21 @@ Before applying to Staging: confirm the target is `framework-portal-staging`, re
 - **Admin** (`/admin/clients/:id/support`, `admin-support.js`): requests open as collapsed rows with the whole conversation (private notes marked); reply (visible, queues a client email), private note (never shown or emailed to the client, also for its attachments), attach one file per reply, change status (confirmation for Quote sent, Approved, Declined, Completed). The client page shows a Support row and an attention item for requests with new activity.
 - **History:** nothing edits or deletes a message, attachment or request. Attachment objects live under `org/<id>/support/<uuid>` and are excluded from organization-wide file removal and orphan housekeeping.
 - **Retention (approved):** completed support requests are kept 24 months after completion, subject to legal and contractual requirements; deletion after that period is a separate, reviewed step (not built).
-- Emails are still not sent (Phase 4): the outbox rows exist.
+
+## Phase 4: email notifications, indicators, global Admin Support Requests
+**Emails** (`service-notifications.js`, sent through the same Resend setup as assessment emails: `RESEND_API_KEY`, `ASSESSMENT_FROM`):
+| Event | Goes to | Content |
+| --- | --- | --- |
+| Client sends a request | Framework (`ASSESSMENT_NOTIFY_TO`, default hello@frameworkco.ca) | client, category, title, link to the Admin conversation |
+| Client replies | Framework | same; at most one per request every 10 minutes |
+| Framework replies | the person who sent the request + the organization's owners | generic "new reply", link |
+| Quote sent (`quoted`) | same | generic "Framework sent you a quote", link |
+| Invoice published | the organization's **owners** | generic "new invoice", link |
+Never emailed: private notes, routine status changes (in review, in progress, approved, completed, declined), drafts, archived invoices. Client emails never contain request text, invoice numbers or amounts.
+- **Saved work first.** The data layers queue a row in `service_notifications` in the same transaction as the change; sending happens afterwards (`ctx.waitUntil` on the platform, awaited in tests), never throws, and can only change that row. A request, reply or invoice is saved whether or not email works.
+- **No duplicates.** A row is claimed with a compare-and-swap on its attempt counter (only one sender can win), at most one pending row exists per (organization, audience, event, request), quick replies are throttled (10 minutes), a sent row is never touched again, and every provider call carries an idempotency key `svc-<notice id>-<recipient position>` so a retry after a half-sent notice is dropped by the provider.
+- **Retries.** Up to 5 attempts; a failed attempt keeps the notice pending with a short reason (never a secret). After the limit it is `failed` and shown in Admin. If email is not configured at all, notices wait without using an attempt. "Send pending emails now" (Admin > Support Requests) runs the same sender.
+- **Client recipients are gated** by the same approved-recipient list as invitations (`PORTAL_INVITE_ALLOWLIST`) while the controlled live test is in force; a notice with nobody allowed is `skipped` (`no_allowed_recipient`). Lifting that restriction later is a reviewed change.
+**Indicators.** Client Home's Client Services card (and the hub rows) show a dot with plain words: "1 new reply · 1 quote to review · 1 overdue invoice" (invoices for owners only); opening a request clears its new-reply call-out. Admin Overview has a "Needs attention" list (requests with new activity, draft and overdue invoices, unsent emails) and the navigation shows a count beside Support Requests.
+**Global Admin Support Requests** (`/admin/support`, `/admin/support/:client/:request`): requests from every client; tabs Needs attention (default) / Open / Closed / All; each row shows the client, title, why it needs attention ("New request", "Client replied"), status and "May be billable"; opening a row shows the whole conversation (private notes marked) and the same reply, note, attachment and status tools as the per-client page.
+**Not built / still manual:** Production (migration 0007, `PORTAL_SERVICES`, secrets) is a separate approval; the privacy draft is not published; deleting support records after their 24-month retention is a reviewed step that does not exist yet.
