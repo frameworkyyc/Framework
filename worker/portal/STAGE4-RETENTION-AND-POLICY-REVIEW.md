@@ -34,8 +34,8 @@ New plain-language disclosures: uploaded files (and that they may contain person
 3. **Retention periods:** 90 days after the relationship ends (what counts as "ends"? who decides?), 24 months for requests and deletion records, "at least six years" for invoices (confirm with an accountant) and the "unless a longer period is legally required" wording.
 4. **Backup copies:** the 90-day removal promise and the exception to "we delete manually", including whether to promise anything about D1 Time Travel recovery points.
 5. **Staff access wording** for files and private internal notes, and the commitment that clients cannot see them.
-6. **Quote requests:** retention was not specified in your decisions; I grouped them with support requests (24 months after completion). Please confirm or change.
-7. **Deletion records:** the policy says they contain no file contents; the tombstone rows keep metadata (type, size, uploader, times and possibly the original file name). Confirm that wording, or I will limit what a tombstone keeps.
+6. **Quote requests:** decided: 24 months after completion or closure, unless legally required longer (wording updated).
+7. **Deletion records:** decided: minimum information only. The Staging code now scrubs the original file name, the content hash and the free-text notes from a file's record when it is deleted; the policy says the record keeps only type, size, the uploading and deleting account and the times.
 8. The beta/"private beta" framing and the 5-business-day acknowledgement and 30-day completion targets, which now also cover files.
 
 ## 5. What needs your approval
