@@ -35,6 +35,7 @@ import { clientDownloadInvoice } from "./invoice-files.js";
 import { invoiceStatusLine, supportStatusLine } from "./services-live.js";
 import * as supportRepo from "./repo/support.js";
 import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./support-files.js";
+import { dispatchNotifications } from "./service-notifications.js";
 import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, limitsFor } from "./brand-files.js";
 
 /**
@@ -327,15 +328,28 @@ const BRANDING_ROUTES = [
 ];
 
 /** The Invoices card status on the hub, or "" when invoices cannot be read (a database without migration 0007): the card then stays "Coming soon". */
-async function invoiceCard(ctx, a) {
-  try { return invoiceStatusLine(await dbCall(() => clientInvoiceSummary(ctx.db, a.membership.organizationId, { now: ctx.now }))); }
-  catch (err) { if (err instanceof Unavailable || /no such table/i.test(String(err && err.message))) return ""; throw err; }
+async function invoiceSummary(ctx, a) {
+  try { return await dbCall(() => clientInvoiceSummary(ctx.db, a.membership.organizationId, { now: ctx.now })); }
+  catch (err) { if (err instanceof Unavailable || /no such table/i.test(String(err && err.message))) return null; throw err; }
 }
+const invoiceCard = async (ctx, a) => { const s = await invoiceSummary(ctx, a); return s ? { line: invoiceStatusLine(s), attention: s.overdue > 0 } : null; };
 
 /** The Support card status on the hub, or "" when requests cannot be read (a database without migration 0007): the card then stays "Coming soon". */
-async function supportCard(ctx, a) {
-  try { return supportStatusLine(await dbCall(() => supportRepo.clientSupportSummary(ctx.db, a.membership.organizationId))); }
-  catch (err) { if (err instanceof Unavailable || /no such table/i.test(String(err && err.message))) return ""; throw err; }
+async function supportSummary(ctx, a) {
+  try { return await dbCall(() => supportRepo.clientSupportSummary(ctx.db, a.membership.organizationId)); }
+  catch (err) { if (err instanceof Unavailable || /no such table/i.test(String(err && err.message))) return null; throw err; }
+}
+const supportCard = async (ctx, a) => { const s = await supportSummary(ctx, a); return s ? { line: supportStatusLine(s), attention: s.unread > 0 || s.quoted > 0 } : null; };
+
+/** What the Home card for Client Services should call out: only things the person can act on. [] when nothing, or when Services is off. */
+async function servicesAttention(ctx, a) {
+  if (!servicesOn(ctx)) return [];
+  const out = [];
+  const s = await supportSummary(ctx, a);
+  if (s && s.unread) out.push(`${s.unread} new ${s.unread === 1 ? "reply" : "replies"}`);
+  if (s && s.quoted) out.push(`${s.quoted} ${s.quoted === 1 ? "quote" : "quotes"} to review`);
+  if (can(a.membership.role, "invoices.view")) { const i = await invoiceSummary(ctx, a); if (i && i.overdue) out.push(`${i.overdue} overdue ${i.overdue === 1 ? "invoice" : "invoices"}`); }
+  return out;
 }
 
 const SUPPORT_BODY = supportRepo.MAX_ATTACHMENTS * supportRepo.MAX_ATTACHMENT_BYTES + UPLOAD_FORM_OVERHEAD;
@@ -357,6 +371,7 @@ async function postNewRequest(ctx, a) {
     return pages.requestFormPage(ctx, a, { values, error: res.error, status });
   }
   logEvent({ evt: "support.request", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  await dispatchNotifications(ctx.env, ctx); // after the request is saved; it can never undo or delay it
   return redirect(`/portal/o/${a.membership.slug}/services/requests/${res.id}?${res.attachmentsFailed ? "flash=partial" : "flash=sent"}`);
 }
 
@@ -380,6 +395,7 @@ async function postReply(ctx, a, id) {
     return showThread(ctx, a, id, { error: res.error, status: supportStatus(res.error) });
   }
   logEvent({ evt: "support.reply", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  await dispatchNotifications(ctx.env, ctx);
   return redirect(`/portal/o/${a.membership.slug}/services/requests/${id}?${res.attachmentsFailed ? "flash=partial" : "flash=replied"}`);
 }
 
@@ -397,7 +413,7 @@ const SERVICES_ROUTES = [
   { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/requests\/([^/]+)\/reply$/, action: "support.view", postAction: "support.submit", bucket: "support", maxBody: () => SUPPORT_BODY,
     run: async (ctx, a, id) => redirect(`/portal/o/${a.membership.slug}/services/requests/${id}`), post: (ctx, a, id) => postReply(ctx, a, id) },
   { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/requests\/([^/]+)$/, action: "support.view", run: (ctx, a, id) => showThread(ctx, a, id) },
-  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services$/, action: "services.view", run: async (ctx, a) => pages.servicesPage(ctx, a, { invoices: can(a.membership.role, "invoices.view") ? await invoiceCard(ctx, a) : "", support: await supportCard(ctx, a) }) },
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services$/, action: "services.view", run: async (ctx, a) => pages.servicesPage(ctx, a, { invoices: can(a.membership.role, "invoices.view") ? await invoiceCard(ctx, a) : null, support: await supportCard(ctx, a) }) },
   // owners only (policy invoices.view): a member who opens the address gets the portal's plain "not allowed" page
   { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/invoices$/, action: "invoices.view", run: async (ctx, a) => pages.invoicesPage(ctx, a, await listClientInvoices(ctx.db, a.membership.organizationId, { now: ctx.now })) },
   { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/invoices\/([^/]+)\/download$/, action: "invoices.view", run: async (ctx, a, id) => {
@@ -417,7 +433,7 @@ const ORG_ROUTES = [
       // One read serves both the greeting's name fallback and the module progress. null (unreadable) shows "Progress unavailable", never 0%.
       const answers = await readAnswers(ctx, a);
       const shown = { ...withDisplayName(a, answers), returning: await returningVisitor(ctx, a) };
-      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }), await brandCard(ctx, a));
+      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }), await brandCard(ctx, a), await servicesAttention(ctx, a));
     },
   },
   { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, { ...a, returning: await returningVisitor(ctx, a) }, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },
@@ -538,7 +554,7 @@ export async function handlePortal(request, env, deps = {}) {
   const cfg = readPortalConfig(env);
   if (url.origin !== cfg.origin) return null;
 
-  const ctx = { request, env, cfg, db: env.PORTAL_DB, url, now: deps.now || new Date(), fetch: deps.fetch || fetch, ref, demo: demoEnabled(env, cfg) };
+  const ctx = { request, env, cfg, db: env.PORTAL_DB, url, now: deps.now || new Date(), fetch: deps.fetch || fetch, waitUntil: deps.waitUntil, ref, demo: demoEnabled(env, cfg) };
   const started = Date.now();
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   let response;

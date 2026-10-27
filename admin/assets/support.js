@@ -30,16 +30,17 @@ export const errorText = (err) => ERROR_TEXT[err && err.code] || GENERIC;
 const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : n >= 1024 ? Math.round(n / 1024) + " KB" : n + " B");
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 
-export async function render(orgId, ctx) {
+/** @param opts { only?: request id (show just that conversation, open), back?: { href, label } } used by the global Support Requests page */
+export async function render(orgId, ctx, opts = {}) {
   const base = "/clients/" + encodeURIComponent(orgId) + "/support";
   let data;
   try { data = await api(base); } catch (err) { return { title: "Support requests", node: h("div", { class: "adm-page" }, errorState(err, ctx.retry)) }; }
-  const back = h("a", { class: "adm-back", href: "/admin/clients/" + encodeURIComponent(orgId), "data-link": "" }, "← " + (data.organization ? data.organization.name : "Client"));
+  const back = opts.back ? h("a", { class: "adm-back", href: opts.back.href, "data-link": "" }, opts.back.label) : h("a", { class: "adm-back", href: "/admin/clients/" + encodeURIComponent(orgId), "data-link": "" }, "← " + (data.organization ? data.organization.name : "Client"));
   if (!data.available) return { title: "Support requests", node: h("div", { class: "adm-page" }, back, h("h1", { class: "adm-title", tabindex: "-1" }, "Support & Change Requests"), h("p", { class: "adm-banner" }, "Support requests aren’t available on this deployment (its database migration hasn’t been applied).")) };
 
   const root = h("div", { class: "adm-page adm-supportpage" });
   const live = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
-  const opened = new Set();
+  const opened = new Set(opts.only ? [opts.only] : []);
   let busy = false;
   const caps = () => data.capabilities;
 
@@ -139,16 +140,18 @@ export async function render(orgId, ctx) {
     return det;
   }
 
+  const shown = () => (opts.only ? data.requests.filter((r) => r.id === opts.only) : data.requests);
+
   function draw() {
     const s = data.summary;
     root.replaceChildren(...[
       back,
-      h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, data.organization.name), h("h1", { class: "adm-title", tabindex: "-1" }, "Support & Change Requests"),
-        h("p", { class: "adm-sub" }, "Read each request, reply to the client, keep private notes and update the status. Nothing is deleted."))),
+      h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, data.organization.name), h("h1", { class: "adm-title", tabindex: "-1" }, opts.only ? "Support request" : "Support & Change Requests"),
+        h("p", { class: "adm-sub" }, opts.only ? "The whole conversation, including private notes." : "Read each request, reply to the client, keep private notes and update the status. Nothing is deleted."))),
       caps().writes ? null : h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can read requests, but not reply or change them."),
       live,
-      h("p", { class: "adm-inv__chips" }, [s.unseen ? chip("pending", plural(s.unseen, "request") + " with new activity", "info") : null, chip("plain", s.total ? `${s.open} open of ${s.total}` : "No requests yet")]),
-      data.requests.length ? h("div", { class: "adm-accgroup" }, data.requests.map(card)) : h("p", { class: "adm-muted", text: "This client hasn’t sent any requests." }),
+      opts.only ? null : h("p", { class: "adm-inv__chips" }, [s.unseen ? chip("pending", plural(s.unseen, "request") + " with new activity", "info") : null, chip("plain", s.total ? `${s.open} open of ${s.total}` : "No requests yet")]),
+      shown().length ? h("div", { class: "adm-accgroup" }, shown().map(card)) : h("p", { class: "adm-muted", text: "This client hasn’t sent any requests." }),
     ].filter(Boolean));
   }
   draw();

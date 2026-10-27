@@ -177,7 +177,7 @@ test("the conversation: client replies, Framework replies and updates status; th
   assert.match(html, /perf\.png/); assert.match(html, /Framework is reviewing your request\./);
   assert.ok(!/New reply/.test(await page(mia, "/requests")), "opening the thread clears the flag");
   assert.equal(sql(w.db, "SELECT count(*) n FROM service_notifications WHERE audience = 'staff'")[0].n, 2, "submit and client reply queued for the staff");
-  assert.equal(sql(w.db, "SELECT count(*) n FROM service_notifications WHERE audience = 'client'")[0].n, 2, "Framework reply and status change queued for the client");
+  assert.equal(sql(w.db, "SELECT count(*) n FROM service_notifications WHERE audience = 'client'")[0].n, 1, "a Framework reply is queued for the client; the routine status change (in review) is not");
   const admin = (await call(`/clients/${A.id}/support/${id}`)).json;
   assert.equal(admin.messages.length, 4, "three messages and one status entry"); assert.equal(admin.request.status, "in_review");
 });

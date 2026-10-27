@@ -19,7 +19,7 @@ Sending a request does not authorize paid work. Where a request involves extra w
 - Attachments and invoice files are stored privately and are only available to your organization and Framework staff.
 
 ## Emails
-Framework is emailed when you submit or reply to a request. You are emailed when an invoice is published or when Framework responds to a request. These emails say that something is waiting in the portal and do not include invoice amounts or request details.
+Framework is emailed when you submit or reply to a request. You are emailed when an invoice is published, when Framework replies to a request, or when Framework sends you a quote. Routine status changes and Framework's private notes are not emailed. These emails say that something is waiting in the portal and do not include invoice numbers, amounts or request details. To avoid a flood, a conversation sends at most one reply email to each side every ten minutes.
 
 ## How long we keep it
 - **Invoices are retained, not routinely deleted.** We keep invoice records for at least six years after the end of the calendar year in which they were issued, to meet bookkeeping and tax record requirements, and archive them from view rather than delete them. After that period they are reviewed before any permanent deletion. *(Confirm the period with an accountant.)*

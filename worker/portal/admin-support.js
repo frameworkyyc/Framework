@@ -11,12 +11,19 @@
  *   POST /clients/:org/support/:id/attach               multipart: file + meta { messageId }   one file on a staff message of this request
  *   POST /clients/:org/support/:id/status               { status, note? }
  *   GET  /clients/:org/support/:id/files/:file/download an attachment as a download (recorded)
+ *
+ *   GET  /support?scope=attention|open|closed|all       requests of EVERY client (Framework Admin only), each with its organization and why it needs attention
+ *   GET  /services/attention                            counts for the Admin dashboard and navigation badge: requests, invoices, unsent emails
+ *   POST /services/notifications/process                sends pending notification emails now (the same code that runs after each change)
  * Nothing deletes a message, an attachment or a request. A database without migration 0007 answers { available: false }.
  */
 import { getOrganizationById } from "./repo/orgs.js";
 import { UUID } from "./repo/common.js";
 import * as sup from "./repo/support.js";
 import * as files from "./support-files.js";
+import { dispatchNotifications, processNotifications, notificationTotals } from "./service-notifications.js";
+import { adminInvoiceTotals } from "./repo/invoices.js";
+import { emailConfig } from "../assessment.js";
 import { json, err, sameOriginWrite, readJson, readUpload } from "./admin-branding.js";
 
 const STATUS = {
@@ -34,9 +41,45 @@ async function tablesPresent(db) {
 const publicRequest = (r) => ({ id: r.id, category: r.category, scope: r.scope, title: r.title, status: r.status, createdAt: r.createdAt, statusChangedAt: r.statusChangedAt, lastMessageAt: r.lastMessageAt, lastMessageBy: r.lastMessageBy, closed: r.closed, needsLook: r.newForAdmin });
 const publicThread = (t) => ({ request: publicRequest(t.request), messages: t.messages, attachments: t.attachments });
 
+const SCOPES = ["attention", "open", "closed", "all"];
+const emailState = (env, totals) => ({ ...totals, configured: emailConfig(env).ok });
+
+/** The routes that are not about one client: the global list, the dashboard counts and "send pending emails now". */
+async function globalApi(request, env, kind, deps) {
+  const method = kind === "process" ? "POST" : "GET";
+  if (request.method !== method) return json({ error: "method_not_allowed", message: "That method is not allowed here." }, 405, { Allow: method });
+  if (method === "POST") {
+    if (env.PORTAL_ADMIN_WRITES !== "1") return err(403, "writes_disabled", "Changes are not enabled on this deployment.");
+    if (!sameOriginWrite(request)) return err(403, "forbidden", "This request was not accepted.");
+  }
+  if (!env.PORTAL_DB) return err(503, "portal_unavailable", "The portal database is not available.");
+  const db = env.PORTAL_DB;
+  try {
+    if (!(await tablesPresent(db))) return json({ available: false });
+    const now = deps.now || new Date();
+    if (kind === "list") {
+      const scope = new URL(request.url).searchParams.get("scope");
+      const use = SCOPES.includes(scope) ? scope : "attention";
+      const requests = await sup.listRequestsAllAdmin(db, { scope: use });
+      return json({ available: true, scope: use, capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1" }, requests: requests.map((r) => ({ ...publicRequest(r), organization: { id: r.organizationId, name: r.orgName }, reason: r.reason })), totals: await sup.adminSupportTotals(db), emails: emailState(env, await notificationTotals(db)) });
+    }
+    if (kind === "attention") {
+      return json({ available: true, support: await sup.adminSupportTotals(db), invoices: await adminInvoiceTotals(db, { now }), emails: emailState(env, await notificationTotals(db)) });
+    }
+    const result = await processNotifications(env, { db, now, fetch: deps.fetch });
+    return json({ ok: true, result, emails: emailState(env, await notificationTotals(db)) });
+  } catch (e) {
+    console.error("admin services api error:", e && e.name);
+    return err(500, "server_error", "Something went wrong. Nothing was changed.");
+  }
+}
+
 /** @param path pathname with "/api/admin" removed. @returns Response, or null when it is not a Support route. */
 export async function handleSupportApi(request, env, principal, path, deps = {}) {
   const seg = path.split("/").filter(Boolean);
+  if (seg[0] === "support" && seg.length === 1) return globalApi(request, env, "list", deps);
+  if (seg[0] === "services" && seg.length === 2 && seg[1] === "attention") return globalApi(request, env, "attention", deps);
+  if (seg[0] === "services" && seg.length === 3 && seg[1] === "notifications" && seg[2] === "process") return globalApi(request, env, "process", deps);
   if (!(seg[0] === "clients" && seg[2] === "support" && seg.length >= 3)) return null;
   const rest = seg.slice(3);
   let route = null;
@@ -82,6 +125,7 @@ export async function handleSupportApi(request, env, principal, path, deps = {})
       if (read.body.internal !== undefined && typeof read.body.internal !== "boolean") return err(422, "invalid_message", "The change was not made.");
       if (!(await sup.getRequest(db, org.id, route.target))) return err(404, "not_found", "No such request.");
       const r = await sup.addStaffMessage(db, org.id, route.target, read.body.body, actor, { internal: read.body.internal === true, now });
+      if (r.ok && read.body.internal !== true) await dispatchNotifications(env, { ...deps, now });
       return r.ok ? json({ ok: true, messageId: r.messageId }, 201) : fromFailure(r);
     }
     if (route.kind === "attach") {
@@ -95,6 +139,7 @@ export async function handleSupportApi(request, env, principal, path, deps = {})
       const read = await readJson(request, ["status", "note"]);
       if (read.response) return read.response;
       const r = await sup.setRequestStatus(db, org.id, route.target, read.body.status, actor, { note: read.body.note ?? null, now });
+      if (r.ok && r.changed && read.body.status === "quoted") await dispatchNotifications(env, { ...deps, now });
       return r.ok ? json({ ok: true, changed: r.changed }) : fromFailure(r);
     }
     if (route.kind === "download") {

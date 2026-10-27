@@ -27,10 +27,28 @@ export async function render() {
     alert.hidden = false;
   }).catch(() => {});
 
+  // What needs a person: requests nobody has looked at, invoices to publish or past due, and notification emails that did not go out.
+  const attn = h("section", { class: "adm-section", "aria-labelledby": "adm-attn", hidden: true });
+  api("/services/attention").then((a) => {
+    if (!a.available) return;
+    const items = [];
+    const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+    if (a.support.attention) items.push([plural(a.support.attention, "support request") + " with new activity", "/admin/support", "Open Support Requests"]);
+    if (a.invoices.overdue) items.push([plural(a.invoices.overdue, "published invoice") + " past due", "/admin/clients", "Open Clients"]);
+    if (a.invoices.drafts) items.push([plural(a.invoices.drafts, "draft invoice") + " not published yet", "/admin/clients", "Open Clients"]);
+    if (a.emails.failed) items.push([plural(a.emails.failed, "notification email") + " failed to send", "/admin/support", "Open Support Requests"]);
+    else if (a.emails.pending) items.push([plural(a.emails.pending, "notification email") + " waiting to be sent", "/admin/support", "Open Support Requests"]);
+    if (!items.length) return;
+    attn.replaceChildren(h("div", { class: "adm-section-title" }, h("h2", { id: "adm-attn" }, "Needs attention")),
+      h("ul", { class: "adm-attnlist" }, items.map(([text, href, label]) => h("li", null, h("span", { text }), h("a", { class: "adm-link", href, "data-link": "" }, label + " →")))));
+    attn.hidden = false;
+  }).catch(() => {});
+
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Overview"))),
 
     alert,
+    attn,
     h("section", { class: "adm-section", "aria-label": "Feedback summary" }, h("div", { class: "adm-metrics" },
       metric("Total feedback", String(s.total), null, s.unreviewed ? `${s.unreviewed} unreviewed` : null),
       metric("Avg. satisfaction", none ? "—" : avg(s.avg_satisfaction), none ? null : "/ 10"),
