@@ -60,8 +60,8 @@ export async function render(ctx) {
         h("span", { class: "adm-approved__email", text: e.email }),
         h("span", { class: "adm-approved__meta", text: [e.note, `Added ${fmtDate(e.addedAt)} by ${e.addedBy}`].filter(Boolean).join(" · ") })),
       writes ? h("button", { class: "adm-linkbtn adm-approved__remove", type: "button", "aria-label": `Remove ${e.email}`, onclick: async () => {
-        if (!(await confirmDialog({ title: "Remove this address?", body: "No new invitations or emails can go to it. Anyone who already has portal access keeps it.", details: [["Address", e.email]], confirmLabel: "Remove" }))) return;
-        act(() => api("/approved-emails/remove", { method: "POST", body: { email: e.email } }), (r) => (r.changed ? `${r.email} was removed.` : `${r.email} was already removed.`));
+        if (!(await confirmDialog({ title: "Remove this address?", body: "No new invitations or emails can go to it (unless the Cloudflare setting also lists it). Anyone who already has portal access keeps it.", details: [["Address", e.email]], confirmLabel: "Remove" }))) return;
+        act(() => api("/approved-emails/remove", { method: "POST", body: { email: e.email } }), (r) => (r.stillApprovedBySetting ? `${r.email} was removed from this list, but the Cloudflare setting still approves it. Remove it from PORTAL_INVITE_ALLOWLIST too.` : r.changed ? `${r.email} was removed.` : `${r.email} was already removed.`));
       } }, "Remove") : null));
 
     const pending = data.setting.addresses.filter((a) => !a.inList);
