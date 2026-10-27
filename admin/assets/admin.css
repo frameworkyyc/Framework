@@ -616,9 +616,6 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-brandpage .adm-actions { margin-top: 4px; }
 .adm-brandpage .adm-row-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start; }
 .adm-brandpage .adm-row-actions .adm-small, .adm-brandpage .adm-actions .adm-small { min-height: 44px; padding: 0 18px; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
-.adm-brandrow { margin-top: 8px; }
-.adm-brandrow .adm-section-title { margin-bottom: 8px; }
-.adm-brandrow__chips { margin: 0; }
 @media (max-width: 520px) { .adm-brandpage .adm-row-actions .adm-small { flex: 1 1 calc(50% - 10px); } .adm-tile__big--sm { font-size: 22px; } }
 .adm-brandpage .adm-acc--sub { margin: 0 0 26px; }
 .adm-brandpage .adm-acc--sub > .adm-acc__sum { min-height: 48px; }
@@ -687,3 +684,9 @@ a.adm-tile--link:hover .adm-tile__go { color: var(--ink); transform: translateX(
 .adm-attnlist li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; align-items: center; min-height: 52px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
 .adm-nav__badge { margin-left: auto; min-width: 22px; padding: 1px 7px; text-align: center; font-size: 12px; font-weight: 700; background: var(--ink); color: var(--paper); }
 .adm-nav__link:has(.adm-nav__badge) { display: flex; align-items: center; gap: 8px; }
+
+/* Client page: every area (Business Profile, Team, Branding, Invoices, Support & Change Requests) is the same card; the linked ones are whole-card links. */
+@media (min-width: 1100px) { .adm-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+a.adm-tile--link { display: flex; flex-direction: column; gap: 0; }
+.adm-tile__chips { margin-top: auto; padding-top: 10px; }
+.adm-tile__label { min-height: 22px; align-items: center; }

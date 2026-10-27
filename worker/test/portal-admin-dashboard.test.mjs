@@ -66,7 +66,9 @@ test("client detail structure: header, next step, a single clickable Business Pr
   const detail = src.slice(start, end > start ? end : undefined);
   assert.match(detail, /dash\.header,\s*dash\.overview,/, "header then overview first");
   assert.ok(!/sectionMap\(|stepAccordion|Saved answers|adm-mapsec|id: "adm-profile"/.test(detail), "no section map or saved answers on the dashboard");
-  assert.ok(detail.indexOf("brandingRow(") < detail.indexOf("access,") && detail.indexOf("access,") < detail.lastIndexOf("info,"), "order: Branding, team, organization details last");
+  assert.ok(!/brandingRow|invoicesRow|supportRow/.test(detail), "Branding, Invoices and Support are cards in the dashboard overview, not separate rows");
+  assert.match(dash, /brandingTile, invoicesTile, supportTile/, "all five areas share one tile grid");
+  assert.ok(detail.indexOf("dash.overview") < detail.indexOf("access,") && detail.indexOf("access,") < detail.lastIndexOf("info,"), "order: overview cards, team access, organization details last");
   assert.match(detail, /id: "org-details"[\s\S]*?"Portal address"[\s\S]*?"Website"[\s\S]*?"Created"/, "the low-priority details stay available inside a collapsed section");
   assert.ok(!/open: true/.test(detail), "nothing in the detail page is open by default");
   assert.match(dash, /profile \? "a" : "div"[\s\S]*?href: profileHref, "data-link": ""/, "the whole Business Profile card is one link to its page");

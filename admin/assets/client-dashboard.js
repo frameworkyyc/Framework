@@ -161,10 +161,30 @@ export function dashboard({ org, profile, members, invitations, branding = null,
         ]
       : h("p", { class: "adm-tile__note" }, "Not available on this deployment."));
 
+  /** A whole-card link in the same style as Business Profile: label and arrow, one big figure, a note and status chips. */
+  const linkTile = ({ href, label, big, unit, note, chips }) => h("a", { class: "adm-tile adm-tile--link", href, "data-link": "" },
+    h("p", { class: "adm-tile__label" }, label, h("span", { class: "adm-tile__go", "aria-hidden": "true" }, "→")),
+    h("p", { class: "adm-tile__big" }, big, unit ? h("span", { class: "adm-tile__unit", text: unit }) : null),
+    note ? h("p", { class: "adm-tile__note", text: note }) : null,
+    h("p", { class: "adm-tile__chips" }, chips.filter(Boolean)),
+    h("span", { class: "visually-hidden" }, `Open ${label}`));
+  const brandingTile = branding && linkTile({
+    href: brandingHref, label: "Branding", big: branding.kitStatus === "published" ? "Published" : branding.kitStatus === "draft" ? "Draft" : "No kit yet", unit: branding.kitStatus ? "brand kit" : "",
+    note: branding.assets ? `${branding.assetsPublished} of ${branding.assets} files published` : "No files yet",
+    chips: [branding.uploadsNew ? chip("pending", plural(branding.uploadsNew, "new upload"), "info") : null, branding.requestsOpen ? chip(branding.requestsNew ? "pending" : "warn", plural(branding.requestsOpen, "open request"), "info") : null, branding.kitStatus === "published" ? chip("ok", "Visible to the client", "complete") : null] });
+  const invoicesTile = invoices && linkTile({
+    href: invoicesHref, label: "Invoices", big: String(invoices.total), unit: invoices.total === 1 ? "invoice" : "invoices",
+    note: invoices.total ? "Archived invoices are kept, not shown here." : "None entered yet.",
+    chips: [invoices.drafts ? chip("pending", plural(invoices.drafts, "draft") + " to publish", "info") : null, invoices.overdue ? chip("warn", `${invoices.overdue} past due`, "warn") : null, !invoices.drafts && !invoices.overdue ? chip("plain", invoices.total ? "Nothing to do" : "No invoices yet") : null] });
+  const supportTile = support && linkTile({
+    href: supportHref, label: "Support & Change Requests", big: String(support.open), unit: "open",
+    note: support.total ? `of ${plural(support.total, "request")} in all` : "No requests yet.",
+    chips: [support.unseen ? chip("pending", plural(support.unseen, "request") + " with new activity", "info") : support.total ? chip("plain", "All seen") : null] });
+
   paint(teamFacts(members, invitations));
   return {
     header,
-    overview: h("div", { class: "adm-dash" }, next, h("div", { class: "adm-tiles" }, prof, team)),
+    overview: h("div", { class: "adm-dash" }, next, h("div", { class: "adm-tiles" }, prof, team, brandingTile, invoicesTile, supportTile)),
     update: (m, i) => paint(teamFacts(m, i)),
   };
 }
