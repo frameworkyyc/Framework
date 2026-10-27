@@ -131,5 +131,7 @@ test("the Worker exports a scheduled handler that runs the same code and returns
   await Promise.all(waited);
   const cfg = readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, "");
   assert.ok(!/"triggers"|"crons"/.test(cfg), "no schedule is configured in this stage");
-  assert.ok(!/PORTAL_FILES_BACKUP/.test(cfg), "and no backup bucket is bound in this stage");
+  const parsed = JSON.parse(cfg);
+  assert.equal(parsed.r2_buckets, undefined, "and no bucket is bound on Production in this stage (the Staging backup bucket is bound under previews only)");
+  assert.ok(parsed.previews.r2_buckets.some((b) => b.binding === "PORTAL_FILES_BACKUP"));
 });

@@ -29,7 +29,7 @@ Expected objects after 0005-0008: tables `brand_kits, brand_assets, brand_upload
 ## Stage 1: backup, then schema
 (a) Record a Time Travel bookmark for `framework-portal` and, optionally, download a SQL export from the dashboard; confirm the Time Travel retention window in the dashboard. (b) Run "Portal Production D1 migration" in verify-only mode (required reviewers approve). (c) Run it in apply mode: 0005-0008. (d) Verify: no pending migrations, exactly the expected tables and indexes, row counts of existing tables unchanged. Running Production code ignores the new tables, so nothing visible changes. *Rollback:* leave the empty tables, or Time Travel restore to the bookmark (discards anything written after it).
 
-## Stage 2: storage and its backup
+## Stage 2: storage and its backup (DONE: both Production buckets created, confirmed private, backup bucket locked by the owner; nothing bound yet)
 Create two private R2 buckets: `framework-portal-files` (the files) and `framework-portal-files-backup` (copies). No public access and no custom domain on either. Add one bucket lock rule to the BACKUP bucket only (retain all objects indefinitely) so nobody and nothing can delete or overwrite a backup copy by accident; the application never deletes there. (A lock on the primary invoices folder is not possible: lock rules match a literal prefix and keys are `org/<id>/<area>/...`.) Verify both exist, are private and the lock rule is listed. Nothing is bound yet.
 
 ## Stage 3: new code, client features OFF
@@ -46,8 +46,12 @@ One small PR adding `"triggers": { "crons": ["*/5 * * * *"] }`. Each run does th
 ## Stage 6: watch
 24-48 hours of Logs, the Admin notification counts and the backup bucket's object count against the primary. Decide separately: Time Travel/export routine for the database, deleting the Cloudflare secret once its addresses are in Approved Emails.
 
-## Restoring files from the backup
-Copy objects back from `framework-portal-files-backup` to `framework-portal-files` with the same key (dashboard, `rclone` or `wrangler r2 object get/put`); keys are unchanged, so the database rows keep working. Practice this once on one object during Stage 5.
+## Backup and restore, and how they are proven
+- **Names**: every object keeps exactly its name (`org/<organization id>/<area>/<random id>`), so database rows keep working after a restore. Names are random ids (unique), never client text.
+- **Backup** (copy-only, never deletes or overwrites a backup object): the schedule (Stage 5) and the Admin button "Back up now".
+- **Restore** (Admin -> a client's Branding -> Storage -> Backup -> "Restore missing files", or the same API): copies back ONLY files that are missing from the main bucket; a file that exists is never overwritten. Counts only are shown.
+- **Proof** (Admin -> Branding -> Storage -> Backup -> "Run backup check"): writes one tiny test object, copies it to the backup, reads it back FROM the backup and compares, deletes the main copy (simulated loss), restores it from the backup, compares again, cleans up. Run on Staging (real buckets) before Stage 3 and on Production at Stage 3. Each run leaves one ~60-byte test object in the backup bucket (the lock keeps it); the checks' own corner is ignored by normal backup/restore/status.
+- **If everything is lost** (not just a file): create the main bucket again with the same name and use "Restore missing files" repeatedly (up to 50 files per click) until it reports 0 remaining.
 
 ## Needs you
 Go-ahead for each stage; the GitHub environment approval for the migration run; the Access confirmation and the Assessments email check above; your client's address copied in via Approved Emails (Stage 3); the WorkOS branding change; the privacy policy review before Stage 4.

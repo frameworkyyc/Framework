@@ -127,6 +127,12 @@
       {
         "binding": "PORTAL_FILES",
         "bucket_name": "framework-portal-files-staging"
+      },
+      // A second private bucket for copies of the files (worker/portal/file-backup.js). Staging has no cron, so here it is exercised from Admin -> Branding -> Storage
+      // ("Run backup check", "Back up now", "Restore missing files"). Production gets its own pair in the Production rollout (Stage 3).
+      {
+        "binding": "PORTAL_FILES_BACKUP",
+        "bucket_name": "framework-portal-files-staging-backup"
       }
     ],
     // Application-level abuse limiter for the portal's unauthenticated endpoints (worker/portal/ratelimit.js): sign-in start, callback and

@@ -39,6 +39,7 @@
     "DB": { "type": "d1" },
     "PORTAL_DB": { "type": "d1" },
     "PORTAL_FILES": { "type": "r2_bucket", "bucket_name": "framework-portal-files-staging" },
+    "PORTAL_FILES_BACKUP": { "type": "r2_bucket", "bucket_name": "framework-portal-files-staging-backup" },
     "PORTAL_RATE_LIMITER": { "type": "ratelimit", "namespace_id": "4101" }
   },
   "switches": { "PORTAL_ADMIN_WRITES": "1", "PORTAL_INVITE_SENDING": "1" },
