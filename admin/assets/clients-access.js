@@ -52,8 +52,8 @@ const ERROR_TEXT = {
   not_found: "That item no longer exists. The page has been refreshed.",
   writes_disabled: "Changes are switched off on this site, so nothing was changed.",
   sending_disabled: "Sending is switched off on this site. The invitation was saved but nothing was sent.",
-  recipient_not_allowed: "That address isn’t on the approved list for the controlled test, so nothing was created or sent.",
-  recipient_allowlist_missing: "Invitations are locked on this site: no approved recipients are configured. Nothing was created or sent.",
+  recipient_not_allowed: "That address isn’t on the approved list, so nothing was created or sent. Tick “Also approve this address” and try again, or add it in Approved Emails.",
+  recipient_allowlist_missing: "No email addresses are approved yet, so nothing was created or sent. Tick “Also approve this address” and try again, or add it in Approved Emails.",
   provider_not_configured: "The email and WorkOS settings are incomplete on this site. Nothing was sent.",
   delivery_tracking_unavailable: "Delivery tracking isn’t available on this database. Nothing was sent.",
   delivery_unrecorded: "The provider was asked, but the result couldn’t be saved. Check the invitation’s status before trying again.",
@@ -242,11 +242,13 @@ export function accessSections({ orgId, orgName, welcome = false, onData = null 
   function inviteForm(caps) {
     const email = h("input", { id: "iv-email", class: "input", type: "email", maxlength: "254", autocomplete: "off", spellcheck: "false", autocapitalize: "none", required: true });
     const radio = (value, checked) => h("label", { class: "adm-choice" }, h("input", { type: "radio", name: "iv-role", value, checked: checked ? true : null }), h("span", null, h("strong", { text: ROLE_LABEL[value] }), h("span", { class: "adm-muted", text: " — " + ROLE_HELP[value] })));
-    const canCreate = caps.writes && caps.recipients !== "missing";
+    const canCreate = caps.writes; // an address that is not approved yet can be approved in the same step (the checkbox), so an empty list no longer blocks creating
     const canSend = canCreate && caps.sending;
     // With sending on, the main action creates AND sends in one confirmed step; "Create only" saves the invitation for later. With sending off there is only the save.
     const sendButton = canSend ? h("button", { class: "btn btn--primary", type: "submit", "data-mode": "send" }, "Create and send") : null;
     const saveButton = h("button", { class: canSend ? "btn btn--secondary" : "btn btn--primary", type: "submit", "data-mode": "save", disabled: canCreate ? null : true }, canSend ? "Create only" : "Review invitation");
+    const approve = h("input", { id: "iv-approve", type: "checkbox", checked: true, "aria-describedby": "iv-approve-h" });
+    const approveRow = h("div", { class: "adm-field" }, h("label", { class: "adm-check", for: "iv-approve" }, approve, h("span", { text: "Also approve this address" })), h("p", { class: "adm-field__hint", id: "iv-approve-h", text: "Only approved addresses can be invited or emailed. If it is already approved, nothing changes." }));
     const emailError = h("p", { class: "adm-field__error", id: "iv-email-e", role: "alert", hidden: true });
     email.setAttribute("aria-describedby", "iv-email-e");
     return h("form", { class: "adm-form adm-form--inline", novalidate: true, "aria-label": "Invite someone", onsubmit: (ev) => {
@@ -256,7 +258,9 @@ export function accessSections({ orgId, orgName, welcome = false, onData = null 
       const role = root.querySelector('input[name="iv-role"]:checked').value;
       if (!value) { emailError.textContent = ERROR_TEXT.invalid_email; emailError.hidden = false; email.setAttribute("aria-invalid", "true"); email.focus(); return; }
       const mode = canSend && !(ev.submitter && ev.submitter.dataset.mode === "save") ? "send" : "save";
-      const details = [["Person", value], ["Role", ROLE_LABEL[role]], ["Organization", orgName], ["Valid for", "7 days"]];
+      const approveIt = approve.checked;
+      const details = [["Person", value], ["Role", ROLE_LABEL[role]], ["Organization", orgName], ["Valid for", "7 days"], ["Approved emails", approveIt ? "Added if not already approved" : "Not changed"]];
+      const payload = approveIt ? { email: value, role, approve: true } : { email: value, role };
       const onFailure = (err) => {
         if (err.code === "invalid_email") { emailError.textContent = errorText(err); emailError.hidden = false; email.setAttribute("aria-invalid", "true"); }
         return { tone: "error", text: errorText(err) };
@@ -264,8 +268,8 @@ export function accessSections({ orgId, orgName, welcome = false, onData = null 
       if (mode === "save") {
         perform({
           confirm: { title: "Create this invitation?", body: "This saves the invitation. It does not email anyone: you choose when to send it from the list below.", details, confirmLabel: "Create invitation" },
-          request: () => api(base + "/invitations", { method: "POST", body: { email: value, role } }),
-          onSuccess: () => { email.value = ""; return { tone: "success", text: `Invitation created for ${value}. It has not been sent. Use Send in the list below when you’re ready.` }; },
+          request: () => api(base + "/invitations", { method: "POST", body: payload }),
+          onSuccess: (res) => { email.value = ""; return { tone: "success", text: `Invitation created for ${value}.${res && res.approved ? " The address was added to Approved Emails." : ""} It has not been sent. Use Send in the list below when you’re ready.` }; },
           onFailure,
         });
         return;
@@ -278,11 +282,11 @@ export function accessSections({ orgId, orgName, welcome = false, onData = null 
           confirmLabel: "Create and send",
         },
         request: async () => {
-          const created = await api(base + "/invitations", { method: "POST", body: { email: value, role } }); // a failure here (duplicate, address not approved...) means nothing was saved
+          const created = await api(base + "/invitations", { method: "POST", body: payload }); // a failure here (duplicate, address not approved...) means nothing was saved
           try {
-            return { sent: await api(`${base}/invitations/${encodeURIComponent(created.invitation.id)}/send`, { method: "POST", body: {} }) };
+            return { approved: Boolean(created.approved), sent: await api(`${base}/invitations/${encodeURIComponent(created.invitation.id)}/send`, { method: "POST", body: {} }) };
           } catch (sendError) {
-            return { sendError }; // the invitation IS saved; it can be sent again from the list
+            return { approved: Boolean(created.approved), sendError }; // the invitation IS saved; it can be sent again from the list
           }
         },
         onSuccess: (res) => {
@@ -297,6 +301,7 @@ export function accessSections({ orgId, orgName, welcome = false, onData = null 
     } },
       h("div", { class: "adm-field" }, h("label", { for: "iv-email", text: "Email address" }), email, emailError),
       h("fieldset", { class: "adm-field adm-fieldset" }, h("legend", { text: "Role" }), radio("member", true), radio("owner", false)),
+      approveRow,
       h("div", { class: "adm-actions" }, sendButton, saveButton),
     );
   }
@@ -399,7 +404,7 @@ export function accessSections({ orgId, orgName, welcome = false, onData = null 
       children: [
         h("p", { class: "adm-sub" }, "Creating an invitation and sending it are separate steps. Access is only granted when the person signs in with the invited email address."),
         !caps.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site. You can look, but not create, send, revoke or remove.") : !caps.sending ? h("p", { class: "adm-banner" }, "Sending is switched off on this site. You can create and revoke invitations, but nothing will be emailed.") : null,
-        caps.recipients === "missing" ? h("p", { class: "adm-banner adm-banner--alert" }, "Invitations are locked: no approved recipients are configured on this site, so none can be created or sent.") : caps.recipients === "configured" ? h("p", { class: "adm-banner" }, "Controlled test: invitations can only be created for, and sent to, approved recipients. The server refuses any other address.") : null,
+        caps.recipients === "missing" ? h("p", { class: "adm-banner adm-banner--alert" }, "No email addresses are approved yet. Approve the address when you invite (below), or add it in Approved Emails.") : h("p", { class: "adm-banner" }, "Invitations can only be created for, and sent to, approved addresses. Manage them under Approved Emails."),
         caps.writes ? inviteForm(caps) : null, // with changes switched off there is nothing to submit, so the form is not shown (the banner above says why)
         table,
       ],

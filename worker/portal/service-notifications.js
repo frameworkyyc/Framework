@@ -13,11 +13,12 @@
  *
  * Who is emailed: Framework (ASSESSMENT_NOTIFY_TO, default hello@frameworkco.ca) when a client sends a request or replies; the client when Framework replies, sends
  * a quote, or publishes an invoice (invoices: owners only; requests: the person who sent it and the owners). Never for private notes or routine status changes.
- * Client emails only go to addresses on the same approved-recipient list as invitations (PORTAL_INVITE_ALLOWLIST) while that controlled test is in force.
+ * Client emails only go to addresses on the same approved-recipient list as invitations (Admin -> Approved Emails, plus the PORTAL_INVITE_ALLOWLIST secret) while that controlled test is in force.
  * Client emails never contain request text, amounts or invoice numbers: they say that something is waiting and link to the portal.
  */
 import { sendEmail, emailConfig, notifyRecipient } from "../assessment.js";
 import { checkRecipient } from "./invite-recipients.js";
+import { loadApproved } from "./repo/approved-emails.js";
 import { isoTime } from "./repo/common.js";
 import { CATEGORY_LABEL } from "./repo/support.js";
 
@@ -75,7 +76,8 @@ async function context(db, n) {
 async function clientRecipients(env, db, n, ctx) {
   const submitter = ctx.request ? ctx.request.submitted_by : "";
   const rows = (await db.prepare("SELECT DISTINCT u.email FROM memberships m JOIN portal_users u ON u.id = m.user_id WHERE m.organization_id = ? AND m.status = 'active' AND u.status = 'active' AND (m.role = 'owner' OR u.id = ?) ORDER BY u.email").bind(n.organization_id, submitter).all()).results;
-  return rows.map((r) => r.email).filter((e) => checkRecipient(env, e).ok);
+  const stored = await loadApproved(db);
+  return rows.map((r) => r.email).filter((e) => checkRecipient(env, e, stored).ok);
 }
 
 /* ------------------------------------------------------------------ sending */
