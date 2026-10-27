@@ -253,10 +253,10 @@ test("services pages never leak another organization or a draft: the hub and con
   assert.equal((await ann.get("/portal/o/beta/services/contact")).status, 404);
 });
 
-test("the privacy additions are a draft for review: written to a separate file, and privacy.html is untouched", () => {
+test("the privacy additions are a draft for review: written to a separate file, and privacy.html carries them only with the effective date still pending (never published by accident)", () => {
   const draft = readFileSync(new URL("../portal/PRIVACY-SERVICES-DRAFT.md", import.meta.url), "utf8");
   assert.match(draft, /DRAFT/); assert.match(draft, /not published/i); assert.match(draft, /invoice/i); assert.match(draft, /support/i);
   const policy = readFileSync(new URL("../../privacy.html", import.meta.url), "utf8");
-  assert.ok(!policy.includes("Client Services") && !/support and change request/i.test(policy), "privacy.html does not describe Client Services yet");
+  if (/support and change request/i.test(policy)) assert.match(policy, /<time id="effective-date" data-status="pending">/, "a policy that describes Client Services must still show the pending effective date until the owner approves publication");
   assert.ok(rows(openPortalDb(), "SELECT name FROM sqlite_master WHERE name = 'invoices'").length === 1);
 });
