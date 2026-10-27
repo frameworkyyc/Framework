@@ -641,3 +641,25 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .inv__act .btn { min-height: 44px; }
 @media (max-width: 560px) { .inv__act .btn { width: 100%; } }
 @media (min-width: 760px) { .inv { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; } .inv__side { flex-direction: column; align-items: flex-end; gap: 6px; } }
+
+/* Support & Change Requests (client): the list, the form, and the conversation. */
+.req-notice { margin: var(--space-3) 0; padding: 14px 16px; border: 1px solid var(--field-edge); border-left: 3px solid var(--ink); max-width: 46em; font-size: 15px; }
+.req-list { list-style: none; margin: var(--space-3) 0; padding: 0; border-top: 1px solid var(--ink); }
+.req-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main arrow" "status status"; gap: 8px 12px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--hairline); color: inherit; text-decoration: none; }
+.req-row:hover .req-row__title { text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+.req-row__main { grid-area: main; display: grid; gap: 2px; min-width: 0; } .req-row .req-status { grid-area: status; justify-self: start; } .req-row .tile__arrow { grid-area: arrow; }
+@media (min-width: 640px) { .req-row { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "main status arrow"; } }
+.req-row__title { font-family: var(--font-display); font-weight: 600; font-size: 19px; overflow-wrap: anywhere; }
+.req-new { display: inline-block; margin-left: 6px; padding: 1px 7px; border: 1px solid var(--signal); color: var(--signal); font-family: var(--font-body); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; vertical-align: 2px; }
+.req-status { display: inline-block; padding: 2px 8px; border: 1px solid var(--field-edge); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); }
+.req-status--quoted, .req-status--approved, .req-status--in_progress { border-color: var(--ink); color: var(--ink); }
+.req-status--completed { background: var(--mist); } .req-status--declined { border-style: dashed; }
+.req-meta { margin: 8px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.req-form { max-width: 40em; margin: var(--space-3) 0; } .req-form .choice__opt { align-items: flex-start; } .req-form textarea { min-height: 9em; }
+.req-form input[type="file"] { display: block; width: 100%; min-height: 48px; padding: 10px; border: 1px solid var(--field-edge); background: var(--paper); font: inherit; }
+.thread { list-style: none; margin: var(--space-3) 0; padding: 0; display: grid; gap: 12px; max-width: 46em; }
+.msg { padding: 14px 16px; border: 1px solid var(--hairline); } .msg p { margin: 0; overflow-wrap: anywhere; } .msg__who { margin-bottom: 6px !important; }
+.msg--staff { background: var(--mist); border-color: var(--hairline); } .msg--client { background: var(--paper); }
+.msg--status { padding: 8px 0 8px 14px; border: 0; border-left: 2px solid var(--ink); }
+.msg__body { white-space: pre-wrap; } .msg__files { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+@media (max-width: 560px) { .req-form .btn--primary { width: 100%; } }

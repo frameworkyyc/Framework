@@ -234,8 +234,8 @@ test("with the flag on: Home links Client Services; the hub shows Invoices only 
   const o = await owner.text();
   assert.match(o, /<h1 class="h1 h1--section">Client Services<\/h1>/);
   assert.deepEqual([...o.matchAll(/class="hub__title">([^<]+)</g)].map((m) => m[1].replace(/&amp;/g, "&")), ["Invoices", "Support & Change Requests", "Contact"]);
-  assert.equal([...o.matchAll(/<a class="hub"/g)].length, 2, "Invoices (live since Phase 2) and Contact are links; Support is still coming");
-  assert.match(o, /href="\/portal\/o\/alpha\/services\/contact"/); assert.equal([...o.matchAll(/Coming soon/g)].length, 1); assert.match(o, /href="\/portal\/o\/alpha\/services\/invoices"/);
+  assert.equal([...o.matchAll(/<a class="hub"/g)].length, 3, "Invoices, Support and Contact are all links now");
+  assert.match(o, /href="\/portal\/o\/alpha\/services\/contact"/); assert.equal([...o.matchAll(/Coming soon/g)].length, 0); assert.match(o, /href="\/portal\/o\/alpha\/services\/invoices"/);
   const m = await (await mia.get("/portal/o/alpha/services")).text();
   assert.deepEqual([...m.matchAll(/class="hub__title">([^<]+)</g)].map((x) => x[1].replace(/&amp;/g, "&")), ["Support & Change Requests", "Contact"], "members do not see Invoices");
   const c = await mia.get("/portal/o/alpha/services/contact");

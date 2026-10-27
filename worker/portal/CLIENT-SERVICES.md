@@ -1,11 +1,11 @@
 # Client Services (Invoices, Support & Change Requests, Contact)
 
-Status: **Phases 1 (foundation) and 2 (Invoices) on Staging.** Switched on only where `PORTAL_SERVICES = "1"` (Staging `previews.vars`; never the top-level vars, so never Production).
+Status: **Phases 1 (foundation), 2 (Invoices) and 3 (Support & Change Requests) on Staging.** Switched on only where `PORTAL_SERVICES = "1"` (Staging `previews.vars`; never the top-level vars, so never Production).
 
 ## Phases
 1. **Foundation** (done): migration 0007, data layers, permissions, the flag, the hub and Contact page, Home card, privacy draft.
 2. **Invoices** (done, below): Admin entry/publish/payment/archive, PDF storage, owner-only list and download.
-3. Support & Change Requests: client flow with attachments, Admin review/reply/status.
+3. **Support & Change Requests** (done, below): client flow with attachments, Admin review/reply/status.
 4. Notifications (Resend), Home/Admin badges, polish, end-to-end tests.
 
 ## What exists in Phase 1
@@ -18,7 +18,6 @@ Status: **Phases 1 (foundation) and 2 (Invoices) on Staging.** Switched on only 
 | Pages | `/portal/o/:slug/services` (hub), `/services/contact`; `services-live.js` |
 | Flag | `servicesEnabled(env)` in `config.js` |
 
-Support requests have **no routes yet**: on the hub they are a quiet "Coming soon" card (not a link).
 
 ## Phase 2: Invoices
 - **Admin** (`/admin/clients/:id/invoices`, API `worker/portal/admin-invoices.js`): enter number, dates, amount (typed in dollars, stored as cents, CAD), description (client-visible) and an internal note; attach a PDF (PDF only: type, content and active-content checks); publish (needs the PDF; queues the client notice); record payment (unpaid / paid with date / void); archive and restore. Drafts are staff-only. There is no delete control and no delete route. The client page shows drafts waiting to publish and invoices past due.
@@ -43,3 +42,11 @@ Support requests have **no routes yet**: on the hub they are a quiet "Coming soo
 
 ## Migration 0007 (not applied)
 Before applying to Staging: confirm the target is `framework-portal-staging`, record a Time Travel bookmark, apply with `migrations/portal/wrangler.migrate.staging.jsonc`, verify the five tables. Production is a separate, later approval; the Production workflow's expected list does not know 0007 and fails closed while it is pending.
+
+## Phase 3: Support & Change Requests
+- **Client** (`/portal/o/:slug/services/requests`, owners and members): list (title, category, status, "New reply" flag), a new-request form (category, title, description up to 4,000 characters, up to 3 attachments of 10 MB: images, PDF, text, Word/Excel/PowerPoint, ZIP download-only), and a conversation page with a reply form (until the request is completed or declined). Rate-limited (`support` bucket), CSRF-protected, same-site checked. Ten open requests per organization at most; three attachments per request in total.
+- **Support vs billable change:** the form and every change request say, in these words, "Sending a request does not authorize any paid work. Framework will review it and, if it involves extra work, send you a quote to approve before anything starts." Statuses explain themselves to the client ("Quote sent: nothing goes ahead until you approve it"; "Approved: Framework has recorded that you approved the quote"). There is **no client route that changes a status**; only Admin can mark Quote sent or Approved, and only for changes.
+- **Admin** (`/admin/clients/:id/support`, `admin-support.js`): requests open as collapsed rows with the whole conversation (private notes marked); reply (visible, queues a client email), private note (never shown or emailed to the client, also for its attachments), attach one file per reply, change status (confirmation for Quote sent, Approved, Declined, Completed). The client page shows a Support row and an attention item for requests with new activity.
+- **History:** nothing edits or deletes a message, attachment or request. Attachment objects live under `org/<id>/support/<uuid>` and are excluded from organization-wide file removal and orphan housekeeping.
+- **Retention (approved):** completed support requests are kept 24 months after completion, subject to legal and contractual requirements; deletion after that period is a separate, reviewed step (not built).
+- Emails are still not sent (Phase 4): the outbox rows exist.

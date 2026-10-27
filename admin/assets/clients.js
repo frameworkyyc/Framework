@@ -9,8 +9,9 @@ const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 
 export async function render(ctx) {
-  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding|\/profile|\/invoices)?$/);
+  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding|\/profile|\/invoices|\/support)?$/);
   if (m && m[2] === "/branding") return (await import("./branding.js")).render(decodeURIComponent(m[1]), ctx);
+  if (m && m[2] === "/support") return (await import("./support.js")).render(decodeURIComponent(m[1]), ctx);
   if (m && m[2] === "/invoices") return (await import("./invoices.js")).render(decodeURIComponent(m[1]), ctx);
   if (m && m[2] === "/profile") return renderProfile(decodeURIComponent(m[1]), ctx);
   return m ? renderDetail(decodeURIComponent(m[1]), ctx) : renderList(ctx);
@@ -85,12 +86,22 @@ function invoicesRow(orgId, s) {
     h("p", { class: "adm-brandrow__chips" }, chips));
 }
 
+/** A quiet row that opens the client's Support & Change Requests page: requests with activity staff have not seen, and how many are open. */
+function supportRow(orgId, s) {
+  if (!s) return null;
+  const chips = [chip("plain", s.total ? `${s.open} open of ${s.total}` : "No requests yet")];
+  if (s.unseen) chips.push(chip("pending", plural(s.unseen, "request") + " with new activity", "info"));
+  return h("section", { class: "adm-section adm-brandrow", "aria-labelledby": "adm-suprow-h" },
+    h("div", { class: "adm-section-title" }, h("h2", { id: "adm-suprow-h", text: "Support & Change Requests" }), h("a", { class: "btn btn--secondary adm-small", href: `/admin/clients/${encodeURIComponent(orgId)}/support`, "data-link": "" }, "Open requests")),
+    h("p", { class: "adm-brandrow__chips" }, chips));
+}
+
 async function renderDetail(id, ctx) {
   const data = await api("/clients/" + encodeURIComponent(id));
   const o = data.organization;
   const p = data.profile;
   const welcome = ctx.url.searchParams.get("welcome") === "1";
-  const dash = dashboard({ org: o, profile: data.profile_available ? p : null, members: data.members, invitations: data.invitations, branding: data.branding, invoices: data.invoices });
+  const dash = dashboard({ org: o, profile: data.profile_available ? p : null, members: data.members, invitations: data.invitations, branding: data.branding, invoices: data.invoices, support: data.support });
 
   const info = disclosure({
     id: "org-details", title: "Organization details", className: "adm-acc--quiet",
@@ -111,6 +122,7 @@ async function renderDetail(id, ctx) {
     dash.overview,
     brandingRow(o.id, data.branding),
     invoicesRow(o.id, data.invoices),
+    supportRow(o.id, data.support),
     access,
     info,
   );

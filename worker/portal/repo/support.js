@@ -107,7 +107,7 @@ export async function getClientThread(db, organizationId, requestId) {
 /** Marks Framework's replies as seen. Only the unread flag changes. */
 export async function markClientRead(db, organizationId, requestId, { now = new Date() } = {}) {
   requireOrgId(organizationId); requireId(requestId, "request_id");
-  await db.prepare("UPDATE support_requests SET client_read_at = ? WHERE id = ? AND organization_id = ? AND (client_read_at IS NULL OR client_read_at < last_message_at)").bind(isoTime(now), requestId, organizationId).run();
+  await db.prepare("UPDATE support_requests SET client_read_at = MAX(?, last_message_at) WHERE id = ? AND organization_id = ? AND (client_read_at IS NULL OR client_read_at < last_message_at)").bind(isoTime(now), requestId, organizationId).run();
   return ok();
 }
 
@@ -254,4 +254,24 @@ export async function adminSupportSummary(db, organizationId) {
   requireOrgId(organizationId);
   const r = await db.prepare("SELECT count(*) AS total, COALESCE(sum(status NOT IN ('completed', 'declined')), 0) AS open, COALESCE(sum(admin_seen_at IS NULL OR admin_seen_at < last_message_at), 0) AS unseen FROM support_requests WHERE organization_id = ?").bind(organizationId).first();
   return { total: r.total, open: r.open, unseen: r.unseen };
+}
+
+/** A message of this request (any visibility), or null. Used to make sure a staff attachment goes on a staff message of the right request. */
+export async function getMessage(db, organizationId, requestId, messageId) {
+  requireOrgId(organizationId); requireId(requestId, "request_id"); requireId(messageId, "message_id");
+  const r = await db.prepare("SELECT id, author_type, visibility FROM support_messages WHERE id = ? AND request_id = ? AND organization_id = ?").bind(messageId, requestId, organizationId).first();
+  return r ? { id: r.id, authorType: r.author_type, visibility: r.visibility } : null;
+}
+
+/** Every storage key of an organization's support attachments, so housekeeping never mistakes one for an orphan. */
+export async function listSupportStorageKeys(db, organizationId) {
+  requireOrgId(organizationId);
+  return (await db.prepare("SELECT storage_key FROM support_attachments WHERE organization_id = ?").bind(organizationId).all()).results.map((r) => r.storage_key);
+}
+
+/** One request of the organization (no conversation), or null. */
+export async function getRequest(db, organizationId, requestId) {
+  requireOrgId(organizationId); requireId(requestId, "request_id");
+  const r = await db.prepare(`SELECT ${REQ} FROM support_requests WHERE id = ? AND organization_id = ?`).bind(requestId, organizationId).first();
+  return r ? request(r) : null;
 }

@@ -16,7 +16,7 @@
  */
 import { hashIp } from "./crypto.js";
 
-export const BUCKETS = Object.freeze(["login", "callback", "logout", "profile", "feedback", "branding"]);
+export const BUCKETS = Object.freeze(["login", "callback", "logout", "profile", "feedback", "branding", "support"]);
 
 const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 
