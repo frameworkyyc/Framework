@@ -211,14 +211,16 @@ test("admin review: admin-only, read-only, organization + type + date + section 
   assert.match((await call("/api/admin/portal-feedback")).headers.get("cache-control"), /no-store/);
   for (const m of ["POST", "PUT", "PATCH", "DELETE"]) assert.equal((await call("/api/admin/portal-feedback", { method: m })).status, 405, m);
 });
-test("admin review: a deployment without the table reports it plainly; the survey 'Client Feedback' stays a separate entry", async () => {
+test("admin review: a deployment without the table reports it plainly; portal feedback is a tab of the single Feedback entry", async () => {
   const { w, call, env } = await adminSetup();
   w.db.raw.exec("DROP TABLE portal_feedback");
   assert.deepEqual(await (await call("/api/admin/portal-feedback")).json(), { available: false, items: [], truncated: false });
   assert.equal((await call("/api/admin/portal-feedback", { e: { ...env, PORTAL_DB: undefined } })).status, 503);
   const mods = read("admin/assets/modules.js");
-  assert.match(mods, /id: "feedback", label: "Client Feedback", path: "\/admin\/feedback"/);
-  assert.match(mods, /id: "portal-feedback", label: "Portal Feedback", path: "\/admin\/portal-feedback", enabled: true/);
+  assert.match(mods, /id: "feedback", label: "Feedback", path: "\/admin\/feedback"/);
+  assert.doesNotMatch(mods, /id: "portal-feedback"/);
+  assert.match(read("admin/assets/feedback.js"), /portal-feedback\.js/);
+  assert.match(read("admin/assets/admin.js"), /\/admin\/portal-feedback[\s\S]*\/admin\/feedback\/portal/);
   const ui = read("admin/assets/portal-feedback.js");
   assert.ok(!/method: "(POST|PUT|PATCH|DELETE)"|<form|"input"|"textarea"|"select"|innerHTML/.test(ui), "read-only and text-only");
   assert.match(ui, /class: "adm-answer", text: r\.message/);

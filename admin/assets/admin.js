@@ -105,6 +105,7 @@ async function refreshBadge() {
 
 async function route() {
   const token = ++routeToken;
+  if (clean(location.pathname) === "/admin/portal-feedback") history.replaceState(null, "", "/admin/feedback/portal" + location.search); // the old address now lives under the Feedback tabs
   const url = new URL(location.href);
   const module = resolve(url.pathname);
   navLinks.forEach((a) => (a.dataset.module === (module && module.id) ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));

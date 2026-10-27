@@ -1,6 +1,7 @@
 /* Framework Admin — Feedback module: /admin/feedback (list) and /admin/feedback/:id (response). */
 
 import { sharePanel } from "./feedback-share.js";
+import { feedbackTabs } from "./feedback-tabs.js";
 import { h, api, ApiError, fmtDate, fmtDateTime, shortRef, clientName, permissionShort, rating5, score, meter10, stateBlock, confirmDialog } from "./ui.js";
 
 const RATING_LABELS = [
@@ -66,6 +67,7 @@ const emptyFeedback = () =>
 
 export async function render(ctx) {
   const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/feedback\/([^/]+)$/);
+  if (m && m[1] === "portal") return (await import("./portal-feedback.js")).render(ctx); // the second tab (a response id is never the word "portal")
   return m ? renderDetail(ctx, decodeURIComponent(m[1])) : renderList(ctx);
 }
 
@@ -120,17 +122,18 @@ async function renderList(ctx) {
   const share = await sharePanel();
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" },
-      h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Client Feedback"),
+      h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Feedback"),
         h("p", { class: "adm-sub" }, "Responses from the client feedback form, newest first.")),
       h("div", { class: "adm-actions" }, h("a", { class: "btn btn--secondary", href: "/api/admin/feedback/export", download: "" }, "Export CSV")),
     ),
+    feedbackTabs("client"),
     share,
     data.reviewed_supported ? null : h("p", { class: "adm-banner" }, "Reviewed tracking is off. Apply migrations/0002_add_reviewed_at.sql in the D1 console to enable it."),
     rows.length ? bar : null,
     note,
     results,
   );
-  return { title: "Client Feedback", node };
+  return { title: "Feedback", node };
 }
 
 /* ---------- Detail ---------- */

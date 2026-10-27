@@ -161,10 +161,10 @@ test("existing feedback stays compatible: stored values are plain text with no c
   assert.match(read("worker/index.js"), /"Slight improvement", "About the same", "Worse", NO_PREVIOUS_WEBSITE\]/);
   assert.match(read("worker/index.js"), /LEGACY_NO_PREVIOUS_WEBSITE = "I didn\\u2019t have a website before\."/);
 });
-test("the admin navigation entry is Client Feedback and the page offers the share panel", () => {
-  assert.match(read("admin/assets/modules.js"), /id: "feedback", label: "Client Feedback", path: "\/admin\/feedback", enabled: true/);
+test("the admin navigation entry is Feedback (with client and portal tabs) and the page offers the share panel", () => {
+  assert.match(read("admin/assets/modules.js"), /id: "feedback", label: "Feedback", path: "\/admin\/feedback", enabled: true/);
   const js = read("admin/assets/feedback.js");
-  assert.match(js, /"Client Feedback"/); assert.match(js, /await sharePanel\(\)/);
+  assert.match(js, /feedbackTabs\("client"\)/); assert.match(js, /await sharePanel\(\)/);
   const ui = read("admin/assets/feedback-share.js");
   assert.match(ui, /Copy feedback link/); assert.match(ui, /Open feedback form/); assert.match(ui, /Send feedback request/); assert.match(ui, /Invitation template/);
 });
