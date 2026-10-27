@@ -61,7 +61,7 @@ export function buildEmail(n, d, origin) {
 /* ------------------------------------------------------------------ data the message needs */
 
 async function context(db, n) {
-  const org = await db.prepare("SELECT id, name, slug FROM organizations WHERE id = ?").bind(n.organization_id).first();
+  const org = await db.prepare("SELECT id, name, slug, status FROM organizations WHERE id = ?").bind(n.organization_id).first();
   if (!org) return null;
   if (n.entity_type === "support_request") {
     const r = await db.prepare("SELECT id, title, category, submitted_by FROM support_requests WHERE id = ? AND organization_id = ?").bind(n.entity_id, n.organization_id).first();
@@ -110,6 +110,7 @@ export async function processNotifications(env, { db, now = new Date(), fetch: f
       }
       const ctx = await context(db, n);
       if (!ctx) { await mark(db, n.id, "skipped", "entity_missing", at); out.skipped++; continue; }
+      if (ctx.org.status === "archived") { await mark(db, n.id, "skipped", "client_deleted", at); out.skipped++; continue; } // a deleted client is not emailed
       const to = n.audience === "staff" ? [notifyRecipient(env)] : await clientRecipients(env, db, n, ctx);
       if (!to.length) { await mark(db, n.id, "skipped", "no_allowed_recipient", at); out.skipped++; continue; }
       const mail = buildEmail(n, { org: ctx.org, request: ctx.request, invoice: ctx.invoice }, origin);

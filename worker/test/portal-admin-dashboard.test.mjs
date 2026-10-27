@@ -64,7 +64,7 @@ test("client detail structure: header, next step, a single clickable Business Pr
   const src = strip(read("admin/assets/clients.js")), dash = strip(read("admin/assets/client-dashboard.js"));
   const start = src.indexOf("async function renderDetail"), end = src.indexOf("async function renderProfile");
   const detail = src.slice(start, end > start ? end : undefined);
-  assert.match(detail, /dash\.header,\s*dash\.overview,/, "header then overview first");
+  assert.match(detail, /dash\.header,\s*deletedBanner,\s*dash\.overview,/, "header then overview first");
   assert.ok(!/sectionMap\(|stepAccordion|Saved answers|adm-mapsec|id: "adm-profile"/.test(detail), "no section map or saved answers on the dashboard");
   assert.ok(!/brandingRow|invoicesRow|supportRow/.test(detail), "Branding, Invoices and Support are cards in the dashboard overview, not separate rows");
   assert.match(dash, /brandingTile, invoicesTile, supportTile/, "all five areas share one tile grid");

@@ -302,7 +302,7 @@ const SCOPE_WHERE = Object.freeze({ attention: "r.status NOT IN ('completed', 'd
 export async function listRequestsAllAdmin(db, { scope = "attention", limit = 200 } = {}) {
   const where = SCOPE_WHERE[scope] || SCOPE_WHERE.open;
   const rows = (await db
-    .prepare(`SELECT ${REQ_R}, o.name AS org_name FROM support_requests r JOIN organizations o ON o.id = r.organization_id WHERE ${where} ORDER BY r.last_message_at DESC, r.id LIMIT ?`)
+    .prepare(`SELECT ${REQ_R}, o.name AS org_name FROM support_requests r JOIN organizations o ON o.id = r.organization_id WHERE o.status <> 'archived' AND ${where} ORDER BY r.last_message_at DESC, r.id LIMIT ?`)
     .bind(Math.min(Math.max(1, limit), 500)).all()).results;
   const list = rows.map((r) => ({ ...request(r), orgName: r.org_name, reason: attentionReason(r) }));
   return scope === "attention" ? list.filter((r) => r.reason) : list;
@@ -310,6 +310,6 @@ export async function listRequestsAllAdmin(db, { scope = "attention", limit = 20
 
 /** Counts across every organization for the Admin dashboard and navigation badge. */
 export async function adminSupportTotals(db) {
-  const r = await db.prepare("SELECT count(*) AS total, COALESCE(sum(status NOT IN ('completed', 'declined')), 0) AS open, COALESCE(sum(status NOT IN ('completed', 'declined') AND (admin_seen_at IS NULL OR admin_seen_at < last_message_at)), 0) AS attention FROM support_requests").first();
+  const r = await db.prepare("SELECT count(*) AS total, COALESCE(sum(status NOT IN ('completed', 'declined')), 0) AS open, COALESCE(sum(status NOT IN ('completed', 'declined') AND (admin_seen_at IS NULL OR admin_seen_at < last_message_at)), 0) AS attention FROM support_requests WHERE organization_id IN (SELECT id FROM organizations WHERE status <> 'archived') /* cross-tenant: Admin totals; deleted clients are left out */").first();
   return { total: r.total, open: r.open, attention: r.attention };
 }

@@ -120,7 +120,7 @@ export function dashboard({ org, profile, members, invitations, branding = null,
     h("div", { class: "adm-idhead__text" },
       h("span", { class: "eyebrow" }, "Client"),
       h("h1", { class: "adm-title", tabindex: "-1" }, org.name),
-      org.status !== "active" ? h("p", { class: "adm-idhead__chips" }, chip("bad", org.status[0].toUpperCase() + org.status.slice(1), "warn")) : null));
+      org.status !== "active" ? h("p", { class: "adm-idhead__chips" }, chip("bad", org.status === "archived" ? "Deleted" : org.status[0].toUpperCase() + org.status.slice(1), "warn")) : null));
 
   function paint(facts) {
     const items = attention({ org, profile, facts, branding, invoices, support });

@@ -285,6 +285,6 @@ export async function listInvoiceStorageKeys(db, organizationId) {
 
 /** Counts across every organization for the Admin dashboard: drafts waiting to be published and published invoices past due. */
 export async function adminInvoiceTotals(db, { now = new Date() } = {}) {
-  const r = await db.prepare("SELECT COALESCE(sum(published_at IS NULL), 0) AS drafts, COALESCE(sum(published_at IS NOT NULL AND payment_status = 'unpaid' AND due_date IS NOT NULL AND due_date < ?), 0) AS overdue FROM invoices WHERE archived_at IS NULL").bind(todayOf(now)).first();
+  const r = await db.prepare("SELECT COALESCE(sum(published_at IS NULL), 0) AS drafts, COALESCE(sum(published_at IS NOT NULL AND payment_status = 'unpaid' AND due_date IS NOT NULL AND due_date < ?), 0) AS overdue FROM invoices WHERE archived_at IS NULL AND organization_id IN (SELECT id FROM organizations WHERE status <> 'archived') /* cross-tenant: Admin totals; deleted clients are left out */").bind(todayOf(now)).first();
   return { drafts: r.drafts, overdue: r.overdue };
 }

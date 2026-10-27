@@ -3,9 +3,11 @@
 
 import { h, api, fmtDate, stateBlock } from "./ui.js";
 import { newClientPanel, accessSections } from "./clients-access.js";
+import { actionsMenu, deleteClient, restoreClient } from "./clients-delete.js";
 import { dashboard, sectionMap, stepAccordion, disclosure, chip, icon, STATE_TEXT } from "./client-dashboard.js";
 
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+const statusWord = (s) => (s === "archived" ? "Deleted" : cap(s));
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 
 export async function render(ctx) {
@@ -33,7 +35,7 @@ function completion(p) {
 
 /** One whole row is the link: name first (full width), then when it was created and how far the Business Profile is. Members and invitations live on the client's own page. */
 function clientRow(c) {
-  const created = c.status === "active" ? "Created " + fmtDate(c.created_at) : `${cap(c.status)} · created ${fmtDate(c.created_at)}`;
+  const created = c.status === "active" ? "Created " + fmtDate(c.created_at) : `${statusWord(c.status)} · created ${fmtDate(c.created_at)}`;
   return h("a", { class: "adm-clientrow", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "" },
     h("span", { class: "adm-clientrow__name", text: c.name }),
     h("span", { class: "adm-clientrow__date", text: created }),
@@ -43,9 +45,18 @@ function clientRow(c) {
 
 async function renderList(ctx) {
   const data = await api("/clients");
-  const rows = data.clients;
-  const list = h("ul", { class: "adm-clientlist", "aria-label": "Client organizations" }, rows.map((c) => h("li", null, clientRow(c))));
+  const rows = data.clients.filter((c) => c.status !== "archived");
+  const deleted = data.clients.filter((c) => c.status === "archived");
   const writes = Boolean(data.capabilities && data.capabilities.writes);
+  const done = () => ctx.retry();
+  const list = h("ul", { class: "adm-clientlist", "aria-label": "Client organizations" }, rows.map((c) => h("li", { class: "adm-clientitem" }, clientRow(c),
+    writes ? actionsMenu({ label: `Actions for ${c.name}`, items: [{ label: "Delete client", danger: true, run: () => deleteClient(c, { notify: ctx.notify, after: done }) }] }) : null)));
+  const trash = deleted.length ? disclosure({ id: "deleted-clients", title: "Deleted clients", className: "adm-acc--quiet", meta: String(deleted.length),
+    children: h("ul", { class: "adm-clientlist adm-clientlist--deleted", "aria-label": "Deleted clients" }, deleted.map((c) => h("li", { class: "adm-deleteditem" },
+      h("div", { class: "adm-deleteditem__text" },
+        h("a", { class: "adm-link", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "" }, c.name),
+        h("span", { class: "adm-clientrow__date", text: "Deleted " + fmtDate(c.archived_at) })),
+      writes ? h("button", { class: "btn btn--secondary adm-small", type: "button", "aria-label": `Restore ${c.name}`, onclick: () => restoreClient(c, { notify: ctx.notify, after: done }) }, "Restore") : null))) }) : null;
   const create = newClientPanel({ navigate: ctx.navigate, writesEnabled: writes });
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Clients"),
@@ -55,6 +66,7 @@ async function renderList(ctx) {
     data.profile_available ? null : h("p", { class: "adm-banner" }, "Business Profile data isn’t available on this deployment (its database migration hasn’t been applied)."),
     rows.length ? list : stateBlock({ title: "No client organizations yet", body: writes ? "Use New client to add the first one, then invite its first owner." : "Nothing has been created yet. Changes are switched off on this site." }),
     rows.length ? h("p", { class: "adm-sub", role: "status" }, `${plural(rows.length, "organization")}.`) : null,
+    trash,
   );
   return { title: "Clients", node };
 }
@@ -72,20 +84,28 @@ async function renderDetail(id, ctx) {
 
   const info = disclosure({
     id: "org-details", title: "Organization details", className: "adm-acc--quiet",
-    meta: o.status === "active" ? "Active" : cap(o.status),
+    meta: o.status === "active" ? "Active" : statusWord(o.status),
     children: spec([
-      ["Status", o.status === "active" ? "Active" : cap(o.status)],
+      ["Status", o.status === "active" ? "Active" : statusWord(o.status)],
       ["Portal address", h("code", { class: "adm-code" }, "/portal/o/" + o.slug)],
       o.website_url ? ["Website", h("a", { class: "adm-link", href: o.website_url, rel: "noopener noreferrer", target: "_blank" }, o.website_url.replace(/^https:\/\//, ""))] : ["Website", h("span", { class: "adm-muted" }, "Not given")],
       ["Created", fmtDate(o.created_at)],
     ]),
   });
 
-  const access = accessSections({ orgId: o.id, orgName: o.name, welcome, onData: (d) => dash.update(d.members, d.invitations) });
+  const deletedOrg = o.status === "archived";
+  const writes = Boolean(data.capabilities && data.capabilities.writes);
+  const done = () => ctx.retry();
+  const menu = writes && !deletedOrg ? actionsMenu({ label: `Actions for ${o.name}`, items: [{ label: "Delete client", danger: true, run: () => deleteClient(o, { notify: ctx.notify, after: () => ctx.navigate("/admin/clients") }) }] }) : null;
+  const deletedBanner = deletedOrg ? h("div", { class: "adm-banner adm-banner--alert adm-deletedbanner", role: "status" },
+    h("p", { class: "adm-deletedbanner__text" }, `This client was deleted${o.archived_at ? " on " + fmtDate(o.archived_at) : ""}. Its team can’t open the portal, and it is hidden from the active lists. Invoices, support requests and other records are kept.`),
+    writes ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => restoreClient(o, { notify: ctx.notify, after: done }) }, "Restore client") : null) : null;
+  const access = deletedOrg ? null : accessSections({ orgId: o.id, orgName: o.name, welcome, onData: (d) => dash.update(d.members, d.invitations) });
 
   const node = h("div", { class: "adm-page adm-detail" },
-    h("a", { class: "adm-back", href: "/admin/clients", "data-link": "" }, "← All clients"),
+    h("div", { class: "adm-detailbar" }, h("a", { class: "adm-back", href: "/admin/clients", "data-link": "" }, "← All clients"), menu),
     dash.header,
+    deletedBanner,
     dash.overview,
     access,
     info,

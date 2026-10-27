@@ -345,7 +345,7 @@ test("methods and paths: wrong methods get 405 with Allow; unknown paths are 404
   assert.equal((await s.call(`${base}/members/${ann}/remove`, { method: "DELETE" })).headers.get("Allow"), "POST");
   assert.equal((await s.call(`${base}/members/${ann}/remove`, { method: "PUT", json: {} })).status, 405);
   const before = s.snap();
-  for (const p of [`${base}/members/${ann}`, `${base}/members/${ann}/offboard`, `${base}/members/${ann}/disable`, `/api/admin/users/${ann}/offboard`, `/api/admin/users/${ann}/disable`, `${base}/delete`, `${base}/status`]) {
+  for (const p of [`${base}/members/${ann}`, `${base}/members/${ann}/offboard`, `${base}/members/${ann}/disable`, `/api/admin/users/${ann}/offboard`, `/api/admin/users/${ann}/disable`, `${base}/status`]) {
     const r = await s.post(p, {});
     assert.ok([404, 503].includes(r.status), `${p} -> ${r.status}`); // 503 = the feedback modules' own "no feedback database" answer in this harness; never a success
     assert.ok(r.status !== 200 && r.status !== 201);
