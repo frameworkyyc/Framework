@@ -690,3 +690,34 @@ a.adm-tile--link:hover .adm-tile__go { color: var(--ink); transform: translateX(
 a.adm-tile--link { display: flex; flex-direction: column; gap: 0; }
 .adm-tile__chips { margin-top: auto; padding-top: 10px; }
 .adm-tile__label { min-height: 22px; align-items: center; }
+
+/* ---------- Delete / restore client ---------- */
+.adm-clientitem { position: relative; display: flex; align-items: center; gap: 4px; }
+.adm-clientitem > .adm-clientrow { flex: 1 1 auto; min-width: 0; }
+.adm-menuwrap { position: relative; flex: none; }
+.adm-menubtn { appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; background: none; color: var(--ink); cursor: pointer; }
+.adm-menubtn svg { width: 22px; height: 22px; fill: currentColor; }
+.adm-menubtn:hover, .adm-menubtn[aria-expanded="true"] { background: var(--mist); }
+.adm-menubtn:focus-visible, .adm-menu__item:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.adm-menu { position: absolute; z-index: 20; top: 100%; right: 0; min-width: 180px; padding: 4px 0; border: 1px solid var(--ink); background: var(--paper); box-shadow: 0 6px 18px rgba(10, 10, 10, 0.12); }
+.adm-menu[hidden] { display: none; }
+.adm-menu__item { appearance: none; display: block; width: 100%; min-height: 44px; padding: 0 16px; border: 0; background: none; text-align: left; font: inherit; font-size: 15px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.adm-menu__item:hover { background: var(--mist); }
+.adm-menu__item--danger { color: var(--bad, #A12B2B); }
+.adm-detailbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.adm-detailbar .adm-menuwrap { margin-top: -10px; }
+.adm-btn--danger { background: var(--bad, #A12B2B); border-color: var(--bad, #A12B2B); color: #fff; }
+.adm-btn--danger:hover:not(:disabled) { background: #7d1f1f; border-color: #7d1f1f; }
+.adm-btn--danger:disabled { opacity: .45; cursor: not-allowed; }
+.adm-delete__name { margin: 0 0 12px; font-family: var(--font-display); font-weight: 600; font-size: 20px; color: var(--ink); overflow-wrap: anywhere; }
+.adm-dialog .adm-delete__list { margin: 8px 0 20px; padding-left: 20px; list-style: disc; color: var(--slate); }
+.adm-dialog .adm-delete__list li { margin-bottom: 6px; }
+.adm-delete__label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 15px; }
+.adm-dialog .input { width: 100%; min-height: 48px; font-size: 16px; }
+.adm-dialog .adm-delete__help { margin: 6px 0 0; font-size: 13px; }
+.adm-clientlist--deleted { border-top: 0; }
+.adm-deleteditem { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; }
+.adm-deleteditem__text { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.adm-deletedbanner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; max-width: none; margin-top: 16px; }
+.adm-deletedbanner__text { margin: 0; flex: 1 1 320px; }
+@media (max-width: 560px) { .adm-deleteditem { flex-wrap: wrap; } }

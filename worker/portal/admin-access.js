@@ -22,6 +22,8 @@
  * Routes (path after /api/admin):
  *   GET  /clients/:org/access                         organization, members, invitations
  *   POST /clients                                     {name, websiteUrl?, slug?}   create an organization; with no slug it is made from the name and made unique (-2, -3, ...)
+ *   POST /clients/:org/delete                         {confirm:"DELETE"}          delete (archive) a client: portal access stops, every record is kept; reversible
+ *   POST /clients/:org/restore                        {}                           bring a deleted client back
  *   POST /clients/:org/invitations                    {email, role}                create a pending invitation (7 days), not sent
  *   POST /clients/:org/invitations/:id/revoke         {}                           revoke in D1 first, then cancel the WorkOS invitation (partial failure is reported; repeat to retry WorkOS)
  *   POST /clients/:org/invitations/:id/replace        {role?}                      replace an expired or revoked invitation with a fresh 7-day one
@@ -33,7 +35,7 @@
  * Errors are { error: <code>, message: <sentence> } (plus invitationId for a duplicate); unexpected failures answer a bare server_error.
  */
 import { readOnlyDb } from "./admin-clients.js";
-import { createOrganizationAudited, getOrganizationById } from "./repo/orgs.js";
+import { createOrganizationAudited, archiveOrganizationAudited, restoreOrganizationAudited, getOrganizationById } from "./repo/orgs.js";
 import { createInvitation, replaceInvitation, revokeInvitation, getInvitation } from "./repo/invitations.js";
 import { setMemberRole, revokeMembership } from "./repo/memberships.js";
 import { validateSlug, validateName, validateHttpsUrl, normalizeEmail, validateEnum, ROLES } from "./repo/validate.js";
@@ -235,6 +237,7 @@ export async function handleAccessApi(request, env, principal, path, deps = {}) 
     if (method !== "POST") return null; // GET /clients (and others) belong to the read-only Clients handler
     route = { kind: "create_org" };
   } else if (seg.length === 3 && seg[2] === "access") route = { kind: "access", org: seg[1] };
+  else if (seg.length === 3 && (seg[2] === "delete" || seg[2] === "restore")) route = { kind: "org_" + seg[2], org: seg[1] };
   else if (seg.length === 3 && seg[2] === "invitations") route = { kind: "invite", org: seg[1] };
   else if (seg.length === 5 && seg[2] === "invitations" && (seg[4] === "revoke" || seg[4] === "replace" || seg[4] === "send" || seg[4] === "resend")) route = { kind: "invitation_" + seg[4], org: seg[1], target: seg[3] };
   else if (seg.length === 5 && seg[2] === "members" && (seg[4] === "role" || seg[4] === "remove")) route = { kind: "member_" + seg[4], org: seg[1], target: seg[3] };
@@ -258,7 +261,7 @@ export async function handleAccessApi(request, env, principal, path, deps = {}) 
     const db = env.PORTAL_DB;
     const actor = principal && principal.email;
     const fields = {
-      create_org: ["name", "slug", "websiteUrl"], invite: ["email", "role"], invitation_revoke: [], invitation_replace: ["role"], invitation_send: [], invitation_resend: [], member_role: ["role"], member_remove: [],
+      create_org: ["name", "slug", "websiteUrl"], invite: ["email", "role"], invitation_revoke: [], invitation_replace: ["role"], invitation_send: [], invitation_resend: [], member_role: ["role"], member_remove: [], org_delete: ["confirm"], org_restore: [],
     }[route.kind];
     let body = {};
     if (wanted === "POST") {
@@ -290,6 +293,17 @@ export async function handleAccessApi(request, env, principal, path, deps = {}) 
     if (!org) return err(404, "not_found", "No such organization.");
 
     if (route.kind === "access") return json(await readAccess(env, org, now));
+
+    // Delete = reversible archive (see archiveOrganizationAudited): the server insists on the typed word, whatever the interface did.
+    if (route.kind === "org_delete") {
+      if (body.confirm !== "DELETE") return err(422, "confirmation_required", "Type DELETE to confirm. Nothing was changed.");
+      const r = await archiveOrganizationAudited(db, org.id, actor, { now });
+      return r.ok ? json({ deleted: true, changed: r.changed, organization: publicOrg(r.organization) }) : fromFailure(r);
+    }
+    if (route.kind === "org_restore") {
+      const r = await restoreOrganizationAudited(db, org.id, actor, { now });
+      return r.ok ? json({ restored: true, changed: r.changed, organization: publicOrg(r.organization) }) : fromFailure(r);
+    }
 
     if (route.kind === "invite") {
       if (typeof body.email !== "string" || !normalizeEmail(body.email)) return err(422, "invalid_email", "Enter a valid email address.");
