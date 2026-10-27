@@ -24,15 +24,15 @@ test("Staging (Preview): DB -> framework-staging is preserved, plus PORTAL_DB ->
   assert.deepEqual(config.previews.d1_databases, [STAGING, PORTAL_STAGING]);
 });
 
-test("Production's portal resources are exactly: its own portal database, the WorkOS settings, the four launch switches, the limiter; the two private R2 buckets (Stage 3) and no probe flag, and no client-feature switch", () => {
+test("Production's portal resources are exactly: its own portal database, the WorkOS settings, the four launch switches, the limiter; the two private R2 buckets (Stage 3), the Branding switch (Release 2), no Client Services switch and no probe flag", () => {
   assert.deepEqual(config.previews.r2_buckets, [{ binding: "PORTAL_FILES", bucket_name: "framework-portal-files-staging" }, { binding: "PORTAL_FILES_BACKUP", bucket_name: "framework-portal-files-staging-backup" }]);
   assert.deepEqual(config.r2_buckets, [{ binding: "PORTAL_FILES", bucket_name: "framework-portal-files" }, { binding: "PORTAL_FILES_BACKUP", bucket_name: "framework-portal-files-backup" }]);
-  assert.equal(config.vars.PORTAL_BRANDING, undefined, "Branding stays off for Production clients until Stage 4");
+  assert.equal(config.vars.PORTAL_BRANDING, "1", "Release 2: Branding is on for Production clients");
   assert.equal(config.vars.PORTAL_SERVICES, undefined, "Client Services stay off for Production clients until Stage 4");
   assert.equal(config.vars.ASSESSMENT_NOTIFY_TO, "hello@frameworkco.ca");
   assert.deepEqual(config.triggers, { crons: ["0-59/5 * * * *"] }, "the Stage 5 schedule: Production only");
   assert.equal(config.previews.triggers, undefined);
-  assert.deepEqual(Object.keys(config.vars).filter((k) => k.startsWith("PORTAL_")).sort(), ["PORTAL_ADMIN_WRITES", "PORTAL_ALLOW_PRODUCTION", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER", "PORTAL_BASE_URL", "PORTAL_ENABLED", "PORTAL_INVITE_SENDING"]);
+  assert.deepEqual(Object.keys(config.vars).filter((k) => k.startsWith("PORTAL_")).sort(), ["PORTAL_ADMIN_WRITES", "PORTAL_ALLOW_PRODUCTION", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER", "PORTAL_BASE_URL", "PORTAL_BRANDING", "PORTAL_ENABLED", "PORTAL_INVITE_SENDING"]);
   const before = raw.slice(0, raw.indexOf('"previews"')).replace(/^\s*\/\/.*$/gm, "");
   assert.ok(!/PORTAL_PROBE|PORTAL_DEMO/.test(before), "no probe flag and no demo switch before the previews block");
   assert.equal(before.split('"bucket_name": "framework-portal-files"').length - 1, 1, "the Production files bucket is bound exactly once, outside previews");
@@ -64,7 +64,7 @@ test("the Production ID appears exactly once in the file (never inside the previ
 
 test("Production (top-level vars) and Staging (previews.vars) each carry the sender, the same public Turnstile site key and their OWN WorkOS settings; both enable the portal (Production since launch), only Staging also has the demo", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
-  assert.deepEqual(config.vars, { ...shared, ASSESSMENT_NOTIFY_TO: "hello@frameworkco.ca", PORTAL_AUTH_CLIENT_ID: "client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_BASE_URL: "https://frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1" });
+  assert.deepEqual(config.vars, { ...shared, ASSESSMENT_NOTIFY_TO: "hello@frameworkco.ca", PORTAL_AUTH_CLIENT_ID: "client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_BASE_URL: "https://frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1" });
   assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1", PORTAL_DEMO: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1", PORTAL_SERVICES: "1" });
 });
 
