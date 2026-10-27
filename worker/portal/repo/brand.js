@@ -248,6 +248,7 @@ export async function replaceBrandAssetFile(db, organizationId, assetId, file, a
   return (await brandAssetNameTaken(db, organizationId, file.name, assetId)) ? fail("duplicate_name") : fail("conflict");
 }
 
+/* A deleted file keeps only what an audit needs (type, size, key, who and when): the UPDATEs below overwrite its original file name, content hash and free-text notes in the same statement as the delete. */
 /** Soft delete: the row stays as a tombstone for the audit trail, is unpublished, and its storage key is returned so the object can be deleted at once. */
 export async function deleteBrandAsset(db, organizationId, assetId, actor, { now = new Date() } = {}) {
   requireOrgId(organizationId); requireId(assetId, "asset_id");
@@ -256,7 +257,7 @@ export async function deleteBrandAsset(db, organizationId, assetId, actor, { now
   if (!cur) return fail("not_found");
   const at = isoTime(now);
   const res = await db.batch([
-    db.prepare("UPDATE brand_assets SET deleted_at = ?, published = 0, updated_at = ? WHERE id = ? AND organization_id = ? AND deleted_at IS NULL").bind(at, at, assetId, organizationId),
+    db.prepare("UPDATE brand_assets SET deleted_at = ?, published = 0, updated_at = ?, original_name = 'deleted', sha256 = '0000000000000000000000000000000000000000000000000000000000000000', usage_note = NULL, license_note = NULL WHERE id = ? AND organization_id = ? AND deleted_at IS NULL").bind(at, at, assetId, organizationId),
     auditAfterChange(db, { organizationId, actorType: "admin", actorRef: actor.trim(), action: "brand.asset.deleted", entityType: "brand_asset", entityId: assetId, at }),
   ]);
   return res[0].meta.changes === 1 ? ok({ storageKey: cur.storageKey }) : fail("not_found");
@@ -398,7 +399,7 @@ export async function deleteUpload(db, organizationId, uploadId, { by, actorType
   if (!cur) return fail("not_found");
   const at = isoTime(now);
   const res = await db.batch([
-    db.prepare("UPDATE brand_uploads SET deleted_at = ?, deleted_by = ? WHERE id = ? AND organization_id = ? AND deleted_at IS NULL").bind(at, by, uploadId, organizationId),
+    db.prepare("UPDATE brand_uploads SET deleted_at = ?, deleted_by = ?, original_name = 'deleted', sha256 = '0000000000000000000000000000000000000000000000000000000000000000' WHERE id = ? AND organization_id = ? AND deleted_at IS NULL").bind(at, by, uploadId, organizationId),
     auditAfterChange(db, { organizationId, actorType, actorRef: by, action: "brand.upload.deleted", entityType: "brand_upload", entityId: uploadId, at }),
   ]);
   return res[0].meta.changes === 1 ? ok({ storageKey: cur.storageKey }) : fail("not_found");
@@ -488,8 +489,8 @@ export async function tombstoneAllFiles(db, organizationId, actor, { now = new D
   if (!validActor(actor)) return fail("invalid_actor");
   const at = isoTime(now);
   const res = await db.batch([
-    db.prepare("UPDATE brand_assets SET deleted_at = ?, published = 0, updated_at = ? WHERE organization_id = ? AND deleted_at IS NULL").bind(at, at, organizationId),
-    db.prepare("UPDATE brand_uploads SET deleted_at = ?, deleted_by = ? WHERE organization_id = ? AND deleted_at IS NULL").bind(at, actor.trim(), organizationId),
+    db.prepare("UPDATE brand_assets SET deleted_at = ?, published = 0, updated_at = ?, original_name = 'deleted', sha256 = '0000000000000000000000000000000000000000000000000000000000000000', usage_note = NULL, license_note = NULL WHERE organization_id = ? AND deleted_at IS NULL").bind(at, at, organizationId),
+    db.prepare("UPDATE brand_uploads SET deleted_at = ?, deleted_by = ?, original_name = 'deleted', sha256 = '0000000000000000000000000000000000000000000000000000000000000000' WHERE organization_id = ? AND deleted_at IS NULL").bind(at, actor.trim(), organizationId),
   ]);
   return ok({ assets: res[0].meta.changes, uploads: res[1].meta.changes });
 }

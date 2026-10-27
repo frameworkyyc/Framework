@@ -19,7 +19,8 @@
  *   GET  /branding/backup                                counts only: objects in the files bucket and the backup bucket, and what is missing where
  *   POST /branding/backup-run                            copies new/changed files to the backup bucket now (the same copy the schedule runs)
  *   POST /branding/backup-check                          END TO END proof on a tiny test object: write, copy to the backup, read back from it, simulate a loss, restore, compare
- *   POST /branding/backup-restore                        { confirm: "RESTORE" }  copies back ONLY the files missing from the files bucket; never overwrites an existing one
+ *   POST /branding/backup-restore                        { confirm: "RESTORE" }  copies back ONLY the files missing from the files bucket that a LIVE database row still points to; never overwrites one, never brings back a deleted file
+ *   POST /branding/backup-purge                          dry run by default (counts of what 90-day-old deleted files would be removed from the backup); { confirm: "PURGE" } really removes them, and only while PORTAL_BACKUP_PURGE is "1"
  *
  * A database without migration 0005 answers { available: false }: nothing else runs.
  */
@@ -31,6 +32,7 @@ import * as files from "./brand-files.js";
 import { BRANDING_SERVICES, brandingService } from "./brand-services.js";
 import { limitsFor } from "./brand-files.js";
 import { backupFiles, restoreFiles, backupStatus } from "./file-backup.js";
+import { backupPurge, restorableKeys, purgeEnabled } from "./backup-purge.js";
 import { ADMIN_MAX_FILE_BYTES, makeKey, putObject, getObject, deleteObject, StorageError } from "./files/index.js";
 
 const MAX_JSON = 20 * 1024;
@@ -198,14 +200,26 @@ async function backupCheck(env) {
 async function backupApi(request, env, kind, actor, now) {
   const [P, B] = [env.PORTAL_FILES, env.PORTAL_FILES_BACKUP];
   const ready = Boolean(P && B && P !== B);
-  if (kind === "backup") return json(ready ? await backupStatus({ primary: P, backup: B }) : { ok: false, configured: false });
+  if (kind === "backup") {
+    if (!ready) return json({ ok: false, configured: false });
+    const status = await backupStatus({ primary: P, backup: B });
+    const retention = await backupPurge({ db: env.PORTAL_DB, primary: P, backup: B, now, dryRun: true });
+    return json({ ...status, retention: { ok: retention.ok, enabled: purgeEnabled(env), waiting: retention.waiting, due: retention.eligible, protected: retention.protected, unreferenced: retention.unreferenced } });
+  }
   if (!ready) return err(503, "backup_unavailable", "File backup is not set up on this deployment.");
   if (kind === "backup_check") { const r = await backupCheck(env); await logActivity(env, actor, "files.backup.check", { ok: r.ok, steps: r.steps.map((x) => `${x.name}:${x.ok ? "ok" : "fail"}`) }, now); return json(r); }
-  const read = await readJson(request, kind === "backup_restore" ? ["confirm"] : []);
+  const read = await readJson(request, kind === "backup_restore" || kind === "backup_purge" ? ["confirm"] : []);
   if (read.response) return read.response;
   if (kind === "backup_run") { const r = await backupFiles({ primary: P, backup: B, limit: 50 }); await logActivity(env, actor, "files.backup.run", { ok: r.ok, copied: r.copied, failed: r.failed, remaining: r.remaining }, now); return json(r); }
+  if (kind === "backup_purge") {
+    const real = read.body.confirm === "PURGE";
+    if (real && !purgeEnabled(env)) return err(409, "purge_disabled", "Automatic removal of old backup copies is switched off. Nothing was deleted.");
+    const r = await backupPurge({ db: env.PORTAL_DB, primary: P, backup: B, now, dryRun: !real });
+    if (real) await logActivity(env, actor, "files.backup.purge", { ok: r.ok, deleted: r.deleted, failed: r.failed, remaining: r.remaining }, now);
+    return json(r);
+  }
   if (read.body.confirm !== "RESTORE") return err(422, "confirmation_required", "Type RESTORE to confirm. Nothing was copied.");
-  const r = await restoreFiles({ primary: P, backup: B, limit: 50 });
+  const r = await restoreFiles({ primary: P, backup: B, limit: 50, only: (keys) => restorableKeys(env.PORTAL_DB, keys) });
   await logActivity(env, actor, "files.backup.restore", { ok: r.ok, copied: r.copied, failed: r.failed, remaining: r.remaining }, now);
   return json(r);
 }
@@ -215,7 +229,7 @@ export async function handleBrandingApi(request, env, principal, path, deps = {}
   const seg = path.split("/").filter(Boolean);
   let route = null;
   if (seg[0] === "branding" && seg.length === 2 && seg[1] === "storage-check") route = { kind: "storage_check", method: "POST" };
-  else if (seg[0] === "branding" && seg.length === 2 && ["backup", "backup-check", "backup-run", "backup-restore"].includes(seg[1])) route = { kind: seg[1].replace("-", "_"), method: seg[1] === "backup" ? "GET" : "POST" };
+  else if (seg[0] === "branding" && seg.length === 2 && ["backup", "backup-check", "backup-run", "backup-restore", "backup-purge"].includes(seg[1])) route = { kind: seg[1].replace("-", "_"), method: seg[1] === "backup" ? "GET" : "POST" };
   else if (seg[0] === "clients" && seg[2] === "branding" && seg.length >= 3) {
     const rest = seg.slice(3), org = seg[1];
     const id = (i) => rest[i];

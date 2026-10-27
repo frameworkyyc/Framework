@@ -31,12 +31,13 @@ async function listAll(bucket, prefix = "") {
 const differs = (a, b) => a.size !== b.size || Boolean(a.etag && b.etag && a.etag !== b.etag);
 
 /** Copies objects from `from` to `to`: those missing in `to` and, when `overwriteDifferent`, those that differ. Bounded, counts only, never deletes, never throws. */
-async function copyAcross({ from, to, limit, prefix, overwriteDifferent }) {
+async function copyAcross({ from, to, limit, prefix, overwriteDifferent, only }) {
   const result = { ok: true, checked: 0, copied: 0, failed: 0, remaining: 0 };
   try {
     const [src, dst] = [await listAll(from, prefix), await listAll(to, prefix)];
     result.checked = src.size;
-    const todo = [...src].filter(([key, o]) => { const b = dst.get(key); return !b || (overwriteDifferent && differs(o, b)); }).map(([key]) => key).sort();
+    let todo = [...src].filter(([key, o]) => { const b = dst.get(key); return !b || (overwriteDifferent && differs(o, b)); }).map(([key]) => key).sort();
+    if (only) { const allowed = await only(todo); todo = todo.filter((k) => allowed.has(k)); } // a failing filter throws: nothing is copied (fail closed)
     for (const key of todo) {
       if (result.copied + result.failed >= limit) { result.remaining = todo.length - result.copied - result.failed; break; }
       try {
@@ -66,13 +67,13 @@ export async function backupFiles({ primary, backup, limit = 20, prefix = "" } =
   return copyAcross({ from: primary, to: backup, limit, prefix, overwriteDifferent: true });
 }
 
-/** Backup -> primary: ONLY objects missing from the primary. An object that exists in the primary is never overwritten. */
-export async function restoreFiles({ primary, backup, limit = 20, prefix = "" } = {}) {
+/** Backup -> primary: ONLY objects missing from the primary. An object that exists in the primary is never overwritten. `only(keys)` (optional, async) returns the Set of keys that may be restored; Admin passes the database filter so a deliberately deleted file stays deleted. */
+export async function restoreFiles({ primary, backup, limit = 20, prefix = "", only } = {}) {
   const none = { ok: true, checked: 0, copied: 0, failed: 0, remaining: 0 };
   if (!primary) return { ...none, skipped: "no_primary" };
   if (!backup) return { ...none, skipped: "no_backup" };
   if (primary === backup) return { ...none, ok: false, skipped: "same_bucket" };
-  return copyAcross({ from: backup, to: primary, limit, prefix, overwriteDifferent: false });
+  return copyAcross({ from: backup, to: primary, limit, prefix, overwriteDifferent: false, only });
 }
 
 /** Counts only: how many objects each side holds and what is missing where. */

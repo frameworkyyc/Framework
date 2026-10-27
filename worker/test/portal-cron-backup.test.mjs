@@ -93,7 +93,7 @@ test("the scheduled handler: notifications run only when Client Services is swit
   const log = (f) => lines.push(f);
   // switch off: nothing is sent, nothing is touched
   let r = await runScheduled(env, { fetch: fetchOk, log });
-  assert.deepEqual(r, { notifications: null, backup: null });
+  assert.deepEqual(r, { notifications: null, backup: null, purge: null });
   assert.equal(sent.length, 0);
   // switch on: the pending staff notice goes out (to the configured staff address) with nobody visiting
   w.db.raw.prepare("UPDATE service_notifications SET status = 'pending', attempts = 0").run();
