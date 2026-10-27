@@ -29,7 +29,10 @@
     // Framework Admin -> Clients: create client organizations and invitations (behind Cloudflare Access AND ADMIN_EMAILS), and send invitations.
     // Sending is still limited server-side to the exact addresses in the Cloudflare secret PORTAL_INVITE_ALLOWLIST (missing or malformed = every invitation operation refused).
     "PORTAL_ADMIN_WRITES": "1",
-    "PORTAL_INVITE_SENDING": "1"
+    "PORTAL_INVITE_SENDING": "1",
+    // Release 2 (client launch): the client-facing Branding section (view and download published brand assets, upload existing brand materials, request a quote).
+    // Needs migrations 0005/0006 and the PORTAL_FILES binding (both in place). Exactly "1" or absent: absent returns Branding to a "Coming soon" page. Rollback: delete this line.
+    "PORTAL_BRANDING": "1"
   },
   // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
   // redact_query_string keeps ?code= / ?invitation_token= out of platform logs; invocation_logs is OFF because the automatic per-request record
@@ -116,7 +119,7 @@
       // Missing, empty or malformed means every invitation operation is refused. Setup and the add-an-address procedure: worker/portal/INVITATION-DELIVERY-PLAN.md and ADMIN-INVITATIONS-RUNBOOK.md.
       "PORTAL_ADMIN_WRITES": "1",
       "PORTAL_INVITE_SENDING": "1",
-      // Turns on the client-facing Branding section (view and download published brand assets, upload existing brand materials). STAGING ONLY, never at the top level.
+      // Turns on the client-facing Branding section (view and download published brand assets, upload existing brand materials). On in Production since Release 2 (top-level vars).
       // Needs migrations 0005/0006 and the PORTAL_FILES binding below. Exactly "1" or absent: absent keeps Branding as a "Coming soon" page.
       "PORTAL_BRANDING": "1",
       // Turns on the client-facing Client Services area (invoices, support & change requests, contact). STAGING ONLY, never at the top level. Needs migration 0007 for its data.
