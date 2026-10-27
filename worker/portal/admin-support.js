@@ -57,6 +57,9 @@ async function globalApi(request, env, kind, deps) {
   try {
     if (!(await tablesPresent(db))) return json({ available: false });
     const now = deps.now || new Date();
+    // Every Admin page load asks for these counts, so it doubles as the retry sweep: anything left unsent (a provider hiccup, a Worker restart) goes out now,
+    // after the growing wait, with no one pressing a button. Cheap when nothing is pending; never delays or fails the response.
+    if (kind === "list" || kind === "attention") await dispatchNotifications(env, { ...deps, now });
     if (kind === "list") {
       const scope = new URL(request.url).searchParams.get("scope");
       const use = SCOPES.includes(scope) ? scope : "attention";
@@ -66,7 +69,7 @@ async function globalApi(request, env, kind, deps) {
     if (kind === "attention") {
       return json({ available: true, support: await sup.adminSupportTotals(db), invoices: await adminInvoiceTotals(db, { now }), emails: emailState(env, await notificationTotals(db)) });
     }
-    const result = await processNotifications(env, { db, now, fetch: deps.fetch });
+    const result = await processNotifications(env, { db, now, fetch: deps.fetch, force: true });
     return json({ ok: true, result, emails: emailState(env, await notificationTotals(db)) });
   } catch (e) {
     console.error("admin services api error:", e && e.name);

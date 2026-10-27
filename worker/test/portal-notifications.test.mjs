@@ -164,7 +164,7 @@ test("a provider failure never affects saved work: the request, reply and publis
   const stuck = sql(w.db, "SELECT status, attempts, last_error FROM service_notifications WHERE status = 'pending' AND attempts > 0");
   assert.ok(stuck.length > 0 && stuck.every((n) => n.last_error && n.attempts >= 1 && n.attempts < MAX_ATTEMPTS), "failed sends stay pending with a reason");
   assert.ok(!JSON.stringify(stuck).match(/re_test_key|Bearer/), "no secret in the stored reason");
-  for (let i = 0; i < MAX_ATTEMPTS + 1; i++) await run();
+  for (let i = 0; i < MAX_ATTEMPTS + 1; i++) await run({ force: true });
   assert.ok(sql(w.db, "SELECT count(*) n FROM service_notifications WHERE status = 'failed'")[0].n > 0, "after the limit a notice is marked failed and not retried forever");
   assert.equal(sql(w.db, "SELECT count(*) n FROM service_notifications WHERE status = 'pending' AND attempts >= ?", MAX_ATTEMPTS)[0].n, 0);
   w.mail.mode = "ok"; w.mail.sent.length = 0;
@@ -178,7 +178,7 @@ test("a retry after a half-sent notice reuses the same idempotency key, so the p
   const id = await create(mia); await run(); w.mail.sent.length = 0;
   await adminJson(`/clients/${A.id}/support/${id}/reply`, { body: "Hello" });
   const row = sql(w.db, "SELECT id FROM service_notifications WHERE event = 'request_staff_reply'")[0];
-  w.mail.mode = "500"; await run(); w.mail.mode = "ok"; await run();
+  w.mail.mode = "500"; await run({ force: true }); w.mail.mode = "ok"; await run({ force: true });
   const keys = w.mail.sent.map((m) => m.key); assert.ok(keys.length >= 2 && keys.every((k) => k.startsWith("svc-" + row.id)), "keys derive from the notice id and the recipient position");
   void ann;
 });
@@ -285,4 +285,48 @@ test("the Admin pages are built the safe way: the global list and conversation r
   assert.match(readFileSync(new URL("../../admin/assets/modules.js", import.meta.url), "utf8"), /id: "support", label: "Support Requests", path: "\/admin\/support"/);
   assert.match(readFileSync(new URL("../../admin/assets/admin.js", import.meta.url), "utf8"), /adm-nav__badge/);
   assert.match(readFileSync(new URL("../../admin/assets/overview.js", import.meta.url), "utf8"), /Needs attention/);
+});
+
+test("automatic delivery: a failed email is retried with a growing wait and no button; every Admin page load and client Home visit sweeps; the Send-now button forces", async () => {
+  const { w, A, mia, ann, create, adminJson, call, run } = await setup();
+  w.mail.mode = "500";
+  const id = await create(mia, { title: "Outage request" });
+  w.mail.mode = "ok"; w.mail.sent.length = 0;
+  const row = () => sql(w.db, "SELECT status, attempts, created_at FROM service_notifications WHERE event = 'request_submitted'")[0];
+  assert.deepEqual([row().status, row().attempts], ["pending", 1], "the first attempt failed and the notice waits");
+  const t0 = new Date(row().created_at).getTime();
+  assert.equal((await run({ now: new Date(t0 + 30 * 1000) })).sent, 0, "30 seconds in: too soon to retry (the wait after one failure is a minute)");
+  assert.equal((await run({ now: new Date(t0 + 90 * 1000) })).sent, 1, "a minute and a half in: retried and sent without anyone pressing anything");
+  assert.equal(w.mail.sent.length, 1); assert.equal(row().status, "sent");
+  // the growing wait: after two failures a retry needs four minutes
+  w.mail.mode = "500"; await adminJson(`/clients/${A.id}/support/${id}/reply`, { body: "Hello" }); w.mail.mode = "ok";
+  const r2 = sql(w.db, "SELECT created_at, attempts FROM service_notifications WHERE event = 'request_staff_reply'")[0], t1 = new Date(r2.created_at).getTime();
+  w.mail.mode = "500"; await run({ now: new Date(t1 + 70 * 1000) }); w.mail.mode = "ok"; // the retry also fails: two attempts used
+  assert.equal(sql(w.db, "SELECT attempts FROM service_notifications WHERE event = 'request_staff_reply'")[0].attempts, 2);
+  assert.equal((await run({ now: new Date(t1 + 120 * 1000) })).sent, 0, "after a second failure two minutes is still too soon");
+  // an Admin page load sweeps: once enough time has passed (simulated by ageing the notice an hour) ...
+  w.db.raw.prepare("UPDATE service_notifications SET created_at = ? WHERE event = 'request_staff_reply'").run(new Date(Date.now() - 3600 * 1000).toISOString());
+  assert.equal(sql(w.db, "SELECT count(*) n FROM service_notifications WHERE status = 'pending'")[0].n, 1, "the staff reply notice is still waiting");
+  w.mail.sent.length = 0;
+  assert.equal((await call(`/services/attention`)).status, 200);
+  assert.equal(w.mail.sent.filter((m) => /replied to your request/.test(m.subject)).length >= 1, true, "loading Admin sent it");
+  assert.equal(sql(w.db, "SELECT count(*) n FROM service_notifications WHERE status = 'pending'")[0].n, 0);
+  // ... and so does a client's Home visit
+  w.mail.mode = "500"; const id2 = await create(ann, { title: "Second outage" }); w.mail.mode = "ok"; w.mail.sent.length = 0;
+  await ann.get("/portal/o/alpha"); assert.equal(w.mail.sent.length, 0, "right after the failure the wait has not passed");
+  w.clock.advance(120); await mia.get("/portal/o/alpha");
+  assert.ok(w.mail.sent.some((m) => /Second outage/.test(m.text)), "two minutes later a Home visit retried and sent it");
+  // the button ignores the wait
+  w.mail.mode = "500"; await adminJson(`/clients/${A.id}/support/${id2}/reply`, { body: "again" }); w.mail.mode = "ok"; w.mail.sent.length = 0;
+  const forced = (await call("/services/notifications/process", { method: "POST", json: {} })).json;
+  assert.ok(forced.result.sent >= 1, "Send pending emails now sends at once"); void run;
+});
+
+test("the sweep is wired where people already go: Admin counts, the global list and the client Home; and a scheduled trigger is deliberately not used", () => {
+  const admin = readFileSync(new URL("../portal/admin-support.js", import.meta.url), "utf8");
+  assert.match(admin, /kind === "list" \|\| kind === "attention"\) await dispatchNotifications/); assert.match(admin, /force: true/);
+  const router = readFileSync(new URL("../portal/router.js", import.meta.url), "utf8");
+  assert.match(router, /if \(servicesOn\(ctx\)\) await dispatchNotifications\(ctx\.env, ctx\)/);
+  const cfg = readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8");
+  assert.ok(!/"crons"|"triggers"/.test(cfg), "no cron trigger: they run on the production deployment only, so they cannot serve Staging (and must not be added to Production here)");
 });

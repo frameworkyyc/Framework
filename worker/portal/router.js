@@ -431,6 +431,7 @@ const ORG_ROUTES = [
   ...SERVICES_ROUTES,
   { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => {
       // One read serves both the greeting's name fallback and the module progress. null (unreadable) shows "Progress unavailable", never 0%.
+      if (servicesOn(ctx)) await dispatchNotifications(ctx.env, ctx); // a client visit is also a chance to retry any email that did not go out (see service-notifications.js)
       const answers = await readAnswers(ctx, a);
       const shown = { ...withDisplayName(a, answers), returning: await returningVisitor(ctx, a) };
       return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }), await brandCard(ctx, a), await servicesAttention(ctx, a));
