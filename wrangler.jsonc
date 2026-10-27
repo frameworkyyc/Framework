@@ -68,6 +68,10 @@
     { "binding": "PORTAL_FILES", "bucket_name": "framework-portal-files" },
     { "binding": "PORTAL_FILES_BACKUP", "bucket_name": "framework-portal-files-backup" }
   ],
+  // Background work (PRODUCTION rollout Stage 5), every 5 minutes, Production only (Previews are never invoked by Cron Triggers): worker/portal/scheduled.js runs
+  // (1) the Client Services email sweep, only while PORTAL_SERVICES is "1" (atomic claim, no duplicate emails, retries at 1/4/9/16 minutes, at most 5 attempts) and
+  // (2) the client-file backup (copy-only, never deletes or overwrites a backup object). Rollback: set "crons": [].
+  "triggers": { "crons": ["0-59/5 * * * *"] },
   // Portal abuse limiter (worker/portal/ratelimit.js): 20 requests / 60 s per client network on sign-in start, callback and sign-out. Inert while
   // the portal is off. namespace_id must be unique in the account: 4201 is Production's, Staging uses 4101 in previews.ratelimits.
   "ratelimits": [
