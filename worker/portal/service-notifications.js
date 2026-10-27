@@ -7,6 +7,8 @@
  *     (organization, audience, event, request) so a burst is one email, every provider call carries an idempotency key derived from the row, and a sent row is
  *     never touched again.
  *   - Quick replies are throttled: at most one reply email per request, per side, every REPLY_THROTTLE_MS.
+ *   - Delivery is automatic: each change dispatches right after it is saved, and every Admin page load and client Home visit sweeps anything still unsent (with a growing
+ *     wait between attempts), so no one has to press a button. (A scheduled trigger cannot do this job: cron triggers run only on the production deployment.)
  *   - Retries are bounded (MAX_ATTEMPTS). A row that cannot be sent because email is not configured is left pending without using an attempt.
  *
  * Who is emailed: Framework (ASSESSMENT_NOTIFY_TO, default hello@frameworkco.ca) when a client sends a request or replies; the client when Framework replies, sends
@@ -82,9 +84,11 @@ const mark = (db, id, status, error, at) => db.prepare("UPDATE service_notificat
 
 /**
  * Sends up to `limit` pending notices. Never throws. Returns counts: { sent, failed, retry, skipped, pending, configured }.
- * @param o { db, now?, fetch?, limit? }
+ * A notice that failed before is retried only after a growing wait (attempt number squared, in minutes, counted from when it was queued), unless `force` is set
+ * (the Admin "send now" button). Fresh notices are always eligible at once.
+ * @param o { db, now?, fetch?, limit?, force? }
  */
-export async function processNotifications(env, { db, now = new Date(), fetch: fetchImpl = fetch, limit = BATCH } = {}) {
+export async function processNotifications(env, { db, now = new Date(), fetch: fetchImpl = fetch, limit = BATCH, force = false } = {}) {
   const out = { sent: 0, failed: 0, retry: 0, skipped: 0, pending: 0, configured: true };
   try {
     if (!db) return out;
@@ -94,7 +98,7 @@ export async function processNotifications(env, { db, now = new Date(), fetch: f
       return out;
     }
     const origin = new URL(String(env.PORTAL_BASE_URL || "")).origin;
-    const rows = (await db.prepare("SELECT id, organization_id, audience, event, entity_type, entity_id, attempts FROM service_notifications WHERE status = 'pending' AND attempts < ? ORDER BY created_at, id LIMIT ?").bind(MAX_ATTEMPTS, limit).all()).results;
+    const rows = (await db.prepare("SELECT id, organization_id, audience, event, entity_type, entity_id, attempts FROM service_notifications WHERE status = 'pending' AND attempts < ? AND (? = 1 OR attempts = 0 OR (julianday(?) - julianday(created_at)) * 1440.0 >= attempts * attempts) ORDER BY created_at, id LIMIT ?").bind(MAX_ATTEMPTS, force ? 1 : 0, isoTime(now), limit).all()).results;
     for (const n of rows) {
       // claim: only the worker whose UPDATE changes the row may send it
       const claim = await db.prepare("UPDATE service_notifications SET attempts = attempts + 1 WHERE id = ? AND status = 'pending' AND attempts = ?").bind(n.id, n.attempts).run();
