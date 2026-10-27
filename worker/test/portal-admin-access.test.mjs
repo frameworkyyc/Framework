@@ -370,7 +370,7 @@ test("failures are safe: a database error answers 500 server_error with no SQL, 
 test("the module imports exactly the reviewed modules, and no other file imports the delivery code", () => {
   const src = read("worker/portal/admin-access.js");
   const imports = [...src.matchAll(/from "([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(imports, ["./admin-clients.js", "./repo/orgs.js", "./repo/invitations.js", "./repo/memberships.js", "./repo/validate.js", "./repo/common.js", "./workos-admin.js", "./invite-delivery.js", "../assessment.js", "./invite-recipients.js"]);
+  assert.deepEqual(imports, ["./admin-clients.js", "./repo/orgs.js", "./repo/invitations.js", "./repo/memberships.js", "./repo/validate.js", "./repo/common.js", "./workos-admin.js", "./invite-delivery.js", "../assessment.js", "./invite-recipients.js", "./repo/approved-emails.js"]);
   for (const f of ["worker/index.js", "worker/admin/router.js", "worker/portal/router.js", "worker/portal/auth.js", "worker/portal/admin-clients.js", "worker/portal/admin-feedback.js"]) {
     assert.ok(!/invite-delivery|workos-admin|invitation-delivery/.test(read(f)), f + " does not import the unwired delivery code");
   }

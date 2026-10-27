@@ -191,7 +191,7 @@ test("Create and send: one confirmation, create first then send, a failed send k
   const i = src.indexOf("request: async () => {");
   const block = src.slice(i, i + 700);
   assert.ok(block.indexOf('/invitations", { method: "POST"') < block.indexOf("/send`"), "create before send");
-  assert.match(block, /catch \(sendError\) \{\s*return \{ sendError \};/);
+  assert.match(block, /catch \(sendError\) \{\s*return \{ approved: Boolean\(created\.approved\), sendError \};/);
   assert.match(src, /was saved but NOT sent\./);
   assert.match(src, /Nothing was emailed\./);
   assert.match(src, /A common reason is that this address already has an earlier WorkOS invitation/);

@@ -360,16 +360,16 @@ test("every path that can email an invitation is behind the check: only admin-ac
   const importsRepo = /import\s*\{[^}]*\b(createInvitation|replaceInvitation)\b[^}]*\}\s*from/;
   assert.deepEqual(users(/\bsendEmail\b/), ["admin-access.js", "invite-delivery.js", "service-notifications.js"], "the admin API wires invitation email, the delivery code only calls what it is given, and the Client Services notifier (below) sends only notices of its own");
   const notifier = strip(read("worker/portal/service-notifications.js"));
-  assert.match(notifier, /filter\(\(e\) => checkRecipient\(env, e\)\.ok\)/, "client notices only go to approved recipients");
+  assert.match(notifier, /filter\(\(e\) => checkRecipient\(env, e, stored\)\.ok\)/, "client notices only go to approved recipients");
   assert.ok(!/createInvitation|replaceInvitation|deliverInvitation/.test(notifier), "the notifier cannot create or send an invitation");
   assert.deepEqual(users(importsRepo), ["admin-access.js"], "no other module imports the invitation creation or replacement functions");
   assert.deepEqual(users(/\bdeliverInvitation\b/), ["admin-access.js", "invite-delivery.js"]);
   const src = strip(read("worker/portal/admin-access.js"));
-  assert.match(src, /const gate = checkRecipient\(env, body\.email\);\s*if \(!gate\.ok\) return err\(403/, "creation is checked before createInvitation");
-  const checkAt = src.indexOf("gateStoredInvitation(env, db, org.id, route.target)");
+  assert.match(src, /let gate = checkRecipient\(env, body\.email, stored\);[\s\S]*?if \(!gate\.ok\) return err\(403[\s\S]*?createInvitation\(db/, "creation is checked before createInvitation (an explicit approval happens first, in the same place)");
+  const checkAt = src.indexOf("gateStoredInvitation(env, db, org.id, route.target, stored)");
   for (const call of ["deliverInvitation(ctx", "replaceInvitation(db"]) assert.ok(checkAt > 0 && checkAt < src.indexOf(call), `the stored-address check comes before ${call}`);
   assert.match(src, /route\.kind === "invitation_send" \|\| route\.kind === "invitation_resend" \|\| route\.kind === "invitation_replace"/);
-  assert.match(src, /checkRecipient: \(email\) => checkRecipient\(env, email\)/, "the delivery code gets the same policy");
+  assert.match(src, /checkRecipient: \(email\) => checkRecipient\(env, email, stored\)/, "the delivery code gets the same policy");
   // the portal routes (what clients can reach) have no way to create or send an invitation
   for (const f of ["router.js", "auth.js", "pages.js", "guard.js"]) assert.ok(!/createInvitation|replaceInvitation|deliverInvitation|sendEmail/.test(strip(read("worker/portal/" + f))), f);
   // the separate, existing admin FEEDBACK-request email is a different feature (a link to the public feedback form) and is not a portal invitation
