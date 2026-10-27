@@ -24,17 +24,13 @@ function brand() {
 }
 
 function navItem(m) {
-  if (!m.enabled) {
-    return h("li", null, h("span", { class: "adm-nav__link is-disabled", "aria-disabled": "true" }, m.label, h("span", { class: "adm-nav__later" }, "Later")));
-  }
   const a = h("a", { class: "adm-nav__link", href: m.path, "data-link": "", "data-module": m.id }, m.label);
   navLinks.push(a);
   return h("li", null, a);
 }
 
 function buildShell() {
-  const live = MODULES.filter((m) => m.enabled);
-  const later = MODULES.filter((m) => !m.enabled);
+  const live = MODULES.filter((m) => m.enabled); // a module that is not built yet (enabled: false) is not shown at all
 
   toggle = h("button", { class: "menu-toggle", type: "button", "aria-expanded": "false", "aria-controls": "adm-side" }, "Menu");
   const bar = h("header", { class: "adm-bar" }, brand(), toggle);
@@ -48,9 +44,6 @@ function buildShell() {
       "nav",
       { class: "adm-nav", "aria-label": "Admin" },
       h("div", { class: "adm-nav__group" }, h("ul", null, live.map(navItem))),
-      later.length
-        ? h("div", { class: "adm-nav__group" }, h("p", { class: "adm-side__label adm-nav__group-label" }, "Coming later"), h("ul", null, later.map(navItem)))
-        : null,
     ),
     h("div", { class: "adm-side__foot" }, userLine, h("a", { href: "/", target: "_blank", rel: "noopener" }, "View website"), h("a", { href: "/cdn-cgi/access/logout" }, "Sign out")),
   );
