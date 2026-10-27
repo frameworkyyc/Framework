@@ -21,7 +21,6 @@ export async function render(ctx) {
 
 /* ---------- List ---------- */
 
-const ARROW = () => { const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false"); svg.setAttribute("class", "adm-clientrow__arrow"); const path = document.createElementNS("http://www.w3.org/2000/svg", "path"); path.setAttribute("d", "M5 12h14m-5-5 5 5-5 5"); svg.append(path); return svg; };
 
 /** Business Profile completion: a thin native progress bar and the percentage. The bar is decorative (the percentage and a screen-reader sentence carry the meaning), and a native element needs no inline style (the Admin CSP forbids those). */
 function completion(p) {
@@ -33,14 +32,13 @@ function completion(p) {
     h("span", { class: "visually-hidden" }, `Business Profile ${p.percent}% complete (${p.done} of ${p.total} steps)`));
 }
 
-/** One whole row is the link: name first (full width), then when it was created and how far the Business Profile is. Members and invitations live on the client's own page. */
+/** One whole row is the link (no arrow: the actions menu sits beside it): name first (full width), then when it was created and how far the Business Profile is. Members and invitations live on the client's own page. */
 function clientRow(c) {
   const created = c.status === "active" ? "Created " + fmtDate(c.created_at) : `${statusWord(c.status)} · created ${fmtDate(c.created_at)}`;
   return h("a", { class: "adm-clientrow", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "" },
     h("span", { class: "adm-clientrow__name", text: c.name }),
     h("span", { class: "adm-clientrow__date", text: created }),
-    completion(c.profile),
-    ARROW());
+    completion(c.profile));
 }
 
 async function renderList(ctx) {

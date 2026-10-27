@@ -353,14 +353,13 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-clientlist { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
 .adm-clientlist li { border-bottom: 1px solid var(--hairline); }
 .adm-clientrow {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name name" "date arrow" "profile arrow";
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "name" "date" "profile";
   gap: 6px 16px; align-items: center; min-height: 44px; padding: 18px 0; color: var(--ink); text-decoration: none;
   -webkit-tap-highlight-color: transparent; transition: background-color .15s ease;
 }
 .adm-clientrow__name { grid-area: name; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: 20px; line-height: 1.25; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .adm-clientrow__date { grid-area: date; min-width: 0; font-size: 14px; line-height: 1.4; color: var(--slate); overflow-wrap: anywhere; }
 .adm-clientrow__profile { grid-area: profile; display: flex; align-items: center; gap: 12px; min-width: 0; margin-top: 4px; font-size: 14px; color: var(--slate); }
-.adm-clientrow__arrow { grid-area: arrow; width: 22px; height: 22px; fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: square; stroke-linejoin: miter; transition: transform .15s ease; }
 .adm-meter { flex: none; align-self: center; margin: 0; vertical-align: middle; width: 112px; height: 4px; border: 0; border-radius: 0; background: var(--hairline); color: var(--ink); -webkit-appearance: none; appearance: none; }
 .adm-meter::-webkit-progress-bar { background: var(--hairline); }
 .adm-meter::-webkit-progress-value { background: var(--ink); }
@@ -368,18 +367,17 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-clientrow__pct { line-height: 1.4; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
 @media (hover: hover) {
   .adm-clientrow:hover { background: var(--mist); }
-  .adm-clientrow:hover .adm-clientrow__arrow { transform: translateX(3px); }
 }
 .adm-clientrow:active { background: var(--mist); }
 .adm-clientrow:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; background: var(--mist); }
 @media (hover: hover) { .adm-clientrow { margin-inline: -12px; padding-inline: 12px; } }
 @media (hover: none) { .adm-clientrow { margin-inline: 0; } }
 @media (min-width: 900px) {
-  .adm-clientrow { grid-template-columns: minmax(0, 1fr) 13em 12.5em 22px; grid-template-areas: "name date profile arrow"; gap: 16px 24px; padding-block: 20px; }
+  .adm-clientrow { grid-template-columns: minmax(0, 1fr) 13em 12.5em; grid-template-areas: "name date profile"; gap: 16px 24px; padding-block: 20px; }
   .adm-clientrow__name { font-size: 18px; }
   .adm-clientrow__profile { margin-top: 0; }
 }
-@media (prefers-reduced-motion: reduce) { .adm-clientrow, .adm-clientrow__arrow { transition: none; } .adm-clientrow:hover .adm-clientrow__arrow { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .adm-clientrow { transition: none; } }
 @media print { .adm-clientrow:hover { background: transparent; } }
 
 /* ---------- Client detail (mobile-first): records instead of squeezed columns ---------- */
@@ -695,6 +693,7 @@ a.adm-tile--link { display: flex; flex-direction: column; gap: 0; }
 .adm-clientitem { position: relative; display: flex; align-items: center; gap: 4px; }
 .adm-clientitem > .adm-clientrow { flex: 1 1 auto; min-width: 0; }
 .adm-menuwrap { position: relative; flex: none; }
+.adm-clientitem .adm-menuwrap { margin-right: -11px; margin-left: 8px; }
 .adm-menubtn { appearance: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; background: none; color: var(--ink); cursor: pointer; }
 .adm-menubtn svg { width: 22px; height: 22px; fill: currentColor; }
 .adm-menubtn:hover, .adm-menubtn[aria-expanded="true"] { background: var(--mist); }
