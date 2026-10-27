@@ -9,6 +9,8 @@
   // block; Staging has its own copy in previews.vars below. Never put secrets (API keys, tokens, admin emails) in this file.
   "vars": {
     "ASSESSMENT_FROM": "Framework <hello@frameworkco.ca>",
+    // Staff recipient for assessment and client-service notifications, pinned explicitly (it is also the code's default). Not a secret.
+    "ASSESSMENT_NOTIFY_TO": "hello@frameworkco.ca",
     // Public Turnstile site key (safe to expose; it is rendered in the page). The matching TURNSTILE_SECRET is an
     // encrypted runtime secret stored in Cloudflare, never in this file. Both must be set for the check to be enforced.
     "TURNSTILE_SITE_KEY": "0x4AAAAAAFZzTbJqfnTzJNss",
@@ -58,6 +60,13 @@
       // The portal's migrations live in migrations/portal (one .sql file). Nothing runs on deploy; the reviewed manual workflow applies them.
       "migrations_dir": "migrations/portal"
     }
+  ],
+  // Client files (PRODUCTION rollout Stage 3): two PRIVATE R2 buckets, no public access and no custom domain. PORTAL_FILES holds the files; PORTAL_FILES_BACKUP holds
+  // copies (worker/portal/file-backup.js; it has a retain-everything bucket lock, and the application never deletes there). Bound here, but nothing uses them for clients until
+  // PORTAL_BRANDING / PORTAL_SERVICES are switched on (Stage 4), and there is no cron yet (Stage 5). Admin -> Branding -> Storage can check, back up and restore.
+  "r2_buckets": [
+    { "binding": "PORTAL_FILES", "bucket_name": "framework-portal-files" },
+    { "binding": "PORTAL_FILES_BACKUP", "bucket_name": "framework-portal-files-backup" }
   ],
   // Portal abuse limiter (worker/portal/ratelimit.js): 20 requests / 60 s per client network on sign-in start, callback and sign-out. Inert while
   // the portal is off. namespace_id must be unique in the account: 4201 is Production's, Staging uses 4101 in previews.ratelimits.
