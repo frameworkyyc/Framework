@@ -130,8 +130,9 @@ test("the Worker exports a scheduled handler that runs the same code and returns
   assert.equal(waited.length, 1);
   await Promise.all(waited);
   const cfg = readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8").replace(/^\s*\/\/.*$/gm, "");
-  assert.ok(!/"triggers"|"crons"/.test(cfg), "no schedule is configured in this stage");
   const parsed = JSON.parse(cfg);
-  assert.deepEqual(parsed.r2_buckets.map((b) => b.binding), ["PORTAL_FILES", "PORTAL_FILES_BACKUP"], "Production binds its own two buckets (Stage 3); still no cron");
+  assert.deepEqual(parsed.triggers, { crons: ["0-59/5 * * * *"] }, "Production runs the scheduled handler every 5 minutes (Stage 5)");
+  assert.equal(parsed.previews.triggers, undefined, "Staging is never scheduled");
+  assert.deepEqual(parsed.r2_buckets.map((b) => b.binding), ["PORTAL_FILES", "PORTAL_FILES_BACKUP"], "Production binds its own two buckets (Stage 3)");
   assert.ok(parsed.previews.r2_buckets.some((b) => b.binding === "PORTAL_FILES_BACKUP"));
 });
