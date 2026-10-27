@@ -119,6 +119,8 @@ export const PROFILES = Object.freeze({
   brand_client: Object.freeze(["png", "jpg", "webp", "svg", "pdf", "ai", "eps", "ttf", "otf", "woff", "woff2", "txt", "docx", "xlsx", "pptx", "zip"]),
   // Invoices are PDFs prepared by Framework: nothing else is accepted.
   invoice: Object.freeze(["pdf"]),
+  // Support request attachments (screenshots, documents, a ZIP): no fonts, vector or print files. ZIPs are inspected and download-only like everywhere else.
+  support: Object.freeze(["png", "jpg", "webp", "pdf", "txt", "docx", "xlsx", "pptx", "zip"]),
   brand_admin: Object.freeze(["png", "jpg", "webp", "svg", "pdf", "ai", "eps", "ttf", "otf", "woff", "woff2", "txt", "docx", "xlsx", "pptx", "zip"]),
 });
 

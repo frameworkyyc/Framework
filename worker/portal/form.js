@@ -101,3 +101,42 @@ export async function readUpload(request, max) {
   }
   return { fields, file };
 }
+
+/**
+ * Like readUpload, but accepts up to `maxFiles` file parts, all named "file" (a form with a multiple file input sends one part per file). The same streaming size
+ * limit applies to the WHOLE body. Empty file parts (a file input left blank) are ignored, so a form without attachments is fine.
+ * @returns {Promise<{ fields: Map<string,string>, files: { name: string, bytes: Uint8Array }[] } | { error: 400 | 413 }>}
+ */
+export async function readUploads(request, max, maxFiles = 3) {
+  const type = request.headers.get("Content-Type") || "";
+  if (!/^multipart\/form-data;\s*boundary=/i.test(type) || !request.body) return { error: 400 };
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) { await reader.cancel().catch(() => {}); return { error: 413 }; }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) { bytes.set(c, at); at += c.byteLength; }
+  let form;
+  try { form = await new Response(bytes, { headers: { "Content-Type": type } }).formData(); } catch { return { error: 400 }; }
+  const fields = new Map();
+  const files = [];
+  for (const [k, v] of form.entries()) {
+    if (typeof v === "string") {
+      if (fields.has(k)) return { error: 400 };
+      fields.set(k, v);
+    } else {
+      if (k !== "file") return { error: 400 };
+      if (!v.name && v.size === 0) continue; // an empty file input
+      if (files.length >= maxFiles) return { error: 400 };
+      files.push({ name: v.name || "", bytes: new Uint8Array(await v.arrayBuffer()) });
+    }
+  }
+  return { fields, files };
+}

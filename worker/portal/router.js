@@ -25,14 +25,16 @@ import { hasPriorVisit } from "./repo/visits.js";
 import { stepById, PROFILE_STEPS, MULTI_SEP } from "./profile-schema.js";
 import { comingSoonKeys, LIVE_AREAS } from "./guided-data.js";
 import { moduleStatuses, nextActions } from "./module-status.js";
-import { readForm, readUpload, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES, UPLOAD_FORM_OVERHEAD } from "./form.js";
+import { readForm, readUpload, readUploads, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES, UPLOAD_FORM_OVERHEAD } from "./form.js";
 import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
 import { checkCsrf } from "./sessions.js";
 import { can } from "./policy.js";
 import { getClientBrand, listClientUploads, uploadUsage, getBrandKit } from "./repo/brand.js";
 import { listClientInvoices, clientInvoiceSummary } from "./repo/invoices.js";
 import { clientDownloadInvoice } from "./invoice-files.js";
-import { invoiceStatusLine } from "./services-live.js";
+import { invoiceStatusLine, supportStatusLine } from "./services-live.js";
+import * as supportRepo from "./repo/support.js";
+import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./support-files.js";
 import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, limitsFor } from "./brand-files.js";
 
 /**
@@ -330,9 +332,72 @@ async function invoiceCard(ctx, a) {
   catch (err) { if (err instanceof Unavailable || /no such table/i.test(String(err && err.message))) return ""; throw err; }
 }
 
+/** The Support card status on the hub, or "" when requests cannot be read (a database without migration 0007): the card then stays "Coming soon". */
+async function supportCard(ctx, a) {
+  try { return supportStatusLine(await dbCall(() => supportRepo.clientSupportSummary(ctx.db, a.membership.organizationId))); }
+  catch (err) { if (err instanceof Unavailable || /no such table/i.test(String(err && err.message))) return ""; throw err; }
+}
+
+const SUPPORT_BODY = supportRepo.MAX_ATTACHMENTS * supportRepo.MAX_ATTACHMENT_BYTES + UPLOAD_FORM_OVERHEAD;
+/** The HTTP status for a refused request or reply. */
+const supportStatus = (error) => (error === "forbidden" ? 403 : error === "not_found" ? 404 : error === "closed" ? 409 : error === "file_too_large" ? 413 : String(error).startsWith("storage_") ? 503 : 422);
+
+async function postNewRequest(ctx, a) {
+  const read = await readUploads(ctx.request, SUPPORT_BODY, supportRepo.MAX_ATTACHMENTS);
+  if (read.error) return pages.requestFormPage(ctx, a, { error: read.error === 413 ? "file_too_large" : "invalid", status: read.error });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) {
+    logEvent({ evt: "support.request", outcome: "rejected", reason: "csrf", status: 403, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return errorPage(403, { ref: ctx.ref });
+  }
+  const values = { category: read.fields.get("category") || "", title: read.fields.get("title") || "", description: read.fields.get("description") || "" };
+  const res = await clientCreateRequest(brandDeps(ctx), { ...who(a), ...values, files: read.files });
+  if (!res.ok) {
+    const status = supportStatus(res.error);
+    logEvent({ evt: "support.request", outcome: "refused", reason: res.error, status, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return pages.requestFormPage(ctx, a, { values, error: res.error, status });
+  }
+  logEvent({ evt: "support.request", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  return redirect(`/portal/o/${a.membership.slug}/services/requests/${res.id}?${res.attachmentsFailed ? "flash=partial" : "flash=sent"}`);
+}
+
+async function showThread(ctx, a, id, o = {}) {
+  if (!UUID.test(id)) return notFoundPage(ctx);
+  const org = a.membership.organizationId;
+  const thread = await supportRepo.getClientThread(ctx.db, org, id);
+  if (!thread) return notFoundPage(ctx);
+  if (thread.request.unreadForClient) await supportRepo.markClientRead(ctx.db, org, id, { now: ctx.now });
+  return pages.requestThreadPage(ctx, a, thread, { flash: viewFilters(ctx.url).flash, ...o });
+}
+
+async function postReply(ctx, a, id) {
+  if (!UUID.test(id)) return notFoundPage(ctx);
+  const read = await readUploads(ctx.request, SUPPORT_BODY, supportRepo.MAX_ATTACHMENTS);
+  if (read.error) return showThread(ctx, a, id, { error: read.error === 413 ? "file_too_large" : "invalid", status: read.error });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) return errorPage(403, { ref: ctx.ref });
+  const res = await clientReply(brandDeps(ctx), { ...who(a), requestId: id, body: read.fields.get("body") || "", files: read.files });
+  if (!res.ok) {
+    if (res.error === "not_found") return notFoundPage(ctx);
+    return showThread(ctx, a, id, { error: res.error, status: supportStatus(res.error) });
+  }
+  logEvent({ evt: "support.reply", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  return redirect(`/portal/o/${a.membership.slug}/services/requests/${id}?${res.attachmentsFailed ? "flash=partial" : "flash=replied"}`);
+}
+
 /* Client Services (only where PORTAL_SERVICES is on). Phase 1: the hub and the Contact page; invoices and support requests follow. */
 const SERVICES_ROUTES = [
-  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services$/, action: "services.view", run: async (ctx, a) => pages.servicesPage(ctx, a, { invoices: can(a.membership.role, "invoices.view") ? await invoiceCard(ctx, a) : "" }) },
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/requests$/, action: "support.view", postAction: "support.submit", bucket: "support", maxBody: () => SUPPORT_BODY,
+    run: async (ctx, a) => pages.requestsPage(ctx, a, await supportRepo.listClientRequests(ctx.db, a.membership.organizationId)), post: (ctx, a) => postNewRequest(ctx, a) },
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/requests\/new$/, action: "support.submit", run: (ctx, a) => pages.requestFormPage(ctx, a, {}) },
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/requests\/([^/]+)\/files\/([^/]+)$/, action: "support.view", run: async (ctx, a, rid, aid) => {
+      if (!UUID.test(rid || "") || !UUID.test(aid || "")) return notFoundPage(ctx);
+      if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
+      const res = await clientDownloadAttachment(brandDeps(ctx), { ...who(a), requestId: rid, attachmentId: aid });
+      return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
+    } },
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/requests\/([^/]+)\/reply$/, action: "support.view", postAction: "support.submit", bucket: "support", maxBody: () => SUPPORT_BODY,
+    run: async (ctx, a, id) => redirect(`/portal/o/${a.membership.slug}/services/requests/${id}`), post: (ctx, a, id) => postReply(ctx, a, id) },
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/requests\/([^/]+)$/, action: "support.view", run: (ctx, a, id) => showThread(ctx, a, id) },
+  { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services$/, action: "services.view", run: async (ctx, a) => pages.servicesPage(ctx, a, { invoices: can(a.membership.role, "invoices.view") ? await invoiceCard(ctx, a) : "", support: await supportCard(ctx, a) }) },
   // owners only (policy invoices.view): a member who opens the address gets the portal's plain "not allowed" page
   { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/invoices$/, action: "invoices.view", run: async (ctx, a) => pages.invoicesPage(ctx, a, await listClientInvoices(ctx.db, a.membership.organizationId, { now: ctx.now })) },
   { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/invoices\/([^/]+)\/download$/, action: "invoices.view", run: async (ctx, a, id) => {
@@ -440,7 +505,7 @@ async function orgRoute(ctx, path) {
     const access = await requireOrgAccess(ctx, slug, isPost ? r.postAction : r.action);
     if (access instanceof Response) return access;
     try {
-      return await (isPost ? r.post : r.run)(ctx, access, m[2]);
+      return await (isPost ? r.post : r.run)(ctx, access, m[2], m[3]);
     } catch (err) {
       // a failed database read after the guard is an outage; a bug (TypeError and friends) or bad input is a 500 and is not disguised
       if (err instanceof Unavailable || !(err instanceof Error) || !["PortalDataError", "TypeError", "ReferenceError", "RangeError", "SyntaxError"].includes(err.name)) return unavailablePage(ctx);

@@ -659,3 +659,15 @@ a.adm-tile--link:hover .adm-tile__go { color: var(--ink); transform: translateX(
 .adm-payrow { display: grid; gap: 10px; margin: 8px 0 16px; max-width: 640px; }
 .adm-fgrid--pay { align-items: end; } .adm-paydate[hidden] { display: none; }
 .adm-invpage .adm-acc { margin: 16px 0; }
+
+/* Support & Change Requests (Admin): requests are collapsed rows; the thread loads when one is opened. */
+.adm-req { margin: 12px 0; } .adm-reqbody { margin-top: 12px; }
+.adm-thread { display: grid; gap: 16px; }
+.adm-statusrow { display: grid; gap: 10px; max-width: 640px; } .adm-field__label { font-weight: 600; font-size: 15px; }
+.adm-msglist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.adm-msgrow { padding: 12px 14px; border: 1px solid var(--hairline); background: var(--paper); min-width: 0; } .adm-msgrow p { margin: 0 0 4px; overflow-wrap: anywhere; }
+.adm-msgrow.is-staff { background: var(--mist); } .adm-msgrow.is-note { border-style: dashed; border-color: var(--field-edge); }
+.adm-msgrow--status { border: 0; border-left: 2px solid var(--ink); background: transparent; }
+.adm-msgrow__body { white-space: pre-wrap; } .adm-msgrow__files { margin: 6px 0 0; padding-left: 18px; }
+.adm-check { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.adm-check input { width: 22px; height: 22px; }

@@ -159,6 +159,20 @@ export async function invoicesPage(ctx, a, items) {
   const vm = liveModel(ctx, a, {});
   return shell(ctx, a, { title: "Invoices", active: "home", body: servicesLive.invoicesPage(vm, items), vm, ref: "services-invoices" });
 }
+export async function requestsPage(ctx, a, items) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Support & Change Requests", active: "home", body: servicesLive.requestsList(vm, items), vm, ref: "services-requests" });
+}
+export async function requestFormPage(ctx, a, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  return shell(ctx, a, { title: "New request", active: "home", body: servicesLive.requestForm(vm, { ...o, csrf }), vm, status: o.status || 200, script: o.error ? FOCUS_SCRIPT : null, ref: "services-requests" });
+}
+export async function requestThreadPage(ctx, a, thread, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  return shell(ctx, a, { title: thread.request.title, active: "home", body: servicesLive.requestThread(vm, thread, { ...o, csrf }), vm, status: o.status || 200, script: o.error ? FOCUS_SCRIPT : null, ref: "services-requests" });
+}
 export async function contactPage(ctx, a) {
   const vm = liveModel(ctx, a, {});
   return shell(ctx, a, { title: "Contact", active: "home", body: servicesLive.contactPage(vm), vm, ref: "services-contact" });
