@@ -35,6 +35,7 @@ const goodEnv = () => ({
   DB: { type: "d1", id: expected.websiteDb.id, database_id: expected.websiteDb.id },
   PORTAL_DB: { type: "d1", id: expected.d1.id, database_id: expected.d1.id },
   PORTAL_FILES: { type: "r2_bucket", bucket_name: "framework-portal-files-staging" },
+  PORTAL_FILES_BACKUP: { type: "r2_bucket", bucket_name: "framework-portal-files-staging-backup" },
   PORTAL_RATE_LIMITER: { type: "ratelimit", namespace_id: "4101", simple: { limit: 20, period: 60 } },
 });
 
@@ -349,10 +350,11 @@ test("the expected-config file matches wrangler.jsonc (Staging databases, non-se
   assert.deepEqual([portal.database_name, portal.database_id], [expected.d1.name, expected.d1.id]);
   assert.deepEqual([site.database_name, site.database_id], [expected.websiteDb.name, expected.websiteDb.id]);
   assert.equal(p.r2_buckets[0].bucket_name, expected.bindings.PORTAL_FILES.bucket_name);
+  assert.equal(p.r2_buckets[1].bucket_name, expected.bindings.PORTAL_FILES_BACKUP.bucket_name);
   assert.equal(String(p.ratelimits[0].namespace_id), expected.bindings.PORTAL_RATE_LIMITER.namespace_id);
   const prod = cfg.d1_databases.map((d) => d.database_id);
   assert.deepEqual(Object.keys(expected.forbiddenDatabaseIds).sort(), prod.sort(), "the forbidden ids are exactly Production's databases");
-  assert.deepEqual([...Object.keys(expected.bindings)].sort(), ["ASSETS", "DB", "PORTAL_DB", "PORTAL_FILES", "PORTAL_RATE_LIMITER"]);
+  assert.deepEqual([...Object.keys(expected.bindings)].sort(), ["ASSETS", "DB", "PORTAL_DB", "PORTAL_FILES", "PORTAL_FILES_BACKUP", "PORTAL_RATE_LIMITER"]);
   for (const n of expected.forbiddenNames) assert.ok(!strip(read("wrangler.jsonc")).includes(n), n + " must not be in the configuration");
   for (const [n, want] of Object.entries(expected.switches)) { assert.equal(p.vars[n] === undefined ? null : p.vars[n], want, n + " matches the Staging block"); assert.ok(cfg.vars[n] === undefined || cfg.vars[n] === "1", n + " is at most the launch value \"1\" at the top level (Production)"); }
   assert.equal(expected.worker, cfg.name);

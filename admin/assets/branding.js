@@ -415,6 +415,34 @@ export async function render(orgId, ctx) {
 
   /* ---------------------------------------------------------- storage */
 
+  /* Backup of the files bucket to a second private bucket: counts and step names only; real client files are never shown. */
+  function backupBlock() {
+    const out = h("p", { class: "adm-sub", role: "status" });
+    const say = (t) => { out.textContent = t; };
+    const STEP = { bindings: "both buckets are connected", write: "a test file was written", new_unique_name: "its name is new and unique", copy: "it was copied to the backup bucket", backup_has_same_name: "the backup holds it under the same name", backup_bytes_match: "the backup copy matches byte for byte", loss_simulated: "its main copy was deleted to simulate a loss", restore: "it was restored from the backup", restored_bytes_match: "the restored file matches byte for byte", cleanup: "the test file was cleaned up" };
+    const run = (label, request, describe) => button(label, { onclick: async (ev) => {
+      const btn = ev.currentTarget; btn.disabled = true; say("Working…");
+      try { say(describe(await request())); } catch (e) { say(e && e.code === "backup_unavailable" ? "File backup isn’t set up on this site." : "That didn’t work and nothing was changed. Please try again."); }
+      btn.disabled = false;
+    } });
+    const counts = (r) => `${r.copied} copied, ${r.failed} failed, ${r.remaining} still to do (${r.checked} files checked).`;
+    return h("div", { class: "adm-backup" },
+      h("h2", { class: "adm-approved__h", text: "Backup" }),
+      h("p", { class: "adm-sub", text: "New files are copied to a second private bucket (copy only: nothing is ever deleted there). Restoring copies back only files that are missing, and never overwrites one that exists." }),
+      h("div", { class: "adm-actions" },
+        run("Backup status", () => api("/branding/backup"), (r) => (r.configured ? `Files: ${r.primary}. Backup: ${r.backup}. Not yet backed up: ${r.missingFromBackup + r.changed}. Only in the backup: ${r.missingFromPrimary}.` : "File backup isn’t set up on this site.")),
+        canWrite() ? run("Run backup check", () => api("/branding/backup-check", { method: "POST", body: {} }), (r) => (r.ok ? "Backup works: " + r.steps.map((x) => STEP[x.name] || x.name).join("; ") + "." : "Backup check failed at: " + r.steps.filter((x) => !x.ok).map((x) => STEP[x.name] || x.name).join(", ") + ".")) : null,
+        canWrite() ? run("Back up now", () => api("/branding/backup-run", { method: "POST", body: {} }), (r) => (r.ok ? "Done: " : "Finished with problems: ") + counts(r)) : null,
+        canWrite() ? button("Restore missing files…", { onclick: async (ev) => {
+          const btn = ev.currentTarget; // read before any await: the event's target is cleared afterwards
+          if (!(await confirmDialog({ title: "Restore missing files?", body: "This copies back, from the backup, only files that are missing from the main bucket. Files that exist are never overwritten.", confirmLabel: "Restore" }))) return;
+          btn.disabled = true; say("Working…");
+          try { const r = await api("/branding/backup-restore", { method: "POST", body: { confirm: "RESTORE" } }); say((r.ok ? "Done: " : "Finished with problems: ") + counts(r)); } catch { say("That didn’t work and nothing was changed. Please try again."); }
+          btn.disabled = false;
+        } }) : null),
+      out);
+  }
+
   function storageSection() {
     const result = h("p", { class: "adm-sub", role: "status" });
     const limits = data.limits, use = data.usage;
@@ -427,6 +455,7 @@ export async function render(orgId, ctx) {
         b.disabled = false;
       } })) : null,
       result,
+      backupBlock(),
     ];
     return disclosure({ id: "br-storage", title: "Storage", className: "adm-acc--quiet", open: opened.has("br-storage"), onToggle: toggled("br-storage"), meta: caps().storage ? "Private" : "Not available", children: body });
   }

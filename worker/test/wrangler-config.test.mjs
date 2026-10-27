@@ -25,7 +25,7 @@ test("Staging (Preview): DB -> framework-staging is preserved, plus PORTAL_DB ->
 });
 
 test("Production's portal resources are exactly: its own portal database, the WorkOS settings, the four launch switches, the limiter; no R2 bucket and no probe flag", () => {
-  assert.deepEqual(config.previews.r2_buckets, [{ binding: "PORTAL_FILES", bucket_name: "framework-portal-files-staging" }]);
+  assert.deepEqual(config.previews.r2_buckets, [{ binding: "PORTAL_FILES", bucket_name: "framework-portal-files-staging" }, { binding: "PORTAL_FILES_BACKUP", bucket_name: "framework-portal-files-staging-backup" }]);
   assert.equal(config.r2_buckets, undefined, "no file storage on Production yet");
   assert.deepEqual(Object.keys(config.vars).filter((k) => k.startsWith("PORTAL_")).sort(), ["PORTAL_ADMIN_WRITES", "PORTAL_ALLOW_PRODUCTION", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER", "PORTAL_BASE_URL", "PORTAL_ENABLED", "PORTAL_INVITE_SENDING"]);
   const before = raw.slice(0, raw.indexOf('"previews"')).replace(/^\s*\/\/.*$/gm, "");
