@@ -230,3 +230,52 @@ test("the Approved Emails page: registered as a module, no HTML injection, chang
   assert.match(access, /\{ email: value, role, approve: true \}/);
   assert.match(access, /\["Approved emails", approveIt/, "the confirmation says whether the address will be approved");
 });
+
+test("LIFECYCLE of an address first approved in the Cloudflare secret: import, remove while the secret still lists it, delete the secret, re-add, remove. Invitations and emails follow the list at every step; the person's portal access never changes", async () => {
+  const s = await setup({ secret: "ann@a.test" }); // ann is the signed-in owner of Alpha AND approved only through the secret
+  const annId = sql(s.w.db, "SELECT id FROM portal_users WHERE email = 'ann@a.test'")[0].id;
+  const req = await sup.createRequest(s.w.db, s.A.id, annId, { category: "technical_issue", title: "Help", description: "x" });
+  const env = { ...s.w.env, RESEND_API_KEY: "re_test_FAKE", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", ASSESSMENT_NOTIFY_TO: "staff@framework.test", PORTAL_BASE_URL: "https://staging.frameworkco.ca" };
+  const emailed = async () => {
+    sql(s.w.db, "DELETE FROM service_notifications");
+    sql(s.w.db, "INSERT INTO service_notifications (id, organization_id, audience, event, entity_type, entity_id, created_at) VALUES (?, ?, 'client', 'request_staff_reply', 'support_request', ?, ?)", crypto.randomUUID(), s.A.id, req.id, new Date().toISOString());
+    const to = [];
+    await processNotifications({ ...env, PORTAL_INVITE_ALLOWLIST: s.env.PORTAL_INVITE_ALLOWLIST }, { db: s.w.db, fetch: async (u, init) => { const a = JSON.parse(init.body).to[0]; if (a !== "staff@framework.test") to.push(a); return new Response("{}", { status: 200 }); }, force: true });
+    return to;
+  };
+  const access = async () => {
+    assert.equal((await s.ann.get("/portal/o/alpha")).status, 200, "the person still has portal access");
+    assert.equal(sql(s.w.db, "SELECT count(*) AS n FROM memberships WHERE user_id = ? AND status = 'active'", annId)[0].n, 1);
+    assert.equal(sql(s.w.db, "SELECT count(*) AS n FROM portal_sessions WHERE user_id = ? AND revoked_at IS NULL", annId)[0].n > 0, true, "their session is not revoked");
+  };
+  const canInvite = async () => (await s.invite("ann@a.test")).status;
+
+  // 1. approved only by the secret (the situation before Approved Emails existed)
+  assert.deepEqual(await emailed(), ["ann@a.test"]);
+  assert.equal(await canInvite(), 409, "approved (so the gate passes); the only refusal is that she is already a member");
+  assert.equal((await s.invite("stranger@a.test")).status, 403);
+  // 2. copy the secret into the list: nothing changes for anyone
+  assert.deepEqual(await (await s.call("/api/admin/approved-emails/import")).json(), { added: 1 });
+  assert.deepEqual(await emailed(), ["ann@a.test"]);
+  // 3. remove her from the LIST while the secret still lists her: the response says she is still approved, and she is
+  const removed = await (await s.remove("ann@a.test")).json();
+  assert.deepEqual(removed, { email: "ann@a.test", changed: true, stillApprovedBySetting: true });
+  assert.deepEqual(await emailed(), ["ann@a.test"], "still approved by the Cloudflare setting");
+  assert.equal(await canInvite(), 409);
+  // 4. the secret is deleted in Cloudflare: now she is not approved anywhere
+  delete s.env.PORTAL_INVITE_ALLOWLIST;
+  assert.deepEqual(await emailed(), [], "no more client emails");
+  assert.equal(await canInvite(), 403, "no more invitations");
+  assert.equal((await (await s.invite("ann@a.test")).json()).error, "recipient_allowlist_missing", "nothing is approved anywhere: locked");
+  await access();
+  // 5. approve her again in Admin, then remove her again
+  assert.equal((await s.add("ann@a.test")).status, 201);
+  assert.deepEqual(await emailed(), ["ann@a.test"]);
+  const again = await (await s.remove("ann@a.test")).json();
+  assert.deepEqual(again, { email: "ann@a.test", changed: true, stillApprovedBySetting: false });
+  assert.deepEqual(await emailed(), []);
+  assert.equal(await canInvite(), 403);
+  await access();
+  assert.equal((await s.ann.get("/portal/o/alpha/profile/business")).status, 200);
+  assert.deepEqual(audit(s).map((a) => a.action), ["approved_email.added", "approved_email.removed", "approved_email.added", "approved_email.removed"]);
+});

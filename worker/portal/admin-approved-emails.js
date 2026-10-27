@@ -6,7 +6,8 @@
  *
  *   GET  /approved-emails           { available, emails: [{email, note, addedBy, addedAt}], setting: {addresses: [{email, inList}]}, capabilities }
  *   POST /approved-emails           { email, note? }   approve an address (idempotent)
- *   POST /approved-emails/remove    { email }          stop approving an address (idempotent); never ends anyone's existing access
+ *   POST /approved-emails/remove    { email }          stop approving an address (idempotent); never ends anyone's existing access. { stillApprovedBySetting: true } when the
+ *                                                      Cloudflare secret also lists it (it must then be removed there too)
  *   POST /approved-emails/import    {}                 copy every address of the Cloudflare secret into this list, so the secret can later be deleted
  * The address is sent in the body, never in the URL.
  */
@@ -47,7 +48,8 @@ export async function handleApprovedEmailsApi(request, env, principal, path, dep
     }
     if (method === "POST" && kind === "remove") {
       const r = await removeApproved(db, body.email, actor, { now });
-      return r.ok ? json({ email: r.email, changed: r.changed }) : fromFailure(r);
+      // An address that is ALSO in the Cloudflare secret stays approved until it is removed there: say so, so a removal is never mistaken for a revocation.
+      return r.ok ? json({ email: r.email, changed: r.changed, stillApprovedBySetting: parseAllowlist(env[ALLOWLIST_SETTING]).has(r.email) }) : fromFailure(r);
     }
     if (method === "POST" && kind === "import") {
       let added = 0;
