@@ -63,39 +63,6 @@ async function renderList(ctx) {
 
 const spec = (rows) => h("dl", { class: "adm-spec" }, rows.filter(Boolean).map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", null, v))));
 
-/** A quiet row that opens the client's Branding page: the kit's state and anything waiting for staff, without the page's weight. Not shown on a database without branding. */
-function brandingRow(orgId, b) {
-  if (!b) return null;
-  const chips = [chip(b.kitStatus === "published" ? "ok" : "plain", b.kitStatus === "published" ? "Kit published" : b.kitStatus === "draft" ? "Kit draft" : "No kit yet", b.kitStatus === "published" ? "complete" : null)];
-  if (b.assets) chips.push(chip("plain", `${b.assetsPublished} of ${b.assets} files published`));
-  if (b.uploadsNew) chips.push(chip("pending", plural(b.uploadsNew, "new upload"), "info"));
-  if (b.requestsOpen) chips.push(chip(b.requestsNew ? "pending" : "warn", plural(b.requestsOpen, "open request"), "info"));
-  return h("section", { class: "adm-section adm-brandrow", "aria-labelledby": "adm-brandrow-h" },
-    h("div", { class: "adm-section-title" }, h("h2", { id: "adm-brandrow-h", text: "Branding" }), h("a", { class: "btn btn--secondary adm-small", href: `/admin/clients/${encodeURIComponent(orgId)}/branding`, "data-link": "" }, "Manage branding")),
-    h("p", { class: "adm-brandrow__chips" }, chips));
-}
-
-/** A quiet row that opens the client's Invoices page: drafts waiting to be published and invoices past due. Not shown on a database without invoices. */
-function invoicesRow(orgId, s) {
-  if (!s) return null;
-  const chips = [chip("plain", s.total ? plural(s.total, "invoice") : "No invoices yet")];
-  if (s.drafts) chips.push(chip("pending", plural(s.drafts, "draft") + " to publish", "info"));
-  if (s.overdue) chips.push(chip("warn", `${s.overdue} past due`, "warn"));
-  return h("section", { class: "adm-section adm-brandrow", "aria-labelledby": "adm-invrow-h" },
-    h("div", { class: "adm-section-title" }, h("h2", { id: "adm-invrow-h", text: "Invoices" }), h("a", { class: "btn btn--secondary adm-small", href: `/admin/clients/${encodeURIComponent(orgId)}/invoices`, "data-link": "" }, "Manage invoices")),
-    h("p", { class: "adm-brandrow__chips" }, chips));
-}
-
-/** A quiet row that opens the client's Support & Change Requests page: requests with activity staff have not seen, and how many are open. */
-function supportRow(orgId, s) {
-  if (!s) return null;
-  const chips = [chip("plain", s.total ? `${s.open} open of ${s.total}` : "No requests yet")];
-  if (s.unseen) chips.push(chip("pending", plural(s.unseen, "request") + " with new activity", "info"));
-  return h("section", { class: "adm-section adm-brandrow", "aria-labelledby": "adm-suprow-h" },
-    h("div", { class: "adm-section-title" }, h("h2", { id: "adm-suprow-h", text: "Support & Change Requests" }), h("a", { class: "btn btn--secondary adm-small", href: `/admin/clients/${encodeURIComponent(orgId)}/support`, "data-link": "" }, "Open requests")),
-    h("p", { class: "adm-brandrow__chips" }, chips));
-}
-
 async function renderDetail(id, ctx) {
   const data = await api("/clients/" + encodeURIComponent(id));
   const o = data.organization;
@@ -120,9 +87,6 @@ async function renderDetail(id, ctx) {
     h("a", { class: "adm-back", href: "/admin/clients", "data-link": "" }, "← All clients"),
     dash.header,
     dash.overview,
-    brandingRow(o.id, data.branding),
-    invoicesRow(o.id, data.invoices),
-    supportRow(o.id, data.support),
     access,
     info,
   );
