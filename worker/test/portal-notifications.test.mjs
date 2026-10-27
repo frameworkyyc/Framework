@@ -328,5 +328,6 @@ test("the sweep is wired where people already go: Admin counts, the global list 
   const router = readFileSync(new URL("../portal/router.js", import.meta.url), "utf8");
   assert.match(router, /if \(servicesOn\(ctx\)\) await dispatchNotifications\(ctx\.env, ctx\)/);
   const cfg = readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8");
-  assert.ok(!/"crons"|"triggers"/.test(cfg), "no cron trigger: they run on the production deployment only, so they cannot serve Staging (and must not be added to Production here)");
+  const stripped = cfg.replace(/^\s*\/\/.*$/gm, "");
+  assert.ok(stripped.indexOf('"triggers"') > -1 && stripped.indexOf('"triggers"') < stripped.indexOf('"previews"'), "the cron trigger is Production's (top level) and never inside previews, which Cron Triggers cannot serve");
 });
