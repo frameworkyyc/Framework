@@ -13,7 +13,6 @@ export const MODULES = [
   { id: "clients", label: "Clients", path: "/admin/clients", enabled: true, load: () => import("./clients.js") },
   { id: "approved-emails", label: "Approved Emails", path: "/admin/approved-emails", enabled: true, load: () => import("./approved-emails.js") },
   { id: "projects", label: "Projects", path: "/admin/projects", enabled: false },
-  { id: "testimonials", label: "Testimonials", path: "/admin/testimonials", enabled: false },
   { id: "files", label: "Files", path: "/admin/files", enabled: false },
   { id: "changes", label: "Change requests", path: "/admin/change-requests", enabled: false },
   { id: "leads", label: "Leads", path: "/admin/leads", enabled: false },
