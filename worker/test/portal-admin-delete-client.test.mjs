@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync, createSign } from "node:crypto";
 import { handleAdmin } from "../admin/router.js";
 import { resetKeyCacheForTests } from "../admin/access.js";
-import { makeWorld } from "./helpers/portal-e2e.mjs";
+import { makeWorld, csrfOf } from "./helpers/portal-e2e.mjs";
 import { saveProfileStep } from "../portal/repo/business-profile.js";
 import * as inv from "../portal/repo/invoices.js";
 import * as sup from "../portal/repo/support.js";
@@ -162,4 +162,61 @@ test("the interface: Confirm Delete starts disabled and needs the typed word, En
   assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML/.test(ui));
   const clients = strip(readFileSync(new URL("../../admin/assets/clients.js", import.meta.url), "utf8"));
   assert.ok(!/\bapi\([^)]*\/delete|\bapi\([^)]*\/restore/.test(clients), "the page only goes through the confirmation helpers");
+});
+
+test("a deleted client's EXISTING signed-in sessions lose every page and every write on the very next request, and nothing they could replay changes data; restore brings the same sessions back", async () => {
+  const s = await setup();
+  // a second organization for the same person, so "still signed in" can be told apart from "signed out"
+  await s.w.invite(s.B, "ann@a.test", "member");
+  assert.equal((await s.w.browser().signIn(s.w.user(1, "ann@a.test"))).status, 303); // activates the Bravo invitation; the existing session below is the one under test
+  const profilePage = await (await s.ann.get("/portal/o/alpha/profile/business")).text();
+  const csrf = csrfOf(profilePage);
+  assert.ok(csrf && profilePage.includes("Alpha Co Ltd."));
+  const stable = ["business_profile_answers", "portal_feedback", "projects", "invoices", "support_requests", "memberships", "portal_users"];
+  const snap = () => JSON.stringify(stable.map((t) => sql(s.w.db, `SELECT * FROM ${t} ORDER BY 1`)));
+  const before = snap();
+  const sessionsBefore = sql(s.w.db, "SELECT count(*) AS n FROM portal_sessions WHERE revoked_at IS NULL")[0].n;
+
+  assert.equal((await s.del(s.A)).status, 200);
+
+  const routes = ["", "/progress", "/profile", "/profile/business", "/projects", "/activity", "/documents", "/account", "/members", "/feedback", "/branding", "/services", "/services/invoices", "/services/requests", "/services/requests/new"];
+  for (const r of routes) {
+    const res = await s.ann.get("/portal/o/alpha" + r);
+    assert.equal(res.status, 404, "GET " + r);
+    assert.ok(!(await res.text()).includes("Alpha Co"), "no Alpha data on " + r);
+  }
+  const post = (path, fields) => s.ann.post(path, { csrf, ...fields });
+  for (const [path, fields] of [["/portal/o/alpha/profile/business", { legal: "HIJACKED", operating: "X" }], ["/portal/o/alpha/feedback", { kind: "problem", message: "still here?" }], ["/portal/o/alpha/account", { name: "Hijack" }], ["/portal/o/alpha/services/requests", { category: "general", title: "Hijack", description: "x" }]]) {
+    assert.equal((await post(path, fields)).status, 404, "POST " + path);
+  }
+  assert.equal(snap(), before, "no record changed and the replayed writes wrote nothing");
+  assert.equal(sql(s.w.db, "SELECT count(*) AS n FROM portal_sessions WHERE revoked_at IS NULL")[0].n, sessionsBefore, "sessions are not revoked: access is decided on every request");
+  // the same session still reaches the person's OTHER organization
+  assert.equal((await s.ann.get("/portal/o/bravo")).status, 200);
+  assert.equal((await s.ann.get("/portal")).headers.get("Location"), "/portal/o/bravo", "the picker offers only the organization still available");
+  // a deleted client looks exactly like one that does not exist
+  const strip = (h) => h.replace(/\b[A-Z0-9]{8}\b/g, "REF");
+  assert.equal(strip(await (await s.ann.get("/portal/o/alpha")).text()), strip(await (await s.ann.get("/portal/o/no-such-org")).text()));
+  // a fresh sign-in does not reopen it either
+  const again = s.w.browser();
+  await again.signIn(s.w.user(1, "ann@a.test"));
+  assert.equal((await again.get("/portal/o/alpha")).status, 404);
+
+  // retained records are all still in place
+  assert.equal(sql(s.w.db, "SELECT count(*) AS n FROM business_profile_answers WHERE organization_id = ?", s.A.id)[0].n > 0, true);
+  assert.equal(sql(s.w.db, "SELECT count(*) AS n FROM memberships WHERE organization_id = ? AND status = 'active'", s.A.id)[0].n, 1);
+
+  // restore: the original session works again, with the original data
+  assert.equal((await s.restore(s.A)).status, 200);
+  assert.equal((await s.ann.get("/portal/o/alpha")).status, 200);
+  assert.ok((await (await s.ann.get("/portal/o/alpha/profile/business")).text()).includes("Alpha Co Ltd."));
+  assert.equal(snap(), before);
+});
+
+test("the Clients list has no navigation arrow: the row is the link and the three-dot menu sits beside it", async () => {
+  const { readFileSync } = await import("node:fs");
+  const js = readFileSync(new URL("../../admin/assets/clients.js", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../../admin/assets/admin.css", import.meta.url), "utf8");
+  assert.ok(!/ARROW|clientrow__arrow/.test(js + css));
+  assert.match(js, /h\("li", \{ class: "adm-clientitem" \}, clientRow\(c\),\s*writes \? actionsMenu/);
 });
