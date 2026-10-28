@@ -671,3 +671,14 @@ test("typography specimens stay on one line: sized from the card width, no wrapp
   assert.match(aa, /white-space: nowrap/); assert.match(aa, /font-size: clamp\(18px, 13cqw, 46px\)/); assert.doesNotMatch(aa, /overflow-wrap/);
   assert.match(aa, /font-size: clamp\(20px, 2\.6vw, 34px\);[^}]*font-size: clamp\(18px, 13cqw/, "a plain fallback comes first for browsers without container units");
 });
+
+test("03 Brand Colours: at most six swatches in a balanced grid: 3 columns from 600px, 2 on a phone, 1 on the narrowest; example and client colours share it; Copy buttons stack the same way in narrow columns", () => {
+  const css = read("assets/css/portal.css");
+  assert.match(css, /\.swatches \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(css, /@media \(max-width: 360px\) \{ \.swatches \{ grid-template-columns: minmax\(0, 1fr\); \} \}/);
+  assert.match(css, /@media \(min-width: 600px\) \{ \.swatches \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); \} \}/);
+  assert.doesNotMatch(css, /\.swatches \{ grid-template-columns: repeat\((4|5)/, "no four- or five-column layouts remain");
+  assert.match(css, /\.swatch \{ min-width: 0; container-type: inline-size; \}/);
+  assert.match(css, /@container \(max-width: 220px\) \{ \.swatch__code \{ display: block; \} \.swatch__code \.copy:not\(\[hidden\]\) \{ display: block;/);
+  assert.match(css, /\.bk-eg--colours \.swatches \{ margin: 0; \}/, "the example palette uses the same grid");
+});

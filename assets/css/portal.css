@@ -537,14 +537,16 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .logo-card__actions .btn { min-height: 44px; }
 
 .swatches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-2); }
-@media (min-width: 700px) { .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (min-width: 1000px) { .swatches { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.swatch { min-width: 0; }
+@media (max-width: 360px) { .swatches { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 600px) { .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); } } /* a brand kit has at most six colours: a 3 x 2 grid on tablet and desktop, 2 columns on a phone (1 on the narrowest) */
+.swatch { min-width: 0; container-type: inline-size; }
 .swatch__chip { display: block; width: 100%; height: auto; aspect-ratio: 5 / 3; }
 .swatch__chip--edge { outline: 1px solid var(--hairline); outline-offset: -1px; }
 .swatch__body { padding-top: 10px; }
 .swatch__body p { margin: 0 0 2px; overflow-wrap: anywhere; }
 .swatch__name { font-family: var(--font-display); font-weight: 600; }
+.swatch__code { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; } /* the Copy button drops under the value rather than splitting it */
+@container (max-width: 220px) { .swatch__code { display: block; } .swatch__code .copy:not([hidden]) { display: block; margin-top: 4px; } } /* a narrow column puts every Copy button under its value (the value stays on one line), the same way for every swatch */
 .swatch__code code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; }
 .copy { min-height: 44px; min-width: 44px; margin-left: 4px; padding: 0 12px; border: 1px solid var(--field-edge); border-radius: 0; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
 .copy:hover { background: var(--ink); color: var(--paper); }
@@ -812,7 +814,6 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .tf-card--example .tf-card__chars { border-color: var(--hairline); }
 .tf-level--example { background: var(--mist); padding-left: 12px; padding-right: 12px; }
 .bk-eg--colours .swatches { margin: 0; }
-@media (min-width: 1000px) { .bk-eg--colours .swatches { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 .bk-eg--colours .swatch__chip { outline: 1px solid var(--hairline); outline-offset: -1px; }
 .bk-eg__tagline { margin: 0 0 8px; font-family: var(--font-display); font-weight: 600; font-size: clamp(26px, 4.4vw, 44px); line-height: 1.1; letter-spacing: -0.02em; overflow-wrap: anywhere; }
 .bk-eg p.small { margin: 0; }
