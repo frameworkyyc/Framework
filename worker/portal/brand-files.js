@@ -73,11 +73,11 @@ export async function clientDeleteUpload(deps, { role, organizationId, userId, u
   return ok({ storageCleanup: cleaned ? "done" : "pending" });
 }
 
-async function stream(deps, { organizationId, row, actorType, actorRef, entityType, inline = false }) {
+async function stream(deps, { organizationId, row, actorType, actorRef, entityType, inline = false, record = true }) {
   let object;
   try { object = await getObject(deps.bucket, { key: row.storageKey, organizationId }); } catch (err) { return storageFail(err); }
   if (!object) return fail("not_found");
-  await brand.recordBrandDownload(deps.db, { organizationId, actorType, actorRef, entityType, entityId: row.id, now: deps.now });
+  if (record) await brand.recordBrandDownload(deps.db, { organizationId, actorType, actorRef, entityType, entityId: row.id, now: deps.now });
   const name = row.originalName || row.title || "download";
   return ok({ response: fileResponse({ object, name, ext: row.format, inlineImage: inline, size: row.size }) });
 }
@@ -112,7 +112,7 @@ const companyName = async (db, org) => { const kit = await brand.getBrandKit(db,
 const nameInput = (org, m, ext) => ({ company: org.company || org.name, slug: org.slug, kind: m.kind, logo: { role: m.logo_role, orientation: m.orientation, tone: m.tone, transparent: m.transparent === true || m.transparent === 1 }, description: m.title, ext });
 
 /**
- * A new deliverable. The file's NAME is generated here from the organization's name and the file's details (Framework-Primary-Square-Light-Transparent.png);
+ * A new deliverable. The file's NAME is generated here from the organization's name and the file's details (Framework-Primary-Square-Transparent.png);
  * the browser never supplies it. The same logo in another format gets the same stem and a different extension. A name that is already used by a live file of
  * the organization is refused (never overwritten, never silently renamed).
  */
@@ -130,7 +130,7 @@ export async function adminUploadAsset(deps, { organizationId, actor, meta, file
   if (await brand.brandAssetNameTaken(deps.db, organizationId, built.name)) return fail("duplicate_name"); // checked before anything is stored; the insert checks again atomically
   const isLogo = m.kind === "logo";
   const finalMeta = { ...pickKeys(m, ["kind", "usage_note", "downloadable", "license_note", "sort_order", "published"]), title: built.title, variant_key: built.variantKey,
-    logo_role: isLogo ? m.logo_role : null, orientation: isLogo ? m.orientation : null, tone: isLogo ? m.tone : null, transparent: isLogo && m.transparent === true };
+    logo_role: isLogo ? m.logo_role ?? null : null, orientation: isLogo ? m.orientation ?? null : null, tone: isLogo ? m.tone ?? null : null, transparent: isLogo && m.transparent === true };
   const key = makeKey(organizationId, "brand-assets");
   try { await putObject(deps.bucket, { key, organizationId, bytes: file.bytes, sha256: inspected.sha256, contentType: inspected.contentType }); } catch (err) { return storageFail(err); }
   let rec;
@@ -165,7 +165,7 @@ export async function adminReplaceAsset(deps, { organizationId, assetId, actor, 
 }
 
 /**
- * Editing a deliverable. The file name is regenerated ONLY when a naming detail changed (logo type, shape, version, transparency, or a non-logo's name); other
+ * Editing a deliverable. The file name is regenerated ONLY when a naming detail changed (logo type, shape, transparency, or a non-logo's name); other
  * edits (publication, usage note, order) never touch it, so older files keep their names until their naming details are edited on purpose. The file type
  * (logo, font ...) cannot be changed after upload.
  */
@@ -220,10 +220,11 @@ export async function adminDownloadUpload(deps, { organizationId, uploadId, acto
 }
 
 /** Admin download of a deliverable, draft or published. */
-export async function adminDownloadAsset(deps, { organizationId, assetId, actor }) {
+export async function adminDownloadAsset(deps, { organizationId, assetId, actor, inline = false }) {
   const row = await brand.getBrandAssetAdmin(deps.db, organizationId, assetId);
   if (!row) return fail("not_found");
-  return stream(deps, { organizationId, row, actorType: "admin", actorRef: actor, entityType: "brand_asset" });
+  if (inline && row.kind !== "logo") return fail("not_found"); // only logo images are ever shown as pictures
+  return stream(deps, { organizationId, row, actorType: "admin", actorRef: actor, entityType: "brand_asset", inline, record: !inline }); // a preview on the Branding page is not a download, so it is not recorded
 }
 
 /* ------------------------------------------------------------------ offboarding and housekeeping */
