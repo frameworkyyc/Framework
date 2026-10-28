@@ -80,7 +80,7 @@ test("no brand kit: the full dashboard still shows all five sections, each open 
   assert.match(html, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   assert.match(html, /Need a complete brand identity\?/); assert.match(html, /Request full brand kit/);
   assert.ok(!/logo-grid|swatches|Download (SVG|PNG|PDF|WEBP|JPG)|lv-card--has/.test(html), "no library chrome and no download buttons");
-  assert.equal([...html.matchAll(/lv-card--example/g)].length, 4, "the four variation cards are shown as examples"); assert.equal([...html.matchAll(/Not added yet<\/span><\/div><p class="lv-card__desc/g)].length, 4);
+  assert.equal([...html.matchAll(/lv-card--example/g)].length, 4, "the four variation cards are shown as examples"); assert.equal([...html.matchAll(/<span class="tag">Not added yet<\/span>/g)].length, 4);
   const m = await (await mia.get(base("alpha"))).text();
   assert.ok(!/<summary class="btn/.test(m), "a member has no request buttons");
   assert.match(m, /Ask an owner of your organization to send a request for this section/);

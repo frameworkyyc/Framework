@@ -580,28 +580,27 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .brand-empty__list { margin: var(--space-2) 0 var(--space-3); padding-left: 1.2em; }
 .brand-empty__list li { margin-bottom: 8px; }
 
-/* Logo variations: four equal cards (one column on a phone, two on a tablet, four on a desktop). A square-ish preview tile, the variation name and what it is for, a status
-   and the downloads. Example cards use the same tile with an illustration in the ink colour and a plain "Example" label. */
-.lv-grid { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+/* Logo variations: four equal columns (one on a phone, two on a tablet, four on a desktop). The 16:9 image is the visual: a white frame with a thin #E0E0E0 edge, the artwork
+   contained (never cropped or stretched); the text sits below it with no box around the card. Example cards use Framework's own logos from static assets. */
+.lv-grid { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px 20px; }
 @media (min-width: 600px) { .lv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1024px) { .lv-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.lv-card { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--hairline); background: var(--paper); }
-.lv-card__stage { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 4 / 3; padding: 28px; background: var(--mist); border-bottom: 1px solid var(--hairline); color: var(--ink); overflow: hidden; }
-.lv-card__stage img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
-.lv-card__stage svg { display: block; width: 100%; height: 100%; max-height: 100%; }
-.lv-card__stage--dark { background: var(--ink); border-bottom-color: var(--ink); }
-.lv-card__stage--file { text-align: center; }
-.lv-card__stage--example svg { opacity: .55; }
-.lv-card__badge { position: absolute; top: 10px; left: 10px; padding: 2px 8px; border: 1px solid var(--slate); background: var(--paper); color: var(--slate); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; line-height: 1.4; }
-.lv-card__body { display: flex; flex: 1; flex-direction: column; gap: 10px; padding: 18px 18px 20px; }
-.lv-card__top { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.lv-card__top .tag { white-space: nowrap; }
+.lv-card { display: flex; flex-direction: column; min-width: 0; background: var(--paper); }
+.lv-card__stage { display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; background: var(--paper); border: 1px solid var(--hairline); color: var(--ink); overflow: hidden; }
+.lv-card__stage img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.lv-card__stage--logo { padding: 14px; }
+.lv-card__stage--logo img { max-width: 100%; max-height: 100%; width: auto; height: auto; }
+.lv-card__stage--dark { background: var(--ink); border-color: var(--ink); }
+.lv-card__stage--file { padding: 14px; text-align: center; }
+.lv-card__body { display: flex; flex: 1; flex-direction: column; gap: 8px; padding: 16px 0 0; }
+.lv-card__no { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .14em; color: var(--slate); }
 .lv-card__title { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 20px; line-height: 1.15; letter-spacing: -0.01em; }
+.lv-card__status { margin: 0; }
+.lv-card__status .tag { white-space: nowrap; }
 .lv-card__desc { margin: 0; font-size: 15px; }
 .lv-card__meta { margin: 0; overflow-wrap: anywhere; }
 .lv-card__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 4px; }
-.lv-card--example { border-style: dashed; }
-.lv-grid + p { margin: 14px 0 0; }
+.lv-grid + p { margin: 20px 0 0; }
 .lv-more { margin-top: 4px; font-size: 14px; }
 .lv-more summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; }
 .lv-more__list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 12px; }
