@@ -580,6 +580,18 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .brand-empty__list { margin: var(--space-2) 0 var(--space-3); padding-left: 1.2em; }
 .brand-empty__list li { margin-bottom: 8px; }
 
+/* Branding requests: a status line or a native <details> whose summary is a button; the Full Brand Kit block closes the page. */
+.brq { margin-top: var(--space-3); }
+.brq > summary { display: inline-flex; align-items: center; justify-content: center; width: auto; list-style: none; cursor: pointer; }
+.brq > summary::-webkit-details-marker { display: none; }
+.brq form { max-width: 34em; margin-top: var(--space-2); }
+.brq .field { margin-bottom: var(--space-2); }
+.brq__status { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: var(--space-3) 0 0; }
+.acc__body > .empty + .brq, .acc__body > .empty + .brq__status { margin-top: var(--space-3); }
+.brand-kit { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 2px solid var(--ink); max-width: 46em; }
+.brand-kit .h2 { margin: 0 0 8px; }
+.brand-kit p { margin: 0 0 var(--space-2); }
+
 .upload { max-width: 40em; margin-bottom: var(--space-5); }
 .upload input[type="file"] { display: block; width: 100%; min-height: 48px; padding: 10px; border: 1px solid var(--field-edge); background: var(--paper); font: inherit; }
 .upload input[type="file"]::file-selector-button { min-height: 36px; margin-right: 12px; padding: 0 14px; border: 1px solid var(--ink); background: var(--paper); font: inherit; cursor: pointer; }
