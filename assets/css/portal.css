@@ -764,7 +764,7 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .tf-card__stage { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; background: var(--paper); border: 1px solid var(--hairline); color: var(--ink); overflow: hidden; padding: 12px; container-type: inline-size; }
 /* The specimen "Aa Bb Cc 123" is always one line: it is sized from the card's own width (cqw), so it fits whatever the card width or typeface; the stage clips as a last resort. */
 .tf-card__aa { margin: 0; max-width: 100%; font-size: clamp(20px, 2.6vw, 34px); font-size: clamp(18px, 13cqw, 46px); line-height: 1.1; text-align: center; white-space: nowrap; }
-.tf-card__stage--fallback .tf-card__aa { font-family: var(--font-display); }
+.tf-card__stage--fallback .tf-card__aa:not([class*="sp-"]) { font-family: var(--font-display); } /* a specimen that carries a loaded font family (.sp-*) is never overridden by this fallback face */
 .tf-card__flag { position: absolute; left: 10px; bottom: 10px; background: var(--paper); }
 .tf-card__body { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; min-width: 0; }
 .tf-card__family { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.15; overflow-wrap: anywhere; }
