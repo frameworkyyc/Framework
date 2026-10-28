@@ -76,6 +76,38 @@ const row = (main, meta, href) =>
     href ? h("a", { class: "adm-feed__main adm-link", href, "data-link": "", text: main }) : h("span", { class: "adm-feed__main", text: main }),
     h("span", { class: "adm-feed__meta", text: meta }));
 
+/** Where a request lives: a Branding request on its client's Branding page (Service requests opens by itself when one is outstanding), a support or change request on its own page. */
+const requestHref = (r) => (r.kind === "branding" ? `/admin/clients/${enc(r.organizationId)}/branding` : `/admin/support/${enc(r.organizationId)}/${enc(r.id)}`);
+
+/** Outstanding client requests across every client, newest first: client, type, status, date, and a link to the request. Closed and declined ones are never in the data. */
+export function requestsSection(reqs) {
+  if (!reqs) return null;
+  const parts = [reqs.branding ? plural(reqs.branding, "Branding request") : null, reqs.support ? plural(reqs.support, "support or change request", "support or change requests") : null].filter(Boolean);
+  const count = h("p", { class: "adm-sub adm-req__count", role: "status", text: reqs.total ? `${reqs.total} outstanding${parts.length ? ` · ${parts.join(" · ")}` : ""}` : "Nothing outstanding" });
+  const list = reqs.items.length
+    ? h("ul", { class: "adm-feed" }, reqs.items.map((r) => row(`${r.orgName}: ${r.type}`, `${r.statusLabel} · ${fmtDate(r.createdAt)}`, requestHref(r))))
+    : empty("No client requests need a response.");
+  const more = reqs.total > reqs.items.length ? h("p", { class: "adm-sub", text: `Showing the newest ${reqs.items.length} of ${reqs.total}.` }) : null;
+  return h("section", { class: "adm-section adm-dash__sec adm-dash__sec--wide", id: "adm-req-sec", "aria-labelledby": "adm-req" },
+    h("div", { class: "adm-section-title" }, h("h2", { id: "adm-req", text: "Client requests" }), reqs.support ? h("a", { class: "adm-link", href: "/admin/support", "data-link": "" }, "All support requests →") : null),
+    count, list, more);
+}
+
+/** Keeps the section current without a reload: every minute and whenever the tab becomes visible again, and only while the section is on the page. */
+function watchRequests(first) {
+  let current = first, timer = 0;
+  const stop = () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
+  const refresh = async () => {
+    if (!current.isConnected) return stop();
+    const data = await quiet("/dashboard/requests");
+    const next = data && data.available !== false ? requestsSection(data.requests) : null;
+    if (next && current.isConnected) { current.replaceWith(next); current = next; }
+  };
+  const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
+  timer = window.setInterval(refresh, 60000);
+  document.addEventListener("visibilitychange", onVisible);
+}
+
 function supportSection(sup) {
   if (!sup) return null;
   const body = sup.items.length
@@ -118,16 +150,18 @@ export async function render() {
     ? responseTable(feedback.recent.slice(0, 5), ["client", "date", "satisfaction", "recommend", "testimonial", "view"])
     : feedback ? stateBlock({ title: "No feedback yet", body: "Responses appear here after a client completes the feedback form." }) : null;
 
+  const requestsEl = requestsSection(d && d.requests);
   const node = h("div", { class: "adm-page adm-dash" },
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Overview"),
       d ? h("p", { class: "adm-sub", text: `Live data · updated ${ago(d.generatedAt)}` }) : null)),
     ...[
       attentionSection(attentionItems({ dash: d, services: svc, assess, feedback })),
       kpiGrid({ dash: d, feedback }),
-      h("div", { class: "adm-dash__cols" }, ...[supportSection(d && d.support), invoiceSection(d && d.invoices), clientSection(d && d.clients), activitySection(d && d.activity)].filter(Boolean)),
+      h("div", { class: "adm-dash__cols" }, ...[requestsEl, supportSection(d && d.support), invoiceSection(d && d.invoices), clientSection(d && d.clients), activitySection(d && d.activity)].filter(Boolean)),
       recent ? section("adm-recent", "Recent feedback", recent, feedback.recent.length ? ["/admin/feedback", "All feedback"] : null) : null,
     ].filter(Boolean),
   );
+  if (requestsEl) watchRequests(requestsEl);
   if (!d && !feedback) node.append(stateBlock({ title: "The overview couldn't load", body: "Nothing has been changed. Reload the page to try again.", actionLabel: "Reload", onAction: () => location.reload() }));
   return { title: "Overview", node };
 }

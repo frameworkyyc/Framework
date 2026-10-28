@@ -754,6 +754,8 @@ a.adm-tile--link { display: flex; flex-direction: column; gap: 0; }
 @media (hover: hover) { .adm-kpi:hover { background: var(--mist); } }
 .adm-dash__cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 48px; }
 .adm-dash__sec { min-width: 0; }
+.adm-dash__sec--wide { grid-column: 1 / -1; }
+.adm-req__count { margin: 0 0 12px; }
 .adm-feed { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
 .adm-feed__row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 16px; padding: 12px 0; border-bottom: 1px solid var(--hairline); }
 .adm-feed__main { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
