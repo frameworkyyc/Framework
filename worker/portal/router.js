@@ -29,14 +29,14 @@ import { readForm, readUpload, readUploads, declaredBodyProblem, MAX_PROFILE_FOR
 import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
 import { checkCsrf } from "./sessions.js";
 import { can } from "./policy.js";
-import { getClientBrand, listClientUploads, uploadUsage, getBrandKit } from "./repo/brand.js";
+import { getClientBrand, listClientUploads, uploadUsage, getBrandKit, listServiceRequests } from "./repo/brand.js";
 import { listClientInvoices, clientInvoiceSummary } from "./repo/invoices.js";
 import { clientDownloadInvoice } from "./invoice-files.js";
 import { invoiceStatusLine, supportStatusLine } from "./services-live.js";
 import * as supportRepo from "./repo/support.js";
 import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./support-files.js";
 import { dispatchNotifications } from "./service-notifications.js";
-import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, limitsFor } from "./brand-files.js";
+import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, clientRequestService, limitsFor } from "./brand-files.js";
 
 /**
  * The answer for every /portal path when the portal is not serving this request (disabled, wrong host). Deliberately bare: no portal
@@ -300,6 +300,23 @@ async function removeBrandUpload(ctx, a, id) {
   return redirect(`/portal/o/${a.membership.slug}/branding/uploads?removed=1`);
 }
 
+/** A client owner asks for additions or changes to one Branding section, or for the full brand kit. One open request per section (the database enforces it): a second press is a friendly "already open". */
+async function requestBrandSection(ctx, a) {
+  const read = await readForm(ctx.request, MAX_FEEDBACK_FORM_BYTES);
+  if (read.error) return errorPage(read.error, { ref: ctx.ref });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) return errorPage(403, { ref: ctx.ref });
+  const note = (read.fields.get("note") || "").trim();
+  const res = await clientRequestService(brandDeps(ctx), { ...who(a), serviceKey: read.fields.get("section") || "", note: note || null });
+  const base = `/portal/o/${a.membership.slug}/branding`;
+  if (!res.ok) {
+    if (res.error === "already_requested") return redirect(`${base}?requested=0`);
+    if (res.error === "forbidden" || res.error === "not_allowed") return errorPage(403, { ref: ctx.ref });
+    return errorPage(400, { ref: ctx.ref });
+  }
+  logEvent({ evt: "brand.request", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  return redirect(`${base}?requested=1`);
+}
+
 async function downloadBrandFile(ctx, a, id, kind) {
   if (!UUID.test(id)) return notFoundPage(ctx);
   if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
@@ -318,9 +335,13 @@ const BRANDING_ROUTES = [
       const brand = await getClientBrand(ctx.db, org);
       const kit = brand.published ? await getBrandKit(ctx.db, org) : null;
       const uploadCount = (await listClientUploads(ctx.db, org)).length;
-      return pages.brandingPage(ctx, a, brand, { canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "" });
+      const newest = {}; // the newest request per section (listServiceRequests is newest first)
+      for (const r of await listServiceRequests(ctx.db, org)) if (!newest[r.serviceKey]) newest[r.serviceKey] = r;
+      const f = viewFilters(ctx.url);
+      return pages.brandingPage(ctx, a, brand, { canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, notice: f.requested ? "sent" : f.requestDup ? "dup" : "" });
     },
   },
+  { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/request$/, action: "branding.view", postAction: "branding.request", bucket: "branding", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/branding`), post: (ctx, a) => requestBrandSection(ctx, a) },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads$/, action: "branding.view", postAction: "branding.upload", bucket: "branding", maxBody: (ctx) => limitsFor(brandDeps(ctx)).maxFileBytes + UPLOAD_FORM_OVERHEAD, run: (ctx, a) => brandingUploadsView(ctx, a), post: (ctx, a) => uploadBrandFile(ctx, a) },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads\/([^/]+)\/download$/, action: "branding.view", run: (ctx, a, id) => downloadBrandFile(ctx, a, id, "upload") },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads\/([^/]+)\/delete$/, action: "branding.view", postAction: "branding.delete_upload", bucket: "branding", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/branding/uploads`), post: (ctx, a, id) => removeBrandUpload(ctx, a, id) },

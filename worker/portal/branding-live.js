@@ -7,6 +7,7 @@
 import { e } from "./ui.js";
 import { crumb } from "./guided.js";
 import { UPLOAD_CATEGORIES } from "./repo/brand.js";
+import { BRAND_REQUESTS } from "./brand-services.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const MB = 1024 * 1024;
@@ -87,62 +88,100 @@ function docRow(vm, a) {
  * One accordion section: a native <details>, so it opens and closes with no script and is keyboard- and screen-reader-operable. It is rendered closed (compact on a
  * phone); /assets/js/portal-branding.js only opens the one a link (#hash) points at. `summary` is the concise line shown while closed.
  */
-function section(id, title, summary, intro, inner) {
-  return `<details class="acc" id="${id}"><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">${e(title)}</h2><span class="acc__sum">${e(summary)}</span></span><span class="acc__chev" aria-hidden="true"></span></summary><div class="acc__body">${intro ? `<p class="muted brand-section__intro">${e(intro)}</p>` : ""}${inner}</div></details>`;
+function section(id, title, summary, intro, inner, open = false) {
+  return `<details class="acc" id="${id}"${open ? " open" : ""}><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">${e(title)}</h2><span class="acc__sum">${e(summary)}</span></span><span class="acc__chev" aria-hidden="true"></span></summary><div class="acc__body">${intro ? `<p class="muted brand-section__intro">${e(intro)}</p>` : ""}${inner}</div></details>`;
 }
 const count = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const list = (items) => items.join(" · ");
 
-/** Shown when there is no published brand system: a useful next step, never an empty library. */
-function emptyState(vm, { canUpload, uploadCount }) {
-  const cta = canUpload ? `<p><a class="btn btn--primary" href="${e(href(vm, "/branding/uploads"))}">Upload your existing brand materials</a></p>` : "";
-  const seen = uploadCount ? `<p class="muted small">You have shared ${uploadCount} ${uploadCount === 1 ? "file" : "files"} with Framework. <a class="text-link" href="${e(href(vm, "/branding/uploads"))}">See your uploads</a></p>` : "";
-  return `<div class="brand-empty"><span class="tag">Not published yet</span><h2 class="h2">Your brand system isn’t ready yet</h2>
-<p class="lead">When Framework finishes your brand, your logos, colours, fonts and guidelines will appear here, ready to download.</p>
-<ul class="brand-empty__list"><li><strong>Already have a logo or brand materials?</strong> Share them and we’ll review them.</li><li><strong>Starting from scratch?</strong> Your Framework contact will publish your brand here when it’s approved.</li></ul>${cta}${seen}
-<p class="muted small">Questions? Email <a class="text-link" href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a>.</p></div>`;
-}
+const REQUEST_STATUS = Object.freeze({
+  new: ["Requested", "Framework has your request and will follow up."],
+  contacted: ["In progress", "Framework has been in touch about this request."],
+  closed: ["Closed", "Your last request is closed."],
+  declined: ["Declined", "Framework couldn’t take on your last request."],
+});
 
 /**
- * @param brand   getClientBrand() result
- * @param o       { canUpload, uploadCount, brandName }
+ * The request control under a section. One request per section can be open at a time (a database rule, so it holds even if the button is pressed twice): while one is
+ * open the page shows its status instead of a button; once it is closed or declined a new one can be sent. Only an owner can send one; everyone sees the status.
+ * `r` is the newest request for this section, or undefined.
  */
-export function brandingOverview(vm, brand, { canUpload = false, uploadCount = 0, brandName = "" } = {}) {
-  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1>${brand.published ? `<p class="lead">${brandName ? `The approved ${e(brandName)} brand` : "Your approved brand"}: logos, colours, fonts and guidelines. Download what you need, any time.</p>` : ""}</header>`;
-  if (!brand.published) return head + emptyState(vm, { canUpload, uploadCount });
+function requestControl(vm, def, { r, canRequest, csrf, label, primary = false }) {
+  const open = r && (r.status === "new" || r.status === "contacted");
+  const [word, line] = r ? REQUEST_STATUS[r.status] || ["", ""] : ["", ""];
+  const status = r ? `<p class="brq__status"><span class="tag">${e(word)}</span> <span class="muted small">${e(line)} Sent ${e(dateOnly(r.createdAt))}.</span></p>` : "";
+  if (open) return status;
+  if (!canRequest) return `${status}<p class="muted small">Ask an owner of your organization to send a request${def.key === "brand-full-kit" ? "" : " for this section"}.</p>`;
+  return `${status}<details class="brq"><summary class="btn ${primary ? "btn--primary" : "btn--small"}">${e(label)}<span class="visually-hidden">: ${e(def.section)}</span></summary>
+<form method="post" action="${e(href(vm, "/branding/request"))}"><input type="hidden" name="csrf" value="${e(csrf)}"><input type="hidden" name="section" value="${e(def.key)}">
+<div class="field"><label for="req-${e(def.key)}">Anything we should know? (optional)</label><textarea id="req-${e(def.key)}" name="note" rows="3" maxlength="1000"></textarea></div>
+<p class="step-nav"><button class="btn btn--primary" type="submit">Send request</button></p></form></details>`;
+}
 
-  const assets = brand.assets || [];
+const SECTION_COPY = Object.freeze({
+  "brand-logos": "No logos have been added yet.",
+  "brand-colours": "No brand colours have been added yet.",
+  "brand-typography": "No typefaces or fonts have been added yet.",
+  "brand-guidelines": "No guidelines or documents have been added yet.",
+  "brand-additional": "No additional brand assets have been added yet.",
+});
+
+/**
+ * The Branding dashboard. Every client always sees the same five sections, whatever Framework has published for them: a section with files shows them (with the
+ * existing viewing and download links), an empty one says so and is open so its Request button is in view, and every section lets an owner request additions or
+ * changes. A Full Brand Kit request sits at the bottom.
+ * @param brand   getClientBrand() result
+ * @param o       { canUpload, uploadCount, brandName, canRequest, csrf, requests: { [key]: newest request }, notice: "sent" | "dup" | "" }
+ */
+export function brandingOverview(vm, brand, { canUpload = false, uploadCount = 0, brandName = "", canRequest = false, csrf = "", requests = {}, notice = "" } = {}) {
+  const live = Boolean(brand.published);
+  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1><p class="lead">${live ? `${brandName ? `The approved ${e(brandName)} brand` : "Your approved brand"}: logos, colours, fonts and guidelines. Download what you need, any time.` : "Your logos, colours, fonts and guidelines in one place. Anything that isn’t here yet can be requested below."}</p></header>`;
+  const banner = notice === "sent" ? `<p class="form-banner" role="status">Request sent. Framework will follow up.</p>` : notice === "dup" ? `<p class="form-banner" role="status">That request is already open, so we didn’t send it twice.</p>` : "";
+
+  const assets = live ? brand.assets || [] : [];
   const logos = logoGroups(assets);
-  const colours = brand.colours || [];
+  const colours = live ? brand.colours || [] : [];
   const fonts = assets.filter((a) => a.kind === "font");
   const fontFiles = fonts.filter((a) => a.canDownload);
-  const type = brand.typography || [];
-  const docs = DOC_KINDS.map((k) => [k, assets.filter((a) => a.kind === k)]).filter(([, list]) => list.length);
+  const type = live ? brand.typography || [] : [];
+  const guideDocs = ["guideline", "document"].map((k) => [k, assets.filter((a) => a.kind === k)]).filter(([, l]) => l.length);
+  const extraDocs = ["package", "other"].map((k) => [k, assets.filter((a) => a.kind === k)]).filter(([, l]) => l.length);
+  const reqDef = (key) => BRAND_REQUESTS.find((d) => d.key === key);
+  const isOpen = (key) => requests[key] && (requests[key].status === "new" || requests[key].status === "contacted");
+  const sum = (key, text) => (isOpen(key) ? `${text} · Request open` : text);
+  const control = (key, hasContent) => requestControl(vm, reqDef(key), { r: requests[key], canRequest, csrf, label: hasContent ? "Request additions or changes" : "Request" });
+  const groups = (docs) => docs.map(([k, l]) => `${docs.length > 1 ? `<p class="acc__group">${e(DOC_LABEL[k])}</p>` : ""}<ul class="file-list">${l.map((a) => docRow(vm, a)).join("")}</ul>`).join("");
+  const empty = (key) => `<div class="empty"><strong>Nothing here yet</strong>${e(SECTION_COPY[key])}</div>`;
+  const total = (docs) => docs.reduce((n, [, l]) => n + l.length, 0);
 
   const parts = [];
   if (logos.length) {
     const formats = [...new Set(assets.filter((x) => x.kind === "logo").sort(byFormat).map((x) => upper(x.format)))];
-    parts.push(section("logos", "Logos", list([count(logos.length, "logo variation"), formats.join(", ")]), "Use the version that suits the background. Each logo is available in every format we’ve prepared.", `<ul class="logo-grid">${logos.map((g) => logoCard(vm, g)).join("")}</ul>`));
-  }
-  if (colours.length) parts.push(section("colours", "Colours", count(colours.length, "colour"), "", `<ul class="swatches">${colours.map(swatch).join("")}</ul>`));
+    parts.push(section("logos", "Logos", sum("brand-logos", list([count(logos.length, "logo variation"), formats.join(", ")])), "Use the version that suits the background. Each logo is available in every format we’ve prepared.", `<ul class="logo-grid">${logos.map((g) => logoCard(vm, g)).join("")}</ul>${control("brand-logos", true)}`));
+  } else parts.push(section("logos", "Logos", sum("brand-logos", "Not added yet"), "", empty("brand-logos") + control("brand-logos", false), true));
+
+  if (colours.length) parts.push(section("colours", "Colours", sum("brand-colours", count(colours.length, "colour")), "", `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}`));
+  else parts.push(section("colours", "Colours", sum("brand-colours", "Not added yet"), "", empty("brand-colours") + control("brand-colours", false), true));
+
   if (type.length || fonts.length) {
     const unlisted = fontFiles.filter((f) => !type.some((t) => f.title.toLowerCase().includes(t.family.toLowerCase())));
     const note = fonts.some((f) => !f.canDownload) ? `<p class="muted small">Some fonts can’t be shared as files because of their licence. Use the link beside each one to get it from its provider, or ask us.</p>` : "";
     const names = type.map((t) => t.family);
-    parts.push(section("typography", "Typography & Fonts", names.length ? list([count(names.length, "typeface"), names.slice(0, 2).join(", ") + (names.length > 2 ? "…" : "")]) : count(fontFiles.length, "font file"), "", `${type.length ? `<ul class="types">${type.map((t) => typeface(vm, t, fontFiles)).join("")}</ul>` : ""}${unlisted.length ? `<ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}`));
-  }
-  if (docs.length) {
-    const total = docs.reduce((n, [, l]) => n + l.length, 0);
-    const inner = docs.map(([k, l]) => `${docs.length > 1 ? `<p class="acc__group">${e(DOC_LABEL[k])}</p>` : ""}<ul class="file-list">${l.map((a) => docRow(vm, a)).join("")}</ul>`).join("");
-    parts.push(section("guidelines", "Brand Guidelines & Documents", count(total, "file"), "How to use your brand consistently.", inner));
-  }
-  if (!parts.length) parts.push(`<div class="empty"><strong>Nothing to download yet</strong>Your brand system is published, but Framework hasn’t added files to it yet.</div>`);
+    parts.push(section("typography", "Typography & Fonts", sum("brand-typography", names.length ? list([count(names.length, "typeface"), names.slice(0, 2).join(", ") + (names.length > 2 ? "…" : "")]) : count(fontFiles.length, "font file")), "", `${type.length ? `<ul class="types">${type.map((t) => typeface(vm, t, fontFiles)).join("")}</ul>` : ""}${unlisted.length ? `<ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}${control("brand-typography", true)}`));
+  } else parts.push(section("typography", "Typography & Fonts", sum("brand-typography", "Not added yet"), "", empty("brand-typography") + control("brand-typography", false), true));
+
+  if (guideDocs.length) parts.push(section("guidelines", "Brand Guidelines & Documents", sum("brand-guidelines", count(total(guideDocs), "file")), "How to use your brand consistently.", groups(guideDocs) + control("brand-guidelines", true)));
+  else parts.push(section("guidelines", "Brand Guidelines & Documents", sum("brand-guidelines", "Not added yet"), "", empty("brand-guidelines") + control("brand-guidelines", false), true));
+
+  if (extraDocs.length) parts.push(section("additional", "Additional Brand Assets", sum("brand-additional", count(total(extraDocs), "file")), "", groups(extraDocs) + control("brand-additional", true)));
+  else parts.push(section("additional", "Additional Brand Assets", sum("brand-additional", "Not added yet"), "", empty("brand-additional") + control("brand-additional", false), true));
 
   const share = canUpload
     ? `<aside class="brand-aside" aria-labelledby="h-share"><h2 class="h3" id="h-share">Have brand materials of your own?</h2><p class="muted">Share your existing logo, fonts or guidelines and Framework will review them.</p><p><a class="btn" href="${e(href(vm, "/branding/uploads"))}">Upload your materials${uploadCount ? ` (${uploadCount} shared)` : ""}</a></p></aside>`
     : "";
-  const meta = brand.publishedAt ? `<p class="muted small">Last published ${e(dateOnly(brand.publishedAt))}.</p>` : "";
-  return head + `<div class="acc-list">${parts.join("")}</div>` + meta + share;
+  const kit = `<section class="brand-kit" aria-labelledby="h-kit"><h2 class="h2" id="h-kit">Need a complete brand identity?</h2><p class="muted">Logo, colours, typography and guidelines, designed together as one system.</p>${requestControl(vm, reqDef("brand-full-kit"), { r: requests["brand-full-kit"], canRequest, csrf, label: "Request full brand kit", primary: true })}</section>`;
+  const meta = brand.publishedAt && live ? `<p class="muted small">Last published ${e(dateOnly(brand.publishedAt))}.</p>` : "";
+  return head + banner + `<div class="acc-list">${parts.join("")}</div>` + meta + share + kit;
 }
 
 /* ------------------------------------------------------------------ the uploads area */

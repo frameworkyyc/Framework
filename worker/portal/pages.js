@@ -138,10 +138,11 @@ export async function feedbackPage(ctx, a, o = {}) {
 }
 
 const BRANDING_SCRIPT = "/assets/js/portal-branding.js";
-/** The Branding page: the published brand system, or the empty state. `o`: { canUpload, uploadCount, brandName }. */
+/** The Branding page: the five sections (always), the request controls and the Full Brand Kit request. `o`: see branding-live.js brandingOverview. */
 export async function brandingPage(ctx, a, brand, o = {}) {
   const vm = liveModel(ctx, a, {});
-  return shell(ctx, a, { title: "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, o), vm, script: brand.published ? BRANDING_SCRIPT : null, ref: "branding" });
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  return shell(ctx, a, { title: "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, { ...o, csrf }), vm, script: brand.published ? BRANDING_SCRIPT : null, ref: "branding" });
 }
 /** The separate area for the client's own brand materials. `o`: see branding-live.js brandingUploads; `status` is the HTTP status (4xx for a refused upload). */
 export async function brandingUploadsPage(ctx, a, o = {}) {

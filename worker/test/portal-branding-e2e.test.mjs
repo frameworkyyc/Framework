@@ -60,14 +60,14 @@ const page = async (b, p = "") => (await b.get("/portal/o/alpha/branding" + p)).
 
 test("Admin to client, end to end: nothing shows until published; publishing, unpublishing and deleting in Admin are reflected for the client immediately; downloads return the exact bytes", async () => {
   const { w, A, ann, mia, call, adminUpload } = await setup();
-  assert.match(await page(mia), /isn’t ready yet/);
+  assert.match(await page(mia), /Nothing here yet/);
 
   // Admin drafts a deliverable and a kit: the client still sees the empty state and cannot fetch the file
   const up = await adminUpload({ ...LOGO, published: false }, "logo.png", S.png(12, 12));
   assert.equal(up.status, 201, JSON.stringify(up.json));
   const id = up.json.id;
   const kit = await call(`/clients/${A.id}/branding/kit`, { method: "PUT", json: { colours: [{ name: "Ink", role: "primary", hex: "#0a0a0a", note: "" }], typography: [] } }); assert.equal(kit.status, 200, JSON.stringify(kit.json));
-  assert.match(await page(mia), /isn’t ready yet/);
+  assert.match(await page(mia), /Nothing here yet/);
   assert.equal((await mia.get(`/portal/o/alpha/branding/files/${id}`)).status, 404);
 
   // kit published but the file still a draft: colours show, the file does not
@@ -90,7 +90,7 @@ test("Admin to client, end to end: nothing shows until published; publishing, un
   assert.equal((await mia.get(`/portal/o/alpha/branding/files/${id}`)).status, 404);
   await call(`/clients/${A.id}/branding/assets/${id}/update`, { method: "POST", json: { published: true } });
   await call(`/clients/${A.id}/branding/kit/unpublish`, { method: "POST", json: {} });
-  assert.match(await page(ann), /isn’t ready yet/); assert.equal((await ann.get(`/portal/o/alpha/branding/files/${id}`)).status, 404);
+  assert.match(await page(ann), /Nothing here yet/); assert.equal((await ann.get(`/portal/o/alpha/branding/files/${id}`)).status, 404);
   await call(`/clients/${A.id}/branding/kit/publish`, { method: "POST", json: {} });
   assert.equal((await call(`/clients/${A.id}/branding/assets/${id}/delete`, { method: "POST", json: {} })).status, 200);
   assert.equal((await mia.get(`/portal/o/alpha/branding/files/${id}`)).status, 404); assert.ok(!(await page(mia)).includes(id));
