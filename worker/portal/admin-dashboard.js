@@ -4,11 +4,13 @@
  * a database without a migration (or a failing query) gives `null` for that part and never fails the page. Deleted clients are left out of every count and list.
  * Staff-facing, so it may name clients; it never returns client answers, message text, file names or storage keys.
  *
- *   GET /dashboard   { generatedAt, clients, support, invoices, activity }
+ *   GET /dashboard            { generatedAt, clients, support, invoices, activity, requests }
+ *   GET /dashboard/requests   { available, generatedAt, requests }   just the outstanding client requests (the Overview refreshes this one on its own)
  */
 import { readOnlyDb } from "./admin-clients.js";
 import { profileProgress } from "./profile-schema.js";
-import { listRequestsAllAdmin, adminSupportTotals } from "./repo/support.js";
+import { listRequestsAllAdmin, adminSupportTotals, CATEGORY_LABEL, STATUS_LABEL } from "./repo/support.js";
+import { brandingService, BRAND_REQUESTS } from "./brand-services.js";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
 const part = async (fn) => { try { return await fn(); } catch { return null; } };
@@ -24,6 +26,7 @@ export const ACTIVITY_LABELS = Object.freeze({
   "membership.revoked": "Access removed",
   "profile.updated": "Business Profile updated",
   "feedback.submitted": "Portal feedback sent",
+  "service.requested": "Branding request submitted",
   "support.request.created": "Support request submitted",
   "support.message.client": "Client replied to a request",
   "invoice.published": "Invoice published",
@@ -61,6 +64,32 @@ async function supportPart(env) {
   };
 }
 
+const BRANDING_OPEN = "r.status IN ('new', 'contacted')";
+const BRANDING_STATUS = Object.freeze({ new: "New", contacted: "In progress" });
+const REQUEST_LIMIT = 10;
+
+/**
+ * Outstanding requests of every client in one list, newest first: Branding requests (service_requests: new or contacted) and support or change requests
+ * (support_requests: anything not completed or declined). Closed and declined ones are never included. Reads the same tables the per-client pages and the Support
+ * list read; it only counts and names them. Each part loads on its own: Branding without Client Services (no migration 0007) still lists the Branding ones.
+ */
+async function requestsPart(env, rdb) {
+  const branding = await part(async () => {
+    const from = `FROM service_requests r JOIN organizations o ON o.id = r.organization_id WHERE ${BRANDING_OPEN} AND ${LIVE}`;
+    const total = (await rdb.prepare(`SELECT count(*) AS n ${from}`).first()).n;
+    const rows = (await rdb.prepare(`SELECT r.id, r.service_key, r.status, r.created_at, o.id AS organization_id, o.name AS org_name ${from} ORDER BY r.created_at DESC, r.id LIMIT ?`).bind(REQUEST_LIMIT).all()).results;
+    const section = (key) => { const d = BRAND_REQUESTS.find((x) => x.key === key); return d ? d.section : (brandingService(key) || { title: key }).title; };
+    return { total, items: rows.map((r) => ({ kind: "branding", id: r.id, organizationId: r.organization_id, orgName: r.org_name, type: `Branding: ${section(r.service_key)}`, status: r.status, statusLabel: BRANDING_STATUS[r.status] || r.status, createdAt: r.created_at })) };
+  });
+  const support = await part(async () => {
+    const [totals, list] = [await adminSupportTotals(env.PORTAL_DB), await listRequestsAllAdmin(env.PORTAL_DB, { scope: "open", limit: 200 })];
+    return { total: totals.open, items: list.slice(0, 200).map((r) => ({ kind: "support", id: r.id, organizationId: r.organizationId, orgName: r.orgName, type: `${r.scope === "change" ? "Change request" : "Support request"}: ${CATEGORY_LABEL[r.category] || "Request"}`, title: r.title, status: r.status, statusLabel: STATUS_LABEL[r.status] || r.status, createdAt: r.createdAt })) };
+  });
+  if (!branding && !support) return null;
+  const items = [...(branding ? branding.items : []), ...(support ? support.items : [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : a.id < b.id ? -1 : 1));
+  return { total: (branding ? branding.total : 0) + (support ? support.total : 0), branding: branding ? branding.total : 0, support: support ? support.total : 0, items: items.slice(0, REQUEST_LIMIT) };
+}
+
 async function invoicesPart(rdb, now) {
   const today = now.toISOString().slice(0, 10);
   const base = `FROM invoices i JOIN organizations o ON o.id = i.organization_id WHERE i.archived_at IS NULL AND ${LIVE}`;
@@ -92,11 +121,12 @@ async function activityPart(rdb) {
 }
 
 export async function handleDashboardApi(request, env, principal, path, deps = {}) {
-  if (path !== "/dashboard") return null;
+  if (path !== "/dashboard" && path !== "/dashboard/requests") return null;
   if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
   if (!env.PORTAL_DB) return json({ available: false });
   const now = deps.now || new Date();
   const rdb = readOnlyDb(env.PORTAL_DB);
+  if (path === "/dashboard/requests") return json({ available: true, generatedAt: now.toISOString(), requests: await part(() => requestsPart(env, rdb)) });
   return json({
     available: true,
     generatedAt: now.toISOString(),
@@ -104,5 +134,6 @@ export async function handleDashboardApi(request, env, principal, path, deps = {
     support: await part(() => supportPart(env)),
     invoices: await part(() => invoicesPart(rdb, now)),
     activity: await part(() => activityPart(rdb)),
+    requests: await part(() => requestsPart(env, rdb)),
   });
 }
