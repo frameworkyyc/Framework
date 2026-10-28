@@ -74,12 +74,13 @@ test("no brand kit: the full dashboard still shows all five sections, each open 
   const html = await res.text();
   const ids = [...html.matchAll(/<details class="acc" id="(\w+)" open>/g)].map((m) => m[1]);
   assert.deepEqual(ids, ["logos", "colours", "typography", "guidelines", "additional"], "all five sections, open so the Request button is in view");
-  assert.equal([...html.matchAll(/Nothing here yet/g)].length, 5);
+  assert.equal([...html.matchAll(/Nothing here yet/g)].length, 4, "the four other sections; Logos shows its four example cards instead");
   for (const t of ["Logos", "Colours", "Typography &amp; Fonts", "Brand Guidelines &amp; Documents", "Additional Brand Assets"]) assert.ok(html.includes(`<h2 class="acc__title">${t}</h2>`), t);
   assert.equal([...html.matchAll(/<summary class="btn btn--small">Request<span/g)].length, 5, "a Request button in every empty section");
   assert.match(html, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   assert.match(html, /Need a complete brand identity\?/); assert.match(html, /Request full brand kit/);
-  assert.ok(!/logo-grid|swatches|Download/.test(html), "no library chrome");
+  assert.ok(!/logo-grid|swatches|Download (SVG|PNG|PDF|WEBP|JPG)|lv-card--has/.test(html), "no library chrome and no download buttons");
+  assert.equal([...html.matchAll(/lv-card--example/g)].length, 4, "the four variation cards are shown as examples"); assert.equal([...html.matchAll(/Not added yet<\/span><\/div><p class="lv-card__desc/g)].length, 4);
   const m = await (await mia.get(base("alpha"))).text();
   assert.ok(!/<summary class="btn/.test(m), "a member has no request buttons");
   assert.match(m, /Ask an owner of your organization to send a request for this section/);
@@ -108,7 +109,8 @@ test("a published kit shows logos grouped by variation, colours with codes, typo
   const res = await ann.get(base("alpha"));
   assert.equal(res.headers.get("content-security-policy"), PORTAL_CSP_WITH_SCRIPT, "script only for the copy button, never inline");
   const html = await res.text();
-  assert.equal((html.match(/class="logo-card"/g) || []).length, 1, "PNG and SVG of one variation share a card");
+  assert.equal((html.match(/lv-card--has/g) || []).length, 1, "PNG and SVG of one variation share a card");
+  assert.equal((html.match(/lv-card--example/g) || []).length, 3, "the other three variations keep their example cards");
   assert.match(html, new RegExp(`files/${pngId}`)); assert.match(html, new RegExp(`files/${svgId}`));
   assert.match(html, /Download PNG/); assert.match(html, /Download SVG/);
   assert.ok(html.includes(`files/${svgId}?preview=1`) || html.includes(`files/${pngId}?preview=1`), "a preview image");
@@ -392,7 +394,7 @@ test("Home stays up when branding data cannot be read: the Branding card says so
 
 /* ------------------------------------------------------------------ accordion */
 
-test("Branding is five native accordion sections, each with a concise summary; sections with files are closed, empty ones open (script only opens a linked section); every download is still present", async () => {
+test("Branding is five native accordion sections, each with a concise summary; Logos and empty ones are open, sections with files are closed (script only opens a linked section); every download is still present", async () => {
   const { ann, alpha, deliver, publishKit } = await setup();
   const a = await deliver(alpha, logo, "a.png", S.png()), b = await deliver(alpha, logo, "a.svg", S.svg());
   const g = await deliver(alpha, { kind: "guideline", title: "Brand Guidelines" }, "g.pdf", S.pdf());
@@ -401,9 +403,10 @@ test("Branding is five native accordion sections, each with a concise summary; s
   await publishKit(alpha);
   const html = await (await ann.get(base("alpha"))).text();
   const secs = [...html.matchAll(/<details class="acc" id="(\w+)"><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">([^<]+)<\/h2><span class="acc__sum">([^<]+)<\/span>/g)].map((m) => m.slice(1));
-  assert.deepEqual(secs, [["logos", "Logos", "1 logo variation · SVG, PNG"], ["colours", "Colours", "2 colours"], ["typography", "Typography & Fonts".replace("&", "&amp;"), "1 typeface · Switzer"], ["guidelines", "Brand Guidelines &amp; Documents", "2 files"]]);
+  assert.deepEqual(secs, [["colours", "Colours", "2 colours"], ["typography", "Typography & Fonts".replace("&", "&amp;"), "1 typeface · Switzer"], ["guidelines", "Brand Guidelines &amp; Documents", "2 files"]]);
+  assert.match(html, /<details class="acc" id="logos" open><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">Logos<\/h2><span class="acc__sum">1 of 4 variations · SVG, PNG/, "Logos is always open: its four cards are the centrepiece");
   assert.match(html, /<details class="acc" id="additional" open><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">Additional Brand Assets<\/h2><span class="acc__sum">Not added yet/, "the one empty section is open");
-  assert.equal([...html.matchAll(/<details class="acc" id="\w+" open>/g)].length, 1, "sections with files are closed by default on every screen");
+  assert.equal([...html.matchAll(/<details class="acc" id="\w+" open>/g)].length, 2, "Logos and the empty section are open; sections with files are closed by default on every screen");
   assert.equal([...html.matchAll(/<summary class="acc__head"/g)].length, 5);
   for (const id of [a, b, g, d, f]) assert.ok(html.includes(`/branding/files/${id}"`), "download link kept: " + id);
   assert.match(html, /aria-hidden="true"><\/span><\/summary>/, "the chevron is decorative");

@@ -94,6 +94,70 @@ function section(id, title, summary, intro, inner, open = false) {
 const count = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const list = (items) => items.join(" · ");
 
+/* ------------------------------------------------------------------ the four logo variations */
+
+/** The four logo variations every client sees. Admin assigns each logo file to one of them (its "Logo type"); the stored value is the logo role (icon is the Sub-mark). */
+export const LOGO_VARIATIONS = Object.freeze([
+  Object.freeze({ key: "primary", title: "Primary", desc: "The main brand logo for websites, print and general branding." }),
+  Object.freeze({ key: "secondary", title: "Secondary", desc: "An alternative arrangement, typically horizontal, for headers, banners and wider spaces." }),
+  Object.freeze({ key: "simplified", title: "Simplified", desc: "A reduced-detail logo for smaller applications where the full logo isn’t practical." }),
+  Object.freeze({ key: "submark", title: "Sub-mark", desc: "A compact brand symbol for profile pictures, favicons, icons and watermarks." }),
+]);
+const ROLE_TO_VARIATION = Object.freeze({ primary: "primary", secondary: "secondary", simplified: "simplified", icon: "submark" });
+/** Which variation a logo file belongs to, from the type Admin chose, or null when none was chosen (older files): those are listed separately, never guessed into a card. */
+export const variationOf = (a) => (a && a.kind === "logo" ? ROLE_TO_VARIATION[a.logoRole] || null : null);
+
+const TONE_RANK = { light: 0, colour: 1, mono: 2, dark: 3 };
+
+/** The files of one variation grouped into versions (same shape, background and transparency), each version with its formats in the usual order. */
+function versionsOf(files) {
+  const groups = new Map();
+  for (const a of files) {
+    const key = `${a.orientation || ""}|${a.tone || ""}|${a.transparent ? 1 : 0}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(a);
+  }
+  return [...groups.values()].map((list) => list.sort(byFormat)).sort((x, y) => (TONE_RANK[x[0].tone] ?? 9) - (TONE_RANK[y[0].tone] ?? 9) || String(x[0].orientation).localeCompare(String(y[0].orientation)) || Number(Boolean(y[0].transparent)) - Number(Boolean(x[0].transparent)));
+}
+const versionLabel = (v) => [ORIENTATION_LABEL[v[0].orientation], TONE_LABEL[v[0].tone], v[0].transparent ? "Transparent background" : ""].filter(Boolean).join(" · ");
+const previewable = (v) => IMAGE_FORMATS.map((f) => v.find((a) => a.format === f)).find(Boolean) || null;
+
+/**
+ * Illustrative examples, one per variation, of ONE fictional brand ("Alder Studio"), drawn with plain SVG shapes in the page's ink colour. They only show how the four
+ * variations differ; each card marks its example clearly and the section says they are not the client's logo. Presentation attributes only (no style, no script).
+ */
+const MARK = `<rect x="4" y="4" width="56" height="56" fill="none" stroke="currentColor" stroke-width="5"/><path d="M17 47 L32 15 L47 47 Z" fill="currentColor"/>`;
+const EXAMPLE_ART = Object.freeze({
+  primary: `<svg viewBox="0 0 220 170" role="img" aria-label="Example of a primary logo: a square symbol above the name Alder Studio" focusable="false"><g transform="translate(78 8)">${MARK}</g><text x="110" y="116" text-anchor="middle" font-family="Switzer, Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="7" fill="currentColor">ALDER</text><text x="110" y="141" text-anchor="middle" font-family="Switzer, Arial, sans-serif" font-size="11" letter-spacing="5" fill="currentColor">STUDIO</text></svg>`,
+  secondary: `<svg viewBox="0 0 300 90" role="img" aria-label="Example of a secondary logo: the symbol beside the name Alder Studio on one line" focusable="false"><g transform="translate(10 13)">${MARK}</g><text x="92" y="50" font-family="Switzer, Arial, sans-serif" font-size="32" font-weight="700" letter-spacing="6" fill="currentColor">ALDER</text><text x="94" y="72" font-family="Switzer, Arial, sans-serif" font-size="11" letter-spacing="5" fill="currentColor">STUDIO</text></svg>`,
+  simplified: `<svg viewBox="0 0 220 120" role="img" aria-label="Example of a simplified logo: a solid symbol beside a short name, without the tagline" focusable="false"><rect x="14" y="30" width="60" height="60" fill="currentColor"/><path d="M29 77 L44 41 L59 77 Z" fill="#fff"/><text x="92" y="72" font-family="Switzer, Arial, sans-serif" font-size="32" font-weight="700" letter-spacing="3" fill="currentColor">ALDER</text></svg>`,
+  submark: `<svg viewBox="0 0 150 150" role="img" aria-label="Example of a sub-mark: the symbol alone inside a circle" focusable="false"><circle cx="75" cy="75" r="62" fill="currentColor"/><path d="M45 105 L75 38 L105 105 Z" fill="#fff"/></svg>`,
+});
+
+function downloads(vm, version) { return version.map((a) => downloadLink(vm, a, `Download ${e(upper(a.format))}`)).join(""); }
+
+/** A card whose variation has published files: the real preview, what it contains and a download button per format (all versions under "All versions" when there is more than one). */
+function variationCard(vm, def, files) {
+  const versions = versionsOf(files);
+  const first = versions[0];
+  const shownVersion = versions.find((v) => previewable(v)) || first;
+  const shown = previewable(shownVersion);
+  const dark = shownVersion[0].tone === "dark"; // a logo for dark backgrounds sits on a dark tile so it is visible
+  const stage = shown
+    ? `<div class="lv-card__stage${dark ? " lv-card__stage--dark" : ""}"><img src="${e(previewUrl(vm, shown))}" alt="${e(def.title)} logo${shownVersion[0].title ? `: ${e(shownVersion[0].title)}` : ""}" loading="lazy" decoding="async"></div>`
+    : `<div class="lv-card__stage lv-card__stage--file"><span class="muted small">No preview for this format. Download it below.</span></div>`;
+  const formats = [...new Set(files.slice().sort(byFormat).map((a) => upper(a.format)))].join(" · ");
+  const more = versions.length > 1
+    ? `<details class="lv-more"><summary>All versions (${versions.length})</summary><ul class="lv-more__list">${versions.map((v) => `<li><p class="small">${e(versionLabel(v) || v[0].title)}</p><div class="lv-card__actions">${downloads(vm, v)}</div></li>`).join("")}</ul></details>`
+    : "";
+  return `<li class="lv-card lv-card--has">${stage}<div class="lv-card__body"><div class="lv-card__top"><h3 class="lv-card__title">${e(def.title)}</h3><span class="tag">Available</span></div><p class="lv-card__desc muted">${e(def.desc)}</p><p class="lv-card__meta muted small">${e([formats, versions.length === 1 ? versionLabel(first) : `${versions.length} versions`].filter(Boolean).join(" · "))}</p><div class="lv-card__actions">${downloads(vm, versions.length > 1 ? shownVersion : first)}</div>${more}</div></li>`;
+}
+
+/** A card whose variation has no published file yet: a clearly labelled example illustration and the status "Not added yet". */
+function exampleCard(def) {
+  return `<li class="lv-card lv-card--example"><div class="lv-card__stage lv-card__stage--example">${EXAMPLE_ART[def.key]}<span class="lv-card__badge">Example</span></div><div class="lv-card__body"><div class="lv-card__top"><h3 class="lv-card__title">${e(def.title)}</h3><span class="tag">Not added yet</span></div><p class="lv-card__desc muted">${e(def.desc)}</p><p class="lv-card__meta muted small">Illustration of a fictional brand, not your logo.</p></div></li>`;
+}
+
 const REQUEST_STATUS = Object.freeze({
   new: ["Requested", "Framework has your request and will follow up."],
   contacted: ["In progress", "Framework has been in touch about this request."],
@@ -119,7 +183,6 @@ function requestControl(vm, def, { r, canRequest, csrf, label, primary = false }
 }
 
 const SECTION_COPY = Object.freeze({
-  "brand-logos": "No logos have been added yet.",
   "brand-colours": "No brand colours have been added yet.",
   "brand-typography": "No typefaces or fonts have been added yet.",
   "brand-guidelines": "No guidelines or documents have been added yet.",
@@ -139,7 +202,6 @@ export function brandingOverview(vm, brand, { canUpload = false, uploadCount = 0
   const banner = notice === "sent" ? `<p class="form-banner" role="status">Request sent. Framework will follow up.</p>` : notice === "dup" ? `<p class="form-banner" role="status">That request is already open, so we didn’t send it twice.</p>` : "";
 
   const assets = live ? brand.assets || [] : [];
-  const logos = logoGroups(assets);
   const colours = live ? brand.colours || [] : [];
   const fonts = assets.filter((a) => a.kind === "font");
   const fontFiles = fonts.filter((a) => a.canDownload);
@@ -155,10 +217,18 @@ export function brandingOverview(vm, brand, { canUpload = false, uploadCount = 0
   const total = (docs) => docs.reduce((n, [, l]) => n + l.length, 0);
 
   const parts = [];
-  if (logos.length) {
-    const formats = [...new Set(assets.filter((x) => x.kind === "logo").sort(byFormat).map((x) => upper(x.format)))];
-    parts.push(section("logos", "Logos", sum("brand-logos", list([count(logos.length, "logo variation"), formats.join(", ")])), "Use the version that suits the background. Each logo is available in every format we’ve prepared.", `<ul class="logo-grid">${logos.map((g) => logoCard(vm, g)).join("")}</ul>${control("brand-logos", true)}`));
-  } else parts.push(section("logos", "Logos", sum("brand-logos", "Not added yet"), "", empty("brand-logos") + control("brand-logos", false), true));
+  const logoFiles = assets.filter((a) => a.kind === "logo");
+  const byVariation = new Map(LOGO_VARIATIONS.map((d) => [d.key, []]));
+  const unassigned = [];
+  for (const a of logoFiles) { const k = variationOf(a); if (k) byVariation.get(k).push(a); else unassigned.push(a); }
+  const filled = LOGO_VARIATIONS.filter((d) => byVariation.get(d.key).length).length;
+  const logoFormats = [...new Set(logoFiles.slice().sort(byFormat).map((x) => upper(x.format)))];
+  const logoSummary = filled ? list([`${filled} of 4 variations`, logoFormats.join(", ")]) : unassigned.length ? count(logoGroups(unassigned).length, "logo") : "Not added yet";
+  const cards = LOGO_VARIATIONS.map((d) => (byVariation.get(d.key).length ? variationCard(vm, d, byVariation.get(d.key)) : exampleCard(d))).join("");
+  const others = unassigned.length ? `<p class="acc__group">Other logo files</p><ul class="logo-grid">${logoGroups(unassigned).map((g) => logoCard(vm, g)).join("")}</ul>` : "";
+  const examples = filled < 4 ? `<p class="muted small">Cards marked “Example” are illustrations of a fictional brand, shown until your own logo for that variation is added. They are not your branding.</p>` : "";
+  // The Logos section is always open: its four cards are the page's centrepiece.
+  parts.push(section("logos", "Logos", sum("brand-logos", logoSummary), "Four logo variations, each for a different use. Download the version that suits the job.", `<ul class="lv-grid">${cards}</ul>${examples}${others}${control("brand-logos", logoFiles.length > 0)}`, true));
 
   if (colours.length) parts.push(section("colours", "Colours", sum("brand-colours", count(colours.length, "colour")), "", `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}`));
   else parts.push(section("colours", "Colours", sum("brand-colours", "Not added yet"), "", empty("brand-colours") + control("brand-colours", false), true));

@@ -141,7 +141,7 @@ export async function adminUploadAsset(deps, { organizationId, actor, meta, file
 
 /** A submitted logo detail that is not one of the allowed values gets its specific error (not "incomplete"). */
 const enumError = (m) => {
-  for (const [key, list, code] of [["logo_role", brand.LOGO_ROLES, "invalid_logo_role"], ["orientation", brand.ORIENTATIONS, "invalid_orientation"], ["tone", brand.TONES, "invalid_tone"]]) if (m[key] !== undefined && m[key] !== null && m[key] !== "" && !list.includes(m[key])) return code;
+  for (const [key, list, code] of [["logo_role", brand.LOGO_ROLE_INPUT, "invalid_logo_role"], ["orientation", brand.ORIENTATIONS, "invalid_orientation"], ["tone", brand.TONES, "invalid_tone"]]) if (m[key] !== undefined && m[key] !== null && m[key] !== "" && !list.includes(m[key])) return code;
   return null;
 };
 const pickKeys = (obj, keys) => Object.fromEntries(Object.entries(obj).filter(([k]) => keys.includes(k)));
