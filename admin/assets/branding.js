@@ -392,9 +392,43 @@ export async function render(orgId, ctx) {
     return section("br-s-logo", numbered(SECTION.logo), filled ? chip("plain", `${filled} of 4 variations`) : chip("plain", "Not added yet"), [sectionIntro(SECTION.logo), logoCards()]);
   }
 
-  /** 04 Tagline: the client page shows its empty state until text content can be stored. Nothing to manage yet. */
+  /** 04 Tagline: the approved primary tagline, optional alternates and usage guidelines, as plain text (no file needed). Saving an empty form removes the tagline. */
   function taglineSection() {
-    return section("br-s-tagline", numbered(SECTION.tagline), chip("plain", "Not added yet"), [sectionIntro(SECTION.tagline), h("p", { class: "adm-banner" }, "The client sees “Not added yet” here. Text content (the tagline and guidelines) can’t be stored yet: it needs a small database change that is waiting for approval.")]);
+    const saved = (data.kit && data.kit.sections && data.kit.sections.tagline) || {};
+    const available = caps().sections !== false;
+    const rows = [...(saved.alternates || [])];
+    const primary = h("input", { id: "br-tag-primary", class: "input", type: "text", maxlength: "120", value: saved.primary || "", autocomplete: "off" });
+    const guide = h("textarea", { id: "br-tag-guide", class: "input adm-brand__textarea", maxlength: "600", rows: "4" }, saved.guidelines || "");
+    const list = h("ul", { class: "adm-brand__list adm-brand__list--tight", "aria-label": "Alternate taglines" });
+    const err = h("p", { class: "adm-field__error", role: "alert", hidden: true });
+    const addBtn = button("Add alternate tagline", { onclick: () => { if (rows.length >= 6) return; rows.push(""); draw(); list.querySelector("li:last-child input")?.focus(); } });
+    const draw = () => {
+      list.replaceChildren(...rows.map((v, i) => {
+        const input = h("input", { id: `br-tag-alt-${i}`, class: "input", type: "text", maxlength: "120", value: v, autocomplete: "off", oninput: () => { rows[i] = input.value; } });
+        return h("li", { class: "adm-brand__row" }, h("div", { class: "adm-brand__rowhead" }, h("span", { class: "adm-brand__rowtitle", text: `Alternate tagline ${i + 1}` }), button("Remove", { "aria-label": `Remove alternate tagline ${i + 1}`, onclick: () => { rows.splice(i, 1); draw(); } })), labelled(`br-tag-alt-${i}`, "Tagline", input));
+      }));
+      addBtn.disabled = rows.length >= 6;
+    };
+    draw();
+    const save = (tagline, success) => perform({ request: () => api(base + "/kit", { method: "PUT", body: { sections: { tagline } } }), success, onError: (e) => (e.code === "sections_unavailable" ? "Tagline storage isn’t available on this site yet, so nothing was saved." : e.code === "invalid_sections" ? "Check the tagline: each one needs to be a single line of up to 120 characters, with at most six alternates, and the guidelines up to 600 characters." : null) });
+    const body = [
+      sectionIntro(SECTION.tagline),
+      !available ? h("p", { class: "adm-banner" }, "Tagline storage isn’t available on this site yet (its database change hasn’t been applied). The client sees the Framework example until it is.") : null,
+      h("form", { class: "adm-form adm-brand__form", novalidate: true, "aria-label": "Tagline", onsubmit: (ev) => {
+        ev.preventDefault(); err.hidden = true;
+        const alternates = rows.map((x) => x.trim()).filter(Boolean);
+        const tagline = { primary: primary.value.trim() || null, alternates, guidelines: guide.value.trim() || null };
+        if ([primary.value, ...alternates].some((x) => x.length > 120) || guide.value.length > 600) { err.textContent = "A tagline can be up to 120 characters and the guidelines up to 600."; err.hidden = false; return; }
+        save(tagline, tagline.primary || alternates.length || tagline.guidelines ? "Tagline saved. The client sees it once the kit is published." : "Tagline removed.");
+      } },
+        labelled("br-tag-primary", "Primary tagline", primary, "The main approved tagline: one line, up to 120 characters."),
+        h("fieldset", { class: "adm-field" }, h("legend", { text: "Alternate tagline" + "s (optional)" }), h("p", { class: "adm-field__hint", text: "Supporting or alternate lines, up to six." }), list, h("div", { class: "adm-actions" }, addBtn)),
+        labelled("br-tag-guide", "Usage guidelines (optional)", guide, "Where and how to use the tagline, up to 600 characters. A blank line starts a new paragraph."),
+        err,
+        canWrite() ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--primary adm-small", type: "submit", disabled: available ? null : true }, "Save tagline"), saved.primary || (saved.alternates || []).length || saved.guidelines ? button("Remove tagline", { onclick: () => save(null, "Tagline removed."), disabled: available ? null : true }) : null) : null),
+    ];
+    const summary = saved.primary ? chip("plain", (saved.alternates || []).length ? `Primary + ${plural(saved.alternates.length, "alternate")}` : "Primary added") : (saved.alternates || []).length || saved.guidelines ? chip("plain", "Incomplete") : chip("plain", "Not added yet");
+    return section("br-s-tagline", numbered(SECTION.tagline), summary, body);
   }
 
   /** 05 to 09 (except the tagline): files placed in the section, with upload and the usual management. */

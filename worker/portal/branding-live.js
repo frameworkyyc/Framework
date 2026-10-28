@@ -233,6 +233,18 @@ function fileTile(vm, a, key) {
 }
 
 const SECTION_EXAMPLE = { imagery: exampleImagery, layout: exampleLayout, textures: exampleTextures, iconography: exampleIcons, style: exampleStyle };
+const copyButton = (text, label) => `<button class="copy" type="button" data-copy="${e(text)}" hidden>Copy<span class="visually-hidden"> ${e(label)}</span></button>`;
+
+/** 04 Tagline: the approved primary tagline set large, then alternates and usage guidelines, each tagline with a Copy button (shown by script; the text stays selectable without it). */
+function taglineBlock(t) {
+  const primary = t.primary
+    ? `<div class="bk-tag"><p class="bk-tag__label">Primary tagline</p><div class="bk-tag__row"><p class="bk-tag__primary">${e(t.primary)}</p>${copyButton(t.primary, "primary tagline")}</div></div>`
+    : `<div class="bk-tag"><p class="bk-tag__label">Primary tagline</p><p class="muted">The primary tagline hasn’t been added yet.</p></div>`;
+  const alts = (t.alternates || []).length ? `<div class="bk-tag"><p class="bk-tag__label">Alternate taglines</p><ul class="bk-tag__alts">${t.alternates.map((a) => `<li class="bk-tag__row"><p class="bk-tag__alt">${e(a)}</p>${copyButton(a, "alternate tagline")}</li>`).join("")}</ul></div>` : "";
+  const guide = t.guidelines ? `<div class="bk-tag"><p class="bk-tag__label">Usage guidelines</p><div class="bk-tag__guide">${String(t.guidelines).split(/\n{2,}/).map((p) => `<p>${e(p).replace(/\n/g, "<br>")}</p>`).join("")}</div></div>` : "";
+  return `<div class="bk-tagline">${primary}${alts}${guide}</div>`;
+}
+
 const emptyState = (text) => `<div class="bk-empty"><p class="bk-empty__title">Not added yet</p><p class="muted">${e(text)}</p></div>`;
 
 /** One of the nine numbered sections: a large two-digit number, the title, a short description, then the section's content or its empty state. All nine are always shown. */
@@ -298,8 +310,8 @@ export function brandingOverview(vm, brand, o = {}) {
   }
   parts.push(bkSection(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : exampleColours() + control("brand-colours", false)));
 
-  // 04 Tagline: text content is not stored yet, so this always shows its empty state.
-  parts.push(bkSection(def.tagline, exampleTagline()));
+  // 04 Tagline: the approved tagline (kit published), or the labelled Framework example while none has been added.
+  parts.push(bkSection(def.tagline, live && brand.tagline ? taglineBlock(brand.tagline) : exampleTagline()));
 
   // 05 to 09: files an admin placed in the section.
   for (const key of ["imagery", "layout", "textures", "iconography", "style"]) {
