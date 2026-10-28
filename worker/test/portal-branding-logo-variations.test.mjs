@@ -683,6 +683,99 @@ test("03 Brand Colours: at most six swatches in a balanced grid: 3 columns from 
   assert.match(css, /\.bk-eg--colours \.swatches \{ margin: 0; \}/, "the example palette uses the same grid");
 });
 
+/* ------------------------------------------------------------------ 04 Tagline (stored in brand_kits.sections_json, migration 0009) */
+
+import { readFileSync as readSql } from "node:fs";
+const applyProposed = (s) => s.w.db.raw.exec(readSql(new URL("../../migrations/portal-proposed/0009_brand_sections.sql", import.meta.url), "utf8"));
+const saveTag = (s, org, tagline) => s.call(`/clients/${org.id}/branding/kit`, { method: "PUT", json: { sections: { tagline } } });
+const TAG = { primary: "Clear thinking, beautifully made.", alternates: ["Built to be remembered", "Design with intent"], guidelines: "Use beside the logo, never above it.\n\nNever stretch or restyle it." };
+
+test("tagline storage is optional until migration 0009 is applied: the code works without the column, says so plainly, and keeps every other kit save working", async () => {
+  const s = await setup();
+  const view = await s.call(`/clients/${s.A.id}/branding`);
+  assert.equal(view.json.capabilities.sections, false, "Admin is told storage isn't available yet");
+  const refused = await saveTag(s, s.A, TAG);
+  assert.equal(refused.status, 409); assert.equal(refused.json.error, "sections_unavailable");
+  assert.equal(s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM brand_kits WHERE organization_id = ?").get(s.A.id).n, 0, "a refused tagline creates and changes nothing");
+  assert.equal((await s.call(`/clients/${s.A.id}/branding/kit`, { method: "PUT", json: { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }] } })).status, 200, "colours still save");
+  await publishOnly(s, s.A);
+  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "tagline"), /bk-eg--tagline/, "the client keeps the labelled example");
+});
+
+test("Admin saves, edits and removes a tagline; the client sees it only once the kit is published, with a Copy button beside each tagline; other kit content is untouched both ways", async () => {
+  const s = await setup(); applyProposed(s);
+  await s.call(`/clients/${s.A.id}/branding/kit`, { method: "PUT", json: { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }], typography: [TF({ slot: "primary" })], brand_name: "Alpha" } });
+  assert.equal((await s.call(`/clients/${s.A.id}/branding`)).json.capabilities.sections, true);
+  const saved = await saveTag(s, s.A, TAG); assert.equal(saved.status, 200, JSON.stringify(saved.json));
+  assert.deepEqual(saved.json.kit.sections.tagline, TAG);
+  const kit = (await s.call(`/clients/${s.A.id}/branding`)).json.kit;
+  assert.deepEqual(kit.sections.tagline, TAG); assert.equal(kit.colours.length, 1); assert.equal(kit.typography.length, 1); assert.equal(kit.brandName, "Alpha", "saving a tagline leaves the rest of the kit alone");
+  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "tagline"), /bk-eg--tagline/, "a draft kit shows the example, not the tagline");
+  await publishOnly(s, s.A);
+  const html = sectionHtml(await (await s.ann.get(base)).text(), "tagline");
+  assert.ok(!/bk-eg/.test(html), "the example is gone once a tagline is approved");
+  assert.match(html, /<p class="bk-tag__primary">Clear thinking, beautifully made\.<\/p>/);
+  assert.deepEqual([...html.matchAll(/data-copy="([^"]*)"/g)].map((m) => m[1]), [TAG.primary, ...TAG.alternates], "a Copy button beside each tagline");
+  assert.equal([...html.matchAll(/<button class="copy"[^>]* hidden>Copy<span class="visually-hidden"> (primary|alternate) tagline<\/span><\/button>/g)].length, 3);
+  assert.match(html, /Alternate taglines/); assert.match(html, /<p>Use beside the logo, never above it\.<\/p><p>Never stretch or restyle it\.<\/p>/, "guidelines keep their paragraphs");
+  // edit: change the primary, drop one alternate, add blanks and a duplicate (dropped)
+  const edited = await saveTag(s, s.A, { primary: "  Made with care.  ", alternates: ["Design with intent", "", "Design with intent", "   "], guidelines: null });
+  assert.deepEqual(edited.json.kit.sections.tagline, { primary: "Made with care.", alternates: ["Design with intent"], guidelines: null });
+  // saving colours afterwards keeps the tagline
+  await s.call(`/clients/${s.A.id}/branding/kit`, { method: "PUT", json: { colours: [{ name: "Moss", role: "primary", hex: "#3A5A40", note: "" }] } });
+  assert.equal((await s.call(`/clients/${s.A.id}/branding`)).json.kit.sections.tagline.primary, "Made with care.");
+  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "tagline"), /Made with care\./);
+  // an alternate without a primary is shown honestly
+  await saveTag(s, s.A, { primary: "", alternates: ["Only an alternate"], guidelines: null });
+  const partial = sectionHtml(await (await s.ann.get(base)).text(), "tagline");
+  assert.match(partial, /The primary tagline hasn’t been added yet/); assert.match(partial, /Only an alternate/);
+  // remove everything: the example returns
+  assert.equal((await saveTag(s, s.A, { primary: "", alternates: [], guidelines: "" })).status, 200);
+  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "tagline"), /bk-eg--tagline/);
+  assert.equal((await saveTag(s, s.A, null)).status, 200);
+  assert.equal(s.w.db.raw.prepare("SELECT activity_log.action FROM activity_log WHERE action = 'brand.kit.sections_saved' LIMIT 1").get().action, "brand.kit.sections_saved", "tagline changes are audited");
+});
+
+test("tagline validation: single-line text up to 120 characters, at most six alternates, guidelines up to 600, only the tagline key; the server is the authority", async () => {
+  const s = await setup(); applyProposed(s);
+  const bad = [{ primary: "x".repeat(121) }, { primary: "two\nlines" }, { alternates: new Array(7).fill(0).map((_, i) => "alt " + i) }, { alternates: ["x".repeat(121)] }, { alternates: "not a list" }, { guidelines: "g".repeat(601) }, { primary: "ok", extra: 1 }, { primary: 42 }];
+  for (const t of bad) { const r = await saveTag(s, s.A, t); assert.equal(r.status, 422, JSON.stringify(t).slice(0, 60)); assert.equal(r.json.error, "invalid_sections"); }
+  for (const body of [{ sections: { colours: [] } }, { sections: [] }, { sections: "x" }, { sections: { tagline: [] } }]) assert.equal((await s.call(`/clients/${s.A.id}/branding/kit`, { method: "PUT", json: body })).status, 422, JSON.stringify(body));
+  assert.equal(s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM brand_kits WHERE sections_json IS NOT NULL AND sections_json != '{}'").get().n, 0, "nothing invalid was stored");
+  const max = await saveTag(s, s.A, { primary: "p".repeat(120), alternates: new Array(6).fill(0).map((_, i) => "a".repeat(119) + i), guidelines: "g".repeat(600) });
+  assert.equal(max.status, 200, "the limits themselves are accepted");
+});
+
+test("tagline text is escaped everywhere it is shown, a client can't change it, and another organization never sees it", async () => {
+  const s = await setup(); applyProposed(s); await publishOnly(s, s.A); await publishOnly(s, s.B);
+  const evil = { primary: `<img src=x onerror="alert(1)"> & "quoted"`, alternates: [`</p><script>alert(2)</script>`, `'single' <b>bold</b>`], guidelines: `<script>alert(3)</script>\n<a href="javascript:alert(4)">x</a>` };
+  assert.equal((await saveTag(s, s.A, evil)).status, 200);
+  const html = await (await s.ann.get(base)).text(); const sec = sectionHtml(html, "tagline");
+  assert.ok(!/<img src=x|<script>alert|<b>bold|href="javascript/.test(html), "no markup from the tagline reaches the page");
+  assert.match(sec, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt; &amp; &quot;quoted&quot;/);
+  assert.match(sec, /data-copy="&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt; &amp; &quot;quoted&quot;"/, "the copied text is the plain text, safely quoted in the attribute");
+  assert.ok(!/<script/i.test(sec));
+  // clients have no way to write: no client route, and the Admin API refuses them
+  assert.equal((await s.ann.post(`${base}/kit`, { sections: JSON.stringify({ tagline: { primary: "hijack" } }) })).status, 404);
+  const noAccess = await handleAdmin(new Request(ORIGIN + `/api/admin/clients/${s.A.id}/branding/kit`, { method: "PUT", headers: { Origin: ORIGIN, "Content-Type": "application/json", "X-Framework-Admin": "1" }, body: JSON.stringify({ sections: { tagline: { primary: "hijack" } } }) }), s.w.env, {});
+  assert.ok([401, 403].includes(noAccess.status), "the Admin API needs Access");
+  assert.ok(!(await (await s.ann.get(base)).text()).includes("hijack"));
+  // organization isolation
+  const theirs = await (await s.bob.get("/portal/o/beta/branding")).text();
+  assert.ok(!theirs.includes("quoted") && !theirs.includes("alert(")); assert.match(sectionHtml(theirs, "tagline"), /bk-eg--tagline/);
+  assert.equal((await saveTag(s, s.B, { primary: "Beta line" })).status, 200);
+  const both = [await (await s.ann.get(base)).text(), await (await s.bob.get("/portal/o/beta/branding")).text()];
+  assert.ok(!both[0].includes("Beta line") && !both[1].includes("quoted") && both[1].includes("Beta line"));
+});
+
+test("Admin tagline form: primary, add/remove alternates (up to six), usage guidelines, save and remove, and a plain notice when storage isn't available", () => {
+  const ui = read("admin/assets/branding.js");
+  assert.match(ui, /function taglineSection\(\)/); assert.match(ui, /"Primary tagline"/); assert.match(ui, /"Add alternate tagline"/); assert.match(ui, /Remove alternate tagline/); assert.match(ui, /"Usage guidelines \(optional\)"/);
+  assert.match(ui, /sections: \{ tagline \}/); assert.match(ui, /"Save tagline"/); assert.match(ui, /"Remove tagline"/); assert.match(ui, /maxlength: "120"/); assert.match(ui, /maxlength: "600"/);
+  assert.match(ui, /caps\(\)\.sections !== false/); assert.match(ui, /sections_unavailable/); assert.ok(!/waiting for approval/.test(ui), "the old placeholder notice is gone");
+  assert.match(read("migrations/portal-proposed/0009_brand_sections.sql"), /ALTER TABLE brand_kits ADD COLUMN sections_json TEXT CHECK \(sections_json IS NULL OR \(json_valid\(sections_json\) AND json_type\(sections_json\) = 'object' AND length\(sections_json\) <= 12000\)\);/);
+});
+
 test("Admin status messages have one 1px border and no ring around it when a script focuses them; interactive elements keep their focus rings", () => {
   const css = read("admin/assets/admin.css");
   assert.match(css, /\.adm-msg \{[^}]*border: 1px solid var\(--hairline\)/);

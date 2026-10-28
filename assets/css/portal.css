@@ -845,3 +845,15 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .eg-style__chips svg { width: 28px; height: 28px; outline: 1px solid var(--hairline); outline-offset: -1px; }
 .eg-style__media { position: relative; min-height: 260px; overflow: hidden; } /* the picture fills the frame and never sets its height */
 .eg-style__media img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* 04 Tagline: the approved primary tagline set large in an editorial layout, alternates and usage guidelines below, a small Copy button beside each tagline. */
+.bk-tagline { display: grid; gap: var(--space-4); max-width: 46em; }
+.bk-tag__label { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--slate); }
+.bk-tag__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.bk-tag__primary { margin: 0; flex: 1 1 14em; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(30px, 5vw, 52px); line-height: 1.08; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+@media (min-width: 600px) { .bk-tag__row { flex-wrap: nowrap; } .bk-tag__row .copy { flex: none; } .bk-tag > .bk-tag__row { align-items: flex-start; } .bk-tag > .bk-tag__row .copy { margin-top: 8px; } } /* beside the tagline, not under it, from tablet width up */
+.bk-tag__alts { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hairline); }
+.bk-tag__alts li { padding: 14px 0; border-bottom: 1px solid var(--hairline); }
+.bk-tag__alt { margin: 0; flex: 1 1 12em; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(20px, 2.6vw, 26px); line-height: 1.2; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.bk-tag__guide p { margin: 0 0 12px; max-width: 40em; }
+.bk-tag__guide p:last-child { margin-bottom: 0; }
