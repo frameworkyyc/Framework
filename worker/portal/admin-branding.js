@@ -45,7 +45,7 @@ export const err = (status, error, message) => json({ error, message }, status);
 /** Data-layer and file-service failure codes, as HTTP statuses. Anything unlisted is a bare 500: no internals reach the browser. */
 const STATUS = {
   not_found: 404, forbidden: 403,
-  invalid_colours: 422, invalid_typography: 422, invalid_brand_name: 422, invalid_kind: 422, invalid_title: 422, invalid_variant: 422, invalid_logo_role: 422, invalid_orientation: 422, invalid_tone: 422, invalid_usage_note: 422,
+  invalid_colours: 422, invalid_typography: 422, invalid_brand_name: 422, invalid_kind: 422, invalid_title: 422, invalid_variant: 422, invalid_logo_role: 422, invalid_orientation: 422, invalid_tone: 422, invalid_section: 422, invalid_usage_note: 422,
   invalid_license_note: 422, invalid_sort_order: 422, invalid_input: 422, invalid_status: 422, invalid_note: 422, invalid_kit: 422, font_license_required: 422,
   invalid_name: 422, type_not_allowed: 415, content_mismatch: 422, active_content: 422, image_dimensions: 422, pdf_encrypted: 422, empty_file: 422, no_file: 400, file_too_large: 413,
   archive_unsafe_entry: 422, archive_encrypted: 422, archive_unsupported: 422, archive_entries: 422, archive_too_large: 422,
@@ -97,7 +97,7 @@ export async function readUpload(request, { withMeta }) {
   return { file: { name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }, meta };
 }
 
-const META_FIELDS = ["kind", "title", "standard_name", "logo_role", "orientation", "tone", "transparent", "usage_note", "downloadable", "license_note", "sort_order", "published"];
+const META_FIELDS = ["kind", "title", "standard_name", "logo_role", "orientation", "tone", "transparent", "section", "usage_note", "downloadable", "license_note", "sort_order", "published"];
 const pick = (obj, keys) => Object.fromEntries(Object.entries(obj).filter(([k]) => keys.includes(k)));
 
 const publicAsset = (a) => ({ id: a.id, kind: a.kind, title: a.title, variantKey: a.variantKey, logoRole: a.logoRole, orientation: a.orientation, tone: a.tone, transparent: a.transparent, usageNote: a.usageNote, downloadable: a.downloadable, licenseNote: a.licenseNote, format: a.format, size: a.size, sha256: a.sha256, originalName: a.originalName, published: a.published, sortOrder: a.sortOrder, createdAt: a.createdAt, createdBy: a.createdBy, updatedAt: a.updatedAt });
