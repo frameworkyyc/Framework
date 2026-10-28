@@ -743,6 +743,9 @@ a.adm-tile--link { display: flex; flex-direction: column; gap: 0; }
 .adm-todo__item--info { border-left-color: var(--pend, #2F4B7C); }
 .adm-todo__text { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .adm-todo__item .adm-link { flex: none; white-space: nowrap; }
+.adm-todo__acts { display: flex; flex: none; flex-wrap: wrap; gap: 4px 18px; justify-content: flex-end; }
+.adm-todo__dismiss { background: none; border: 0; padding: 0; color: inherit; font-family: inherit; cursor: pointer; }
+.adm-todo__dismiss:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
 .adm-todo__clear { margin: 0; padding: 18px 0 18px 14px; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--hairline); border-left: 4px solid var(--ok, #1E6B3C); font-weight: 600; }
 .adm-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0 0 40px; border-top: 1px solid var(--ink); border-left: 1px solid var(--hairline); }
 .adm-kpi { display: grid; align-content: start; gap: 10px; padding: 20px 22px 22px; color: var(--ink); text-decoration: none; border-right: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); min-width: 0; }

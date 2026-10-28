@@ -11,6 +11,7 @@ import { readOnlyDb } from "./admin-clients.js";
 import { profileProgress } from "./profile-schema.js";
 import { listRequestsAllAdmin, adminSupportTotals, CATEGORY_LABEL, STATUS_LABEL } from "./repo/support.js";
 import { brandingService, BRAND_REQUESTS } from "./brand-services.js";
+import { todayOf } from "./repo/invoices.js";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
 const part = async (fn) => { try { return await fn(); } catch { return null; } };
@@ -91,7 +92,7 @@ async function requestsPart(env, rdb) {
 }
 
 async function invoicesPart(rdb, now) {
-  const today = now.toISOString().slice(0, 10);
+  const today = todayOf(now);
   const base = `FROM invoices i JOIN organizations o ON o.id = i.organization_id WHERE i.archived_at IS NULL AND ${LIVE}`;
   const out = await rdb.prepare(`SELECT COALESCE(sum(i.published_at IS NULL), 0) AS drafts, COALESCE(sum(i.published_at IS NOT NULL AND i.payment_status = 'unpaid'), 0) AS outstanding_count, COALESCE(sum(CASE WHEN i.published_at IS NOT NULL AND i.payment_status = 'unpaid' THEN i.amount_cents END), 0) AS outstanding_cents, COALESCE(sum(i.published_at IS NOT NULL AND i.payment_status = 'unpaid' AND i.due_date IS NOT NULL AND i.due_date < ?), 0) AS overdue ${base}`).bind(today).first();
   const overdueItems = (await rdb.prepare(`SELECT o.id AS organization_id, o.name AS org_name, i.invoice_number, i.amount_cents, i.due_date ${base} AND i.published_at IS NOT NULL AND i.payment_status = 'unpaid' AND i.due_date IS NOT NULL AND i.due_date < ? ORDER BY i.due_date, i.id LIMIT 5`).bind(today).all()).results;

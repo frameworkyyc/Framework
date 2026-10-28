@@ -10,7 +10,7 @@ const CATEGORY = { website_change: "Website change", design_revision: "Logo or d
 const STATUS = { new: "New", in_review: "In review", quoted: "Quote sent", approved: "Approved", in_progress: "In progress", completed: "Completed", declined: "Declined" };
 const STATUS_ORDER = ["new", "in_review", "quoted", "approved", "in_progress", "completed", "declined"];
 const CONFIRM = {
-  quoted: ["Mark as Quote sent?", "Tell the client a quote has been sent. Nothing goes ahead until they approve it."],
+  quoted: ["Mark as Quote sent?", "Tell the client a quote has been sent. They approve it by replying in the conversation, and no work starts until you confirm their approval."],
   approved: ["Record approval?", "Only do this once the client has agreed to the quote. The client will see that Framework recorded their approval."],
   declined: ["Decline this request?", "The request closes and the client can no longer reply on it. Explain why in the note."],
   completed: ["Mark as completed?", "The request closes and the client can no longer reply on it."],

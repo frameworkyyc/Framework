@@ -31,7 +31,8 @@ const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const STATUS_TEXT = { unpaid: "Unpaid", overdue: "Overdue", paid: "Paid", void: "Void" };
 const STATUS_CHIP = { unpaid: ["plain"], overdue: ["warn", "warn"], paid: ["ok", "complete"], void: ["plain"] };
 const labelled = (id, label, input, hint) => h("div", { class: "adm-field" }, h("label", { for: id, text: label }), hint ? h("p", { class: "adm-field__hint", text: hint }) : null, input);
-const today = () => new Date().toISOString().slice(0, 10);
+const EDMONTON = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit", day: "2-digit" });
+const today = () => { const p = Object.fromEntries(EDMONTON.formatToParts(new Date()).map((x) => [x.type, x.value])); return `${p.year}-${p.month}-${p.day}`; }; // Framework's day, not the UTC date
 
 export async function render(orgId, ctx) {
   const base = "/clients/" + encodeURIComponent(orgId) + "/invoices";

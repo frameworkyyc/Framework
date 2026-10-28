@@ -47,7 +47,7 @@ export function buildEmail(n, d, origin) {
     subject = "A new invoice is ready in your Framework portal"; lines = ["A new invoice has been added to your Framework client portal."]; link = `${portal}/services/invoices`;
     why = `You receive this because you are an owner of ${oneLine(d.org.name, 80)} in the Framework client portal.`;
   } else if (n.event === "request_status") {
-    subject = "Framework sent you a quote"; lines = ["Framework has sent a quote for one of your requests.", "Nothing goes ahead until you approve it."]; link = `${portal}/services/requests/${d.request.id}`;
+    subject = "Framework sent you a quote"; lines = ["Framework has sent a quote for one of your requests.", "To approve it, reply in the request conversation in your portal. No work starts until Framework confirms your approval."]; link = `${portal}/services/requests/${d.request.id}`;
     why = `You receive this because you sent, or are an owner of the organization that sent, a request in the Framework client portal (${oneLine(d.org.name, 80)}).`;
   } else {
     subject = "Framework replied to your request"; lines = ["There is a new reply on one of your requests."]; link = `${portal}/services/requests/${d.request.id}`;
@@ -140,6 +140,33 @@ export function dispatchNotifications(env, deps = {}) {
   const p = Promise.resolve().then(() => processNotifications(env, { db: env.PORTAL_DB, now: deps.now, fetch: deps.fetch })).catch(() => {});
   if (typeof deps.waitUntil === "function") { try { deps.waitUntil(p); } catch { /* the platform refused: the row stays pending for the next dispatch */ } return Promise.resolve(); }
   return p;
+}
+
+/**
+ * Client notices that were skipped because nobody on the approved list could receive them, grouped by organization, with the addresses that are NOT approved
+ * (the organization's active owners, plus the person who sent a request that was skipped). Computed now, not stored: once every one of those addresses is approved the
+ * organization drops out by itself (the skipped notices are not re-sent; the client still sees everything in the portal), and "dismiss" clears the ones that will
+ * never be approved. Staff-facing only: names an organization and addresses, never message, invoice or request content.
+ * @returns {Promise<Array<{organizationId: string, orgName: string, notices: number, recipients: string[], latest: string}>>}
+ */
+export async function unapprovedSkips(env, db) {
+  const orgs = (await db.prepare("SELECT n.organization_id AS id, o.name AS name, count(*) AS notices, max(n.created_at) AS latest FROM service_notifications n JOIN organizations o ON o.id = n.organization_id WHERE n.status = 'skipped' AND n.last_error = 'no_allowed_recipient' AND n.audience = 'client' AND o.status <> 'archived' GROUP BY n.organization_id, o.name ORDER BY latest DESC LIMIT 20").all()).results;
+  if (!orgs.length) return [];
+  const stored = await loadApproved(db);
+  const out = [];
+  for (const o of orgs) {
+    const who = (await db.prepare("SELECT DISTINCT u.email FROM memberships m JOIN portal_users u ON u.id = m.user_id WHERE m.organization_id = ? AND m.status = 'active' AND u.status = 'active' AND (m.role = 'owner' OR u.id IN (SELECT r.submitted_by FROM service_notifications n JOIN support_requests r ON r.id = n.entity_id AND r.organization_id = n.organization_id WHERE n.organization_id = ? AND n.status = 'skipped' AND n.last_error = 'no_allowed_recipient' AND n.entity_type = 'support_request')) ORDER BY u.email").bind(o.id, o.id).all()).results.map((r) => r.email);
+    const missing = who.filter((e) => !checkRecipient(env, e, stored).ok);
+    if (who.length && !missing.length) continue; // every address is approved now: resolved
+    out.push({ organizationId: o.id, orgName: o.name, notices: o.notices, recipients: missing, latest: o.latest });
+  }
+  return out;
+}
+
+/** Clears the "not approved" warning for one organization (for addresses that will never be approved): its skipped notices are marked dismissed, nothing is sent. Returns how many. */
+export async function dismissUnapprovedSkips(db, organizationId) {
+  const r = await db.prepare("UPDATE service_notifications SET last_error = 'no_allowed_recipient_dismissed' WHERE organization_id = ? AND status = 'skipped' AND last_error = 'no_allowed_recipient' AND audience = 'client'").bind(organizationId).run();
+  return r.meta ? r.meta.changes : 0;
 }
 
 /** Counts for Admin: how many notices wait, failed for good, or were skipped. Cross-tenant by design (Framework Admin only). */
