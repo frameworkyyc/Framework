@@ -12,6 +12,7 @@ import { LOGO_VARIATIONS } from "../../admin/assets/logo-variations.js";
 import { BRAND_SECTIONS, TYPE_SLOT_DEFS, sectionOf } from "../../admin/assets/brand-sections.js";
 import { typefaceOf, filesOf, specimenSlots, faceOf, WEIGHT_NAME } from "./brand-type.js";
 import { activePricing, pricingBlock } from "./branding-pricing.js";
+import { exampleTypeCard, exampleColours, exampleTagline, exampleImagery, exampleLayout, exampleTextures, exampleIcons, exampleStyle, EXAMPLE_LABEL } from "./brand-examples.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const MB = 1024 * 1024;
@@ -110,25 +111,31 @@ function typeCard(vm, def, raw, fonts, spec) {
   return `<li class="tf-card tf-card--has">${stage}<div class="tf-card__body"><p class="lv-card__no" aria-hidden="true">${e(def.no)}</p><h3 class="lv-card__title">${e(def.title)}</h3><p class="tf-card__family">${e(t.family)}</p><p class="lv-card__desc muted">${e(def.desc)}</p>${weights}${styles}${chars}${lines}${t.usage ? `<p class="small">${e(t.usage)}</p>` : ""}${note}${get}${dl}</div></li>`;
 }
 
-/** A slot with no typeface yet: restrained, nothing invented. The Accent slot says it is optional. */
-function emptyTypeCard(def) {
-  return `<li class="tf-card tf-card--empty"><div class="tf-card__stage tf-card__stage--empty"><span class="muted small">Not added yet</span></div><div class="tf-card__body"><p class="lv-card__no" aria-hidden="true">${e(def.no)}</p><h3 class="lv-card__title">${e(def.title)}</h3><p class="lv-card__status"><span class="tag">${def.optional ? "Optional" : "Not added yet"}</span></p><p class="lv-card__desc muted">${e(def.desc)}</p></div></li>`;
-}
-
 const LEVELS = [["Heading 1", "h1", "primary", 700, "Largest", "Headlines that stand out"], ["Heading 2", "h2", "primary", 600, "Large", "Section headlines"], ["Heading 3", "h3", "primary", 600, "Medium", "Sub-headings"], ["Body Text", "body", "secondary", 400, "Base", "Paragraphs and everyday communication read comfortably when the body font and size stay steady."], ["Caption / Small Label", "caption", "secondary", 400, "Smallest", "Captions, labels and fine print"]];
 
-/** The Typography Hierarchy: how the approved fonts work together. Illustrative: no approved type scale is stored, so no sizes or line heights are shown as specifications. */
+/**
+ * The Typography Hierarchy: how the fonts work together. A level set in the client's own typeface shows it (in the real font when its file is available); a level whose role the
+ * client hasn't set shows a muted Framework example (Switzer for headings, General Sans for text) and says so. Illustrative: no approved type scale is stored, so no sizes or
+ * line heights are shown as specifications.
+ */
 function hierarchy(bySlot, specimen) {
-  const fallbackNote = [];
+  const fallbackNote = []; let examples = 0;
+  const EX = { primary: ["eg-sw", "Switzer"], secondary: ["eg-gs", "General Sans"] };
   const rows = LEVELS.map(([name, key, slot, weight, size, sample]) => {
-    const use = bySlot[slot] ? slot : bySlot.primary ? "primary" : bySlot.secondary ? "secondary" : null; // a missing role uses the one the brand has
-    const t = use ? bySlot[use] : null;
-    const real = use && specimen[use];
-    if (use && !real && !fallbackNote.includes(t.family)) fallbackNote.push(t.family);
-    const used = t ? `${use === "primary" ? "Primary" : "Secondary"} Typeface · ${t.family}` : "";
-    return `<div class="tf-level"><div class="tf-level__meta"><p class="tf-level__name">${e(name)}</p><p class="muted small">${e(used)}</p><p class="muted small">Relative size: ${e(size)}</p></div><p class="tf-level__sample tf-l-${key}${real ? ` sp-${use} fw-w${weight}` : ""}">${e(sample)}</p></div>`;
+    const t = bySlot[slot];
+    const meta = `<div class="tf-level__meta"><p class="tf-level__name">${e(name)}</p>`;
+    const rel = `<p class="muted small">Relative size: ${e(size)}</p></div>`;
+    if (!t) {
+      examples++;
+      const [cls, family] = EX[slot];
+      return `<div class="tf-level tf-level--example">${meta}<p class="muted small">${e(EXAMPLE_LABEL)} · ${e(family)}</p>${rel}<p class="tf-level__sample tf-l-${key} ${cls} fw-w${weight}">${e(sample)}</p></div>`;
+    }
+    const real = specimen[slot];
+    if (!real && !fallbackNote.includes(t.family)) fallbackNote.push(t.family);
+    return `<div class="tf-level">${meta}<p class="muted small">${e(`${slot === "primary" ? "Primary" : "Secondary"} Typeface · ${t.family}`)}</p>${rel}<p class="tf-level__sample tf-l-${key}${real ? ` sp-${slot} fw-w${weight}` : ""}">${e(sample)}</p></div>`;
   }).join("");
-  return `<div class="tf-hier" id="typography-hierarchy"><h3 class="tf-hier__title">Typography Hierarchy</h3><p class="muted">How your approved fonts work together, from the largest headline to the smallest label.</p><p class="muted small"><strong>Illustrative preview.</strong> A formal type scale hasn’t been recorded for your brand, so these sizes and weights show the intended hierarchy only. They are not approved specifications.</p>${fallbackNote.length ? `<p class="muted small">Rows set in ${e(fallbackNote.join(" and "))} use a standard typeface here, because no font file is available to preview.</p>` : ""}<div class="tf-levels">${rows}</div></div>`;
+  const none = examples === LEVELS.length;
+  return `<div class="tf-hier" id="typography-hierarchy"><h3 class="tf-hier__title">Typography Hierarchy</h3><p class="muted">${none ? "An example of how different sizes, weights and roles work together, from the largest headline to the smallest label." : "How your fonts work together, from the largest headline to the smallest label."}</p><p class="muted small"><strong>Illustrative preview.</strong> ${none ? "This uses Framework’s typography." : ""} A formal type scale hasn’t been recorded for your brand, so these sizes and weights show the intended hierarchy only. They are not approved specifications.</p>${examples && !none ? `<p class="muted small">Rows labelled “${e(EXAMPLE_LABEL)}” stand in for roles you haven’t added yet. They are not your typefaces.</p>` : ""}${fallbackNote.length ? `<p class="muted small">Rows set in ${e(fallbackNote.join(" and "))} use a standard typeface here, because no font file is available to preview.</p>` : ""}<div class="tf-levels">${rows}</div></div>`;
 }
 
 function docRow(vm, a) {
@@ -225,6 +232,7 @@ function fileTile(vm, a, key) {
   return `<li class="bk-tile">${stage}<div class="bk-tile__body"><p class="bk-tile__name">${e(a.title)}</p><p class="muted small">${e(upper(a.format))} · ${e(fileSize(a.size))}${a.usageNote ? ` · ${e(a.usageNote)}` : ""}</p><div class="logo-card__actions">${downloadLink(vm, a, "Download")}</div></div></li>`;
 }
 
+const SECTION_EXAMPLE = { imagery: exampleImagery, layout: exampleLayout, textures: exampleTextures, iconography: exampleIcons, style: exampleStyle };
 const emptyState = (text) => `<div class="bk-empty"><p class="bk-empty__title">Not added yet</p><p class="muted">${e(text)}</p></div>`;
 
 /** One of the nine numbered sections: a large two-digit number, the title, a short description, then the section's content or its empty state. All nine are always shown. */
@@ -276,26 +284,27 @@ export function brandingOverview(vm, brand, o = {}) {
   const specimen = specimenSlots(type, fonts);
   const owned = new Set(typeList.flatMap((t) => filesOf(t, fonts).all.map((f) => f.id)));
   const unlisted = fontFiles.filter((f) => !owned.has(f.id));
+  // Slots the client hasn't filled show a muted Framework example (Primary and Secondary in Switzer and General Sans, Accent as a generic optional example); the hierarchy always shows.
+  const slotCards = `<ul class="tf-grid">${TYPE_SLOT_DEFS.map((d) => (bySlot[d.key] ? typeCard(vm, d, bySlot[d.key], fonts, specimen[d.key]) : exampleTypeCard(d))).join("")}</ul>`;
+  const hier = hierarchy(bySlot, specimen);
   if (typeList.length || fonts.length) {
     const note = fonts.some((f) => !f.canDownload) ? `<p class="muted small">Some fonts can’t be shared as files because of their licence. Use the link beside each one to get it from its provider, or ask us.</p>` : "";
-    const slotCards = `<ul class="tf-grid">${TYPE_SLOT_DEFS.map((d) => (bySlot[d.key] ? typeCard(vm, d, bySlot[d.key], fonts, specimen[d.key]) : emptyTypeCard(d))).join("")}</ul>`;
-    const hier = bySlot.primary || bySlot.secondary ? hierarchy(bySlot, specimen) : "";
     const othersHtml = loose.length ? `<p class="acc__group">Other typefaces</p><p class="muted small">${Object.keys(bySlot).length ? "These typefaces aren’t assigned to a role." : "Framework hasn’t assigned these typefaces to a role yet."}</p><ul class="types bk-types">${loose.map((t) => typeface(vm, t, fontFiles)).join("")}</ul><p class="muted small">Example text is shown in this page’s own typeface, for layout only. It is not set in the font.</p>` : "";
     parts.push(bkSection(def.typography, `${slotCards}${hier}${othersHtml}${unlisted.length ? `<p class="acc__group">Font files</p><ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}${control("brand-typography", typeList.length > 0)}`));
   } else {
     const price = pricingBlock(activePricing("typography", o.pricing), control("brand-typography", false));
     const share = canUpload ? `<p class="muted small">Already have your fonts? <a class="text-link" href="${e(href(vm, "/branding/uploads"))}">Share them with Framework</a>.</p>` : "";
-    parts.push(bkSection(def.typography, emptyState(def.typography.empty) + (price || control("brand-typography", false)) + share));
+    parts.push(bkSection(def.typography, `<p class="muted">${e(def.typography.empty)} Here is an example of a typography system, set in Framework’s own typefaces.</p>${slotCards}${hier}${price || control("brand-typography", false)}${share}`));
   }
-  parts.push(bkSection(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : emptyState(def.colours.empty) + control("brand-colours", false)));
+  parts.push(bkSection(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : exampleColours() + control("brand-colours", false)));
 
   // 04 Tagline: text content is not stored yet, so this always shows its empty state.
-  parts.push(bkSection(def.tagline, emptyState(def.tagline.empty)));
+  parts.push(bkSection(def.tagline, exampleTagline()));
 
   // 05 to 09: files an admin placed in the section.
   for (const key of ["imagery", "layout", "textures", "iconography", "style"]) {
     const files = assets.filter((a) => sectionOf(a) === key);
-    parts.push(bkSection(def[key], files.length ? `<ul class="bk-tiles bk-tiles--${key}">${files.map((a) => fileTile(vm, a, key)).join("")}</ul>` : emptyState(def[key].empty)));
+    parts.push(bkSection(def[key], files.length ? `<ul class="bk-tiles bk-tiles--${key}">${files.map((a) => fileTile(vm, a, key)).join("")}</ul>` : SECTION_EXAMPLE[key]()));
   }
 
   const nav = `<nav class="bk-nav" aria-label="Brand kit sections"><ol>${BRAND_SECTIONS.map((d) => `<li><a href="#${e(d.id)}"><span class="bk-nav__no" aria-hidden="true">${e(d.no)}</span> ${e(d.title)}</a></li>`).join("")}</ol></nav>`;

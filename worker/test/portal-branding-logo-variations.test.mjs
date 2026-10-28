@@ -91,7 +91,7 @@ test("with nothing published every client sees the four Framework examples, labe
     const html = await (await b.get(base)).text();
     const c = cards(html);
     assert.deepEqual(c.map((x) => x.title), ["Primary Logo", "Secondary Logo", "Simplified Logo", "Sub-mark"]);
-    assert.deepEqual([...html.matchAll(/class="lv-card__no" aria-hidden="true">(\d\d)</g)].map((m) => m[1]), ["01", "02", "03", "04"]);
+    assert.deepEqual([...sectionHtml(html, "logo").matchAll(/class="lv-card__no" aria-hidden="true">(\d\d)</g)].map((m) => m[1]), ["01", "02", "03", "04"]);
     assert.ok(c.every((x) => !x.has && x.html.startsWith('<li class="lv-card lv-card--example">')));
     const files = ["primary", "secondary", "simplified", "submark"];
     c.forEach((x, i) => {
@@ -120,11 +120,11 @@ test("Admin assigns each file with 'Logo type': every type lands on its own card
     assert.deepEqual(c.map((x) => [x.title, x.has]), order.map(([, t]) => [t, filled.has(t)]), `after adding ${role}`);
     const card = c.find((x) => x.title === title);
     assert.match(card.html, /<img src="[^"]*\/branding\/files\/[0-9a-f-]{36}\?preview=1" alt="/);
-    assert.equal([...(await (await s.ann.get(base)).text()).matchAll(/logo-examples\/framework-/g)].length, 4 - filled.size, "only the other examples remain"); assert.match(card.html, /<span class="tag">Available<\/span>/); assert.match(card.html, /Download PNG/);
+    assert.equal([...sectionHtml(await (await s.ann.get(base)).text(), "logo").matchAll(/logo-examples\/framework-/g)].length, 4 - filled.size, "only the other examples remain"); assert.match(card.html, /<span class="tag">Available<\/span>/); assert.match(card.html, /Download PNG/);
     assert.ok(!/Example: Framework|logo-examples/.test(card.html), "the Framework example is gone from a real logo");
   }
   assert.deepEqual(cards(await (await s.ann.get(base)).text()).map((x) => x.has), [true, true, true, true]);
-  assert.ok(!/Example: Framework|logo-examples/.test(await (await s.ann.get(base)).text()), "no example text or image once all four are real");
+  assert.ok(!/Example: Framework|logo-examples/.test(sectionHtml(await (await s.ann.get(base)).text(), "logo")), "no example text or image once all four are real");
 });
 
 test("Secondary needs no migration: it is stored as an unset logo_role with a 'secondary-' variant key, shown to Admin as Secondary, named Secondary, and a bad type is refused", async () => {
@@ -353,16 +353,19 @@ test("the nine sections are one shared catalogue: exact numbers, names and order
   }
 });
 
-test("empty sections: every section but Logo (which shows its four examples) says 'Not added yet' with its own sentence, in one consistent block", async () => {
+test("empty sections show a muted Framework example, labelled 'Example: Framework' with 'Not added yet', with no link, copy button or download; Typography shows its own example cards", async () => {
   const s = await setup();
   const html = await (await s.ann.get(base)).text();
   const { BRAND_SECTIONS } = await import("../../admin/assets/brand-sections.js");
-  for (const d of BRAND_SECTIONS.filter((x) => x.key !== "logo")) {
+  for (const d of BRAND_SECTIONS.filter((x) => !["logo", "typography"].includes(x.key))) {
     const sec = sectionHtml(html, d.key);
-    assert.ok(sec.includes('<div class="bk-empty"><p class="bk-empty__title">Not added yet</p>'), d.key);
-    assert.ok(sec.includes(d.empty.replace(/’/g, "’")), d.key + " empty sentence");
-    assert.ok(!/Download/.test(sec) && (d.key === "typography" || !/<a /.test(sec)), d.key + " has no downloads (Typography may offer to share existing fonts)");
+    assert.ok(sec.includes('<div class="bk-eg bk-eg--'), d.key + " has its example panel");
+    assert.ok(sec.includes('<span class="tag">Not added yet</span> <span class="bk-eg__tag">Example: Framework</span>'), d.key + " is labelled an example");
+    assert.ok(!/Download|data-copy|<a /.test(sec), d.key + " offers nothing to download or copy");
+    assert.ok(!/bk-empty/.test(sec), d.key + " no longer shows a bare empty state");
   }
+  const type = sectionHtml(html, "typography");
+  assert.equal([...type.matchAll(/tf-card--example/g)].length, 3); assert.ok(!/Download|data-copy/.test(type));
 });
 
 test("files Admin places in sections 05 to 09 show in that section only: previews for images, a file tile otherwise, downloads, never in the other-files list, other clients never see them", async () => {
@@ -427,7 +430,7 @@ test("typography and colours: families, weights, example text and codes render; 
   assert.match(type, /bk-type__sample">The quick brown fox/); assert.match(type, /Download TTF/);
   const col = sectionHtml(html, "colours");
   assert.match(col, /data-copy="#0A0A0A"/); assert.match(col, /data-copy="10, 10, 10"/); assert.match(col, /data-copy="179, 38, 30"/); assert.match(col, /RGB <code>10, 10, 10<\/code>/);
-  assert.match(sectionHtml(html, "tagline"), /bk-empty/, "the tagline stays empty: text isn't stored yet");
+  assert.match(sectionHtml(html, "tagline"), /bk-eg--tagline/, "the tagline shows its example: text isn't stored yet");
 });
 
 test("requests, uploads and permissions are unchanged by the nine-section layout", async () => {
@@ -484,9 +487,10 @@ test("client page: the three slots show their typeface or a restrained empty car
   assert.deepEqual(cards.map((c) => (/lv-card__title">([^<]+)</.exec(c) || [])[1]), ["Primary Typeface", "Secondary Typeface", "Accent Typeface"]);
   assert.match(cards[0], /^tf-card--has/); assert.match(cards[0], /tf-card__family">Switzer</); assert.match(cards[0], /Regular <span class="muted">400/); assert.match(cards[0], /Bold <span class="muted">700/); assert.match(cards[0], /ABCDEFGHIJKLMNOPQRSTUVWXYZ/); assert.match(cards[0], /0123456789/);
   assert.match(cards[0], /Headlines and titles/);
-  assert.match(cards[1], /^tf-card--empty/); assert.match(cards[1], /<span class="tag">Not added yet<\/span>/); assert.doesNotMatch(cards[1], /Switzer|Aa Bb/);
-  assert.match(cards[2], /^tf-card--empty/); assert.match(cards[2], /<span class="tag">Optional<\/span>/);
-  assert.match(cards[2], /decorative or specialized/);
+  assert.match(cards[1], /^tf-card--example/); assert.match(cards[1], /<span class="tag">Not added yet<\/span>/); assert.match(cards[1], /General Sans/); assert.match(cards[1], /Example: Framework/); assert.doesNotMatch(cards[1], /Download|data-copy|<a /);
+  assert.doesNotMatch(cards[1], /Switzer/, "Framework's Primary is not shown in the client's Secondary slot");
+  assert.match(cards[2], /^tf-card--example/); assert.match(cards[2], /<span class="tag">Optional<\/span>/); assert.match(cards[2], /Illustrative only: a generic serif, not a Framework typeface/); assert.match(cards[2], /Not every brand needs an Accent Typeface/);
+  assert.match(cards[0], /Switzer/); assert.doesNotMatch(cards[0], /Example: Framework/, "the client's own typeface carries no example label");
 });
 
 test("specimens: with a downloadable font file the specimen is set in the real font (generated @font-face, no inline style); without one it is a labelled fallback preview and says it is not the brand's font", async () => {
@@ -537,12 +541,12 @@ test("older typefaces with no slot stay visible under 'Other typefaces' with the
   const html = await (await s.ann.get(base)).text();
   const type = sectionHtml(html, "typography");
   assert.equal([...type.matchAll(/tf-card--has/g)].length, 0, "no slot is filled by guesswork");
-  assert.equal([...type.matchAll(/tf-card--empty/g)].length, 3);
+  assert.equal([...type.matchAll(/tf-card--example/g)].length, 3, "empty slots show muted Framework examples");
   assert.match(type, /Other typefaces/); assert.match(type, /hasn’t assigned these typefaces to a role yet/); assert.match(type, /type__family">Switzer</); assert.match(type, /Download TTF/);
-  assert.ok(!/id="typography-hierarchy"/.test(type), "no hierarchy without a Primary or Secondary typeface");
+  assert.match(type, /This uses Framework’s typography/, "the hierarchy is a labelled example, not the client's");
 });
 
-test("Typography Hierarchy: five levels in order, illustrative (no approved scale invented), no sizes shown as specifications, a missing role uses the one the brand has, fallback is stated", async () => {
+test("Typography Hierarchy: five levels in order, illustrative (no approved scale invented), no sizes shown as specifications, a missing role is a labelled Framework example (never the client's other typeface), fallback is stated", async () => {
   const s = await setup(); await publishOnly(s, s.A);
   await saveType(s, s.A, [TF({ slot: "primary" })]);
   const type = sectionHtml(await (await s.ann.get(base)).text(), "typography");
@@ -551,19 +555,23 @@ test("Typography Hierarchy: five levels in order, illustrative (no approved scal
   assert.match(hier, /Typography Hierarchy/); assert.match(hier, /<strong>Illustrative preview\.<\/strong>/); assert.match(hier, /not approved specifications/);
   assert.ok(!/\d\s?(px|pt|rem)\b|line height/i.test(hier), "no invented sizes or line heights");
   assert.match(hier, /Primary Typeface · Switzer/); assert.match(hier, /Relative size: Largest/);
-  assert.equal([...hier.matchAll(/Primary Typeface · Switzer/g)].length, 5, "with only a Primary typeface it covers every level");
+  assert.equal([...hier.matchAll(/Primary Typeface · Switzer/g)].length, 3, "the client's Primary covers the heading levels only");
+  assert.equal([...hier.matchAll(/tf-level tf-level--example/g)].length, 2, "Body and Caption have no Secondary, so they are examples");
+  assert.equal([...hier.matchAll(/Example: Framework · General Sans/g)].length, 2); assert.match(hier, /Rows labelled “Example: Framework” stand in for roles you haven’t added yet/);
   assert.match(hier, /use a standard typeface here, because no font file is available/);
   const f = (await font(s, s.A, "Switzer Bold")).json.id;
   await saveType(s, s.A, [TF({ slot: "primary", file_ids: [f] }), TF({ family: "Inter", role: "body", slot: "secondary", weights: [400] })]);
   const real = sectionHtml(await (await s.ann.get(base)).text(), "typography"); const h2 = real.slice(real.indexOf('id="typography-hierarchy"'));
-  assert.match(h2, /tf-l-h1 sp-primary fw-w700/); assert.match(h2, /Secondary Typeface · Inter/); assert.doesNotMatch(h2, /tf-l-body sp-secondary/, "Inter has no file, so it is not shown as Inter");
+  assert.match(h2, /tf-l-h1 sp-primary fw-w700/); assert.match(h2, /Secondary Typeface · Inter/); assert.doesNotMatch(h2, /tf-level--example/, "with both roles set there are no examples"); assert.doesNotMatch(h2, /tf-l-body sp-secondary/, "Inter has no file, so it is not shown as Inter");
 });
 
 test("empty typography: a restrained empty state with the existing request button and a way to share fonts; no price is shown by default; a member is told to ask an owner", async () => {
   const s = await setup(); await publishOnly(s, s.A);
   const html = await (await s.ann.get(base)).text(); const type = sectionHtml(html, "typography");
   assert.match(type, /No typefaces have been added yet\./); assert.match(type, /<summary class="btn btn--small">Request<span/); assert.match(type, /href="\/portal\/o\/alpha\/branding\/uploads">Share them with Framework/);
-  assert.ok(!/tf-card/.test(type), "no invented slots when nothing is configured");
+  assert.equal([...type.matchAll(/tf-card--example/g)].length, 3, "three muted Framework examples"); assert.ok(!/tf-card--has/.test(type), "nothing is presented as the client's");
+  assert.match(type, /Switzer/); assert.match(type, /General Sans/); assert.match(type, /Semibold <span class="muted">600/); assert.match(type, /Medium <span class="muted">500/);
+  assert.match(type, /This uses Framework’s typography/); assert.ok(!/Download|data-copy/.test(type.replace(/Download or install/g, "")), "examples are never downloadable");
   assert.ok(!/\$\s?\d|CAD|Starting at|bk-price/.test(html), "no price anywhere on the page by default");
   assert.match(sectionHtml(await (await s.mia.get(base)).text(), "typography"), /Ask an owner of your organization/);
   assert.equal((await s.ann.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-typography" })).status, 303, "the existing request workflow");
@@ -597,4 +605,56 @@ test("Admin typography wiring: slots, styles, file choice and hierarchy-free sav
   assert.match(shared, /TYPE_SLOT_DEFS/); assert.match(ui, /TYPE_SLOT_DEFS\.filter\(\(d\) => !rows\.some\(\(r\) => r\.slot === d\.key\)\)\.map\(\(d\) => button\(`Add \$\{d\.title\}`/);
   assert.match(ui, /slot: t\.slot \|\| null/); assert.match(ui, /styles: t\.styles/); assert.match(ui, /file_ids: t\.file_ids/); assert.match(ui, /Approved styles/); assert.match(ui, /Short usage description/);
   assert.ok(read("assets/js/portal-branding.js").includes("data-font-check") && read("assets/js/portal-branding.js").includes("document.fonts.load"), "a failed font load is stated, not hidden");
+});
+
+/* ------------------------------------------------------------------ navigation dividers and example previews */
+
+test("navigation dividers: one dark line above and one dark line below, same thickness, no lighter line in between; links, numbering and layout untouched", () => {
+  const css = read("assets/css/portal.css");
+  const nav = /\.bk-nav \{([^}]*)\}/.exec(css)[1];
+  assert.match(nav, /border-top: 1px solid var\(--ink\)/); assert.match(nav, /border-bottom: 1px solid var\(--ink\)/);
+  assert.doesNotMatch(nav, /hairline/, "no lighter divider under the navigation");
+  assert.doesNotMatch(/\.bk \{([^}]*)\}/.exec(css)[1], /border/, "the sections add no second line under it");
+  assert.match(css, /\.bk-nav ol \{[^}]*grid-template-columns: minmax\(0, 1fr\)/); assert.match(css, /min-width: 600px\) \{ \.bk-nav ol \{ grid-template-columns: repeat\(3/);
+});
+
+test("examples are application content: not client records, not assets, not downloadable; approved content always replaces them; the other examples stay", async () => {
+  const s = await setup(); await publishOnly(s, s.A);
+  // an organization with nothing: examples everywhere, and nothing in its records or its files
+  const empty = await (await s.bob.get("/portal/o/beta/branding")).text();
+  for (const k of ["typography", "colours", "tagline", "imagery", "layout", "textures", "iconography", "style"]) assert.ok(/Example: Framework/.test(sectionHtml(empty, k)), k + " shows an example");
+  assert.equal((await s.call(`/clients/${s.B.id}/branding`)).json.assets.length, 0, "Admin sees no placeholder files");
+  assert.equal(s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM brand_assets").get().n, 0); assert.equal(s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM brand_uploads").get().n, 0);
+  assert.ok(!/\/branding\/files\//.test(empty), "no file link of any kind on an empty page");
+  assert.ok(!/data-copy|<a [^>]*\bdownload\b|class="btn btn--small"[^>]*download/i.test(empty), "no copy button or download link");
+  // real content replaces only its own example
+  await brand.saveBrandKit(s.w.db, s.A.id, { colours: [{ name: "Moss", role: "primary", hex: "#3A5A40", note: "" }], typography: [TF({ slot: "primary" })] }, ADMIN);
+  const img = await s.upload(s.A, { kind: "other", title: "Hero", section: "imagery", published: true }, "hero.png", S.png());
+  const html = await (await s.ann.get(base)).text();
+  assert.match(sectionHtml(html, "colours"), /Moss/); assert.doesNotMatch(sectionHtml(html, "colours"), /Example: Framework|swatch--example/, "the client's palette replaces the example");
+  assert.match(sectionHtml(html, "imagery"), new RegExp(img.json.id)); assert.doesNotMatch(sectionHtml(html, "imagery"), /Example: Framework|arch-/);
+  const type = sectionHtml(html, "typography");
+  assert.match(type, /tf-card tf-card--has/); assert.equal([...type.matchAll(/tf-card--example/g)].length, 2, "Secondary and Accent stay as examples");
+  for (const k of ["tagline", "layout", "textures", "iconography", "style"]) assert.match(sectionHtml(html, k), /Example: Framework/, k + " keeps its example");
+  assert.ok(!/Example: Framework/.test(sectionHtml(html, "colours")));
+  // other organization's page is unaffected and exposes none of Alpha's content
+  const theirs = await (await s.bob.get("/portal/o/beta/branding")).text();
+  assert.ok(!theirs.includes("Moss") && !theirs.includes(img.json.id));
+});
+
+test("example content: Framework typography (Switzer 600/700, General Sans 400/500/600), a generic labelled Accent, Framework's palette without copy buttons, no price", async () => {
+  const E = await import("../portal/brand-examples.js");
+  assert.deepEqual(E.TYPE_EXAMPLES.primary.weights, [["Semibold", 600], ["Bold", 700]]); assert.deepEqual(E.TYPE_EXAMPLES.secondary.weights, [["Regular", 400], ["Medium", 500], ["Semibold", 600]]);
+  assert.equal(E.TYPE_EXAMPLES.primary.family, "Switzer"); assert.equal(E.TYPE_EXAMPLES.secondary.family, "General Sans"); assert.match(E.TYPE_EXAMPLES.accent.family, /Illustrative/);
+  const colours = E.exampleColours();
+  for (const hex of ["#0A0A0A", "#5C5C5C", "#E0E0E0", "#F5F5F5", "#B3261E"]) assert.ok(colours.includes(hex)); assert.ok(colours.includes("RGB 10, 10, 10")); assert.ok(!/data-copy|<button/.test(colours));
+  const all = [E.exampleColours(), E.exampleTagline(), E.exampleImagery(), E.exampleLayout(), E.exampleTextures(), E.exampleIcons(), E.exampleStyle()].join("");
+  assert.ok(!/ style="|<script|<a |href=|\$\s?\d|CAD/.test(all), "no inline style, script, link or price");
+  assert.equal([...all.matchAll(/<span class="bk-eg__tag">Example: Framework<\/span>/g)].length, 7);
+  const imgs = [...all.matchAll(/src="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(imgs.length && imgs.every((u) => u.startsWith("/assets/img/")), "images are Framework's own static files: " + imgs.join());
+  const ids = [...all.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]); assert.equal(new Set(ids).size, ids.length, "unique ids");
+  const css = read("assets/css/portal.css");
+  assert.match(css, /\.bk-eg \{ background: var\(--mist\)/); assert.match(css, /\.lv-card__stage--example \{ background: var\(--mist\)/);
+  assert.ok(!/\.(bk-eg|tf-card--example|tf-level--example|lv-card__stage--example)[^{]*\{[^}]*(opacity|gradient|box-shadow|border-radius: [1-9])/.test(css), "muted by colour, not opacity; no gradients, shadows or rounded corners");
 });

@@ -704,7 +704,7 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 
 /* Branding as a brand-guidelines document: nine numbered sections, always all nine. A large two-digit number beside the title and a short description, then the
    content or an empty state. White paper, ink text, thin #E0E0E0 dividers, sharp corners, no shadows. */
-.bk-nav { margin: var(--space-3) 0 var(--space-4); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--hairline); }
+.bk-nav { margin: var(--space-3) 0 0; padding: 4px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
 .bk-nav ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 600px) { .bk-nav ol { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .bk-nav a { display: flex; gap: 12px; align-items: baseline; min-height: 44px; padding: 10px 0; color: var(--ink); text-decoration: none; font-weight: 500; border-bottom: 1px solid var(--hairline); }
@@ -712,7 +712,7 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 @media (min-width: 600px) { .bk-nav a { border-bottom: 0; } }
 .bk-nav a:hover { text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
 .bk-nav__no { font-size: 12px; font-weight: 600; letter-spacing: .14em; color: var(--slate); }
-.bk { border-top: 1px solid var(--ink); }
+.bk { margin: 0; }
 .bk-sec { padding: var(--space-5) 0; border-bottom: 1px solid var(--hairline); scroll-margin-top: calc(var(--bar-h) + 16px); }
 .bk-sec__head { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px var(--space-3); margin-bottom: var(--space-4); }
 @media (min-width: 700px) { .bk-sec__head { grid-template-columns: 120px minmax(0, 1fr); align-items: start; } }
@@ -794,3 +794,52 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-price__name { margin: 0 0 4px; font-family: var(--font-display); font-weight: 600; font-size: 20px; }
 .bk-price__label { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
 .bk-price p { margin: 0 0 8px; }
+
+/* Examples: what a section looks like when professionally developed, shown while the client has no approved content. Muted grey panels (never reduced opacity), a small
+   "Example: Framework" label, no links, no copy buttons, no downloads. Approved content replaces them. Framework's own typefaces are the portal's Switzer and General Sans. */
+.eg-sw { font-family: var(--font-display); }
+.eg-gs { font-family: var(--font-body); }
+.eg-accent { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 400; }
+.bk-eg { background: var(--mist); padding: var(--space-3); max-width: 100%; }
+.bk-eg__label { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.bk-eg__tag { font-size: 13px; color: var(--slate); }
+.bk-eg__line { margin: 0 0 var(--space-3); max-width: 40em; }
+.bk-eg .tag { background: var(--paper); }
+.lv-card__stage--example { background: var(--mist); }
+.lv-card__stage--example img { mix-blend-mode: multiply; } /* the artwork is unchanged; only its white backdrop takes the panel's grey */
+.tf-card__stage--example { background: var(--mist); }
+.tf-card--example .tf-card__chars { border-color: var(--hairline); }
+.tf-level--example { background: var(--mist); padding-left: 12px; padding-right: 12px; }
+.bk-eg--colours .swatches { margin: 0; }
+@media (min-width: 1000px) { .bk-eg--colours .swatches { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.bk-eg--colours .swatch__chip { outline: 1px solid var(--hairline); outline-offset: -1px; }
+.bk-eg__tagline { margin: 0 0 8px; font-family: var(--font-display); font-weight: 600; font-size: clamp(26px, 4.4vw, 44px); line-height: 1.1; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.bk-eg p.small { margin: 0; }
+.bk-eg__imgs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.bk-eg__img { aspect-ratio: 4 / 5; overflow: hidden; background: var(--paper); }
+.bk-eg__img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.bk-eg__tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+@media (min-width: 700px) { .bk-eg__tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } .bk-eg__tiles--icons { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.bk-eg__tile svg { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; background: var(--paper); border: 1px solid var(--hairline); }
+.bk-eg__tile p { margin: 6px 0 0; }
+.bk-eg__tile--icon svg { padding: 24%; }
+.eg-layout { position: relative; background: var(--paper); border: 1px solid var(--hairline); padding: 16px 16px 20px; max-width: 640px; }
+.eg-layout__cols { position: absolute; inset: 0 16px; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; pointer-events: none; }
+.eg-layout__cols span { background: var(--mist); }
+.eg-layout__page { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; align-items: stretch; }
+.eg-layout__bar { grid-column: 1 / -1; height: 14px; background: var(--ink); }
+.eg-layout__media { grid-column: 1 / 8; aspect-ratio: 4 / 3; background: var(--slate); }
+.eg-layout__text { grid-column: 8 / -1; display: grid; align-content: start; gap: 8px; }
+.eg-layout__text i { display: block; height: 8px; background: var(--ink); }
+.eg-layout__text i:nth-child(2) { width: 80%; background: var(--slate); }
+.eg-layout__text i:nth-child(3) { width: 60%; background: var(--slate); }
+.eg-style { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); align-items: stretch; background: var(--paper); border: 1px solid var(--hairline); }
+@media (min-width: 700px) { .eg-style { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); } }
+.eg-style__text { padding: var(--space-3); display: grid; gap: 12px; align-content: center; }
+.eg-style__logo { width: 220px; max-width: 100%; height: auto; mix-blend-mode: multiply; }
+.eg-style__head { margin: 0; font-weight: 700; font-size: clamp(22px, 3vw, 32px); line-height: 1.1; letter-spacing: -0.015em; }
+.eg-style__text p { margin: 0; }
+.eg-style__chips { display: flex; gap: 6px; }
+.eg-style__chips svg { width: 28px; height: 28px; outline: 1px solid var(--hairline); outline-offset: -1px; }
+.eg-style__media { position: relative; min-height: 260px; overflow: hidden; } /* the picture fills the frame and never sets its height */
+.eg-style__media img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
