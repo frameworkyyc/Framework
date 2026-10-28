@@ -40,7 +40,7 @@ async function setup() {
     else if (json !== undefined) { h["Content-Type"] = "application/json"; body = JSON.stringify(json); }
     const res = await handleAdmin(new Request(ORIGIN + "/api/admin" + path, { method, headers: h, body }), w.env, {});
     const type = res.headers.get("Content-Type") || "";
-    return { status: res.status, json: type.includes("json") ? await res.json() : null };
+    return { status: res.status, headers: res.headers, json: type.includes("json") ? await res.json() : null };
   };
   const upload = (org, meta, name, bytes) => { const f = new FormData(); f.append("file", new File([bytes], name)); f.append("meta", JSON.stringify(meta)); return call(`/clients/${org.id}/branding/assets`, { method: "POST", form: f }); };
   const publishKit = async (org) => { await brand.saveBrandKit(w.db, org.id, { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }] }, ADMIN); assert.ok((await brand.setBrandKitStatus(w.db, org.id, "published", ADMIN)).ok); };
@@ -229,7 +229,7 @@ test("Admin can move a file to another card: choosing a different Logo type rena
   const ui = read("admin/assets/branding.js");
   assert.match(ui, /const LOGO_ROLE = \{ primary: "Primary", secondary: "Secondary", simplified: "Simplified", icon: "Sub-mark" \}/);
   assert.match(ui, /Which of the four logo cards on the client’s Branding page this file belongs to/);
-  assert.match(ui, /function logoCoverage\(\)/); assert.match(ui, /Client logo cards — /);
+  assert.match(ui, /function logoCards\(\)/); assert.match(ui, /Other logo files/);
   assert.equal(buildBrandFileName({ company: "Alpha", kind: "logo", logo: { role: "secondary", orientation: "horizontal", tone: "light" }, ext: "svg" }).name, "Alpha-Secondary-Horizontal-Light.svg");
 });
 
@@ -266,4 +266,69 @@ test("layout and a11y wiring: one column on a phone, two on a tablet, four on a 
   const logos = html.slice(html.indexOf('id="logos"'), html.indexOf('id="colours"'));
   assert.equal([...logos.matchAll(/<h3 class="lv-card__title">/g)].length, 4);
   assert.equal([...logos.matchAll(/alt="Example: the Framework /g)].length, 4, "every example image has a descriptive alternative text");
+});
+
+test("Admin cards: the page shows four permanent cards with the client page's text, the upload dialog fixes the logo type, and no Version field exists anywhere", () => {
+  const ui = read("admin/assets/branding.js"), names = read("admin/assets/brand-names.js"), shared = read("admin/assets/logo-variations.js");
+  assert.match(shared, /export const LOGO_VARIATIONS/);
+  assert.match(read("worker/portal/branding-live.js"), /import \{ LOGO_VARIATIONS \} from "..\/..\/admin\/assets\/logo-variations.js"/, "the client page and Admin share one catalogue");
+  assert.match(ui, /import \{ LOGO_VARIATIONS \} from "\.\/logo-variations\.js"/);
+  assert.match(ui, /function logoCard\(def, files\)/); assert.match(ui, /function openLogoUpload\(def\)/);
+  assert.match(ui, /fixedRole: def\.role/, "the card chooses the logo type");
+  assert.match(ui, /"Upload logo"/); assert.match(ui, /"Add format"/); assert.match(ui, /Manage files \(/); assert.match(ui, /Example: Framework/);
+  assert.match(ui, /Other logo files \(/);
+  assert.ok(!/"Version"/.test(ui) && !/-tone/.test(ui) && !/TONE_FORM/.test(ui), "no Version field in the Admin logo forms");
+  assert.ok(!/version/i.test(names.replace(/\/\*[\s\S]*?\*\//, "")), "the name builder no longer asks for a version");
+  assert.match(ui, /LOGO_ACCEPT = "\.svg,\.png,\.jpg,\.jpeg,\.webp,\.pdf,\.ai,\.eps"/);
+  const css = read("admin/assets/admin.css");
+  assert.match(css, /\.adm-lv-grid \{[^}]*grid-template-columns: minmax\(0, 1fr\)/); assert.match(css, /min-width: 600px\) \{ \.adm-lv-grid \{ grid-template-columns: repeat\(2/); assert.match(css, /min-width: 1280px\) \{ \.adm-lv-grid \{ grid-template-columns: repeat\(4/);
+  assert.match(css, /\.adm-lv__stage \{[^}]*aspect-ratio: 16 \/ 9[^}]*border: 1px solid var\(--hairline\)[^}]*border-radius: 0/);
+  assert.ok(!/\.adm-lv[^{]*\{[^}]*(box-shadow|border-radius: [1-9])/.test(css), "no shadows or rounded corners");
+});
+
+test("a logo is uploaded without a version: the card's type and the shape are enough, the file name has no background word, formats share one stem and one card, and the file can still be downloaded", async () => {
+  const s = await setup(); await s.publishKit(s.A);
+  const meta = { kind: "logo", logo_role: "primary", orientation: "square", published: true };
+  const png = await s.upload(s.A, meta, "a.png", S.png());
+  assert.equal(png.status, 201, JSON.stringify(png.json));
+  assert.equal(png.json.name, "Alpha-Co-Primary-Square.png");
+  for (const [n, bytes, ext] of [["a.svg", S.svg(), "svg"], ["a.pdf", S.pdf(), "pdf"], ["a.eps", S.eps(), "eps"], ["a.jpg", S.jpeg(), "jpg"], ["a.webp", S.webp(), "webp"]]) {
+    const r = await s.upload(s.A, meta, n, bytes); assert.equal(r.status, 201, n + JSON.stringify(r.json)); assert.equal(r.json.name, "Alpha-Co-Primary-Square." + ext);
+  }
+  assert.equal(s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM brand_assets WHERE tone IS NOT NULL").get().n, 0, "no version is stored for new files");
+  const html = await (await s.ann.get(base)).text();
+  assert.deepEqual(cards(html).map((x) => x.has), [true, false, false, false], "all six formats sit on the Primary card; the others keep their examples");
+  assert.equal((await s.call(`/clients/${s.A.id}/branding/assets/${png.json.id}/download`)).status, 200);
+  assert.equal((await s.upload(s.A, meta, "dup.png", S.png(9, 9))).json.error, "duplicate_name", "the same type, shape and format is never silently overwritten");
+  const view = await s.call(`/clients/${s.A.id}/branding`);
+  assert.equal(view.json.assets.filter((a) => a.logoRole === "primary").length, 6);
+});
+
+test("existing records keep their version: files with a stored background keep their name and value, and editing other details never touches it", async () => {
+  const s = await setup(); await s.publishKit(s.A);
+  const old = await s.upload(s.A, s.logo("primary", { tone: "dark" }), "o.png", S.png());
+  assert.equal(old.json.name, "Alpha-Co-Primary-Square-Dark.png", "the API still accepts a background for older integrations");
+  const note = await s.call(`/clients/${s.A.id}/branding/assets/${old.json.id}/update`, { method: "POST", json: { usage_note: "On dark backgrounds", logo_role: "primary", orientation: "square", transparent: false } });
+  assert.equal(note.status, 200);
+  const row = s.w.db.raw.prepare("SELECT tone, original_name FROM brand_assets WHERE id = ?").get(old.json.id);
+  assert.deepEqual([row.tone, row.original_name], ["dark", "Alpha-Co-Primary-Square-Dark.png"]);
+  const moved = await s.call(`/clients/${s.A.id}/branding/assets/${old.json.id}/update`, { method: "POST", json: { logo_role: "secondary", orientation: "square", transparent: false } });
+  assert.equal(moved.status, 200);
+  assert.equal(s.w.db.raw.prepare("SELECT tone FROM brand_assets WHERE id = ?").get(old.json.id).tone, "dark", "a move between cards keeps the stored value");
+  assert.deepEqual(cards(await (await s.ann.get(base)).text()).map((x) => x.has), [false, true, false, false]);
+});
+
+test("Admin picture preview: a logo image is shown inline from the existing download route, is not counted as a download, other kinds and other clients are refused", async () => {
+  const s = await setup();
+  const up = await s.upload(s.A, s.logo("primary"), "a.png", S.png());
+  const guide = await s.upload(s.A, { kind: "guideline", title: "Brand guidelines" }, "g.pdf", S.pdf());
+  const count = () => s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM activity_log WHERE action = 'brand.asset.download'").get().n;
+  const before = count();
+  const pic = await s.call(`/clients/${s.A.id}/branding/assets/${up.json.id}/download?preview=1`);
+  assert.equal(pic.status, 200); assert.equal(pic.headers.get("Content-Disposition"), "inline"); assert.equal(pic.headers.get("Content-Type"), "image/png");
+  assert.match(pic.headers.get("Content-Security-Policy"), /sandbox/); assert.equal(count(), before, "a preview is not a download");
+  const dl = await s.call(`/clients/${s.A.id}/branding/assets/${up.json.id}/download`);
+  assert.match(dl.headers.get("Content-Disposition"), /attachment/); assert.equal(count(), before + 1, "a real download is still recorded");
+  assert.equal((await s.call(`/clients/${s.A.id}/branding/assets/${guide.json.id}/download?preview=1`)).status, 404, "only logos are ever shown as pictures");
+  assert.equal((await s.call(`/clients/${s.B.id}/branding/assets/${up.json.id}/download?preview=1`)).status, 404, "another client's file is never reachable");
 });

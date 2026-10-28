@@ -305,7 +305,7 @@ export async function handleBrandingApi(request, env, principal, path, deps = {}
       return r.ok ? json({ ok: true, storageCleanup: r.storageCleanup }) : fromFailure(r);
     }
     if (route.kind === "asset_download") {
-      const r = await files.adminDownloadAsset(svc, { organizationId: org.id, assetId: route.target, actor });
+      const r = await files.adminDownloadAsset(svc, { organizationId: org.id, assetId: route.target, actor, inline: new URL(request.url).searchParams.get("preview") === "1" });
       return r.ok ? r.response : fromFailure(r);
     }
     if (route.kind === "upload_download") {
