@@ -12,7 +12,7 @@ import * as brand from "../portal/repo/brand.js";
 import { isKnownBrandingService } from "../portal/brand-services.js";
 import { createOrganizationAudited, archiveOrganizationAudited } from "../portal/repo/orgs.js";
 import { ACTIVITY_LABELS } from "../portal/admin-dashboard.js";
-import { requestsSection } from "../../admin/assets/overview.js";
+import { requestsSection, requestsTile } from "../../admin/assets/overview.js";
 
 const TEAM = "framework.cloudflareaccess.com", AUD = "a".repeat(64), ORIGIN = "https://staging.frameworkco.ca", ADMIN = "owner@frameworkco.ca";
 const pair = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -128,8 +128,32 @@ test("the Overview section: count, newest-first rows linking to the right page, 
   assert.match(src, /\/admin\/support\/\$\{enc\(r\.organizationId\)\}\/\$\{enc\(r\.id\)\}/);
   assert.match(src, /quiet\("\/dashboard\/requests"\)/); assert.match(src, /visibilitychange/); assert.match(src, /isConnected/);
   assert.match(src, /h2", \{ id: "adm-req", text: "Client requests" \}/);
-  assert.ok(src.indexOf("requestsEl, supportSection") > -1, "it leads the section grid");
+  assert.ok(src.indexOf("requestsEl, requestsEl ? null : supportSection") > -1, "it leads the section grid, and the separate support list is only the fallback");
   assert.equal(requestsSection(null), null, "no data, no section");
   const css = read("admin/assets/admin.css");
   assert.match(css, /\.adm-dash__sec--wide \{ grid-column: 1 \/ -1; \}/);
+});
+
+test("the first summary tile is the outstanding Client requests count: it replaces the Clients tile, scrolls to the list, and is refreshed with it; Clients stays in the navigation", () => {
+  const src = read("admin/assets/overview.js");
+  assert.match(src, /if \(requestsCard\) cards\.push\(requestsCard\);[^\n]*\n\s*else if \(cl\) cards\.push\(/, "the requests tile comes first and the Clients tile is only its fallback");
+  assert.match(src, /label: "Client requests", value: String\(reqs\.total\), unit: "outstanding"/);
+  assert.match(src, /href: "#adm-req-sec", local: true/); assert.match(src, /"data-link": local \? null : ""/, "a local tile is not routed as a page");
+  assert.match(src, /scrollIntoView\(/); assert.match(src, /prefers-reduced-motion/); assert.match(src, /heading\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(src, /tile\.replaceWith\(nextTile\)/, "the tile is refreshed with the list");
+  assert.match(src, /watchRequests\(requestsEl, requestsCard\)/);
+  assert.equal(requestsTile(null), null, "no data, no tile (the Clients tile stays)");
+  assert.match(read("admin/assets/modules.js"), /id: "clients", label: "Clients", path: "\/admin\/clients", enabled: true/, "Clients stays in the navigation");
+  assert.ok(!/label: "Support requests"/.test(src.slice(src.indexOf("function supportSection"), src.indexOf("function invoiceSection"))), "(support tile unchanged elsewhere)");
+});
+
+test("a support request with a new client reply says so in the list; an untouched new one does not repeat the status", async () => {
+  const s = await setup();
+  const fresh = await s.support(s.A, "ann@a.test", { category: "general", title: "Fresh", description: "x" }, at(20));
+  const replied = await s.support(s.B, "bob@b.test", { category: "technical_issue", title: "Replied", description: "x" }, at(21));
+  s.w.db.raw.prepare("UPDATE support_requests SET admin_seen_at = ?, last_message_at = ? WHERE id = ?").run(at(21, 10).toISOString(), at(22).toISOString(), replied);
+  const items = (await s.get()).requests.items;
+  assert.equal(items.find((r) => r.id === replied).note, "New reply");
+  assert.equal(items.find((r) => r.id === fresh).note, null);
+  assert.match(read("admin/assets/overview.js"), /\$\{r\.statusLabel\}\$\{r\.note \? ` · \$\{r\.note\}` : ""\} · \$\{fmtDate\(r\.createdAt\)\}/);
 });
