@@ -793,3 +793,7 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-lvdialog [hidden] { display: none !important; }
 .adm-lvwrap .adm-brand__group { margin-top: 40px; }
 .adm-lvdialog { max-width: 560px; max-height: calc(100vh - 32px); overflow-y: auto; }
+
+/* Branding: the nine numbered sections (same numbers and titles as the client's page), and thumbnails of section files. */
+.adm-bk-no { display: inline-block; min-width: 2.2em; margin-right: 6px; font-size: 13px; font-weight: 600; letter-spacing: .14em; color: var(--slate); font-variant-numeric: tabular-nums; }
+.adm-brand__thumb { display: block; width: 96px; height: 64px; margin: 0 0 10px; object-fit: contain; border: 1px solid var(--hairline); background: var(--paper); }

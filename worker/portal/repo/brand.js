@@ -301,9 +301,9 @@ export async function getClientBrand(db, organizationId) {
 /** One deliverable a client may download, or null (not published, kit not published, deleted, another organization's, or a font that is not licensed for download). */
 export async function getClientBrandAsset(db, organizationId, assetId) {
   requireOrgId(organizationId); requireId(assetId, "asset_id");
-  const r = await db.prepare(`SELECT a.id, a.kind, a.title, a.format, a.content_type, a.size_bytes, a.storage_key, a.original_name, a.downloadable FROM brand_assets a WHERE a.id = ? AND a.organization_id = ? AND ${VISIBLE}`).bind(assetId, organizationId).first();
+  const r = await db.prepare(`SELECT a.id, a.kind, a.title, a.variant_key, a.format, a.content_type, a.size_bytes, a.storage_key, a.original_name, a.downloadable FROM brand_assets a WHERE a.id = ? AND a.organization_id = ? AND ${VISIBLE}`).bind(assetId, organizationId).first();
   if (!r || (r.kind === "font" && !r.downloadable)) return null;
-  return { id: r.id, kind: r.kind, title: r.title, format: r.format, contentType: r.content_type, size: r.size_bytes, storageKey: r.storage_key, originalName: r.original_name };
+  return { id: r.id, kind: r.kind, title: r.title, variantKey: r.variant_key, format: r.format, contentType: r.content_type, size: r.size_bytes, storageKey: r.storage_key, originalName: r.original_name };
 }
 
 /* ------------------------------------------------------------------ client uploads (brand_uploads) */

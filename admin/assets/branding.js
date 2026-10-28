@@ -7,6 +7,7 @@ import { h, api, confirmDialog, errorState, fmtDate, fmtDateTime } from "./ui.js
 import { disclosure, chip, plural, goTo } from "./client-dashboard.js";
 import { buildBrandFileName, extensionOf } from "./brand-names.js";
 import { LOGO_VARIATIONS } from "./logo-variations.js";
+import { BRAND_SECTIONS, SECTION_FILE_KEYS, sectionOf } from "./brand-sections.js";
 
 const KIND_LABEL = { logo: "Logos", guideline: "Guidelines", document: "Documents", font: "Fonts", package: "Packages", other: "Other files" };
 const KIND_ONE = { logo: "Logo", guideline: "Guideline", document: "Document", font: "Font", package: "Package", other: "Other file" };
@@ -18,6 +19,8 @@ const CATEGORY = { logo: "Logo", fonts: "Fonts", colours: "Colour palette", guid
 const COLOUR_ROLE = { primary: "Primary", secondary: "Secondary", accent: "Accent", neutral: "Neutral" };
 const TYPE_ROLE = { logo: "Logo", heading: "Headings", subheading: "Subheadings", body: "Body text", other: "Other" };
 const REQUEST_STATUS = { new: "New", contacted: "Contacted", closed: "Closed", declined: "Declined" };
+const SECTION = Object.fromEntries(BRAND_SECTIONS.map((d) => [d.key, d]));
+const SECTION_OPTIONS = Object.fromEntries(SECTION_FILE_KEYS.map((k) => [k, `${SECTION[k].no} ${SECTION[k].title}`])); // where an "other" file can be shown on the client's page
 const LOGO_ACCEPT = ".svg,.png,.jpg,.jpeg,.webp,.pdf,.ai,.eps";
 const IMAGE_ORDER = ["svg", "png", "webp", "jpg", "jpeg"]; // formats a browser can show as a picture, best first
 const KIND_ADD = Object.fromEntries(Object.entries(KIND_ONE).filter(([k]) => k !== "logo")); // logos are added from the four logo cards
@@ -44,7 +47,7 @@ const ERROR_TEXT = {
   invalid_typography: "Check the typefaces: each needs a role and a family; weights are 100 to 900 in steps of 100; a source link must start with https://",
   invalid_title: "Enter a name for the file.", invalid_description: "Enter a name for the file (letters and numbers).", incomplete_logo_details: "Choose the logo type and shape first.",
   duplicate_name: "A file with that name already exists for this client. Change a detail, or replace the existing file instead.",
-  invalid_note: "That note is too long.", invalid_input: "Check the details and try again.", invalid_kit: "The kit couldn’t be saved: check the details.",
+  invalid_section: "That section can’t be used for this file.", invalid_note: "That note is too long.", invalid_input: "Check the details and try again.", invalid_kit: "The kit couldn’t be saved: check the details.",
   invalid_status: "Choose a status.", not_found: "That item no longer exists. The page has been refreshed.", conflict: "That file changed while you were working. The page has been refreshed.",
   writes_disabled: "Changes are switched off on this site, so nothing was changed.",
   storage_unavailable: "File storage isn’t available on this site. Nothing was uploaded.",
@@ -138,10 +141,12 @@ export async function render(orgId, ctx) {
    * The details of a deliverable, shared by "add a file" and "edit a file". There is no title or variant name to type for a logo: the file name is generated from
    * the company and these details (the same module the server uses) and previewed live. Other files take a short name. getExt() is the file's extension.
    */
-  function assetFields(prefix, a = null, getExt = () => "", { fixedRole = null } = {}) {
+  function assetFields(prefix, a = null, getExt = () => "", { fixedRole = null, fixedKind = null, fixedSection = null } = {}) {
     const editing = Boolean(a);
-    const kind = editing || fixedRole ? null : select(prefix + "-kind", KIND_ADD, memory.kind); // a logo card fixes both the kind (logo) and the logo type
-    const kindNow = () => (editing ? a.kind : fixedRole ? "logo" : kind.value);
+    const fixed = Boolean(fixedRole || fixedKind || fixedSection); // a logo card fixes the kind (logo) and the logo type; a font or section button fixes the kind (and the section)
+    const kind = editing || fixed ? null : select(prefix + "-kind", KIND_ADD, memory.kind);
+    const kindNow = () => (editing ? a.kind : fixedRole ? "logo" : fixedKind ? fixedKind : fixedSection ? "other" : kind.value);
+    const sectionSel = select(prefix + "-section", SECTION_OPTIONS, a ? sectionOf(a) || "" : fixedSection || "", { blank: "None (listed under Documents and other files)" });
     const description = h("input", { id: prefix + "-title", class: "input", type: "text", maxlength: "120", value: editing ? (a.kind !== "logo" ? a.title : "") : memory.description, autocomplete: "off" });
     const role = select(prefix + "-role", LOGO_ROLE, a ? a.logoRole || "" : fixedRole || memory.role, { blank: "Choose…" });
     const orient = select(prefix + "-orient", ORIENTATION, a ? a.orientation || "" : memory.orient, { blank: "Choose…" });
@@ -150,6 +155,7 @@ export async function render(orgId, ctx) {
     const downloadable = check(prefix + "-dl", "Clients may download this font file", a && a.downloadable);
     const licence = h("input", { id: prefix + "-lic", class: "input", type: "text", maxlength: "300", value: a && a.licenseNote || "", autocomplete: "off" });
     const logoBox = h("div", { class: "adm-brand__grid" }, fixedRole ? null : labelled(prefix + "-role", "Logo type", role, "Which of the four logo cards on the client’s Branding page this file belongs to. Add each format (SVG, PNG, PDF…) as its own file with the same type."), labelled(prefix + "-orient", "Shape", orient), transparent.node);
+    const sectionBox = labelled(prefix + "-section", "Show in section", sectionSel, "Which numbered section of the client’s Branding page shows this file. Leave it on None to keep it under Documents and other files.");
     const descriptionBox = labelled(prefix + "-title", "Name", description, "Used in the file name, for example “Brand guidelines” or “Switzer Regular”.");
     const fontBox = h("div", { class: "adm-brand__stack" }, downloadable.node, labelled(prefix + "-lic", "Licence note (required to allow downloads)", licence, "For example: Open Font Licence 1.1, or the licence you hold."));
     const previewName = h("code", { class: "adm-brand__previewname" }), previewNote = h("span", { class: "adm-brand__previewnote" });
@@ -164,7 +170,7 @@ export async function render(orgId, ctx) {
     const refresh = () => {
       const k = kindNow();
       if (!editing) Object.assign(memory, { kind: k, role: role.value, orient: orient.value, transparent: transparent.input.checked, description: description.value });
-      logoBox.hidden = k !== "logo"; descriptionBox.hidden = k === "logo"; fontBox.hidden = k !== "font"; if (adopt) adopt.node.hidden = !legacy;
+      logoBox.hidden = k !== "logo"; descriptionBox.hidden = k === "logo"; fontBox.hidden = k !== "font"; sectionBox.hidden = k !== "other" || Boolean(fixedSection); if (adopt) adopt.node.hidden = !legacy;
       if (!changed()) { previewName.textContent = a.originalName; previewNote.textContent = "Unchanged."; preview.className = "adm-brand__preview"; state = { ok: true, message: "", unchanged: true }; return; }
       const built = buildBrandFileName(naming());
       if (!built.ok) {
@@ -183,7 +189,7 @@ export async function render(orgId, ctx) {
     transparent.input.addEventListener("change", refresh);
     if (kind) kind.addEventListener("change", refresh);
     refresh();
-    const node = h("div", { class: "adm-brand__fields" }, editing ? h("p", { class: "adm-brand__meta" }, `Type: ${KIND_ONE[a.kind]}. It can’t be changed after upload.`) : fixedRole ? null : labelled(prefix + "-kind", "Type", kind), logoBox, descriptionBox, adopt ? adopt.node : null, preview, labelled(prefix + "-usage", "Usage note (optional)", usage, "Shown to the client, for example “Use on white or light backgrounds”."), fontBox);
+    const node = h("div", { class: "adm-brand__fields" }, editing ? h("p", { class: "adm-brand__meta" }, `Type: ${KIND_ONE[a.kind]}. It can’t be changed after upload.`) : fixed ? null : labelled(prefix + "-kind", "Type", kind), logoBox, descriptionBox, sectionBox, adopt ? adopt.node : null, preview, labelled(prefix + "-usage", "Usage note (optional)", usage, "Shown to the client, for example “Use on white or light backgrounds”."), fontBox);
     /** What the server accepts. A logo sends only its details; any other file sends its name. The file name itself is never sent: the server generates it. */
     const read = () => {
       const k = kindNow(), out = { usage_note: usage.value.trim() || null };
@@ -191,6 +197,7 @@ export async function render(orgId, ctx) {
       if (adopt && adopt.input.checked) out.standard_name = true;
       if (k === "logo") { if (!editing || changed()) Object.assign(out, { logo_role: role.value || null, orientation: orient.value || null, transparent: transparent.input.checked }); } // no tone is sent: an older file keeps the one it has
       else if (!editing || changed()) out.title = description.value.trim();
+      if (k === "other") out.section = sectionSel.value || null;
       if (k === "font") Object.assign(out, { downloadable: downloadable.input.checked, license_note: licence.value.trim() || null });
       return out;
     };
@@ -221,10 +228,11 @@ export async function render(orgId, ctx) {
     return form;
   }
 
-  function assetRecord(a) {
+  function assetRecord(a, { thumb = false } = {}) {
     const editor = h("div", { class: "adm-brand__edit", hidden: true });
     const chips = [chip(a.published ? "ok" : "plain", a.published ? "Published" : "Draft", a.published ? "complete" : null)];
     if (a.kind === "logo") for (const t of [LOGO_ROLE[a.logoRole], ORIENTATION[a.orientation], TONE[a.tone], a.transparent ? "Transparent" : null]) if (t) chips.push(chip("plain", t));
+    if (sectionOf(a)) chips.push(chip("plain", SECTION_OPTIONS[sectionOf(a)]));
     if (a.kind === "font") chips.push(a.downloadable ? chip("ok", "Download allowed") : chip("warn", "View only", "warn"));
     const replaceInput = h("input", { type: "file", class: "visually-hidden", accept: ACCEPT, "aria-label": `Replace file for ${a.originalName}`, tabindex: "-1", onchange: () => {
       const f = replaceInput.files && replaceInput.files[0]; if (!f) return;
@@ -259,7 +267,7 @@ export async function render(orgId, ctx) {
       } }, fields.node, labelled("br-ed-sort-" + a.id.slice(0, 8), "Order (lower numbers first)", sort), h("div", { class: "adm-actions" }, h("button", { class: "btn btn--primary adm-small", type: "submit" }, "Save changes"), button("Cancel", { onclick: () => { editor.hidden = true; } }))));
     }
     return h("li", { class: "adm-brand__item" },
-      h("div", { class: "adm-brand__main" }, h("p", { class: "adm-brand__name", text: a.title }), h("p", { class: "adm-brand__file" }, h("code", { text: a.originalName })), h("p", { class: "adm-brand__chips" }, chips),
+      h("div", { class: "adm-brand__main" }, thumb && IMAGE_ORDER.includes(a.format) ? h("img", { class: "adm-brand__thumb", src: previewLink(a), alt: "", width: "96", height: "64", loading: "lazy", decoding: "async" }) : null, h("p", { class: "adm-brand__name", text: a.title }), h("p", { class: "adm-brand__file" }, h("code", { text: a.originalName })), h("p", { class: "adm-brand__chips" }, chips),
         h("p", { class: "adm-brand__meta" }, `${a.format.toUpperCase()} · ${fmtSize(a.size)} · added ${fmtDate(a.createdAt)}`, a.usageNote ? h("span", { class: "adm-brand__note", text: a.usageNote }) : null)),
       h("div", { class: "adm-row-actions" }, actions, replaceInput), editor);
   }
@@ -290,14 +298,17 @@ export async function render(orgId, ctx) {
   const previewLink = (a) => assetLink(a) + "?preview=1";
   const byPreview = (x, y) => Number(y.published) - Number(x.published) || (IMAGE_ORDER.indexOf(x.format) + 1 || 99) - (IMAGE_ORDER.indexOf(y.format) + 1 || 99) || x.originalName.localeCompare(y.originalName);
 
-  /** Upload a logo into one card: the existing add-a-file workflow with the logo type already chosen. Only the shape and the file are asked for. */
-  function openLogoUpload(def) {
-    const fileInput = h("input", { id: "br-lv-file", class: "input", type: "file", accept: LOGO_ACCEPT });
-    const fields = assetFields("br-lv", null, () => extensionOf((fileInput.files && fileInput.files[0] && fileInput.files[0].name) || ""), { fixedRole: def.role });
+  /**
+   * The add-a-file workflow in a dialog, opened from a button that already knows what the file is: a logo card (the logo type is set), a section (the file is shown in
+   * that section) or the Typography font button. `opts` = { title, intro, fixed: assetFields options, accept, focusId, added(name) }.
+   */
+  function openUpload(opts) {
+    const fileInput = h("input", { id: "br-up-file", class: "input", type: "file", accept: opts.accept });
+    const fields = assetFields("br-up", null, () => extensionOf((fileInput.files && fileInput.files[0] && fileInput.files[0].name) || ""), opts.fixed);
     const errorEl = h("p", { class: "adm-field__error", role: "alert", hidden: true });
     fileInput.addEventListener("change", () => fields.refresh());
-    const submit = h("button", { class: "btn btn--primary", type: "submit" }, "Upload logo");
-    const dialog = h("dialog", { class: "adm-dialog adm-lvdialog", "aria-labelledby": "br-lv-title" },
+    const submit = h("button", { class: "btn btn--primary", type: "submit" }, opts.submit || "Upload");
+    const dialog = h("dialog", { class: "adm-dialog adm-lvdialog", "aria-labelledby": "br-up-heading" },
       h("form", { class: "adm-form adm-brand__form", novalidate: true, onsubmit: async (ev) => {
         ev.preventDefault(); errorEl.hidden = true;
         const fail = (t) => { errorEl.textContent = t; errorEl.hidden = false; };
@@ -308,18 +319,21 @@ export async function render(orgId, ctx) {
         if (!ready.ok) return fail(ready.message);
         const body = new FormData(); body.append("file", f, f.name); body.append("meta", JSON.stringify(fields.read()));
         submit.disabled = true;
-        const done = await perform({ request: () => api(base + "/assets", { method: "POST", body }), success: (res) => `${res.name} was added to ${def.title} as a draft. Publish it when it’s ready for the client.`, onError: (err) => { fail(errorText(err)); return errorText(err); } });
+        const done = await perform({ request: () => api(base + "/assets", { method: "POST", body }), success: (res) => opts.added(res.name), onError: (err) => { fail(errorText(err)); return errorText(err); } });
         if (done) dialog.close(); else submit.disabled = false;
       } },
-        h("h2", { id: "br-lv-title", text: `${def.no} · ${def.title}` }),
-        h("p", { text: "Add a logo file to this card. Add the other formats (SVG, PNG, PDF…) the same way." }),
-        labelled("br-lv-file", "File", fileInput, `SVG, PNG, JPG, WebP, PDF or EPS, up to ${fmtSize(data.limits.adminMaxFileBytes)}. It’s added as a draft: the client sees nothing until you publish it.`),
+        h("h2", { id: "br-up-heading", text: opts.title }),
+        h("p", { text: opts.intro }),
+        labelled("br-up-file", "File", fileInput, `${opts.accepts || "Up to"} ${fmtSize(data.limits.adminMaxFileBytes)}. It’s added as a draft: the client sees nothing until you publish it.`),
         fields.node, errorEl,
         h("div", { class: "adm-dialog__actions" }, h("button", { class: "btn btn--secondary", type: "button", onclick: () => dialog.close() }, "Cancel"), submit)));
-    dialog.addEventListener("close", () => { dialog.remove(); document.getElementById("br-lv-up-" + def.key)?.focus(); });
+    dialog.addEventListener("close", () => { dialog.remove(); document.getElementById(opts.focusId)?.focus(); });
     document.body.append(dialog);
     dialog.showModal();
   }
+  const openLogoUpload = (def) => openUpload({ title: `${def.no} · ${def.title}`, intro: "Add a logo file to this card. Add the other formats (SVG, PNG, PDF…) the same way.", fixed: { fixedRole: def.role }, accept: LOGO_ACCEPT, accepts: "SVG, PNG, JPG, WebP, PDF or EPS, up to", submit: "Upload logo", focusId: "br-lv-up-" + def.key, added: (name) => `${name} was added to ${def.title} as a draft. Publish it when it’s ready for the client.` });
+  const openSectionUpload = (def) => openUpload({ title: `${def.no} · ${def.title}`, intro: "Add a file to this section. It is shown on the client’s Branding page once published.", fixed: { fixedSection: def.key }, accept: ACCEPT, submit: "Upload file", focusId: "br-sec-up-" + def.key, added: (name) => `${name} was added to ${def.title} as a draft. Publish it when it’s ready for the client.` });
+  const openFontUpload = () => openUpload({ title: "02 · Typography: add a font file", intro: "Add a font file. The client can download it only if you record its licence.", fixed: { fixedKind: "font" }, accept: ".ttf,.otf,.woff,.woff2", submit: "Upload font", focusId: "br-font-up", added: (name) => `${name} was added as a draft. Publish it when it’s ready for the client.` });
 
   const filesId = (def) => "br-lv-files-" + def.key;
 
@@ -353,9 +367,8 @@ export async function render(orgId, ctx) {
   function logoCards() {
     const logos = data.assets.filter((a) => a.kind === "logo").sort(byPreview);
     const loose = logos.filter((a) => !LOGO_VARIATION_ROLES.includes(a.logoRole));
-    return h("div", { class: "adm-brand__group adm-lvwrap" },
-      h("p", { class: "adm-brand__h3", text: "Logos" }),
-      h("p", { class: "adm-sub", text: "The four logo cards the client sees on their Branding page. A card without a published logo shows Framework’s own logo as an example." }),
+    return h("div", { class: "adm-lvwrap" },
+      h("p", { class: "adm-sub", text: "These four cards are what the client sees. A card without a published logo shows Framework’s own logo as an example." }),
       h("ul", { class: "adm-lv-grid", "aria-label": "Logo categories" }, LOGO_VARIATIONS.map((def) => logoCard(def, logos.filter((a) => a.logoRole === def.role)))),
       // the files of each card (view, download, publish, edit, replace, delete) open full width below the cards, where their forms have room
       LOGO_VARIATIONS.map((def) => ({ def, files: logos.filter((a) => a.logoRole === def.role) })).filter((x) => x.files.length).map(({ def, files }) => disclosure({ id: filesId(def), title: `${def.no} · ${def.title}: files`, meta: plural(files.length, "file"), className: "adm-acc--sub", open: opened.has(filesId(def)), onToggle: toggled(filesId(def)),
@@ -366,17 +379,48 @@ export async function render(orgId, ctx) {
         h("ul", { class: "adm-brand__list", "aria-label": "Other logo files" }, loose.map(assetRecord))) : null);
   }
 
-  function assetsSection() {
-    const groups = Object.keys(KIND_LABEL).filter((k) => k !== "logo").map((k) => [k, data.assets.filter((a) => a.kind === k)]).filter(([, list]) => list.length);
-    const published = data.assets.filter((a) => a.published).length;
+  /* ---------------------------------------------------------- the nine numbered sections */
+
+  const numbered = (def) => [h("span", { class: "adm-bk-no", text: def.no }), def.title];
+  const sectionIntro = (def) => h("p", { class: "adm-sub", text: def.desc });
+  const statusChip = (n, one) => (n ? chip("plain", plural(n, one)) : chip("plain", "Not added yet"));
+
+  /** 01 Logo: the four logo cards (upload, formats, files). */
+  function logoSection() {
+    const logos = data.assets.filter((a) => a.kind === "logo");
+    const filled = LOGO_VARIATION_ROLES.filter((r) => logos.some((a) => a.logoRole === r)).length;
+    return section("br-s-logo", numbered(SECTION.logo), filled ? chip("plain", `${filled} of 4 variations`) : chip("plain", "Not added yet"), [sectionIntro(SECTION.logo), logoCards()]);
+  }
+
+  /** 04 Tagline: the client page shows its empty state until text content can be stored. Nothing to manage yet. */
+  function taglineSection() {
+    return section("br-s-tagline", numbered(SECTION.tagline), chip("plain", "Not added yet"), [sectionIntro(SECTION.tagline), h("p", { class: "adm-banner" }, "The client sees “Not added yet” here. Text content (the tagline and guidelines) can’t be stored yet: it needs a small database change that is waiting for approval.")]);
+  }
+
+  /** 05 to 09 (except the tagline): files placed in the section, with upload and the usual management. */
+  function fileSection(def) {
+    const files = data.assets.filter((a) => sectionOf(a) === def.key);
+    const live = files.filter((a) => a.published).length;
     const body = [
-      !canWrite() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at files, but not add, publish or delete them.") : !caps().storage ? h("p", { class: "adm-banner" }, "File storage isn’t available on this site, so files can’t be added or replaced. Colours and typography can still be set.") : null,
-      canWrite() ? brandNameBox() : null,
-      logoCards(),
-      canUpload() ? disclosure({ id: "br-add", title: "Add another file (guidelines, documents, fonts…)", className: "adm-acc--sub", open: opened.has("br-add"), onToggle: toggled("br-add"), children: addForm() }) : null,
-      groups.map(([k, list]) => h("div", { class: "adm-brand__group" }, h("p", { class: "adm-brand__h3", text: `${KIND_LABEL[k]} (${list.length})` }), h("ul", { class: "adm-brand__list", "aria-label": KIND_LABEL[k] }, list.map(assetRecord)))),
+      sectionIntro(def),
+      canUpload() ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "button", id: "br-sec-up-" + def.key, "aria-label": `Upload a file to ${def.title}`, onclick: () => openSectionUpload(def) }, files.length ? "Add file" : "Upload file")) : null,
+      files.length ? h("ul", { class: "adm-brand__list", "aria-label": `${def.title} files` }, files.map((a) => assetRecord(a, { thumb: true }))) : h("p", { class: "adm-muted" }, "Nothing here yet. The client sees “Not added yet”."),
     ];
-    return section("br-assets", "Logos and brand files", data.assets.length ? [chip("ok", `${published} published`, "complete"), data.assets.length - published ? chip("plain", `${data.assets.length - published} draft`) : null] : chip("plain", "None yet"), body);
+    return section("br-s-" + def.key, numbered(def), files.length ? [chip("plain", plural(files.length, "file")), live ? chip("ok", `${live} published`, "complete") : chip("plain", "None published")] : chip("plain", "Not added yet"), body);
+  }
+
+  /** Files that are not part of the nine sections: guidelines, documents, packages and older "other" files (never moved by guesswork), the add-a-file form and the brand name used in file names. */
+  function otherFilesSection() {
+    const rest = data.assets.filter((a) => a.kind !== "logo" && a.kind !== "font" && !sectionOf(a));
+    const groups = ["guideline", "document", "package", "other"].map((k) => [k, rest.filter((a) => a.kind === k)]).filter(([, list]) => list.length);
+    const body = [
+      h("p", { class: "adm-sub" }, "Guidelines, documents, packages and other files that aren’t part of the nine sections. The client sees them under “Documents and other files”. Use Edit → Show in section to place an older file in a section."),
+      canWrite() ? brandNameBox() : null,
+      canUpload() ? disclosure({ id: "br-add", title: "Add a file (guidelines, documents, packages…)", className: "adm-acc--sub", open: opened.has("br-add"), onToggle: toggled("br-add"), children: addForm() }) : null,
+      groups.map(([k, list]) => h("div", { class: "adm-brand__group" }, h("p", { class: "adm-brand__h3", text: `${KIND_LABEL[k]} (${list.length})` }), h("ul", { class: "adm-brand__list", "aria-label": KIND_LABEL[k] }, list.map((a) => assetRecord(a))))),
+      groups.length ? null : h("p", { class: "adm-muted" }, "No other files yet."),
+    ];
+    return section("br-assets", "Documents and other files", statusChip(rest.length, "file"), body);
   }
 
   /* ---------------------------------------------------------- colours and typography */
@@ -409,7 +453,7 @@ export async function render(orgId, ctx) {
           perform({ request: () => api(base + "/kit", { method: "PUT", body: { colours } }), success: "Colours saved." });
         } }, "Save colours")) : null,
     ];
-    return section("br-colours", "Colours", data.kit && data.kit.colours.length ? chip("plain", plural(data.kit.colours.length, "colour")) : chip("plain", "None yet"), body);
+    return section("br-s-colours", numbered(SECTION.colours), data.kit && data.kit.colours.length ? chip("plain", plural(data.kit.colours.length, "colour")) : chip("plain", "Not added yet"), [sectionIntro(SECTION.colours), ...body]);
   }
 
   function typographySection() {
@@ -429,7 +473,7 @@ export async function render(orgId, ctx) {
     };
     draw();
     const body = [
-      h("p", { class: "adm-sub" }, "Fonts for the logo, headings, subheadings and body text, with weights and usage guidance. Font files are added under Logos and brand files, and are downloadable only if you record their licence."),
+      h("p", { class: "adm-sub" }, "Fonts for the logo, headings, subheadings and body text, with weights and usage guidance. Font files are added below, and are downloadable only if you record their licence."),
       list, err,
       canWrite() ? h("div", { class: "adm-actions" },
         button("Add typeface", { onclick: () => { if (rows.length >= 12) return; rows.push({ role: "heading", family: "", weightsText: "", usage: "", source_url: "" }); draw(); list.querySelector("li:last-child input")?.focus(); } }),
@@ -440,7 +484,11 @@ export async function render(orgId, ctx) {
           perform({ request: () => api(base + "/kit", { method: "PUT", body: { typography } }), success: "Typography saved." });
         } }, "Save typography")) : null,
     ];
-    return section("br-type", "Typography", data.kit && data.kit.typography.length ? chip("plain", plural(data.kit.typography.length, "typeface")) : chip("plain", "None yet"), body);
+    const fonts = data.assets.filter((a) => a.kind === "font");
+    const fontBlock = h("div", { class: "adm-brand__group" }, h("p", { class: "adm-brand__h3", text: `Font files (${fonts.length})` }),
+      canUpload() ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "button", id: "br-font-up", onclick: openFontUpload }, "Add font file")) : null,
+      fonts.length ? h("ul", { class: "adm-brand__list", "aria-label": "Font files" }, fonts.map((a) => assetRecord(a))) : h("p", { class: "adm-muted" }, "No font files yet."));
+    return section("br-s-typography", numbered(SECTION.typography), data.kit && data.kit.typography.length ? chip("plain", plural(data.kit.typography.length, "typeface")) : fonts.length ? chip("plain", plural(fonts.length, "font file")) : chip("plain", "Not added yet"), [sectionIntro(SECTION.typography), ...body, fontBlock]);
   }
 
   /* ---------------------------------------------------------- client submissions */
@@ -552,7 +600,7 @@ export async function render(orgId, ctx) {
     const openRequests = data.requests.filter((r) => r.status === "new" || r.status === "contacted").length;
     if (first) {
       first = false;
-      opened.add("br-assets");
+      opened.add("br-s-logo");
       if (newUploads) opened.add("br-uploads");
       if (openRequests) opened.add("br-requests");
     }
@@ -572,7 +620,9 @@ export async function render(orgId, ctx) {
       h("a", { class: "adm-back", href: "/admin/clients/" + encodeURIComponent(orgId), "data-link": "" }, "← " + data.organization.name),
       h("div", { class: "adm-idhead" }, h("div", { class: "adm-idhead__text" }, h("span", { class: "eyebrow" }, "Client"), h("h1", { class: "adm-title", tabindex: "-1" }, "Branding"), h("p", { class: "adm-sub" }, `${data.organization.name}. Clients only see items you publish, and only while the kit is published.`)), h("div", { class: "adm-actions" }, publish)),
       live, tiles,
-      assetsSection(), coloursSection(), typographySection(), uploadsSection(), requestsSection(), storageSection(),
+      !canWrite() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at files, but not add, publish or delete them.") : !caps().storage ? h("p", { class: "adm-banner" }, "File storage isn’t available on this site, so files can’t be added or replaced. Colours and typography can still be set.") : null,
+      logoSection(), typographySection(), coloursSection(), taglineSection(), ...["imagery", "layout", "textures", "iconography", "style"].map((k) => fileSection(SECTION[k])),
+      otherFilesSection(), uploadsSection(), requestsSection(), storageSection(),
     ].filter(Boolean));
   }
 

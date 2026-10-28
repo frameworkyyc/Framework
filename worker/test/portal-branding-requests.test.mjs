@@ -61,10 +61,9 @@ test("an owner requests an empty section: the request is stored for the right or
   assert.equal(rowsOf(w, "SELECT count(*) n FROM activity_log WHERE action = 'service.requested' AND organization_id = ?", alpha.id)[0].n, 1);
   const html = await (await ann.get(res.headers.get("Location"))).text();
   assert.match(html, /Request sent\. Framework will follow up\./);
-  const logos = html.slice(html.indexOf('id="logos"'), html.indexOf('id="colours"'));
+  const logos = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
   assert.match(logos, /class="tag">Requested</); assert.ok(!/<summary class="btn/.test(logos), "no button while the request is open");
-  assert.match(logos, /<span class="acc__sum">Not added yet · Request open<\/span>/, "the closed row also says a request is open");
-  assert.match(html.slice(html.indexOf('id="colours"'), html.indexOf('id="typography"')), /<summary class="btn btn--small">Request<span/, "other sections keep their button");
+  assert.match(html.slice(html.indexOf('id="colours"'), html.indexOf('id="tagline"')), /<summary class="btn btn--small">Request<span/, "other sections keep their button");
 });
 
 test("no accidental duplicates: pressing it again, or twice at once, leaves exactly one open request and says so", async () => {
@@ -89,9 +88,9 @@ test("sections that already have files also offer 'Request additions or changes'
   await brand.setBrandKitStatus(w.db, alpha.id, "published", ADMIN);
   const html = await (await ann.get(base("alpha"))).text();
   const sec = (id, next) => html.slice(html.indexOf(`id="${id}"`), html.indexOf(`id="${next}"`));
-  assert.match(sec("logos", "colours"), /Download PNG/); assert.match(sec("logos", "colours"), /Request additions or changes/);
-  assert.match(sec("colours", "typography"), /data-copy="#0A0A0A"/); assert.match(sec("colours", "typography"), /Request additions or changes/);
-  assert.match(sec("typography", "guidelines"), /Nothing here yet/);
+  assert.match(sec("logo", "typography"), /Download PNG/); assert.match(sec("logo", "typography"), /Request additions or changes/);
+  assert.match(sec("colours", "tagline"), /data-copy="#0A0A0A"/); assert.match(sec("colours", "tagline"), /Request additions or changes/);
+  assert.match(sec("typography", "colours"), /Not added yet/);
   assert.equal((await ann.post(`${base("alpha")}/request`, { csrf: csrfOf(html), section: "brand-logos" })).status, 303);
   assert.match(await (await ann.get(base("alpha"))).text(), /class="tag">Requested</);
 });
