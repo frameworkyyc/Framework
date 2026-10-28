@@ -8,6 +8,7 @@ import { e } from "./ui.js";
 import { crumb } from "./guided.js";
 import { UPLOAD_CATEGORIES } from "./repo/brand.js";
 import { BRAND_REQUESTS } from "./brand-services.js";
+import { LOGO_VARIATIONS } from "../../admin/assets/logo-variations.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const MB = 1024 * 1024;
@@ -96,17 +97,7 @@ const list = (items) => items.join(" · ");
 
 /* ------------------------------------------------------------------ the four logo variations */
 
-/**
- * The four logo variations every client sees, in this order. Admin assigns each logo file to one of them (its "Logo type"); the stored value is the logo role (icon is the
- * Sub-mark). `example` is Framework's own logo for that variation, a static public image shown only while the client has no published file for it (see exampleCard).
- */
-const EXAMPLE_DIR = "/assets/img/logo-examples";
-export const LOGO_VARIATIONS = Object.freeze([
-  Object.freeze({ key: "primary", no: "01", title: "Primary Logo", desc: "The main brand identity, typically used for websites, marketing materials, and official communications.", example: `${EXAMPLE_DIR}/framework-primary.png`, alt: "Example: the Framework primary logo, a square symbol above the word FRAMEWORK" }),
-  Object.freeze({ key: "secondary", no: "02", title: "Secondary Logo", desc: "An alternative logo arrangement, useful when the primary layout doesn’t fit the available space.", example: `${EXAMPLE_DIR}/framework-secondary.png`, alt: "Example: the Framework secondary logo, the square symbol beside the word FRAMEWORK on one line" }),
-  Object.freeze({ key: "simplified", no: "03", title: "Simplified Logo", desc: "A reduced wordmark-only variation for applications where a cleaner identity is appropriate.", example: `${EXAMPLE_DIR}/framework-simplified.png`, alt: "Example: the Framework simplified logo, the word FRAMEWORK alone" }),
-  Object.freeze({ key: "submark", no: "04", title: "Sub-mark", desc: "A compact brand symbol for favicons, social media profiles, watermarks, and small-scale applications.", example: `${EXAMPLE_DIR}/framework-submark.png`, alt: "Example: the Framework sub-mark, the square F symbol alone" }),
-]);
+export { LOGO_VARIATIONS };
 const ROLE_TO_VARIATION = Object.freeze({ primary: "primary", secondary: "secondary", simplified: "simplified", icon: "submark" });
 /** Which variation a logo file belongs to, from the type Admin chose, or null when none was chosen (older files): those are listed separately, never guessed into a card. */
 export const variationOf = (a) => (a && a.kind === "logo" ? ROLE_TO_VARIATION[a.logoRole] || null : null);

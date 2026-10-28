@@ -766,3 +766,30 @@ a.adm-tile--link { display: flex; flex-direction: column; gap: 0; }
 @media (max-width: 560px) { .adm-todo__item { flex-wrap: wrap; } .adm-kpi { padding: 16px 16px 18px; } }
 @media (max-width: 340px) { .adm-kpis { grid-template-columns: minmax(0, 1fr); } }
 .adm-dash__cols > .adm-section { margin-top: 0; margin-bottom: 48px; } /* the columns line up: no sibling spacing between the two cells of a row */
+
+/* ---------- Branding: the four logo cards (same look as the client's Branding page) ---------- */
+
+.adm-lv-grid { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px 20px; align-items: start; }
+@media (min-width: 600px) { .adm-lv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .adm-lv-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.adm-lv { display: flex; flex-direction: column; min-width: 0; background: var(--paper); }
+.adm-lv__stage { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 16 / 9; margin: 0; padding: 0; background: var(--paper); border: 1px solid var(--hairline); border-radius: 0; color: var(--ink); overflow: hidden; font: inherit; }
+button.adm-lv__stage { cursor: pointer; }
+button.adm-lv__stage:hover { border-color: var(--ink); }
+.adm-lv__stage img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.adm-lv__stage--logo { padding: 14px; }
+.adm-lv__stage--logo img { max-width: 100%; max-height: 100%; width: auto; height: auto; }
+.adm-lv__stage--dark { background: var(--ink); border-color: var(--ink); }
+.adm-lv__stage--file { padding: 14px; text-align: center; }
+.adm-lv__body { display: flex; flex-direction: column; gap: 8px; padding: 16px 0 0; min-width: 0; }
+.adm-lv__no { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .14em; color: var(--slate); }
+.adm-lv__title { margin: 0; font-weight: 600; font-size: 20px; line-height: 1.15; letter-spacing: -0.01em; }
+.adm-lv__status, .adm-lv__meta { margin: 0; font-size: 14px; color: var(--slate); overflow-wrap: anywhere; }
+.adm-lv__desc { margin: 0; font-size: 15px; color: var(--slate); }
+.adm-lv__actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+.adm-lv__manage { align-self: flex-start; margin: 0; padding: 0; min-height: 32px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.adm-lvwrap > .adm-acc { margin-top: 24px; }
+.adm-lvwrap > .adm-lv-grid + .adm-acc { margin-top: 32px; }
+.adm-lvdialog [hidden] { display: none !important; }
+.adm-lvwrap .adm-brand__group { margin-top: 40px; }
+.adm-lvdialog { max-width: 560px; max-height: calc(100vh - 32px); overflow-y: auto; }
