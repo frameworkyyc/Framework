@@ -7,7 +7,7 @@ import { h, api, confirmDialog, errorState, fmtDate, fmtDateTime } from "./ui.js
 import { disclosure, chip, plural, goTo } from "./client-dashboard.js";
 import { buildBrandFileName, extensionOf } from "./brand-names.js";
 import { LOGO_VARIATIONS } from "./logo-variations.js";
-import { BRAND_SECTIONS, SECTION_FILE_KEYS, sectionOf } from "./brand-sections.js";
+import { BRAND_SECTIONS, SECTION_FILE_KEYS, TYPE_SLOT_DEFS, sectionOf } from "./brand-sections.js";
 
 const KIND_LABEL = { logo: "Logos", guideline: "Guidelines", document: "Documents", font: "Fonts", package: "Packages", other: "Other files" };
 const KIND_ONE = { logo: "Logo", guideline: "Guideline", document: "Document", font: "Font", package: "Package", other: "Other file" };
@@ -456,39 +456,53 @@ export async function render(orgId, ctx) {
     return section("br-s-colours", numbered(SECTION.colours), data.kit && data.kit.colours.length ? chip("plain", plural(data.kit.colours.length, "colour")) : chip("plain", "Not added yet"), [sectionIntro(SECTION.colours), ...body]);
   }
 
+  const SLOT_ROLE = { primary: "heading", secondary: "body", accent: "other" }; // the older "used for" value kept alongside a slot, so nothing that reads it breaks
+  const slotName = (k) => (TYPE_SLOT_DEFS.find((d) => d.key === k) || {}).title || "";
+
+  /** 02 Typography: the three typeface slots (Primary, Secondary, Accent), each with family, weights, styles, usage and its font files; older typefaces without a slot stay listed and can be given one. */
   function typographySection() {
-    const rows = data.kit ? data.kit.typography.map((t) => ({ ...t, weightsText: (t.weights || []).join(", ") })) : [];
+    const fonts = data.assets.filter((a) => a.kind === "font");
+    const fontIds = new Set(fonts.map((a) => a.id));
+    const rows = data.kit ? data.kit.typography.map((t) => ({ ...t, slot: t.slot || "", styles: t.styles || [], file_ids: (t.file_ids || []).filter((id) => fontIds.has(id)), weightsText: (t.weights || []).join(", ") })) : [];
     const list = h("ul", { class: "adm-brand__list adm-brand__list--tight" });
     const err = h("p", { class: "adm-field__error", role: "alert", hidden: true });
+    const actions = h("div", { class: "adm-actions" });
     const draw = () => {
       list.replaceChildren(...rows.map((t, i) => {
+        const title = h("span", { class: "adm-brand__rowtitle", text: t.slot ? slotName(t.slot) : `Other typeface ${i + 1}` });
+        const slot = select(`br-t-slot-${i}`, Object.fromEntries(TYPE_SLOT_DEFS.map((d) => [d.key, d.title + (d.optional ? " (optional)" : "")])), t.slot, { blank: "Other (not one of the three)" });
         const role = select(`br-t-role-${i}`, TYPE_ROLE, t.role || "heading"); role.addEventListener("change", () => { t.role = role.value; });
+        const roleBox = labelled(`br-t-role-${i}`, "Used for", role); roleBox.hidden = Boolean(t.slot);
+        slot.addEventListener("change", () => { t.slot = slot.value; roleBox.hidden = Boolean(t.slot); title.textContent = t.slot ? slotName(t.slot) : `Other typeface ${i + 1}`; });
         const family = h("input", { id: `br-t-fam-${i}`, class: "input", type: "text", maxlength: "80", value: t.family || "", autocomplete: "off", oninput: () => { t.family = family.value; } });
         const weights = h("input", { id: `br-t-w-${i}`, class: "input", type: "text", maxlength: "60", value: t.weightsText || "", autocomplete: "off", inputmode: "numeric", oninput: () => { t.weightsText = weights.value; } });
+        const styles = h("div", { class: "adm-brand__stack" }, ["normal", "italic"].map((k) => { const c = check(`br-t-st-${k}-${i}`, k === "normal" ? "Normal" : "Italic", t.styles.includes(k)); c.input.addEventListener("change", () => { t.styles = c.input.checked ? [...new Set([...t.styles, k])] : t.styles.filter((x) => x !== k); }); return c.node; }));
         const usage = h("input", { id: `br-t-use-${i}`, class: "input", type: "text", maxlength: "300", value: t.usage || "", autocomplete: "off", oninput: () => { t.usage = usage.value; } });
         const source = h("input", { id: `br-t-src-${i}`, class: "input", type: "url", maxlength: "300", value: t.source_url || "", autocomplete: "off", spellcheck: "false", oninput: () => { t.source_url = source.value; } });
-        return h("li", { class: "adm-brand__row" }, h("div", { class: "adm-brand__rowhead" }, h("span", { class: "adm-brand__rowtitle", text: `Typeface ${i + 1}` }), button("Remove", { "aria-label": `Remove typeface ${i + 1}`, onclick: () => { rows.splice(i, 1); draw(); } })),
-          h("div", { class: "adm-brand__grid" }, labelled(`br-t-role-${i}`, "Used for", role), labelled(`br-t-fam-${i}`, "Font family", family), labelled(`br-t-w-${i}`, "Weights", weights, "For example 400, 600, 700"), labelled(`br-t-use-${i}`, "Usage guidance", usage), labelled(`br-t-src-${i}`, "Where to get it (optional link)", source, "Must start with https://")));
+        const files = fonts.length ? h("div", { class: "adm-brand__stack" }, fonts.slice(0, 40).map((a) => { const c = check(`br-t-f-${i}-${a.id.slice(0, 8)}`, `${a.title} (${a.format.toUpperCase()})${a.downloadable ? "" : " — view only, not used for the specimen"}`, t.file_ids.includes(a.id)); c.input.addEventListener("change", () => { t.file_ids = c.input.checked ? [...new Set([...t.file_ids, a.id])].slice(0, 6) : t.file_ids.filter((x) => x !== a.id); }); return c.node; })) : h("p", { class: "adm-muted" }, "No font files uploaded yet. Add one below.");
+        return h("li", { class: "adm-brand__row" }, h("div", { class: "adm-brand__rowhead" }, title, button("Remove", { "aria-label": `Remove ${t.slot ? slotName(t.slot) : "typeface " + (i + 1)}`, onclick: () => { rows.splice(i, 1); draw(); } })),
+          h("div", { class: "adm-brand__grid" }, labelled(`br-t-slot-${i}`, "Role", slot, "Primary: headings and titles. Secondary: body text. Accent: occasional decorative use. One family may fill several roles."), roleBox, labelled(`br-t-fam-${i}`, "Font family", family), labelled(`br-t-w-${i}`, "Approved weights", weights, "For example 400, 600, 700"), h("fieldset", { class: "adm-field" }, h("legend", { text: "Approved styles" }), styles), labelled(`br-t-use-${i}`, "Short usage description", usage), labelled(`br-t-src-${i}`, "Where to get it (optional link)", source, "Must start with https://"),
+            h("fieldset", { class: "adm-field" }, h("legend", { text: "Font files" }), h("p", { class: "adm-field__hint", text: "The client sees a specimen in the real font, and can download the file, only when its licence allows downloads. With none selected, files whose name contains the family are used." }), files)));
       }));
+      actions.replaceChildren(...[...TYPE_SLOT_DEFS.filter((d) => !rows.some((r) => r.slot === d.key)).map((d) => button(`Add ${d.title}`, { onclick: () => { if (rows.length >= 12) return; rows.push({ role: SLOT_ROLE[d.key], slot: d.key, family: "", weightsText: "", styles: [], usage: "", source_url: "", file_ids: [] }); draw(); list.querySelector("li:last-child input")?.focus(); } })),
+        button("Add other typeface", { onclick: () => { if (rows.length >= 12) return; rows.push({ role: "other", slot: "", family: "", weightsText: "", styles: [], usage: "", source_url: "", file_ids: [] }); draw(); list.querySelector("li:last-child input")?.focus(); } }),
+        h("button", { class: "btn btn--primary adm-small", type: "button", onclick: () => {
+          err.hidden = true;
+          const typography = rows.map((t) => ({ role: t.slot ? SLOT_ROLE[t.slot] : t.role || "other", slot: t.slot || null, family: (t.family || "").trim(), weights: String(t.weightsText || "").split(/[\s,]+/).filter(Boolean).map(Number), styles: t.styles, usage: (t.usage || "").trim() || null, source_url: (t.source_url || "").trim() || null, file_ids: t.file_ids }));
+          if (typography.some((t) => !t.family || t.weights.some((w) => !Number.isInteger(w)))) { err.textContent = ERROR_TEXT.invalid_typography; err.hidden = false; return; }
+          perform({ request: () => api(base + "/kit", { method: "PUT", body: { typography } }), success: "Typography saved. The client sees it once the kit is published." });
+        } }, "Save typography")].filter(Boolean));
     };
     draw();
     const body = [
-      h("p", { class: "adm-sub" }, "Fonts for the logo, headings, subheadings and body text, with weights and usage guidance. Font files are added below, and are downloadable only if you record their licence."),
-      list, err,
-      canWrite() ? h("div", { class: "adm-actions" },
-        button("Add typeface", { onclick: () => { if (rows.length >= 12) return; rows.push({ role: "heading", family: "", weightsText: "", usage: "", source_url: "" }); draw(); list.querySelector("li:last-child input")?.focus(); } }),
-        h("button", { class: "btn btn--primary adm-small", type: "button", onclick: () => {
-          err.hidden = true;
-          const typography = rows.map((t) => ({ role: t.role || "heading", family: (t.family || "").trim(), weights: String(t.weightsText || "").split(/[\s,]+/).filter(Boolean).map(Number), usage: (t.usage || "").trim() || null, source_url: (t.source_url || "").trim() || null }));
-          if (typography.some((t) => !t.family || t.weights.some((w) => !Number.isInteger(w)))) { err.textContent = ERROR_TEXT.invalid_typography; err.hidden = false; return; }
-          perform({ request: () => api(base + "/kit", { method: "PUT", body: { typography } }), success: "Typography saved." });
-        } }, "Save typography")) : null,
+      sectionIntro(SECTION.typography),
+      h("p", { class: "adm-sub" }, "Assign each approved typeface to a role. Nothing is invented: a role you leave empty shows as “Not added yet” (the Accent role as optional). Older typefaces with no role stay listed for the client under “Other typefaces”."),
+      list, err, canWrite() ? actions : null,
     ];
-    const fonts = data.assets.filter((a) => a.kind === "font");
     const fontBlock = h("div", { class: "adm-brand__group" }, h("p", { class: "adm-brand__h3", text: `Font files (${fonts.length})` }),
       canUpload() ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "button", id: "br-font-up", onclick: openFontUpload }, "Add font file")) : null,
       fonts.length ? h("ul", { class: "adm-brand__list", "aria-label": "Font files" }, fonts.map((a) => assetRecord(a))) : h("p", { class: "adm-muted" }, "No font files yet."));
-    return section("br-s-typography", numbered(SECTION.typography), data.kit && data.kit.typography.length ? chip("plain", plural(data.kit.typography.length, "typeface")) : fonts.length ? chip("plain", plural(fonts.length, "font file")) : chip("plain", "Not added yet"), [sectionIntro(SECTION.typography), ...body, fontBlock]);
+    return section("br-s-typography", numbered(SECTION.typography), data.kit && data.kit.typography.length ? chip("plain", plural(data.kit.typography.length, "typeface")) : fonts.length ? chip("plain", plural(fonts.length, "font file")) : chip("plain", "Not added yet"), [...body, fontBlock]);
   }
 
   /* ---------------------------------------------------------- client submissions */

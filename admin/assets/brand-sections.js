@@ -28,3 +28,10 @@ export const sectionOf = (a) => {
   const m = /^section-([a-z]+)$/.exec(a.variantKey);
   return m && SECTION_FILE_KEYS.includes(m[1]) ? m[1] : null;
 };
+
+/* The three typeface slots of 02 Typography, shared by the client page and Admin. A brand may use one family for several slots; only the Primary is expected. */
+export const TYPE_SLOT_DEFS = Object.freeze([
+  Object.freeze({ key: "primary", no: "01", title: "Primary Typeface", optional: false, desc: "For headings, titles and prominent brand messaging." }),
+  Object.freeze({ key: "secondary", no: "02", title: "Secondary Typeface", optional: false, desc: "For body text, paragraphs, descriptions and everyday communications." }),
+  Object.freeze({ key: "accent", no: "03", title: "Accent Typeface", optional: true, desc: "Used sparingly for decorative or specialized applications, such as editorial quotes, packaging, promotional materials or distinctive brand elements." }),
+]);

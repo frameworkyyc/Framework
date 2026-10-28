@@ -274,6 +274,10 @@ export async function handleBrandingApi(request, env, principal, path, deps = {}
       const read = await readJson(request, ["colours", "typography", "brand_name"]);
       if (read.response) return read.response;
       if (read.body.colours === undefined && read.body.typography === undefined && !("brand_name" in read.body)) return err(422, "invalid_input", "Nothing to save.");
+      if (Array.isArray(read.body.typography)) { // a typeface may only point at this organization's own live font files
+        const own = await brand.liveFontAssetIds(db, org.id);
+        if (read.body.typography.some((t) => t && Array.isArray(t.file_ids) && t.file_ids.some((id) => !own.has(String(id).toLowerCase())))) return err(422, "invalid_typography", "The change was not made.");
+      }
       const r = await brand.saveBrandKit(db, org.id, { colours: read.body.colours, typography: read.body.typography, brandName: "brand_name" in read.body ? read.body.brand_name : undefined }, actor, { now });
       return r.ok ? json({ ok: true, kit: (({ status, colours, typography, brandName, updatedAt, publishedAt }) => ({ status, colours, typography, brandName, updatedAt, publishedAt }))(await brand.getBrandKit(db, org.id)) }) : fromFailure(r);
     }

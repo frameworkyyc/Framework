@@ -21,7 +21,7 @@ export const WORKOS_ORIGIN = "https://api.workos.com";
 export const PORTAL_CSP = [
   "default-src 'none'",
   "style-src 'self' https://api.fontshare.com",
-  "font-src https://cdn.fontshare.com",
+  "font-src 'self' https://cdn.fontshare.com", // 'self': the Branding page shows a specimen in the client's own licensed font file, served by this site
   "img-src 'self' data:",
   "form-action 'self' https://api.workos.com",
   "base-uri 'none'",

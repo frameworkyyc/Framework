@@ -755,3 +755,42 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-more .h3 { margin: var(--space-4) 0 var(--space-2); }
 .bk-more__group > .brq, .bk-more__group > .brq__status { margin-top: var(--space-3); }
 .bk-more > .h2 { margin: 0 0 8px; }
+
+/* 02 Typography: three typeface cards in the Logo card style (16:9 frame, thin #E0E0E0 edge, no card outline), then the Typography Hierarchy. A specimen is set in the
+   client's real font only when its file is available (the generated fonts.css defines .sp-primary/.sp-secondary/.sp-accent); otherwise it is flagged as a fallback preview. */
+.tf-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px 24px; align-items: start; }
+@media (min-width: 900px) { .tf-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tf-card { display: flex; flex-direction: column; min-width: 0; background: var(--paper); }
+.tf-card__stage { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; background: var(--paper); border: 1px solid var(--hairline); color: var(--ink); overflow: hidden; padding: 12px; }
+.tf-card__aa { margin: 0; font-size: clamp(30px, 4.2vw, 46px); line-height: 1.1; text-align: center; overflow-wrap: anywhere; }
+.tf-card__stage--fallback .tf-card__aa { font-family: var(--font-display); }
+.tf-card__flag { position: absolute; left: 10px; bottom: 10px; background: var(--paper); }
+.tf-card__body { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; min-width: 0; }
+.tf-card__family { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.15; overflow-wrap: anywhere; }
+.tf-card__chars { border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); padding: 10px 0; font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; }
+.tf-card__chars p { margin: 0; }
+.tf-card__weight { margin: 0; font-size: 17px; line-height: 1.3; overflow-wrap: anywhere; }
+.tf-card__wname { display: block; font-family: var(--font-body); font-weight: 400; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--slate); }
+.tf-card__note { margin: 0; }
+.tf-card--empty .tf-card__stage { border-style: solid; }
+.tf-card__body p { margin: 0; }
+.tf-hier { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--ink); }
+.tf-hier__title { margin: 0 0 8px; font-family: var(--font-display); font-weight: 600; font-size: clamp(24px, 3vw, 32px); letter-spacing: -0.015em; }
+.tf-hier p { margin: 0 0 8px; max-width: 46em; }
+.tf-levels { margin-top: var(--space-3); border-top: 1px solid var(--hairline); }
+.tf-level { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px var(--space-3); padding: 20px 0; border-bottom: 1px solid var(--hairline); }
+@media (min-width: 760px) { .tf-level { grid-template-columns: 220px minmax(0, 1fr); align-items: baseline; } }
+.tf-level__meta p { margin: 0; }
+.tf-level__name { font-weight: 600; }
+.tf-level__sample { margin: 0; overflow-wrap: anywhere; font-family: var(--font-display); }
+.tf-l-h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.05; letter-spacing: -0.02em; }
+.tf-l-h2 { font-size: clamp(26px, 4.4vw, 40px); line-height: 1.1; letter-spacing: -0.015em; }
+.tf-l-h3 { font-size: clamp(21px, 3vw, 28px); line-height: 1.2; }
+.tf-l-body { font-family: var(--font-body); font-size: 17px; line-height: 1.55; max-width: 38em; }
+.tf-l-caption { font-family: var(--font-body); font-size: 13px; line-height: 1.4; letter-spacing: .04em; text-transform: uppercase; }
+.fw-w100 { font-weight: 100; } .fw-w200 { font-weight: 200; } .fw-w300 { font-weight: 300; } .fw-w400 { font-weight: 400; } .fw-w500 { font-weight: 500; }
+.fw-w600 { font-weight: 600; } .fw-w700 { font-weight: 700; } .fw-w800 { font-weight: 800; } .fw-w900 { font-weight: 900; }
+.bk-price { margin: var(--space-3) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--hairline); max-width: 40em; }
+.bk-price__name { margin: 0 0 4px; font-family: var(--font-display); font-weight: 600; font-size: 20px; }
+.bk-price__label { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
+.bk-price p { margin: 0 0 8px; }
