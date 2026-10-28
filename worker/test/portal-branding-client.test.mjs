@@ -75,13 +75,14 @@ test("no brand kit: all nine numbered sections show in order, each with a clean 
   const secs = [...html.matchAll(/<section class="bk-sec" id="(\w+)"[^>]*><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">(\d\d)<\/p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-\w+"><span class="visually-hidden">\d\d <\/span>([^<]+)<\/h2>/g)].map((m) => m.slice(1));
   assert.deepEqual(secs, [["logo", "01", "Logo"], ["typography", "02", "Typography"], ["colours", "03", "Brand Colours"], ["tagline", "04", "Tagline"], ["imagery", "05", "Brand Imagery"], ["layout", "06", "Layout System"], ["textures", "07", "Textures"], ["iconography", "08", "Iconography"], ["style", "09", "Design Style"]], "all nine, in order, with their two-digit numbers");
   assert.equal([...html.matchAll(/<p class="bk-sec__desc muted">/g)].length, 9, "each has a short description");
-  assert.equal([...html.matchAll(/<p class="bk-empty__title">Not added yet<\/p>/g)].length, 10, "eight empty sections (Logo shows examples instead) and the two other-files groups");
+  assert.equal([...html.matchAll(/<p class="bk-empty__title">Not added yet<\/p>/g)].length, 2, "only the two other-files groups; every section shows an example instead");
+  assert.equal([...html.matchAll(/<span class="bk-eg__tag">Example: Framework<\/span>/g)].length, 7, "seven example panels (Logo and Typography show example cards)"); assert.equal([...html.matchAll(/tf-card--example/g)].length, 3);
   assert.match(html, /<nav class="bk-nav" aria-label="Brand kit sections">/); assert.equal([...html.matchAll(/<li><a href="#\w+"><span class="bk-nav__no"/g)].length, 9);
   assert.equal([...html.matchAll(/<summary class="btn btn--small">Request<span/g)].length, 5, "a Request button where a request exists: Logo, Typography, Colours, guidelines and additional assets");
   assert.match(html, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   assert.match(html, /Need a complete brand identity\?/); assert.match(html, /Request full brand kit/);
-  assert.ok(!/logo-grid|swatches|Download (SVG|PNG|PDF|WEBP|JPG)|lv-card--has/.test(html), "no library chrome and no download buttons");
-  assert.equal([...html.matchAll(/lv-card--example/g)].length, 4, "the four variation cards are shown as examples"); assert.equal([...html.matchAll(/<span class="tag">Not added yet<\/span>/g)].length, 4);
+  assert.ok(!/logo-grid|data-copy|Download (SVG|PNG|PDF|WEBP|JPG)|lv-card--has/.test(html), "no library chrome, no copy buttons and no download buttons");
+  assert.equal([...html.matchAll(/lv-card--example/g)].length, 4, "the four variation cards are shown as examples"); assert.equal([...html.matchAll(/<span class="tag">Not added yet<\/span>/g)].length, 14, "4 logo cards + 3 typeface cards + 7 example panels");
   const m = await (await mia.get(base("alpha"))).text();
   assert.ok(!/<summary class="btn/.test(m), "a member has no request buttons");
   assert.match(m, /Ask an owner of your organization to send a request for this section/);
@@ -92,7 +93,7 @@ test("a DRAFT kit (even with published assets) shows the empty sections and noth
   const id = await deliver(alpha, logo, "x.png", S.png(), true);
   await brand.saveBrandKit(w.db, alpha.id, { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }] }, ADMIN);
   const html = await (await ann.get(base("alpha"))).text();
-  assert.match(html, /Not added yet/); assert.ok(!/data-copy|swatch/.test(html));
+  assert.match(html, /Not added yet/); assert.ok(!/data-copy/.test(html) && /swatch--example/.test(html), "the client kit is a draft: only the Framework example is shown, with no copy button");
   assert.equal((await ann.get(`${base("alpha")}/files/${id}`)).status, 404);
 });
 
@@ -130,7 +131,7 @@ test("an unpublished kit's colours never reach the page after a kit is un-publis
   await publishKit(alpha);
   assert.match(await (await ann.get(base("alpha"))).text(), /data-copy="#0A0A0A"/);
   await brand.setBrandKitStatus(w.db, alpha.id, "draft", ADMIN);
-  assert.ok(!/data-copy|swatch/.test(await (await ann.get(base("alpha"))).text()));
+  assert.ok(!/data-copy/.test(await (await ann.get(base("alpha"))).text()));
 });
 
 test("the brand name appears in the introduction when one is set", async () => {
