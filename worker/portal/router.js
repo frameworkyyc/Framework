@@ -6,7 +6,7 @@
  * portal host. When it IS enabled but misconfigured it fails closed with a generic 503 for portal paths.
  */
 import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled, servicesEnabled } from "./config.js";
-import { errorPage, newRef, redirect, checkSameSiteMutation } from "./http.js";
+import { errorPage, newRef, redirect, checkSameSiteMutation, securityHeaders } from "./http.js";
 import { handleLogin, handleCallback, handleLogout } from "./auth.js";
 import { requireSession, requireOrgAccess, dbCall, Unavailable, unavailablePage, notFoundPage } from "./guard.js";
 import { checkRateLimit } from "./ratelimit.js";
@@ -36,6 +36,7 @@ import { invoiceStatusLine, supportStatusLine } from "./services-live.js";
 import * as supportRepo from "./repo/support.js";
 import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./support-files.js";
 import { dispatchNotifications } from "./service-notifications.js";
+import { fontCss } from "./brand-type.js";
 import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, clientRequestService, limitsFor } from "./brand-files.js";
 
 /**
@@ -323,7 +324,7 @@ async function downloadBrandFile(ctx, a, id, kind) {
   const deps = brandDeps(ctx);
   const res = kind === "upload"
     ? await clientDownloadUpload(deps, { ...who(a), uploadId: id })
-    : await clientDownloadAsset(deps, { ...who(a), assetId: id, inline: viewFilters(ctx.url).preview });
+    : await clientDownloadAsset(deps, { ...who(a), assetId: id, inline: viewFilters(ctx.url).preview, font: viewFilters(ctx.url).font });
   return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
 }
 
@@ -345,6 +346,13 @@ const BRANDING_ROUTES = [
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads$/, action: "branding.view", postAction: "branding.upload", bucket: "branding", maxBody: (ctx) => limitsFor(brandDeps(ctx)).maxFileBytes + UPLOAD_FORM_OVERHEAD, run: (ctx, a) => brandingUploadsView(ctx, a), post: (ctx, a) => uploadBrandFile(ctx, a) },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads\/([^/]+)\/download$/, action: "branding.view", run: (ctx, a, id) => downloadBrandFile(ctx, a, id, "upload") },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads\/([^/]+)\/delete$/, action: "branding.view", postAction: "branding.delete_upload", bucket: "branding", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/branding/uploads`), post: (ctx, a, id) => removeBrandUpload(ctx, a, id) },
+  { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/fonts\.css$/, action: "branding.view", run: async (ctx, a) => {
+      // The stylesheet that lets the Typography section show a specimen in the client's own licensed font files (only those they may also download). Empty when there is none.
+      const brand = await getClientBrand(ctx.db, a.membership.organizationId);
+      const css = brand.published ? fontCss(`/portal/o/${encodeURIComponent(a.membership.slug)}`, brand.typography, (brand.assets || []).filter((x) => x.kind === "font")) : "";
+      return withPortalHeaders(new Response(css, { status: 200, headers: securityHeaders({ "Content-Type": "text/css; charset=utf-8" }) }));
+    },
+  },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/files\/([^/]+)$/, action: "branding.view", run: (ctx, a, id) => downloadBrandFile(ctx, a, id, "asset") },
 ];
 

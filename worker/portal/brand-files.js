@@ -92,12 +92,13 @@ export async function clientDownloadUpload(deps, { role, organizationId, userId,
 }
 
 /** Download of a published deliverable. Not published (asset or kit), deleted, another organization's, or an unlicensed font: all the same "not_found". */
-export async function clientDownloadAsset(deps, { role, organizationId, userId, assetId, inline = false }) {
+export async function clientDownloadAsset(deps, { role, organizationId, userId, assetId, inline = false, font = false }) {
   if (!can(role, "branding.view")) return denied();
   const row = await brand.getClientBrandAsset(deps.db, organizationId, assetId);
   if (!row) return fail("not_found");
   if (inline && row.kind !== "logo" && !sectionOf(row)) return fail("not_found"); // only logo files and files placed in a brand section are ever shown as pictures
-  return stream(deps, { organizationId, row, actorType: "client", actorRef: userId, entityType: "brand_asset", inline });
+  if (font && row.kind !== "font") return fail("not_found"); // ?font=1 is the page loading a font for its specimen: fonts only (an unlicensed font is already not found above), and not counted as a download
+  return stream(deps, { organizationId, row, actorType: "client", actorRef: userId, entityType: "brand_asset", inline, record: !font });
 }
 
 export async function clientRequestService(deps, { role, organizationId, userId, serviceKey, note }) {

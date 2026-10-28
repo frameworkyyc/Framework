@@ -342,7 +342,7 @@ test("the nine sections are one shared catalogue: exact numbers, names and order
   assert.deepEqual(BRAND_SECTIONS.map((d) => [d.no, d.key, d.title]), SECTIONS);
   for (const d of BRAND_SECTIONS) { assert.ok(d.desc.length > 20 && d.desc.length < 140, d.key); assert.equal(d.id, d.key); }
   const ui = read("admin/assets/branding.js");
-  assert.match(ui, /import \{ BRAND_SECTIONS, SECTION_FILE_KEYS, sectionOf \} from "\.\/brand-sections\.js"/);
+  assert.match(ui, /import \{ BRAND_SECTIONS, SECTION_FILE_KEYS, TYPE_SLOT_DEFS, sectionOf \} from "\.\/brand-sections\.js"/);
   assert.match(ui, /logoSection\(\), typographySection\(\), coloursSection\(\), taglineSection\(\), \.\.\.\["imagery", "layout", "textures", "iconography", "style"\]\.map/, "Admin lists the same nine, in order");
   assert.ok(ui.indexOf("logoSection(), typographySection()") < ui.lastIndexOf("otherFilesSection()"), "documents and other files come after the nine");
   const s = await setup();
@@ -361,7 +361,7 @@ test("empty sections: every section but Logo (which shows its four examples) say
     const sec = sectionHtml(html, d.key);
     assert.ok(sec.includes('<div class="bk-empty"><p class="bk-empty__title">Not added yet</p>'), d.key);
     assert.ok(sec.includes(d.empty.replace(/’/g, "’")), d.key + " empty sentence");
-    assert.ok(!/<a |Download/.test(sec), d.key + " has no downloads");
+    assert.ok(!/Download/.test(sec) && (d.key === "typography" || !/<a /.test(sec)), d.key + " has no downloads (Typography may offer to share existing fonts)");
   }
 });
 
@@ -440,4 +440,161 @@ test("requests, uploads and permissions are unchanged by the nine-section layout
   assert.match(html, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   assert.match(await (await s.mia.get(base)).text(), /Ask an owner of your organization/);
   assert.equal((await s.bob.get("/portal/o/alpha/branding")).status, 404, "another organization still can't open it");
+});
+
+/* ------------------------------------------------------------------ 02 Typography: three slots, specimens, hierarchy; pricing presentation (inactive) */
+
+const TF = (extra = {}) => ({ role: "heading", family: "Switzer", weights: [400, 700], usage: "Headlines and titles", source_url: null, ...extra });
+const saveType = (s, org, typography) => s.call(`/clients/${org.id}/branding/kit`, { method: "PUT", json: { typography } });
+const font = (s, org, title, extra = {}) => s.upload(org, { kind: "font", title, downloadable: true, license_note: "OFL", published: true, ...extra }, title.replace(/\W+/g, "-") + ".ttf", S.ttf());
+const publishOnly = async (s, org) => { assert.ok((await brand.saveBrandKit(s.w.db, org.id, {}, ADMIN)).ok); assert.ok((await brand.setBrandKitStatus(s.w.db, org.id, "published", ADMIN)).ok); };
+
+test("typeface records: a slot, styles and font files are optional and validated; older records still validate and gain empty values; one slot can't be used twice", () => {
+  const ok = (l) => brand.normaliseTypography(l);
+  const legacy = ok([{ role: "heading", family: "Switzer", weights: [400, 600], usage: "x", source_url: null }]);
+  assert.ok(legacy.ok); assert.deepEqual(legacy.value[0], { family: "Switzer", role: "heading", slot: null, weights: [400, 600], styles: [], usage: "x", source_url: null, file_ids: [] });
+  const id = "11111111-1111-4111-8111-111111111111";
+  const full = ok([TF({ slot: "primary", styles: ["italic", "normal"], file_ids: [id.toUpperCase()] }), TF({ family: "Switzer", role: "body", slot: "secondary" })]);
+  assert.ok(full.ok, "one family may fill several roles"); assert.deepEqual(full.value[0].styles, ["normal", "italic"]); assert.deepEqual(full.value[0].file_ids, [id]);
+  for (const bad of [{ slot: "tertiary" }, { styles: ["bold"] }, { file_ids: ["not-an-id"] }, { file_ids: new Array(7).fill(id) }]) assert.equal(ok([TF(bad)]).ok, false, JSON.stringify(bad));
+  assert.equal(ok([TF({ slot: "primary" }), TF({ family: "Other", slot: "primary" })]).ok, false, "a slot holds one typeface");
+});
+
+test("Admin assigns typefaces to Primary, Secondary and Accent and picks their font files; a file of another client or a deleted file is refused; removing a typeface leaves the rest", async () => {
+  const s = await setup(); await publishOnly(s, s.A);
+  const mine = (await font(s, s.A, "Switzer Regular")).json.id, theirs = (await font(s, s.B, "Beta Sans")).json.id;
+  assert.equal((await saveType(s, s.A, [TF({ slot: "primary", file_ids: [theirs] })])).status, 422, "another organization's file");
+  assert.equal((await saveType(s, s.A, [TF({ slot: "primary", file_ids: ["99999999-9999-4999-8999-999999999999"] })])).status, 422, "an unknown file");
+  const saved = await saveType(s, s.A, [TF({ slot: "primary", file_ids: [mine] }), TF({ family: "Inter", role: "body", slot: "secondary", weights: [400] }), TF({ family: "Playfair", role: "other", slot: "accent", weights: [400], styles: ["italic"] })]);
+  assert.equal(saved.status, 200, JSON.stringify(saved.json));
+  const view = (await s.call(`/clients/${s.A.id}/branding`)).json.kit.typography;
+  assert.deepEqual(view.map((t) => t.slot), ["primary", "secondary", "accent"]); assert.deepEqual(view[0].file_ids, [mine]);
+  assert.equal((await saveType(s, s.A, view.filter((t) => t.slot !== "accent"))).status, 200);
+  const after = (await s.call(`/clients/${s.A.id}/branding`)).json;
+  assert.deepEqual(after.kit.typography.map((t) => t.slot), ["primary", "secondary"]); assert.equal(after.assets.filter((a) => a.kind === "font").length, 1, "the font file is untouched");
+});
+
+test("client page: the three slots show their typeface or a restrained empty card; the Accent slot says it is optional; Primary alone shows normally", async () => {
+  const s = await setup(); await publishOnly(s, s.A);
+  await saveType(s, s.A, [TF({ slot: "primary" })]);
+  const html = await (await s.ann.get(base)).text();
+  const type = sectionHtml(html, "typography");
+  const cards = type.split('<li class="tf-card ').slice(1);
+  assert.equal(cards.length, 3);
+  assert.deepEqual(cards.map((c) => (/lv-card__title">([^<]+)</.exec(c) || [])[1]), ["Primary Typeface", "Secondary Typeface", "Accent Typeface"]);
+  assert.match(cards[0], /^tf-card--has/); assert.match(cards[0], /tf-card__family">Switzer</); assert.match(cards[0], /Regular <span class="muted">400/); assert.match(cards[0], /Bold <span class="muted">700/); assert.match(cards[0], /ABCDEFGHIJKLMNOPQRSTUVWXYZ/); assert.match(cards[0], /0123456789/);
+  assert.match(cards[0], /Headlines and titles/);
+  assert.match(cards[1], /^tf-card--empty/); assert.match(cards[1], /<span class="tag">Not added yet<\/span>/); assert.doesNotMatch(cards[1], /Switzer|Aa Bb/);
+  assert.match(cards[2], /^tf-card--empty/); assert.match(cards[2], /<span class="tag">Optional<\/span>/);
+  assert.match(cards[2], /decorative or specialized/);
+});
+
+test("specimens: with a downloadable font file the specimen is set in the real font (generated @font-face, no inline style); without one it is a labelled fallback preview and says it is not the brand's font", async () => {
+  const s = await setup(); await publishOnly(s, s.A);
+  const file = (await font(s, s.A, "Switzer Bold")).json.id;
+  await saveType(s, s.A, [TF({ slot: "primary", file_ids: [file] }), TF({ family: "Inter", role: "body", slot: "secondary", weights: [400] })]);
+  const res = await s.ann.get(base); const html = await res.text();
+  assert.match(html, new RegExp('<link rel="stylesheet" href="/portal/o/alpha/branding/fonts.css">'));
+  assert.ok(!/ style="/.test(html), "no inline style");
+  const [p, sec] = sectionHtml(html, "typography").split('<li class="tf-card ').slice(1);
+  assert.match(p, /tf-card__aa sp-primary/); assert.match(p, /Specimen set in the font file Framework uploaded for you/); assert.match(p, /data-font-check="fwb-primary"/); assert.doesNotMatch(p, /Fallback preview<\/span>/);
+  assert.match(p, /Download TTF/);
+  assert.match(sec, /<span class="tag tf-card__flag">Fallback preview<\/span>/); assert.match(sec, /Fallback preview: shown in this page’s own typeface, not in Inter\. No font file has been added\./); assert.doesNotMatch(sec, /sp-secondary/);
+  const css = await s.ann.get(`${base}/fonts.css`);
+  assert.equal(css.status, 200); assert.match(css.headers.get("content-type"), /^text\/css/);
+  const text = await css.text();
+  assert.match(text, new RegExp(`@font-face\\{font-family:"fwb-primary";src:url\\("/portal/o/alpha/branding/files/${file}\\?font=1"\\) format\\("truetype"\\);font-weight:700;font-style:normal`));
+  assert.match(text, /\.sp-primary\{font-family:"fwb-primary",sans-serif\}/); assert.ok(!/secondary/.test(text), "no rule for a typeface without a font file");
+  assert.match(res.headers.get("content-security-policy"), /font-src 'self' https:\/\/cdn\.fontshare\.com/);
+  assert.ok(!/<link[^>]+fonts\.css/.test(await (await s.ann.get(`${base}/uploads`)).text()), "only the Branding page loads it");
+});
+
+test("fonts are served for specimens only when the licence allows sharing the file, only to the owning organization, and a specimen load is not counted as a download", async () => {
+  const s = await setup(); await publishOnly(s, s.A); await publishOnly(s, s.B);
+  const ok = (await font(s, s.A, "Switzer Regular")).json.id;
+  const licensed = (await font(s, s.A, "Licensed Serif", { downloadable: false, license_note: "Licensed" })).json.id;
+  const logo = (await s.upload(s.A, s.logo("primary"), "a.png", S.png())).json.id;
+  const theirs = (await font(s, s.B, "Beta Sans")).json.id;
+  await saveType(s, s.A, [TF({ slot: "primary", file_ids: [ok, licensed] })]);
+  const count = () => s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM activity_log WHERE action = 'brand.asset.download'").get().n;
+  const before = count();
+  assert.equal((await s.ann.get(`${base}/files/${ok}?font=1`)).status, 200); assert.equal(count(), before, "not recorded as a download");
+  assert.equal((await s.ann.get(`${base}/files/${licensed}?font=1`)).status, 404, "an unlicensed font is never served");
+  assert.equal((await s.ann.get(`${base}/files/${logo}?font=1`)).status, 404, "font mode is for fonts only");
+  assert.equal((await s.ann.get(`${base}/files/${theirs}?font=1`)).status, 404, "another organization's font");
+  assert.equal((await s.bob.get(`${base}/files/${ok}?font=1`)).status, 404);
+  assert.equal((await s.ann.get(`${base}/files/${ok}`)).status, 200); assert.equal(count(), before + 1, "a real download is still recorded");
+  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "typography"), /licence doesn’t allow sharing the file/);
+  const bobCss = await (await s.bob.get("/portal/o/beta/branding/fonts.css")).text();
+  assert.ok(!bobCss.includes(ok), "a stylesheet only names its own organization's fonts");
+  assert.equal((await s.mia.get(`${base}/fonts.css`)).status, 200, "members may view");
+});
+
+test("older typefaces with no slot stay visible under 'Other typefaces' with their existing downloads; nothing is moved into a slot", async () => {
+  const s = await setup(); await publishOnly(s, s.A);
+  await font(s, s.A, "Switzer Regular");
+  await brand.saveBrandKit(s.w.db, s.A.id, { typography: [{ role: "heading", family: "Switzer", weights: [400, 600], usage: "Headlines", source_url: null }] }, ADMIN);
+  const html = await (await s.ann.get(base)).text();
+  const type = sectionHtml(html, "typography");
+  assert.equal([...type.matchAll(/tf-card--has/g)].length, 0, "no slot is filled by guesswork");
+  assert.equal([...type.matchAll(/tf-card--empty/g)].length, 3);
+  assert.match(type, /Other typefaces/); assert.match(type, /hasn’t assigned these typefaces to a role yet/); assert.match(type, /type__family">Switzer</); assert.match(type, /Download TTF/);
+  assert.ok(!/id="typography-hierarchy"/.test(type), "no hierarchy without a Primary or Secondary typeface");
+});
+
+test("Typography Hierarchy: five levels in order, illustrative (no approved scale invented), no sizes shown as specifications, a missing role uses the one the brand has, fallback is stated", async () => {
+  const s = await setup(); await publishOnly(s, s.A);
+  await saveType(s, s.A, [TF({ slot: "primary" })]);
+  const type = sectionHtml(await (await s.ann.get(base)).text(), "typography");
+  const hier = type.slice(type.indexOf('id="typography-hierarchy"'));
+  assert.deepEqual([...hier.matchAll(/tf-level__name">([^<]+)</g)].map((m) => m[1]), ["Heading 1", "Heading 2", "Heading 3", "Body Text", "Caption / Small Label"]);
+  assert.match(hier, /Typography Hierarchy/); assert.match(hier, /<strong>Illustrative preview\.<\/strong>/); assert.match(hier, /not approved specifications/);
+  assert.ok(!/\d\s?(px|pt|rem)\b|line height/i.test(hier), "no invented sizes or line heights");
+  assert.match(hier, /Primary Typeface · Switzer/); assert.match(hier, /Relative size: Largest/);
+  assert.equal([...hier.matchAll(/Primary Typeface · Switzer/g)].length, 5, "with only a Primary typeface it covers every level");
+  assert.match(hier, /use a standard typeface here, because no font file is available/);
+  const f = (await font(s, s.A, "Switzer Bold")).json.id;
+  await saveType(s, s.A, [TF({ slot: "primary", file_ids: [f] }), TF({ family: "Inter", role: "body", slot: "secondary", weights: [400] })]);
+  const real = sectionHtml(await (await s.ann.get(base)).text(), "typography"); const h2 = real.slice(real.indexOf('id="typography-hierarchy"'));
+  assert.match(h2, /tf-l-h1 sp-primary fw-w700/); assert.match(h2, /Secondary Typeface · Inter/); assert.doesNotMatch(h2, /tf-l-body sp-secondary/, "Inter has no file, so it is not shown as Inter");
+});
+
+test("empty typography: a restrained empty state with the existing request button and a way to share fonts; no price is shown by default; a member is told to ask an owner", async () => {
+  const s = await setup(); await publishOnly(s, s.A);
+  const html = await (await s.ann.get(base)).text(); const type = sectionHtml(html, "typography");
+  assert.match(type, /No typefaces have been added yet\./); assert.match(type, /<summary class="btn btn--small">Request<span/); assert.match(type, /href="\/portal\/o\/alpha\/branding\/uploads">Share them with Framework/);
+  assert.ok(!/tf-card/.test(type), "no invented slots when nothing is configured");
+  assert.ok(!/\$\s?\d|CAD|Starting at|bk-price/.test(html), "no price anywhere on the page by default");
+  assert.match(sectionHtml(await (await s.mia.get(base)).text(), "typography"), /Ask an owner of your organization/);
+  assert.equal((await s.ann.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-typography" })).status, 303, "the existing request workflow");
+  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "typography"), /class="tag">Requested</);
+});
+
+test("pricing presentation is designed but inactive: every provisional price is off, labels follow the three presentations, and a price only renders when explicitly activated", async () => {
+  const P = await import("../portal/branding-pricing.js");
+  assert.deepEqual(Object.fromEntries(Object.values(P.BRANDING_PRICING).map((x) => [x.name, x.priceCad])), { "Primary Logo Design": 500, "Secondary Logo": 150, "Simplified Logo": 150, "Sub-mark": 150, "Typography System": 250, "Brand Colour Palette": 200, "Tagline Development": 250, "Brand Imagery Direction": 300, "Layout System": 350, "Textures & Patterns": 150, Iconography: 250, "Design Style Guide": 350, "Framework Brand Kit": 2500 });
+  assert.ok(Object.values(P.BRANDING_PRICING).every((x) => x.active === false && x.type === "starting_at"), "nothing is live and nothing is assumed included");
+  assert.equal(P.activePricing("typography"), null);
+  assert.equal(P.priceLabel(P.BRANDING_PRICING.typography), "Starting at $250 CAD"); assert.equal(P.priceLabel(P.BRANDING_PRICING["brand-kit"]), "Starting at $2,500 CAD");
+  assert.equal(P.priceLabel({ type: "custom_quote" }), "Custom quote"); assert.equal(P.priceLabel({ type: "included" }), "Included"); assert.equal(P.priceLabel({ type: "starting_at", priceCad: 0 }), ""); assert.equal(P.priceLabel({ type: "bogus" }), "");
+  assert.equal(P.pricingBlock(P.BRANDING_PRICING.typography, "<x>"), "", "inactive renders nothing");
+  const on = { ...P.BRANDING_PRICING.typography, active: true };
+  const block = P.pricingBlock(on, '<p class="req">ACTION</p>');
+  assert.match(block, /Typography System/); assert.match(block, /Starting at \$250 CAD/); assert.match(block, /approved typeface roles, hierarchy and usage guidance/); assert.match(block, /A starting price, not a quote/); assert.match(block, /ACTION/);
+  const kit = P.pricingBlock({ ...P.BRANDING_PRICING["brand-kit"], active: true });
+  assert.match(kit, /Not included: original photography production, bespoke illustration, custom typefaces, extensive icon libraries/); assert.doesNotMatch(kit, /unlimited|revision|turnaround|days/i, "no scope or timing promised that isn't defined");
+  const { brandingOverview } = await import("../portal/branding-live.js");
+  const vm = { base: "/portal/o/alpha" };
+  const withPrice = brandingOverview(vm, { published: true, assets: [], colours: [], typography: [] }, { canRequest: true, csrf: "t", requests: {}, pricing: { typography: on } });
+  assert.match(sectionHtml(withPrice, "typography"), /bk-price[\s\S]*Starting at \$250 CAD[\s\S]*<summary class="btn btn--small">Request/, "the price sits with the existing request button");
+  assert.ok(!/bk-price/.test(sectionHtml(withPrice, "colours")), "no prices beside other section headings");
+  const withTypes = brandingOverview(vm, { published: true, assets: [], colours: [], typography: [TF({ slot: "primary" })] }, { canRequest: true, csrf: "t", requests: {}, pricing: { typography: on } });
+  assert.ok(!/bk-price/.test(withTypes), "completed typography shows no sales block");
+});
+
+test("Admin typography wiring: slots, styles, file choice and hierarchy-free save; the three roles come from one shared catalogue", () => {
+  const ui = read("admin/assets/branding.js"), shared = read("admin/assets/brand-sections.js");
+  assert.match(shared, /TYPE_SLOT_DEFS/); assert.match(ui, /TYPE_SLOT_DEFS\.filter\(\(d\) => !rows\.some\(\(r\) => r\.slot === d\.key\)\)\.map\(\(d\) => button\(`Add \$\{d\.title\}`/);
+  assert.match(ui, /slot: t\.slot \|\| null/); assert.match(ui, /styles: t\.styles/); assert.match(ui, /file_ids: t\.file_ids/); assert.match(ui, /Approved styles/); assert.match(ui, /Short usage description/);
+  assert.ok(read("assets/js/portal-branding.js").includes("data-font-check") && read("assets/js/portal-branding.js").includes("document.fonts.load"), "a failed font load is stated, not hidden");
 });
