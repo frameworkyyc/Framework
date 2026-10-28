@@ -17,7 +17,10 @@ import { recordActivity } from "./activity.js";
 import { usableName } from "../../../admin/assets/brand-names.js";
 
 export const ASSET_KINDS = ["logo", "guideline", "document", "font", "package", "other"];
-export const LOGO_ROLES = ["primary", "simplified", "icon"];
+export const LOGO_ROLES = ["primary", "simplified", "icon"]; // what the database CHECK allows (icon = the Sub-mark)
+/** What Framework Admin may choose. "secondary" has no column value of its own (that would need a migration): it is stored as logo_role NULL and the generated variant_key starts with "secondary-"; roleOf() reads it back. */
+export const LOGO_ROLE_INPUT = [...LOGO_ROLES, "secondary"];
+export const roleOf = (r) => r.logo_role || (r.kind === "logo" && typeof r.variant_key === "string" && /^secondary(-|$)/.test(r.variant_key) ? "secondary" : null);
 export const ORIENTATIONS = ["horizontal", "vertical", "square"];
 export const TONES = ["light", "dark", "colour", "mono"];
 export const UPLOAD_CATEGORIES = ["logo", "fonts", "colours", "guidelines", "stationery", "signature", "other"];
@@ -140,7 +143,8 @@ function assetMeta(meta, { forCreate }) {
   if (forCreate || "kind" in meta) { out.kind = validateEnum(meta.kind, ASSET_KINDS); if (!out.kind) return fail("invalid_kind"); }
   if (forCreate || "title" in meta) { out.title = validateName(meta.title, 120); if (!out.title) return fail("invalid_title"); }
   if ("variant_key" in meta) { const v = meta.variant_key; out.variant_key = v === null || v === "" ? null : typeof v === "string" && /^[a-z0-9-]{1,60}$/.test(v) ? v : undefined; if (out.variant_key === undefined) return fail("invalid_variant"); }
-  for (const [key, list] of [["logo_role", LOGO_ROLES], ["orientation", ORIENTATIONS], ["tone", TONES]]) if (key in meta) { out[key] = meta[key] === null || meta[key] === "" ? null : validateEnum(meta[key], list); if (out[key] === null && meta[key] !== null && meta[key] !== "") return fail("invalid_" + key); }
+  for (const [key, list] of [["logo_role", LOGO_ROLE_INPUT], ["orientation", ORIENTATIONS], ["tone", TONES]]) if (key in meta) { out[key] = meta[key] === null || meta[key] === "" ? null : validateEnum(meta[key], list); if (out[key] === null && meta[key] !== null && meta[key] !== "") return fail("invalid_" + key); }
+  if (out.logo_role === "secondary") out.logo_role = null; // see LOGO_ROLE_INPUT
   if ("transparent" in meta) out.transparent = bool(meta.transparent);
   for (const [key, max] of [["usage_note", 300], ["license_note", 300]]) if (key in meta) { const t = validateText(meta[key], max); if (t === undefined) return fail("invalid_" + key); out[key] = t; }
   if ("downloadable" in meta) out.downloadable = bool(meta.downloadable);
@@ -263,7 +267,7 @@ export async function deleteBrandAsset(db, organizationId, assetId, actor, { now
   return res[0].meta.changes === 1 ? ok({ storageKey: cur.storageKey }) : fail("not_found");
 }
 
-const adminAsset = (r) => ({ id: r.id, organizationId: r.organization_id, kind: r.kind, title: r.title, variantKey: r.variant_key, logoRole: r.logo_role, orientation: r.orientation, tone: r.tone, transparent: !!r.transparent, usageNote: r.usage_note, downloadable: !!r.downloadable, licenseNote: r.license_note, format: r.format, contentType: r.content_type, size: r.size_bytes, sha256: r.sha256, storageKey: r.storage_key, originalName: r.original_name, published: !!r.published, sortOrder: r.sort_order, createdAt: r.created_at, createdBy: r.created_by, updatedAt: r.updated_at });
+const adminAsset = (r) => ({ id: r.id, organizationId: r.organization_id, kind: r.kind, title: r.title, variantKey: r.variant_key, logoRole: roleOf(r), orientation: r.orientation, tone: r.tone, transparent: !!r.transparent, usageNote: r.usage_note, downloadable: !!r.downloadable, licenseNote: r.license_note, format: r.format, contentType: r.content_type, size: r.size_bytes, sha256: r.sha256, storageKey: r.storage_key, originalName: r.original_name, published: !!r.published, sortOrder: r.sort_order, createdAt: r.created_at, createdBy: r.created_by, updatedAt: r.updated_at });
 
 export async function getBrandAssetAdmin(db, organizationId, assetId) {
   requireOrgId(organizationId); requireId(assetId, "asset_id");
@@ -290,7 +294,7 @@ export async function getClientBrand(db, organizationId) {
     .bind(organizationId).all()).results;
   return {
     published: true, publishedAt: kit.publishedAt, colours: kit.colours, typography: kit.typography,
-    assets: rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, variantKey: r.variant_key, logoRole: r.logo_role, orientation: r.orientation, tone: r.tone, transparent: !!r.transparent, usageNote: r.usage_note, canDownload: r.kind !== "font" || !!r.downloadable, licenseNote: r.kind === "font" ? r.license_note : null, format: r.format, size: r.size_bytes })),
+    assets: rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, variantKey: r.variant_key, logoRole: roleOf(r), orientation: r.orientation, tone: r.tone, transparent: !!r.transparent, usageNote: r.usage_note, canDownload: r.kind !== "font" || !!r.downloadable, licenseNote: r.kind === "font" ? r.license_note : null, format: r.format, size: r.size_bytes })),
   };
 }
 
