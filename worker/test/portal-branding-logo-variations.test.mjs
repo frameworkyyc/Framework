@@ -1,5 +1,5 @@
 /* Branding, logo variations: the client's Logos section always shows four cards (Primary, Secondary, Simplified, Sub-mark). A card with published files shows the real preview and
-   a download per format; a card without them shows a clearly labelled example of a fictional brand and "Not added yet". Framework Admin assigns each logo file to a card through
+   a download per format; a card without them shows Framework's own logo for that variation (a static public image, labelled "Example: Framework") and "Not added yet". Framework Admin assigns each logo file to a card through
    the existing "Logo type" (no migration: Secondary is stored as an unset logo_role plus a "secondary-" variant key). Older files keep working and are never guessed into a card. */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -54,40 +54,62 @@ const cards = (html) => {
   return parts.map((p) => ({ html: p, has: p.startsWith('<li class="lv-card lv-card--has"'), title: (/lv-card__title">([^<]+)</.exec(p) || [])[1] }));
 };
 
-test("the four variations are Primary, Secondary, Simplified and Sub-mark with their descriptions; each Admin logo type maps to exactly one (icon is the Sub-mark)", () => {
-  assert.deepEqual(LOGO_VARIATIONS.map((v) => [v.key, v.title]), [["primary", "Primary"], ["secondary", "Secondary"], ["simplified", "Simplified"], ["submark", "Sub-mark"]]);
-  assert.equal(LOGO_VARIATIONS[0].desc, "The main brand logo for websites, print and general branding.");
-  assert.equal(LOGO_VARIATIONS[1].desc, "An alternative arrangement, typically horizontal, for headers, banners and wider spaces.");
-  assert.equal(LOGO_VARIATIONS[2].desc, "A reduced-detail logo for smaller applications where the full logo isn’t practical.");
-  assert.equal(LOGO_VARIATIONS[3].desc, "A compact brand symbol for profile pictures, favicons, icons and watermarks.");
+test("the four variations are 01 Primary Logo, 02 Secondary Logo, 03 Simplified Logo and 04 Sub-mark with their descriptions and example images; each Admin logo type maps to exactly one (icon is the Sub-mark)", () => {
+  assert.deepEqual(LOGO_VARIATIONS.map((v) => [v.no, v.key, v.title]), [["01", "primary", "Primary Logo"], ["02", "secondary", "Secondary Logo"], ["03", "simplified", "Simplified Logo"], ["04", "submark", "Sub-mark"]]);
+  assert.equal(LOGO_VARIATIONS[0].desc, "The main brand identity, typically used for websites, marketing materials, and official communications.");
+  assert.equal(LOGO_VARIATIONS[1].desc, "An alternative logo arrangement, useful when the primary layout doesn’t fit the available space.");
+  assert.equal(LOGO_VARIATIONS[2].desc, "A reduced wordmark-only variation for applications where a cleaner identity is appropriate.");
+  assert.equal(LOGO_VARIATIONS[3].desc, "A compact brand symbol for favicons, social media profiles, watermarks, and small-scale applications.");
+  assert.deepEqual(LOGO_VARIATIONS.map((v) => v.example), ["primary", "secondary", "simplified", "submark"].map((k) => `/assets/img/logo-examples/framework-${k}.png`));
   const v = (logoRole, kind = "logo") => variationOf({ kind, logoRole });
   assert.deepEqual([v("primary"), v("secondary"), v("simplified"), v("icon")], ["primary", "secondary", "simplified", "submark"]);
   assert.equal(v(null), null, "no type chosen: not guessed into a card"); assert.equal(v("primary", "document"), null); assert.equal(v("tertiary"), null);
 });
 
-test("with nothing published every client sees the four cards as clearly labelled examples with the status 'Not added yet', in a fixed order and one shape", async () => {
+test("the four Framework example images are static public assets: real 16:9 PNGs at full size, small, outside private storage, and never referenced as client data", async () => {
+  const dir = new URL("../../assets/img/logo-examples/", import.meta.url);
+  assert.deepEqual(readdirSync(dir).sort(), ["framework-primary.png", "framework-secondary.png", "framework-simplified.png", "framework-submark.png"]);
+  for (const f of readdirSync(dir)) {
+    const bytes = readFileSync(new URL(f, dir));
+    assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], f + " is a PNG");
+    const w = bytes.readUInt32BE(16), h = bytes.readUInt32BE(20);
+    assert.deepEqual([w, h], [1920, 1080], f + " keeps its original 16:9 size");
+    assert.ok(bytes.length < 40000, f + " is light (" + bytes.length + " bytes)");
+  }
+  // not client data: nothing in the data layer, the file service or the backup refers to the example directory, and no migration or row holds them
+  for (const f of ["worker/portal/repo/brand.js", "worker/portal/brand-files.js", "worker/portal/files/storage.js", "worker/portal/file-backup.js", "worker/portal/backup-purge.js", "worker/portal/admin-branding.js"]) assert.ok(!/logo-examples/.test(read(f)), f + " does not know the examples");
+  const s = await setup();
+  await s.ann.get(base);
+  assert.equal(s.w.db.raw.prepare("SELECT count(*) n FROM brand_assets").get().n, 0, "showing the examples creates no asset record");
+  assert.equal([...s.w.env.PORTAL_FILES.store.keys()].length, 0, "and nothing in the private bucket");
+  assert.deepEqual((await s.call(`/clients/${s.A.id}/branding`)).json.assets, [], "the Admin inventory never lists them");
+});
+
+test("with nothing published every client sees the four Framework examples, labelled 'Example: Framework' with the status 'Not added yet', in a fixed order and one frame, with no download", async () => {
   const { ann, mia, bob } = await setup();
   for (const b of [ann, mia]) {
     const html = await (await b.get(base)).text();
     const c = cards(html);
-    assert.deepEqual(c.map((x) => x.title), ["Primary", "Secondary", "Simplified", "Sub-mark"]);
+    assert.deepEqual(c.map((x) => x.title), ["Primary Logo", "Secondary Logo", "Simplified Logo", "Sub-mark"]);
+    assert.deepEqual([...html.matchAll(/class="lv-card__no" aria-hidden="true">(\d\d)</g)].map((m) => m[1]), ["01", "02", "03", "04"]);
     assert.ok(c.every((x) => !x.has && x.html.startsWith('<li class="lv-card lv-card--example">')));
-    for (const x of c) {
-      assert.match(x.html, /<span class="lv-card__badge">Example<\/span>/); assert.match(x.html, /<span class="tag">Not added yet<\/span>/);
-      assert.match(x.html, /<svg [^>]*role="img" aria-label="Example of /); assert.match(x.html, /Illustration of a fictional brand, not your logo\./);
-      assert.ok(!/Download|<img/.test(x.html), "no download and no client image on an example card");
-    }
-    assert.match(html, /Cards marked “Example” are illustrations of a fictional brand/);
+    const files = ["primary", "secondary", "simplified", "submark"];
+    c.forEach((x, i) => {
+      assert.match(x.html, new RegExp(`<img src="/assets/img/logo-examples/framework-${files[i]}\\.png" alt="Example: the Framework [^"]+" width="1920" height="1080" loading="lazy" decoding="async">`));
+      assert.match(x.html, /<p class="lv-card__meta muted small">Example: Framework<\/p>/); assert.match(x.html, /<span class="tag">Not added yet<\/span>/);
+      assert.ok(!/<a |Download|\/branding\/files\//.test(x.html), "no link and no download on an example card");
+      assert.ok(!/lv-card__stage--logo/.test(x.html));
+    });
+    assert.match(html, /Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation\. They are not your logos and are not available to download\./);
     assert.match(html, /<span class="acc__sum">Not added yet<\/span>/);
   }
-  // the same four examples for a client of another organization: examples are not data
-  assert.deepEqual(cards(await (await bob.get("/portal/o/beta/branding")).text()).map((x) => x.title), ["Primary", "Secondary", "Simplified", "Sub-mark"]);
+  assert.deepEqual(cards(await (await bob.get("/portal/o/beta/branding")).text()).map((x) => x.title), ["Primary Logo", "Secondary Logo", "Simplified Logo", "Sub-mark"]);
 });
 
 test("Admin assigns each file with 'Logo type': every type lands on its own card and replaces only that placeholder; the rest stay examples until their files are added", async () => {
   const s = await setup();
   await s.publishKit(s.A);
-  const order = [["primary", "Primary"], ["secondary", "Secondary"], ["simplified", "Simplified"], ["icon", "Sub-mark"]];
+  const order = [["primary", "Primary Logo"], ["secondary", "Secondary Logo"], ["simplified", "Simplified Logo"], ["icon", "Sub-mark"]];
   const filled = new Set();
   for (const [role, title] of order) {
     const up = await s.upload(s.A, s.logo(role, { orientation: role === "secondary" ? "horizontal" : "square" }), `${role}.png`, S.png(20, 20));
@@ -97,11 +119,12 @@ test("Admin assigns each file with 'Logo type': every type lands on its own card
     const c = cards(html);
     assert.deepEqual(c.map((x) => [x.title, x.has]), order.map(([, t]) => [t, filled.has(t)]), `after adding ${role}`);
     const card = c.find((x) => x.title === title);
-    assert.match(card.html, /<img src="[^"]*\/branding\/files\/[0-9a-f-]{36}\?preview=1" alt="/); assert.match(card.html, /<span class="tag">Available<\/span>/); assert.match(card.html, /Download PNG/);
-    assert.ok(!/lv-card__badge/.test(card.html), "the example badge is gone from a real logo");
+    assert.match(card.html, /<img src="[^"]*\/branding\/files\/[0-9a-f-]{36}\?preview=1" alt="/);
+    assert.equal([...(await (await s.ann.get(base)).text()).matchAll(/logo-examples\/framework-/g)].length, 4 - filled.size, "only the other examples remain"); assert.match(card.html, /<span class="tag">Available<\/span>/); assert.match(card.html, /Download PNG/);
+    assert.ok(!/Example: Framework|logo-examples/.test(card.html), "the Framework example is gone from a real logo");
   }
   assert.match(await (await s.ann.get(base)).text(), /<span class="acc__sum">4 of 4 variations · PNG<\/span>/);
-  assert.ok(!/Cards marked “Example”/.test(await (await s.ann.get(base)).text()), "no example note once all four are real");
+  assert.ok(!/Example: Framework|logo-examples/.test(await (await s.ann.get(base)).text()), "no example text or image once all four are real");
 });
 
 test("Secondary needs no migration: it is stored as an unset logo_role with a 'secondary-' variant key, shown to Admin as Secondary, named Secondary, and a bad type is refused", async () => {
@@ -122,14 +145,15 @@ test("several formats in one variation: every format downloads, the preview uses
   const s = await setup();
   await s.publishKit(s.A);
   const ids = {};
-  for (const [name, bytes] of [["p.pdf", S.pdf()], ["p.png", S.png(30, 30)], ["p.svg", S.svg()]]) { const r = await s.upload(s.A, s.logo("primary"), name, bytes); assert.equal(r.status, 201, JSON.stringify(r.json)); ids[name] = r.json.id; }
+  for (const [name, bytes] of [["p.pdf", S.pdf()], ["p.eps", S.eps()], ["p.png", S.png(30, 30)], ["p.svg", S.svg()]]) { const r = await s.upload(s.A, s.logo("primary"), name, bytes); assert.equal(r.status, 201, JSON.stringify(r.json)); ids[name] = r.json.id; }
   const pdfOnly = await s.upload(s.A, s.logo("simplified"), "s.pdf", S.pdf()); assert.equal(pdfOnly.status, 201);
   const c = cards(await (await s.ann.get(base)).text());
   const primary = c[0].html, simplified = c[2].html;
-  assert.deepEqual([...primary.matchAll(/Download ([A-Z]+)</g)].map((m) => m[1]), ["SVG", "PNG", "PDF"], "vector first, then PNG, then PDF");
+  assert.deepEqual([...primary.matchAll(/Download ([A-Z]+)</g)].map((m) => m[1]), ["SVG", "PNG", "EPS", "PDF"], "SVG and PNG first, then the other formats, all on ONE card");
+  assert.equal([...c.map((x) => x.title)].length, 4, "formats never add cards");
   for (const id of Object.values(ids)) assert.ok(primary.includes(`/branding/files/${id}"`), "download link: " + id);
   assert.match(primary, new RegExp(`<img src="[^"]*files/${ids["p.svg"]}\\?preview=1"`), "the SVG is the preview");
-  assert.match(primary, /SVG · PNG · PDF/);
+  assert.match(primary, /SVG · PNG · EPS · PDF/);
   assert.ok(!/<img/.test(simplified) && /No preview for this format/.test(simplified) && /Download PDF/.test(simplified) && /lv-card__stage--file/.test(simplified));
   for (const id of Object.values(ids)) { const dl = await s.ann.get(`${base}/files/${id}`); assert.equal(dl.status, 200); assert.match(dl.headers.get("content-disposition") || "", /attachment/); }
   assert.equal((await s.mia.get(`${base}/files/${ids["p.png"]}`)).status, 200, "members still download");
@@ -232,11 +256,14 @@ test("layout and a11y wiring: one column on a phone, two on a tablet, four on a 
   assert.match(css, /\.lv-grid \{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
   assert.match(css, /@media \(min-width: 600px\) \{ \.lv-grid \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \} \}/);
   assert.match(css, /@media \(min-width: 1024px\) \{ \.lv-grid \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\); \} \}/);
-  assert.match(css, /\.lv-card__stage \{[^}]*aspect-ratio: 4 \/ 3/);
+  assert.match(css, /\.lv-card__stage \{[^}]*aspect-ratio: 16 \/ 9[^}]*border: 1px solid var\(--hairline\)/);
+  assert.match(css, /\.lv-card__stage img \{[^}]*object-fit: contain/, "artwork is contained, never cropped or stretched");
+  assert.match(css, /--hairline: #E0E0E0/);
+  assert.ok(!/\.lv-card \{[^}]*(border:|box-shadow|border-radius)/.test(css), "no box around the card, no shadow, sharp corners");
   const s = await setup();
   const html = await (await s.ann.get(base)).text();
   assert.ok(!/\sstyle=|<script[^>]*>[^<]|onclick=/i.test(html.replace(/<script[^>]*src=[^>]*><\/script>/g, "")), "no inline style, script or handler");
   const logos = html.slice(html.indexOf('id="logos"'), html.indexOf('id="colours"'));
   assert.equal([...logos.matchAll(/<h3 class="lv-card__title">/g)].length, 4);
-  assert.equal([...logos.matchAll(/aria-label="Example of /g)].length, 4);
+  assert.equal([...logos.matchAll(/alt="Example: the Framework /g)].length, 4, "every example image has a descriptive alternative text");
 });
