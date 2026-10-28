@@ -139,12 +139,18 @@ test("Overview: one warning line per client with the addresses, a link to Approv
 
 test("overdue is measured in America/Edmonton: not overdue on the due date or on its evening in Calgary, overdue from the next local day, in summer and winter time", async () => {
   const { todayOf, effectiveStatus } = inv;
-  // MDT (UTC-6): local midnight is 06:00Z
-  assert.equal(todayOf(new Date("2026-10-28T05:59:00Z")), "2026-10-27");
-  assert.equal(todayOf(new Date("2026-10-28T06:00:00Z")), "2026-10-28");
-  // MST (UTC-7): local midnight is 07:00Z
-  assert.equal(todayOf(new Date("2027-01-15T06:59:00Z")), "2027-01-14");
-  assert.equal(todayOf(new Date("2027-01-15T07:00:00Z")), "2027-01-15");
+  // The day must flip exactly at LOCAL midnight in America/Edmonton whatever offset the runtime's time-zone data gives that date (the code names the zone, never a fixed
+  // offset, so it follows the data; asserting a fixed winter offset here would only test one tzdata release). Local midnight = 00:00 UTC minus the zone's offset at noon.
+  const offsetMinutes = (when) => { const m = /GMT([+-])(\d\d):(\d\d)/.exec(new Intl.DateTimeFormat("en-US", { timeZone: "America/Edmonton", timeZoneName: "longOffset" }).format(when)); return m ? (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : NaN; };
+  for (const [y, mo, d, prev] of [[2026, 10, 28, "2026-10-27"], [2027, 1, 15, "2027-01-14"], [2027, 7, 15, "2027-07-14"]]) {
+    const off = offsetMinutes(new Date(Date.UTC(y, mo - 1, d, 12)));
+    assert.ok(Number.isFinite(off) && off <= 0 && off >= -480, "the zone has a western-Canada offset: " + off);
+    const midnight = Date.UTC(y, mo - 1, d) - off * 60000;
+    assert.equal(todayOf(new Date(midnight - 60000)), prev, `one minute before local midnight on ${y}-${mo}-${d}`);
+    assert.equal(todayOf(new Date(midnight)), `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`, `at local midnight on ${y}-${mo}-${d}`);
+  }
+  // an October evening is the same local day as the due date in either offset (UTC-6 or UTC-7)
+  assert.equal(todayOf(new Date("2026-10-28T03:00:00Z")), "2026-10-27");
   const due = { paymentStatus: "unpaid", dueDate: "2026-10-27" };
   assert.equal(effectiveStatus(due, todayOf(new Date("2026-10-28T03:00:00Z"))), "unpaid", "21:00 on the due date in Calgary");
   assert.equal(effectiveStatus(due, todayOf(new Date("2026-10-28T05:59:00Z"))), "unpaid", "23:59 on the due date");
