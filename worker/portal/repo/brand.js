@@ -33,6 +33,7 @@ export const REQUEST_STATUSES = ["new", "contacted", "closed", "declined"];
 const MAX_COLOURS = 16, MAX_TYPEFACES = 12;
 
 const parseList = (text) => { try { const v = JSON.parse(text); return Array.isArray(v) ? v : []; } catch { return []; } };
+const parseObject = (text) => { try { const v = JSON.parse(text); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; } catch { return {}; } };
 const bool = (v) => (v ? 1 : 0);
 
 /* ------------------------------------------------------------------ validation of the kit's documents */
@@ -70,6 +71,46 @@ export function normaliseTypography(list) {
   return ok({ value: out });
 }
 
+export const TAGLINE_MAX = 120, TAGLINE_ALTERNATES_MAX = 6, TAGLINE_GUIDELINES_MAX = 600;
+/**
+ * The short text sections of a brand kit (today only the tagline), stored in brand_kits.sections_json (migration 0009). Only known keys are accepted. For each key given, `null` or an empty
+ * value removes it; the rest of the kit is untouched. A tagline is single-line text (up to 120 characters); alternates are up to six more; usage guidelines are optional multi-line text.
+ * @returns {{ ok: true, value: object, touched: string[] } | { ok: false, error: string }} `value` holds the keys that have content; `touched` the keys that were given (so empty ones are removed).
+ */
+export function normaliseSections(raw) {
+  if (raw === null || raw === undefined) return ok({ value: {}, touched: [] });
+  if (typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).some((k) => k !== "tagline")) return fail("invalid_sections");
+  const value = {}, touched = [];
+  if ("tagline" in raw) {
+    touched.push("tagline");
+    const t = raw.tagline;
+    if (t !== null && t !== undefined) {
+      if (typeof t !== "object" || Array.isArray(t) || Object.keys(t).some((k) => !["primary", "alternates", "guidelines"].includes(k))) return fail("invalid_sections");
+      const blank = (v) => v === undefined || v === null || (typeof v === "string" && v.trim() === "");
+      const primary = blank(t.primary) ? null : validateName(t.primary, TAGLINE_MAX);
+      const alts = blank(t.alternates) ? [] : t.alternates;
+      const guidelines = validateText(t.guidelines, TAGLINE_GUIDELINES_MAX);
+      if ((!blank(t.primary) && !primary) || !Array.isArray(alts) || guidelines === undefined) return fail("invalid_sections");
+      const alternates = [];
+      for (const a of alts) {
+        if (blank(a)) continue; // an empty row in the form is simply dropped
+        const v = validateName(a, TAGLINE_MAX);
+        if (!v) return fail("invalid_sections");
+        if (!alternates.includes(v) && v !== primary) alternates.push(v);
+      }
+      if (alternates.length > TAGLINE_ALTERNATES_MAX) return fail("invalid_sections");
+      if (primary || alternates.length || guidelines) value.tagline = { primary, alternates, guidelines };
+    }
+  }
+  return ok({ value, touched });
+}
+
+/** Does this database have the optional sections_json column (migration 0009)? Admin uses it to say plainly when tagline storage is not available yet. */
+export async function sectionsColumnExists(db) {
+  const cols = (await db.prepare("PRAGMA table_info(brand_kits)").all()).results || [];
+  return cols.some((c) => c.name === "sections_json");
+}
+
 /** The ids of an organization's live font files: a typeface may only point at these (checked by the Admin API when it saves; the client page also ignores any id that is not one of its published fonts). */
 export async function liveFontAssetIds(db, organizationId) {
   requireOrgId(organizationId);
@@ -103,12 +144,13 @@ export async function recordBrandDownload(db, { organizationId, actorType, actor
 
 export async function getBrandKit(db, organizationId) {
   requireOrgId(organizationId);
-  const row = await db.prepare("SELECT organization_id, status, colours_json, typography_json, brand_name, updated_at, updated_by, published_at, published_by FROM brand_kits WHERE organization_id = ?").bind(organizationId).first();
-  return row ? { organizationId: row.organization_id, status: row.status, colours: parseList(row.colours_json), typography: parseList(row.typography_json), brandName: row.brand_name, updatedAt: row.updated_at, updatedBy: row.updated_by, publishedAt: row.published_at, publishedBy: row.published_by } : null;
+  // SELECT * (not a column list): the optional sections_json column (migration 0009) may not exist yet, and the code must work either way.
+  const row = await db.prepare("SELECT * FROM brand_kits WHERE organization_id = ?").bind(organizationId).first();
+  return row ? { organizationId: row.organization_id, status: row.status, colours: parseList(row.colours_json), typography: parseList(row.typography_json), sections: parseObject(row.sections_json), brandName: row.brand_name, updatedAt: row.updated_at, updatedBy: row.updated_by, publishedAt: row.published_at, publishedBy: row.published_by } : null;
 }
 
 /** Saves colours, typography and/or the brand name (whatever is passed; the rest is kept). A new kit starts as a draft; saving never publishes or unpublishes, and never renames an existing file. */
-export async function saveBrandKit(db, organizationId, { colours, typography, brandName }, actor, { now = new Date() } = {}) {
+export async function saveBrandKit(db, organizationId, { colours, typography, brandName, sections }, actor, { now = new Date() } = {}) {
   requireOrgId(organizationId);
   if (!validActor(actor)) return fail("invalid_actor");
   const current = await getBrandKit(db, organizationId);
@@ -116,7 +158,15 @@ export async function saveBrandKit(db, organizationId, { colours, typography, br
   if (colours !== undefined) { const r = normaliseColours(colours); if (!r.ok) return r; c = r.value; }
   if (typography !== undefined) { const r = normaliseTypography(typography); if (!r.ok) return r; t = r.value; }
   if (brandName !== undefined) { const r = normaliseBrandName(brandName); if (!r.ok) return r; bn = r.value; }
+  let sectionsJson = null; // set only when sections were given: the other content in sections_json is kept
+  if (sections !== undefined) {
+    const r = normaliseSections(sections); if (!r.ok) return r;
+    const next = { ...(current ? current.sections : {}) };
+    for (const k of r.touched) { if (r.value[k]) next[k] = r.value[k]; else delete next[k]; }
+    sectionsJson = JSON.stringify(next);
+  }
   const at = isoTime(now);
+  const onlySections = sections !== undefined && colours === undefined && typography === undefined && brandName === undefined;
   try {
     await db.batch([
       db
@@ -124,10 +174,12 @@ export async function saveBrandKit(db, organizationId, { colours, typography, br
           "INSERT INTO brand_kits (organization_id, status, colours_json, typography_json, brand_name, created_at, updated_at, updated_by) VALUES (?, 'draft', ?, ?, ?, ?, ?, ?) ON CONFLICT (organization_id) DO UPDATE SET colours_json = excluded.colours_json, typography_json = excluded.typography_json, brand_name = excluded.brand_name, updated_at = excluded.updated_at, updated_by = excluded.updated_by",
         )
         .bind(organizationId, JSON.stringify(c), JSON.stringify(t), bn, at, at, actor.trim()),
-      auditAfterChange(db, { organizationId, actorType: "admin", actorRef: actor.trim(), action: brandName !== undefined && colours === undefined && typography === undefined ? "brand.kit.brand_name_saved" : "brand.kit.saved", entityType: "brand_kit", entityId: organizationId, at }),
+      ...(sectionsJson === null ? [] : [db.prepare("UPDATE brand_kits SET sections_json = ? WHERE organization_id = ?").bind(sectionsJson, organizationId)]),
+      auditAfterChange(db, { organizationId, actorType: "admin", actorRef: actor.trim(), action: onlySections ? "brand.kit.sections_saved" : brandName !== undefined && colours === undefined && typography === undefined ? "brand.kit.brand_name_saved" : "brand.kit.saved", entityType: "brand_kit", entityId: organizationId, at }),
     ]);
   } catch (err) {
     if (isConstraintViolation(err)) return fail("invalid_kit");
+    if (sectionsJson !== null && /no such column/i.test(String(err && err.message))) return fail("sections_unavailable"); // migration 0009 is not applied here yet: nothing was saved
     throw err;
   }
   return ok();
@@ -307,7 +359,7 @@ export async function getClientBrand(db, organizationId) {
     .prepare(`SELECT a.id, a.kind, a.title, a.variant_key, a.logo_role, a.orientation, a.tone, a.transparent, a.usage_note, a.downloadable, a.license_note, a.format, a.size_bytes, a.sort_order FROM brand_assets a WHERE a.organization_id = ? AND ${VISIBLE} ORDER BY a.kind, a.sort_order, a.created_at, a.id`)
     .bind(organizationId).all()).results;
   return {
-    published: true, publishedAt: kit.publishedAt, colours: kit.colours, typography: kit.typography,
+    published: true, publishedAt: kit.publishedAt, colours: kit.colours, typography: kit.typography, tagline: kit.sections && kit.sections.tagline ? kit.sections.tagline : null,
     assets: rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, variantKey: r.variant_key, logoRole: roleOf(r), orientation: r.orientation, tone: r.tone, transparent: !!r.transparent, usageNote: r.usage_note, canDownload: r.kind !== "font" || !!r.downloadable, licenseNote: r.kind === "font" ? r.license_note : null, format: r.format, size: r.size_bytes })),
   };
 }
