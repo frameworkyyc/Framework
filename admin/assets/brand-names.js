@@ -8,7 +8,7 @@
    The same logo in different formats shares one stem (…-Light-Transparent) and differs only by extension, so formats stay grouped and consistent.
    Names are ASCII letters, digits and hyphens only, so they are safe on every system and in a download header. */
 
-export const LOGO_ROLE_WORD = { primary: "Primary", simplified: "Simplified", icon: "Icon" };
+export const LOGO_ROLE_WORD = { primary: "Primary", secondary: "Secondary", simplified: "Simplified", icon: "Submark" }; // icon is the Sub-mark variation; its files are named Submark from now on (existing files keep their names)
 export const SHAPE_WORD = { horizontal: "Horizontal", vertical: "Vertical", square: "Square" };
 export const TONE_WORD = { light: "Light", dark: "Dark", colour: "Colour", mono: "Mono" };
 const COMPANY_MAX = 30, DESCRIPTION_MAX = 48;

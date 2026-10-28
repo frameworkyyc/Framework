@@ -9,7 +9,8 @@ import { buildBrandFileName, extensionOf } from "./brand-names.js";
 
 const KIND_LABEL = { logo: "Logos", guideline: "Guidelines", document: "Documents", font: "Fonts", package: "Packages", other: "Other files" };
 const KIND_ONE = { logo: "Logo", guideline: "Guideline", document: "Document", font: "Font", package: "Package", other: "Other file" };
-const LOGO_ROLE = { primary: "Primary", simplified: "Simplified", icon: "Icon / symbol" };
+const LOGO_ROLE = { primary: "Primary", secondary: "Secondary", simplified: "Simplified", icon: "Sub-mark" }; // the four logo cards on the client's Branding page (icon is stored as the Sub-mark)
+const LOGO_VARIATION_ROLES = ["primary", "secondary", "simplified", "icon"];
 const ORIENTATION = { horizontal: "Horizontal", vertical: "Vertical", square: "Square" };
 const TONE = { light: "For light backgrounds", dark: "For dark backgrounds", colour: "Full colour", mono: "One colour" };
 const TONE_FORM = { light: "Light (for light backgrounds)", dark: "Dark (for dark backgrounds)", colour: "Colour (full colour)", mono: "Mono (one colour)" };
@@ -146,7 +147,7 @@ export async function render(orgId, ctx) {
     const usage = h("input", { id: prefix + "-usage", class: "input", type: "text", maxlength: "300", value: a && a.usageNote || "", autocomplete: "off" });
     const downloadable = check(prefix + "-dl", "Clients may download this font file", a && a.downloadable);
     const licence = h("input", { id: prefix + "-lic", class: "input", type: "text", maxlength: "300", value: a && a.licenseNote || "", autocomplete: "off" });
-    const logoBox = h("div", { class: "adm-brand__grid" }, labelled(prefix + "-role", "Logo type", role), labelled(prefix + "-orient", "Shape", orient), labelled(prefix + "-tone", "Version", tone), transparent.node);
+    const logoBox = h("div", { class: "adm-brand__grid" }, labelled(prefix + "-role", "Logo type", role, "Which of the four logo cards on the client’s Branding page this file belongs to. Add each format (SVG, PNG, PDF…) as its own file with the same type."), labelled(prefix + "-orient", "Shape", orient), labelled(prefix + "-tone", "Version", tone), transparent.node);
     const descriptionBox = labelled(prefix + "-title", "Name", description, "Used in the file name, for example “Brand guidelines” or “Switzer Regular”.");
     const fontBox = h("div", { class: "adm-brand__stack" }, downloadable.node, labelled(prefix + "-lic", "Licence note (required to allow downloads)", licence, "For example: Open Font Licence 1.1, or the licence you hold."));
     const previewName = h("code", { class: "adm-brand__previewname" }), previewNote = h("span", { class: "adm-brand__previewnote" });
@@ -282,12 +283,21 @@ export async function render(orgId, ctx) {
       h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "submit" }, "Save brand name")));
   }
 
+  /** Which of the four client logo cards have a file and which still show the example, from the files below (published ones are what the client sees). */
+  function logoCoverage() {
+    const logos = data.assets.filter((a) => a.kind === "logo");
+    const line = LOGO_VARIATION_ROLES.map((r) => { const files = logos.filter((a) => a.logoRole === r); const live = files.filter((a) => a.published).length; return `${LOGO_ROLE[r]}: ${files.length ? `${plural(files.length, "file")}${live ? `, ${live} published` : ", none published"}` : "not added"}`; }).join(" · ");
+    const loose = logos.filter((a) => !a.logoRole).length;
+    return h("p", { class: "adm-sub adm-brand__coverage" }, `Client logo cards — ${line}.${loose ? ` ${plural(loose, "older logo file")} with no logo type ${loose === 1 ? "is" : "are"} listed under “Other logo files”; choose a type to place ${loose === 1 ? "it" : "them"} on a card.` : ""}`);
+  }
+
   function assetsSection() {
     const groups = Object.keys(KIND_LABEL).map((k) => [k, data.assets.filter((a) => a.kind === k)]).filter(([, list]) => list.length);
     const published = data.assets.filter((a) => a.published).length;
     const body = [
       !canWrite() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at files, but not add, publish or delete them.") : !caps().storage ? h("p", { class: "adm-banner" }, "File storage isn’t available on this site, so files can’t be added or replaced. Colours and typography can still be set.") : null,
       canWrite() ? brandNameBox() : null,
+      logoCoverage(),
       canUpload() ? disclosure({ id: "br-add", title: "Add a file", className: "adm-acc--sub", open: opened.has("br-add"), onToggle: toggled("br-add"), children: addForm() }) : null,
       groups.length
         ? groups.map(([k, list]) => h("div", { class: "adm-brand__group" }, h("p", { class: "adm-brand__h3", text: `${KIND_LABEL[k]} (${list.length})` }), h("ul", { class: "adm-brand__list", "aria-label": KIND_LABEL[k] }, list.map(assetRecord))))

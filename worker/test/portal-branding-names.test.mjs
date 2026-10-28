@@ -29,7 +29,7 @@ const nameOf = (w, id) => rows(w.db, "SELECT original_name, title, variant_key, 
 test("the name is built from the company and the logo details, exactly like the example, and is always plain ASCII letters, digits and hyphens", () => {
   const r = buildBrandFileName({ company: "Framework", kind: "logo", logo: { role: "primary", orientation: "square", tone: "light", transparent: true }, ext: "png" });
   assert.deepEqual(r, { ok: true, stem: "Framework-Primary-Square-Light-Transparent", name: "Framework-Primary-Square-Light-Transparent.png", title: "Primary logo, square, light, transparent", variantKey: "primary-square-light-transparent" });
-  assert.equal(buildBrandFileName({ company: "Framework", kind: "logo", logo: { role: "icon", orientation: "vertical", tone: "dark" }, ext: "svg" }).name, "Framework-Icon-Vertical-Dark.svg", "no 'Transparent' unless it is");
+  assert.equal(buildBrandFileName({ company: "Framework", kind: "logo", logo: { role: "icon", orientation: "vertical", tone: "dark" }, ext: "svg" }).name, "Framework-Submark-Vertical-Dark.svg", "no 'Transparent' unless it is");
   assert.equal(buildBrandFileName({ company: "Framework", kind: "guideline", description: "brand guidelines", ext: "pdf" }).name, "Framework-Brand-Guidelines.pdf");
   assert.equal(companyPart("Alpha Café & Co."), "Alpha-Cafe-Co");
   assert.equal(companyPart("iPhone Repair Co"), "iPhone-Repair-Co", "mixed-case words are left alone");
