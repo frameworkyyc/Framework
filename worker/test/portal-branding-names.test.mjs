@@ -26,10 +26,21 @@ async function world(name = "Framework") {
 const up = (w, meta, name, bytes, org = w.org) => B.adminUploadAsset(w.deps, { organizationId: org.id, actor: "a@f.test", meta, file: { name, bytes } });
 const nameOf = (w, id) => rows(w.db, "SELECT original_name, title, variant_key, format FROM brand_assets WHERE id = ?", id)[0];
 
+test("a logo needs no version: the name is Company-Type-Shape[-Transparent], and a background word (older files) is still honoured when present", async () => {
+  assert.deepEqual(buildBrandFileName({ company: "Framework", kind: "logo", logo: { role: "primary", orientation: "square", transparent: true }, ext: "svg" }), { ok: true, stem: "Framework-Primary-Square-Transparent", name: "Framework-Primary-Square-Transparent.svg", title: "Primary logo, square, transparent", variantKey: "primary-square-transparent" });
+  assert.equal(buildBrandFileName({ company: "Framework", kind: "logo", logo: { role: "secondary", orientation: "horizontal" }, ext: "png" }).name, "Framework-Secondary-Horizontal.png");
+  assert.equal(buildBrandFileName({ company: "Framework", kind: "logo", logo: { role: "secondary", orientation: "horizontal", tone: "dark" }, ext: "png" }).name, "Framework-Secondary-Horizontal-Dark.png", "existing files keep theirs");
+  const w = await world();
+  const a = await up(w, { kind: "logo", logo_role: "primary", orientation: "square" }, "a.png", S.png());
+  assert.equal(a.name, "Framework-Primary-Square.png");
+  assert.equal((await up(w, { kind: "logo", logo_role: "primary", orientation: "square" }, "a.svg", S.svg ? S.svg() : S.png())).name.startsWith("Framework-Primary-Square."), true, "another format shares the stem");
+  assert.equal(rows(w.db, "SELECT tone FROM brand_assets WHERE id = ?", a.id)[0].tone, null);
+});
+
 test("the name is built from the company and the logo details, exactly like the example, and is always plain ASCII letters, digits and hyphens", () => {
   const r = buildBrandFileName({ company: "Framework", kind: "logo", logo: { role: "primary", orientation: "square", tone: "light", transparent: true }, ext: "png" });
   assert.deepEqual(r, { ok: true, stem: "Framework-Primary-Square-Light-Transparent", name: "Framework-Primary-Square-Light-Transparent.png", title: "Primary logo, square, light, transparent", variantKey: "primary-square-light-transparent" });
-  assert.equal(buildBrandFileName({ company: "Framework", kind: "logo", logo: { role: "icon", orientation: "vertical", tone: "dark" }, ext: "svg" }).name, "Framework-Icon-Vertical-Dark.svg", "no 'Transparent' unless it is");
+  assert.equal(buildBrandFileName({ company: "Framework", kind: "logo", logo: { role: "icon", orientation: "vertical", tone: "dark" }, ext: "svg" }).name, "Framework-Submark-Vertical-Dark.svg", "no 'Transparent' unless it is");
   assert.equal(buildBrandFileName({ company: "Framework", kind: "guideline", description: "brand guidelines", ext: "pdf" }).name, "Framework-Brand-Guidelines.pdf");
   assert.equal(companyPart("Alpha Café & Co."), "Alpha-Cafe-Co");
   assert.equal(companyPart("iPhone Repair Co"), "iPhone-Repair-Co", "mixed-case words are left alone");
@@ -40,7 +51,7 @@ test("the name is built from the company and the logo details, exactly like the 
   assert.equal(descriptionPart("  v2 — final!! "), "V2-Final");
   assert.equal(extensionOf("Logo.JPEG"), "jpg"); assert.equal(extensionOf("noext"), "");
   // the incomplete cases name what is missing
-  assert.deepEqual(buildBrandFileName({ company: "F", kind: "logo", logo: { role: "primary" }, ext: "png" }), { ok: false, missing: ["shape", "version"], error: "incomplete_logo_details" });
+  assert.deepEqual(buildBrandFileName({ company: "F", kind: "logo", logo: { role: "primary" }, ext: "png" }), { ok: false, missing: ["shape"], error: "incomplete_logo_details" });
   assert.deepEqual(buildBrandFileName({ company: "F", kind: "font", description: "  ", ext: "ttf" }), { ok: false, missing: ["name"], error: "invalid_description" });
   for (const company of ["Framework", "Zoë & Sons, Inc.", "  ../../etc/passwd  ", "A".repeat(200), "Ünïcödé Ltd", "<script>alert(1)</script>", "x\u202Ey", "a/b\\c:d*e?f\"g<h>i|j"]) {
     const n = buildBrandFileName({ company, kind: "logo", logo: { role: "primary", orientation: "square", tone: "light", transparent: true }, ext: "png" }).name;
@@ -138,7 +149,7 @@ test("editing: publication and notes never rename a file; changing a naming deta
   assert.equal(nameOf(w, a.id).original_name, "Framework-Primary-Square-Light.png");
   assert.equal((await edit(a.id, { kind: "font" })).error, "invalid_input");
   assert.equal((await edit(a.id, { tone: "neon" })).error, "invalid_tone");
-  assert.equal((await edit(a.id, { tone: "" })).error, "incomplete_logo_details");
+  assert.equal((await edit(a.id, { orientation: "" })).error, "incomplete_logo_details", "the shape is still required");
   assert.equal((await edit(a.id, { variant_key: "x", original_name: "Evil.png" })).ok, true, "name and key cannot be set from outside: unknown fields are ignored");
   assert.equal(nameOf(w, a.id).original_name, "Framework-Primary-Square-Light.png");
   assert.equal((await edit(crypto.randomUUID(), { published: true })).error, "not_found");

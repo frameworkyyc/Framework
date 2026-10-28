@@ -17,12 +17,18 @@ import { recordActivity } from "./activity.js";
 import { usableName } from "../../../admin/assets/brand-names.js";
 
 export const ASSET_KINDS = ["logo", "guideline", "document", "font", "package", "other"];
-export const LOGO_ROLES = ["primary", "simplified", "icon"];
+export const LOGO_ROLES = ["primary", "simplified", "icon"]; // what the database CHECK allows (icon = the Sub-mark)
+/** What Framework Admin may choose. "secondary" has no column value of its own (that would need a migration): it is stored as logo_role NULL and the generated variant_key starts with "secondary-"; roleOf() reads it back. */
+export const LOGO_ROLE_INPUT = [...LOGO_ROLES, "secondary"];
+export const roleOf = (r) => r.logo_role || (r.kind === "logo" && typeof r.variant_key === "string" && /^secondary(-|$)/.test(r.variant_key) ? "secondary" : null);
 export const ORIENTATIONS = ["horizontal", "vertical", "square"];
 export const TONES = ["light", "dark", "colour", "mono"];
 export const UPLOAD_CATEGORIES = ["logo", "fonts", "colours", "guidelines", "stationery", "signature", "other"];
 export const COLOUR_ROLES = ["primary", "secondary", "accent", "neutral"];
 export const TYPE_ROLES = ["logo", "heading", "subheading", "body", "other"];
+export const TYPE_SLOTS = ["primary", "secondary", "accent"]; // the three typeface slots of the client page; an older typeface with no slot is shown under "Other typefaces", never guessed into one
+export const TYPE_STYLES = ["normal", "italic"];
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const REQUEST_STATUSES = ["new", "contacted", "closed", "declined"];
 const MAX_COLOURS = 16, MAX_TYPEFACES = 12;
 
@@ -47,16 +53,27 @@ export function normaliseColours(list) {
 
 export function normaliseTypography(list) {
   if (!Array.isArray(list) || list.length > MAX_TYPEFACES) return fail("invalid_typography");
-  const out = [];
+  const out = [], slotsSeen = new Set();
   for (const t of list) {
     if (!t || typeof t !== "object") return fail("invalid_typography");
     const family = validateName(t.family, 80), role = validateEnum(t.role, TYPE_ROLES);
     const usage = validateText(t.usage, 300), source = validateHttpsUrl(t.source_url);
     const weights = t.weights === undefined || t.weights === null ? [] : t.weights;
+    const slot = t.slot === undefined || t.slot === null || t.slot === "" ? null : validateEnum(t.slot, TYPE_SLOTS);
+    const styles = t.styles === undefined || t.styles === null ? [] : t.styles;
+    const fileIds = t.file_ids === undefined || t.file_ids === null ? [] : t.file_ids;
     if (!family || !role || usage === undefined || source === undefined || !Array.isArray(weights) || weights.length > 9 || !weights.every((w) => Number.isInteger(w) && w >= 100 && w <= 900 && w % 100 === 0)) return fail("invalid_typography");
-    out.push({ family, role, weights: [...new Set(weights)].sort((a, b) => a - b), usage, source_url: source });
+    if ((t.slot !== undefined && t.slot !== null && t.slot !== "" && !slot) || (slot && slotsSeen.has(slot)) || !Array.isArray(styles) || !styles.every((x) => TYPE_STYLES.includes(x)) || !Array.isArray(fileIds) || fileIds.length > 6 || !fileIds.every((x) => typeof x === "string" && UUID_LIKE.test(x))) return fail("invalid_typography");
+    if (slot) slotsSeen.add(slot);
+    out.push({ family, role, slot, weights: [...new Set(weights)].sort((a, b) => a - b), styles: TYPE_STYLES.filter((x) => styles.includes(x)), usage, source_url: source, file_ids: [...new Set(fileIds.map((x) => x.toLowerCase()))] });
   }
   return ok({ value: out });
+}
+
+/** The ids of an organization's live font files: a typeface may only point at these (checked by the Admin API when it saves; the client page also ignores any id that is not one of its published fonts). */
+export async function liveFontAssetIds(db, organizationId) {
+  requireOrgId(organizationId);
+  return new Set((await db.prepare("SELECT id FROM brand_assets WHERE organization_id = ? AND kind = 'font' AND deleted_at IS NULL").bind(organizationId).all()).results.map((r) => r.id));
 }
 
 /** The optional brand name used in generated file names: single-line text of up to 60 characters that leaves letters or digits for a file name. null = none (the organization's name is used). */
@@ -140,7 +157,8 @@ function assetMeta(meta, { forCreate }) {
   if (forCreate || "kind" in meta) { out.kind = validateEnum(meta.kind, ASSET_KINDS); if (!out.kind) return fail("invalid_kind"); }
   if (forCreate || "title" in meta) { out.title = validateName(meta.title, 120); if (!out.title) return fail("invalid_title"); }
   if ("variant_key" in meta) { const v = meta.variant_key; out.variant_key = v === null || v === "" ? null : typeof v === "string" && /^[a-z0-9-]{1,60}$/.test(v) ? v : undefined; if (out.variant_key === undefined) return fail("invalid_variant"); }
-  for (const [key, list] of [["logo_role", LOGO_ROLES], ["orientation", ORIENTATIONS], ["tone", TONES]]) if (key in meta) { out[key] = meta[key] === null || meta[key] === "" ? null : validateEnum(meta[key], list); if (out[key] === null && meta[key] !== null && meta[key] !== "") return fail("invalid_" + key); }
+  for (const [key, list] of [["logo_role", LOGO_ROLE_INPUT], ["orientation", ORIENTATIONS], ["tone", TONES]]) if (key in meta) { out[key] = meta[key] === null || meta[key] === "" ? null : validateEnum(meta[key], list); if (out[key] === null && meta[key] !== null && meta[key] !== "") return fail("invalid_" + key); }
+  if (out.logo_role === "secondary") out.logo_role = null; // see LOGO_ROLE_INPUT
   if ("transparent" in meta) out.transparent = bool(meta.transparent);
   for (const [key, max] of [["usage_note", 300], ["license_note", 300]]) if (key in meta) { const t = validateText(meta[key], max); if (t === undefined) return fail("invalid_" + key); out[key] = t; }
   if ("downloadable" in meta) out.downloadable = bool(meta.downloadable);
@@ -263,7 +281,7 @@ export async function deleteBrandAsset(db, organizationId, assetId, actor, { now
   return res[0].meta.changes === 1 ? ok({ storageKey: cur.storageKey }) : fail("not_found");
 }
 
-const adminAsset = (r) => ({ id: r.id, organizationId: r.organization_id, kind: r.kind, title: r.title, variantKey: r.variant_key, logoRole: r.logo_role, orientation: r.orientation, tone: r.tone, transparent: !!r.transparent, usageNote: r.usage_note, downloadable: !!r.downloadable, licenseNote: r.license_note, format: r.format, contentType: r.content_type, size: r.size_bytes, sha256: r.sha256, storageKey: r.storage_key, originalName: r.original_name, published: !!r.published, sortOrder: r.sort_order, createdAt: r.created_at, createdBy: r.created_by, updatedAt: r.updated_at });
+const adminAsset = (r) => ({ id: r.id, organizationId: r.organization_id, kind: r.kind, title: r.title, variantKey: r.variant_key, logoRole: roleOf(r), orientation: r.orientation, tone: r.tone, transparent: !!r.transparent, usageNote: r.usage_note, downloadable: !!r.downloadable, licenseNote: r.license_note, format: r.format, contentType: r.content_type, size: r.size_bytes, sha256: r.sha256, storageKey: r.storage_key, originalName: r.original_name, published: !!r.published, sortOrder: r.sort_order, createdAt: r.created_at, createdBy: r.created_by, updatedAt: r.updated_at });
 
 export async function getBrandAssetAdmin(db, organizationId, assetId) {
   requireOrgId(organizationId); requireId(assetId, "asset_id");
@@ -290,16 +308,16 @@ export async function getClientBrand(db, organizationId) {
     .bind(organizationId).all()).results;
   return {
     published: true, publishedAt: kit.publishedAt, colours: kit.colours, typography: kit.typography,
-    assets: rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, variantKey: r.variant_key, logoRole: r.logo_role, orientation: r.orientation, tone: r.tone, transparent: !!r.transparent, usageNote: r.usage_note, canDownload: r.kind !== "font" || !!r.downloadable, licenseNote: r.kind === "font" ? r.license_note : null, format: r.format, size: r.size_bytes })),
+    assets: rows.map((r) => ({ id: r.id, kind: r.kind, title: r.title, variantKey: r.variant_key, logoRole: roleOf(r), orientation: r.orientation, tone: r.tone, transparent: !!r.transparent, usageNote: r.usage_note, canDownload: r.kind !== "font" || !!r.downloadable, licenseNote: r.kind === "font" ? r.license_note : null, format: r.format, size: r.size_bytes })),
   };
 }
 
 /** One deliverable a client may download, or null (not published, kit not published, deleted, another organization's, or a font that is not licensed for download). */
 export async function getClientBrandAsset(db, organizationId, assetId) {
   requireOrgId(organizationId); requireId(assetId, "asset_id");
-  const r = await db.prepare(`SELECT a.id, a.kind, a.title, a.format, a.content_type, a.size_bytes, a.storage_key, a.original_name, a.downloadable FROM brand_assets a WHERE a.id = ? AND a.organization_id = ? AND ${VISIBLE}`).bind(assetId, organizationId).first();
+  const r = await db.prepare(`SELECT a.id, a.kind, a.title, a.variant_key, a.format, a.content_type, a.size_bytes, a.storage_key, a.original_name, a.downloadable FROM brand_assets a WHERE a.id = ? AND a.organization_id = ? AND ${VISIBLE}`).bind(assetId, organizationId).first();
   if (!r || (r.kind === "font" && !r.downloadable)) return null;
-  return { id: r.id, kind: r.kind, title: r.title, format: r.format, contentType: r.content_type, size: r.size_bytes, storageKey: r.storage_key, originalName: r.original_name };
+  return { id: r.id, kind: r.kind, title: r.title, variantKey: r.variant_key, format: r.format, contentType: r.content_type, size: r.size_bytes, storageKey: r.storage_key, originalName: r.original_name };
 }
 
 /* ------------------------------------------------------------------ client uploads (brand_uploads) */

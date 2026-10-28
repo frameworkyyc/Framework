@@ -66,20 +66,23 @@ test("with the flag on, Home links Branding", async () => {
 
 /* ------------------------------------------------------------------ empty state */
 
-test("no brand kit: the full dashboard still shows all five sections, each open with a clean empty state and a Request button, plus the upload path and the Full Brand Kit request", async () => {
+test("no brand kit: all nine numbered sections show in order, each with a clean empty state (Logo shows its four examples), plus the other-files groups, the upload path and the Full Brand Kit request", async () => {
   const { ann, mia } = await setup();
   const res = await ann.get(base("alpha"));
   assert.equal(res.status, 200);
-  assert.equal(res.headers.get("content-security-policy"), PORTAL_CSP, "no script on the empty dashboard");
+  assert.equal(res.headers.get("content-security-policy"), PORTAL_CSP, "no script on the empty page");
   const html = await res.text();
-  const ids = [...html.matchAll(/<details class="acc" id="(\w+)" open>/g)].map((m) => m[1]);
-  assert.deepEqual(ids, ["logos", "colours", "typography", "guidelines", "additional"], "all five sections, open so the Request button is in view");
-  assert.equal([...html.matchAll(/Nothing here yet/g)].length, 5);
-  for (const t of ["Logos", "Colours", "Typography &amp; Fonts", "Brand Guidelines &amp; Documents", "Additional Brand Assets"]) assert.ok(html.includes(`<h2 class="acc__title">${t}</h2>`), t);
-  assert.equal([...html.matchAll(/<summary class="btn btn--small">Request<span/g)].length, 5, "a Request button in every empty section");
+  const secs = [...html.matchAll(/<section class="bk-sec" id="(\w+)"[^>]*><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">(\d\d)<\/p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-\w+"><span class="visually-hidden">\d\d <\/span>([^<]+)<\/h2>/g)].map((m) => m.slice(1));
+  assert.deepEqual(secs, [["logo", "01", "Logo"], ["typography", "02", "Typography"], ["colours", "03", "Brand Colours"], ["tagline", "04", "Tagline"], ["imagery", "05", "Brand Imagery"], ["layout", "06", "Layout System"], ["textures", "07", "Textures"], ["iconography", "08", "Iconography"], ["style", "09", "Design Style"]], "all nine, in order, with their two-digit numbers");
+  assert.equal([...html.matchAll(/<p class="bk-sec__desc muted">/g)].length, 9, "each has a short description");
+  assert.equal([...html.matchAll(/<p class="bk-empty__title">Not added yet<\/p>/g)].length, 2, "only the two other-files groups; every section shows an example instead");
+  assert.equal([...html.matchAll(/<span class="bk-eg__tag">Example: Framework<\/span>/g)].length, 7, "seven example panels (Logo and Typography show example cards)"); assert.equal([...html.matchAll(/tf-card--example/g)].length, 3);
+  assert.match(html, /<nav class="bk-nav" aria-label="Brand kit sections">/); assert.equal([...html.matchAll(/<li><a href="#\w+"><span class="bk-nav__no"/g)].length, 9);
+  assert.equal([...html.matchAll(/<summary class="btn btn--small">Request<span/g)].length, 5, "a Request button where a request exists: Logo, Typography, Colours, guidelines and additional assets");
   assert.match(html, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   assert.match(html, /Need a complete brand identity\?/); assert.match(html, /Request full brand kit/);
-  assert.ok(!/logo-grid|swatches|Download/.test(html), "no library chrome");
+  assert.ok(!/logo-grid|data-copy|Download (SVG|PNG|PDF|WEBP|JPG)|lv-card--has/.test(html), "no library chrome, no copy buttons and no download buttons");
+  assert.equal([...html.matchAll(/lv-card--example/g)].length, 4, "the four variation cards are shown as examples"); assert.equal([...html.matchAll(/<span class="tag">Not added yet<\/span>/g)].length, 14, "4 logo cards + 3 typeface cards + 7 example panels");
   const m = await (await mia.get(base("alpha"))).text();
   assert.ok(!/<summary class="btn/.test(m), "a member has no request buttons");
   assert.match(m, /Ask an owner of your organization to send a request for this section/);
@@ -90,7 +93,7 @@ test("a DRAFT kit (even with published assets) shows the empty sections and noth
   const id = await deliver(alpha, logo, "x.png", S.png(), true);
   await brand.saveBrandKit(w.db, alpha.id, { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }] }, ADMIN);
   const html = await (await ann.get(base("alpha"))).text();
-  assert.match(html, /Nothing here yet/); assert.ok(!/data-copy|swatch/.test(html));
+  assert.match(html, /Not added yet/); assert.ok(!/data-copy/.test(html) && /swatch--example/.test(html), "the client kit is a draft: only the Framework example is shown, with no copy button");
   assert.equal((await ann.get(`${base("alpha")}/files/${id}`)).status, 404);
 });
 
@@ -108,7 +111,8 @@ test("a published kit shows logos grouped by variation, colours with codes, typo
   const res = await ann.get(base("alpha"));
   assert.equal(res.headers.get("content-security-policy"), PORTAL_CSP_WITH_SCRIPT, "script only for the copy button, never inline");
   const html = await res.text();
-  assert.equal((html.match(/class="logo-card"/g) || []).length, 1, "PNG and SVG of one variation share a card");
+  assert.equal((html.match(/lv-card--has/g) || []).length, 1, "PNG and SVG of one variation share a card");
+  assert.equal((html.match(/lv-card--example/g) || []).length, 3, "the other three variations keep their example cards");
   assert.match(html, new RegExp(`files/${pngId}`)); assert.match(html, new RegExp(`files/${svgId}`));
   assert.match(html, /Download PNG/); assert.match(html, /Download SVG/);
   assert.ok(html.includes(`files/${svgId}?preview=1`) || html.includes(`files/${pngId}?preview=1`), "a preview image");
@@ -127,7 +131,7 @@ test("an unpublished kit's colours never reach the page after a kit is un-publis
   await publishKit(alpha);
   assert.match(await (await ann.get(base("alpha"))).text(), /data-copy="#0A0A0A"/);
   await brand.setBrandKitStatus(w.db, alpha.id, "draft", ADMIN);
-  assert.ok(!/data-copy|swatch/.test(await (await ann.get(base("alpha"))).text()));
+  assert.ok(!/data-copy/.test(await (await ann.get(base("alpha"))).text()));
 });
 
 test("the brand name appears in the introduction when one is set", async () => {
@@ -392,7 +396,7 @@ test("Home stays up when branding data cannot be read: the Branding card says so
 
 /* ------------------------------------------------------------------ accordion */
 
-test("Branding is five native accordion sections, each with a concise summary; sections with files are closed, empty ones open (script only opens a linked section); every download is still present", async () => {
+test("Branding is nine always-visible numbered sections (no accordion); Logo always shows its cards, sections with content show it, empty ones their empty state; every download is still present; other files keep their own group", async () => {
   const { ann, alpha, deliver, publishKit } = await setup();
   const a = await deliver(alpha, logo, "a.png", S.png()), b = await deliver(alpha, logo, "a.svg", S.svg());
   const g = await deliver(alpha, { kind: "guideline", title: "Brand Guidelines" }, "g.pdf", S.pdf());
@@ -400,13 +404,13 @@ test("Branding is five native accordion sections, each with a concise summary; s
   const f = await deliver(alpha, { kind: "font", title: "Switzer Regular", downloadable: true, license_note: "OFL" }, "f.ttf", S.ttf());
   await publishKit(alpha);
   const html = await (await ann.get(base("alpha"))).text();
-  const secs = [...html.matchAll(/<details class="acc" id="(\w+)"><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">([^<]+)<\/h2><span class="acc__sum">([^<]+)<\/span>/g)].map((m) => m.slice(1));
-  assert.deepEqual(secs, [["logos", "Logos", "1 logo variation · SVG, PNG"], ["colours", "Colours", "2 colours"], ["typography", "Typography & Fonts".replace("&", "&amp;"), "1 typeface · Switzer"], ["guidelines", "Brand Guidelines &amp; Documents", "2 files"]]);
-  assert.match(html, /<details class="acc" id="additional" open><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">Additional Brand Assets<\/h2><span class="acc__sum">Not added yet/, "the one empty section is open");
-  assert.equal([...html.matchAll(/<details class="acc" id="\w+" open>/g)].length, 1, "sections with files are closed by default on every screen");
-  assert.equal([...html.matchAll(/<summary class="acc__head"/g)].length, 5);
+  assert.equal([...html.matchAll(/<section class="bk-sec" id="/g)].length, 9);
+  assert.ok(!/<details class="acc"|acc__head/.test(html), "sections are not collapsed");
+  const sec = (id, next) => html.slice(html.indexOf(`id="${id}"`), html.indexOf(`id="${next}"`));
+  assert.match(sec("colours", "tagline"), /swatch/); assert.match(sec("typography", "colours"), /Switzer/);
+  assert.match(sec("tagline", "imagery"), /Not added yet/); assert.match(sec("imagery", "layout"), /Not added yet/);
+  assert.match(html.slice(html.indexOf('id="guidelines"')), /Brand guidelines &amp; documents/);
   for (const id of [a, b, g, d, f]) assert.ok(html.includes(`/branding/files/${id}"`), "download link kept: " + id);
-  assert.match(html, /aria-hidden="true"><\/span><\/summary>/, "the chevron is decorative");
   const js = (await import("node:fs")).readFileSync(new URL("../../assets/js/portal-branding.js", import.meta.url), "utf8");
   assert.ok(!/matchMedia|min-width/.test(js), "no automatic expansion on any screen"); assert.match(js, /hashchange/);
 });

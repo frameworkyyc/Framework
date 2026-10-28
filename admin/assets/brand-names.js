@@ -2,13 +2,13 @@
    Pure functions, no DOM and no network, so the Admin form's live preview and the server use exactly the same rules (the server is the authority: it
    recomputes the name itself and never trusts a name sent by the browser).
 
-     logo         Framework-Primary-Square-Light-Transparent.png       Company-Type-Shape-Version[-Transparent].ext
+     logo         Framework-Primary-Square-Light-Transparent.png       Company-Type-Shape[-Transparent].ext (older files may also carry a background word such as Light)
      other files  Framework-Brand-Guidelines.pdf                       Company-Description.ext
 
    The same logo in different formats shares one stem (…-Light-Transparent) and differs only by extension, so formats stay grouped and consistent.
    Names are ASCII letters, digits and hyphens only, so they are safe on every system and in a download header. */
 
-export const LOGO_ROLE_WORD = { primary: "Primary", simplified: "Simplified", icon: "Icon" };
+export const LOGO_ROLE_WORD = { primary: "Primary", secondary: "Secondary", simplified: "Simplified", icon: "Submark" }; // icon is the Sub-mark variation; its files are named Submark from now on (existing files keep their names)
 export const SHAPE_WORD = { horizontal: "Horizontal", vertical: "Vertical", square: "Square" };
 export const TONE_WORD = { light: "Light", dark: "Dark", colour: "Colour", mono: "Mono" };
 const COMPANY_MAX = 30, DESCRIPTION_MAX = 48;
@@ -56,9 +56,8 @@ export function buildBrandFileName({ company, slug = "", kind, logo = {}, descri
     const missing = [];
     if (!LOGO_ROLE_WORD[logo.role]) missing.push("logo type");
     if (!SHAPE_WORD[logo.orientation]) missing.push("shape");
-    if (!TONE_WORD[logo.tone]) missing.push("version");
     if (missing.length) return { ok: false, missing, error: "incomplete_logo_details" };
-    const parts = [LOGO_ROLE_WORD[logo.role], SHAPE_WORD[logo.orientation], TONE_WORD[logo.tone], ...(logo.transparent ? ["Transparent"] : [])];
+    const parts = [LOGO_ROLE_WORD[logo.role], SHAPE_WORD[logo.orientation], ...(TONE_WORD[logo.tone] ? [TONE_WORD[logo.tone]] : []), ...(logo.transparent ? ["Transparent"] : [])];
     const stem = [co, ...parts].join("-");
     const title = `${parts[0]} logo, ${parts.slice(1).map((p) => p.toLowerCase()).join(", ")}`;
     return { ok: true, stem, name: stem + suffix, title, variantKey: parts.map((p) => p.toLowerCase()).join("-") };

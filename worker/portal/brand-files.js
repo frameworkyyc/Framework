@@ -19,6 +19,7 @@ import { getOrganizationById } from "./repo/orgs.js";
 import { listInvoiceStorageKeys } from "./repo/invoices.js";
 import { listSupportStorageKeys } from "./repo/support.js";
 import { buildBrandFileName } from "../../admin/assets/brand-names.js";
+import { SECTION_FILE_KEYS, sectionOf, sectionVariantKey } from "../../admin/assets/brand-sections.js";
 
 const denied = () => fail("forbidden");
 const storageFail = (err) => (err instanceof StorageError ? fail(err.code) : (() => { throw err; })());
@@ -73,11 +74,11 @@ export async function clientDeleteUpload(deps, { role, organizationId, userId, u
   return ok({ storageCleanup: cleaned ? "done" : "pending" });
 }
 
-async function stream(deps, { organizationId, row, actorType, actorRef, entityType, inline = false }) {
+async function stream(deps, { organizationId, row, actorType, actorRef, entityType, inline = false, record = true }) {
   let object;
   try { object = await getObject(deps.bucket, { key: row.storageKey, organizationId }); } catch (err) { return storageFail(err); }
   if (!object) return fail("not_found");
-  await brand.recordBrandDownload(deps.db, { organizationId, actorType, actorRef, entityType, entityId: row.id, now: deps.now });
+  if (record) await brand.recordBrandDownload(deps.db, { organizationId, actorType, actorRef, entityType, entityId: row.id, now: deps.now });
   const name = row.originalName || row.title || "download";
   return ok({ response: fileResponse({ object, name, ext: row.format, inlineImage: inline, size: row.size }) });
 }
@@ -91,12 +92,13 @@ export async function clientDownloadUpload(deps, { role, organizationId, userId,
 }
 
 /** Download of a published deliverable. Not published (asset or kit), deleted, another organization's, or an unlicensed font: all the same "not_found". */
-export async function clientDownloadAsset(deps, { role, organizationId, userId, assetId, inline = false }) {
+export async function clientDownloadAsset(deps, { role, organizationId, userId, assetId, inline = false, font = false }) {
   if (!can(role, "branding.view")) return denied();
   const row = await brand.getClientBrandAsset(deps.db, organizationId, assetId);
   if (!row) return fail("not_found");
-  if (inline && row.kind !== "logo") return fail("not_found"); // only logo images are ever shown as pictures
-  return stream(deps, { organizationId, row, actorType: "client", actorRef: userId, entityType: "brand_asset", inline });
+  if (inline && row.kind !== "logo" && !sectionOf(row)) return fail("not_found"); // only logo files and files placed in a brand section are ever shown as pictures
+  if (font && row.kind !== "font") return fail("not_found"); // ?font=1 is the page loading a font for its specimen: fonts only (an unlicensed font is already not found above), and not counted as a download
+  return stream(deps, { organizationId, row, actorType: "client", actorRef: userId, entityType: "brand_asset", inline, record: !font });
 }
 
 export async function clientRequestService(deps, { role, organizationId, userId, serviceKey, note }) {
@@ -112,7 +114,7 @@ const companyName = async (db, org) => { const kit = await brand.getBrandKit(db,
 const nameInput = (org, m, ext) => ({ company: org.company || org.name, slug: org.slug, kind: m.kind, logo: { role: m.logo_role, orientation: m.orientation, tone: m.tone, transparent: m.transparent === true || m.transparent === 1 }, description: m.title, ext });
 
 /**
- * A new deliverable. The file's NAME is generated here from the organization's name and the file's details (Framework-Primary-Square-Light-Transparent.png);
+ * A new deliverable. The file's NAME is generated here from the organization's name and the file's details (Framework-Primary-Square-Transparent.png);
  * the browser never supplies it. The same logo in another format gets the same stem and a different extension. A name that is already used by a live file of
  * the organization is refused (never overwritten, never silently renamed).
  */
@@ -120,6 +122,7 @@ export async function adminUploadAsset(deps, { organizationId, actor, meta, file
   const m = meta && typeof meta === "object" ? meta : {};
   if (!brand.ASSET_KINDS.includes(m.kind)) return fail("invalid_kind");
   if (enumError(m)) return fail(enumError(m));
+  if (sectionError(m, m.kind)) return fail("invalid_section");
   const base = await getOrganizationById(deps.db, organizationId);
   if (!base) return fail("not_found");
   const org = { ...base, company: await companyName(deps.db, base) };
@@ -129,8 +132,8 @@ export async function adminUploadAsset(deps, { organizationId, actor, meta, file
   if (!built.ok) return fail(built.error);
   if (await brand.brandAssetNameTaken(deps.db, organizationId, built.name)) return fail("duplicate_name"); // checked before anything is stored; the insert checks again atomically
   const isLogo = m.kind === "logo";
-  const finalMeta = { ...pickKeys(m, ["kind", "usage_note", "downloadable", "license_note", "sort_order", "published"]), title: built.title, variant_key: built.variantKey,
-    logo_role: isLogo ? m.logo_role : null, orientation: isLogo ? m.orientation : null, tone: isLogo ? m.tone : null, transparent: isLogo && m.transparent === true };
+  const finalMeta = { ...pickKeys(m, ["kind", "usage_note", "downloadable", "license_note", "sort_order", "published"]), title: built.title, variant_key: !isLogo && m.section ? sectionVariantKey(m.section) : built.variantKey,
+    logo_role: isLogo ? m.logo_role ?? null : null, orientation: isLogo ? m.orientation ?? null : null, tone: isLogo ? m.tone ?? null : null, transparent: isLogo && m.transparent === true };
   const key = makeKey(organizationId, "brand-assets");
   try { await putObject(deps.bucket, { key, organizationId, bytes: file.bytes, sha256: inspected.sha256, contentType: inspected.contentType }); } catch (err) { return storageFail(err); }
   let rec;
@@ -141,9 +144,11 @@ export async function adminUploadAsset(deps, { organizationId, actor, meta, file
 
 /** A submitted logo detail that is not one of the allowed values gets its specific error (not "incomplete"). */
 const enumError = (m) => {
-  for (const [key, list, code] of [["logo_role", brand.LOGO_ROLES, "invalid_logo_role"], ["orientation", brand.ORIENTATIONS, "invalid_orientation"], ["tone", brand.TONES, "invalid_tone"]]) if (m[key] !== undefined && m[key] !== null && m[key] !== "" && !list.includes(m[key])) return code;
+  for (const [key, list, code] of [["logo_role", brand.LOGO_ROLE_INPUT, "invalid_logo_role"], ["orientation", brand.ORIENTATIONS, "invalid_orientation"], ["tone", brand.TONES, "invalid_tone"]]) if (m[key] !== undefined && m[key] !== null && m[key] !== "" && !list.includes(m[key])) return code;
   return null;
 };
+/** A brand section can be set on an "other" file only, and only to one of the file sections (null or "" means none). */
+const sectionError = (m, kind) => (m.section === undefined || m.section === null || m.section === "" ? false : kind !== "other" || !SECTION_FILE_KEYS.includes(m.section));
 const pickKeys = (obj, keys) => Object.fromEntries(Object.entries(obj).filter(([k]) => keys.includes(k)));
 const stemOf = (name) => String(name).replace(/\.[^.]+$/, "");
 
@@ -165,7 +170,7 @@ export async function adminReplaceAsset(deps, { organizationId, assetId, actor, 
 }
 
 /**
- * Editing a deliverable. The file name is regenerated ONLY when a naming detail changed (logo type, shape, version, transparency, or a non-logo's name); other
+ * Editing a deliverable. The file name is regenerated ONLY when a naming detail changed (logo type, shape, transparency, or a non-logo's name); other
  * edits (publication, usage note, order) never touch it, so older files keep their names until their naming details are edited on purpose. The file type
  * (logo, font ...) cannot be changed after upload.
  */
@@ -175,6 +180,7 @@ export async function adminUpdateAsset(deps, { organizationId, assetId, actor, p
   const p = patch && typeof patch === "object" ? patch : {};
   if ("kind" in p && p.kind !== cur.kind) return fail("invalid_input");
   if (enumError(p)) return fail(enumError(p));
+  if (sectionError(p, cur.kind)) return fail("invalid_section");
   const base = await getOrganizationById(deps.db, organizationId);
   if (!base) return fail("not_found");
   const org = { ...base, company: await companyName(deps.db, base) };
@@ -185,11 +191,13 @@ export async function adminUpdateAsset(deps, { organizationId, assetId, actor, p
   const adopt = p.standard_name === true; // "rename to the standard name": an explicit, opt-in rename of an older file
   const changed = adopt || (isLogo ? next.logo_role !== cur.logoRole || next.orientation !== cur.orientation || next.tone !== cur.tone || next.transparent !== cur.transparent : next.title !== cur.title);
   const out = pickKeys(p, ["usage_note", "downloadable", "license_note", "sort_order", "published"]);
+  const nextSection = !isLogo && has("section") ? p.section || null : sectionOf(cur); // placing a file in a brand section (or taking it out) is always an explicit choice
+  if (!isLogo && nextSection !== sectionOf(cur)) out.variant_key = nextSection ? sectionVariantKey(nextSection) : null;
   if (changed) {
     const built = buildBrandFileName(nameInput(org, next, cur.format));
     if (!built.ok) return fail(built.error);
     if (await brand.brandAssetNameTaken(deps.db, organizationId, built.name, assetId)) return fail("duplicate_name");
-    Object.assign(out, { title: built.title, variant_key: built.variantKey, original_name: built.name }, isLogo ? { logo_role: next.logo_role, orientation: next.orientation, tone: next.tone, transparent: next.transparent } : {});
+    Object.assign(out, { title: built.title, original_name: built.name }, isLogo ? { variant_key: built.variantKey } : {}, isLogo ? { logo_role: next.logo_role, orientation: next.orientation, tone: next.tone, transparent: next.transparent } : {});
   }
   if (!Object.keys(out).length) return ok({ name: cur.originalName }); // nothing that changes anything
   const r = await brand.updateBrandAsset(deps.db, organizationId, assetId, out, actor, { now: deps.now });
@@ -220,10 +228,11 @@ export async function adminDownloadUpload(deps, { organizationId, uploadId, acto
 }
 
 /** Admin download of a deliverable, draft or published. */
-export async function adminDownloadAsset(deps, { organizationId, assetId, actor }) {
+export async function adminDownloadAsset(deps, { organizationId, assetId, actor, inline = false }) {
   const row = await brand.getBrandAssetAdmin(deps.db, organizationId, assetId);
   if (!row) return fail("not_found");
-  return stream(deps, { organizationId, row, actorType: "admin", actorRef: actor, entityType: "brand_asset" });
+  if (inline && row.kind !== "logo" && !sectionOf(row)) return fail("not_found"); // only logo files and files placed in a brand section are ever shown as pictures
+  return stream(deps, { organizationId, row, actorType: "admin", actorRef: actor, entityType: "brand_asset", inline, record: !inline }); // a preview on the Branding page is not a download, so it is not recorded
 }
 
 /* ------------------------------------------------------------------ offboarding and housekeeping */
