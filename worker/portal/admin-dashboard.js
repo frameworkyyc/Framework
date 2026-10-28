@@ -83,7 +83,7 @@ async function requestsPart(env, rdb) {
   });
   const support = await part(async () => {
     const [totals, list] = [await adminSupportTotals(env.PORTAL_DB), await listRequestsAllAdmin(env.PORTAL_DB, { scope: "open", limit: 200 })];
-    return { total: totals.open, items: list.slice(0, 200).map((r) => ({ kind: "support", id: r.id, organizationId: r.organizationId, orgName: r.orgName, type: `${r.scope === "change" ? "Change request" : "Support request"}: ${CATEGORY_LABEL[r.category] || "Request"}`, title: r.title, status: r.status, statusLabel: STATUS_LABEL[r.status] || r.status, createdAt: r.createdAt })) };
+    return { total: totals.open, items: list.slice(0, 200).map((r) => ({ kind: "support", id: r.id, organizationId: r.organizationId, orgName: r.orgName, type: `${r.scope === "change" ? "Change request" : "Support request"}: ${CATEGORY_LABEL[r.category] || "Request"}`, title: r.title, status: r.status, statusLabel: STATUS_LABEL[r.status] || r.status, note: r.reason === "reply" ? "New reply" : null, createdAt: r.createdAt })) };
   });
   if (!branding && !support) return null;
   const items = [...(branding ? branding.items : []), ...(support ? support.items : [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : a.id < b.id ? -1 : 1));
