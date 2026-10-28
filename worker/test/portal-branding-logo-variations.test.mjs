@@ -658,3 +658,11 @@ test("example content: Framework typography (Switzer 600/700, General Sans 400/5
   assert.match(css, /\.bk-eg \{ background: var\(--mist\)/); assert.match(css, /\.lv-card__stage--example \{ background: var\(--mist\)/);
   assert.ok(!/\.(bk-eg|tf-card--example|tf-level--example|lv-card__stage--example)[^{]*\{[^}]*(opacity|gradient|box-shadow|border-radius: [1-9])/.test(css), "muted by colour, not opacity; no gradients, shadows or rounded corners");
 });
+
+test("typography specimens stay on one line: sized from the card width, no wrapping, for example and client typefaces alike", () => {
+  const css = read("assets/css/portal.css");
+  assert.match(css, /\.tf-card__stage \{[^}]*container-type: inline-size/);
+  const aa = /\.tf-card__aa \{([^}]*)\}/.exec(css)[1];
+  assert.match(aa, /white-space: nowrap/); assert.match(aa, /font-size: clamp\(18px, 13cqw, 46px\)/); assert.doesNotMatch(aa, /overflow-wrap/);
+  assert.match(aa, /font-size: clamp\(20px, 2\.6vw, 34px\);[^}]*font-size: clamp\(18px, 13cqw/, "a plain fallback comes first for browsers without container units");
+});
