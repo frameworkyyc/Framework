@@ -14,6 +14,7 @@ import * as brandingLive from "./branding-live.js";
 import * as servicesLive from "./services-live.js";
 import { brandingEnabled, servicesEnabled } from "./config.js";
 import { LIVE_AREAS } from "./guided-data.js";
+import { specimenSlots } from "./brand-type.js";
 
 /** The one portal script: tidies website fields and warns about unsaved Business Profile changes, and moves keyboard focus to a form's error summary after a refused save. Loaded only where it has a job. */
 const FOCUS_SCRIPT = "/assets/js/portal-profile.js";
@@ -47,11 +48,11 @@ function liveModel(ctx, { session, membership: m, returning }, data = {}) {
   };
 }
 
-async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, ref = null }) {
+async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, styles = [], ref = null }) {
   const { session, membership: m } = a;
   // Header navigation of the connected portal: Home and Account (and Team for owners). Every other page is reached from Home.
   const list = [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: active === "account" || active === "team" ? active : "home", list }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), script, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}` });
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: active === "account" || active === "team" ? active : "home", list }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), script, styles, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}` });
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null }) {
@@ -142,7 +143,7 @@ const BRANDING_SCRIPT = "/assets/js/portal-branding.js";
 export async function brandingPage(ctx, a, brand, o = {}) {
   const vm = liveModel(ctx, a, {});
   const csrf = await csrfFor(ctx.cfg, a.session);
-  return shell(ctx, a, { title: "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, { ...o, csrf }), vm, script: brand.published ? BRANDING_SCRIPT : null, ref: "branding" });
+  return shell(ctx, a, { title: "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, { ...o, csrf }), vm, script: brand.published ? BRANDING_SCRIPT : null, styles: Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [], ref: "branding" });
 }
 /** The separate area for the client's own brand materials. `o`: see branding-live.js brandingUploads; `status` is the HTTP status (4xx for a refused upload). */
 export async function brandingUploadsPage(ctx, a, o = {}) {

@@ -9,7 +9,9 @@ import { crumb } from "./guided.js";
 import { UPLOAD_CATEGORIES } from "./repo/brand.js";
 import { BRAND_REQUESTS } from "./brand-services.js";
 import { LOGO_VARIATIONS } from "../../admin/assets/logo-variations.js";
-import { BRAND_SECTIONS, sectionOf } from "../../admin/assets/brand-sections.js";
+import { BRAND_SECTIONS, TYPE_SLOT_DEFS, sectionOf } from "../../admin/assets/brand-sections.js";
+import { typefaceOf, filesOf, specimenSlots, faceOf, WEIGHT_NAME } from "./brand-type.js";
+import { activePricing, pricingBlock } from "./branding-pricing.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const MB = 1024 * 1024;
@@ -76,14 +78,57 @@ function swatch(c) {
 <div class="swatch__body"><p class="swatch__name">${e(c.name)}</p><p class="muted small">${e(COLOUR_ROLE_LABEL[c.role] || "")}</p><p class="swatch__code"><code>${e(c.hex)}</code> <button class="copy" type="button" data-copy="${e(c.hex)}" hidden>Copy<span class="visually-hidden"> ${e(c.name)} ${e(c.hex)}</span></button></p><p class="swatch__code muted small">RGB <code>${e(rgb(c.hex))}</code> <button class="copy" type="button" data-copy="${e(rgb(c.hex))}" hidden>Copy<span class="visually-hidden"> ${e(c.name)} RGB ${e(rgb(c.hex))}</span></button></p>${c.note ? `<p class="small">${e(c.note)}</p>` : ""}</div></li>`;
 }
 
-const WEIGHT_NAME = { 100: "Thin", 200: "Extra Light", 300: "Light", 400: "Regular", 500: "Medium", 600: "Semibold", 700: "Bold", 800: "Extra Bold", 900: "Black" };
 const SAMPLE_TEXT = "The quick brown fox jumps over the lazy dog";
 
 /** One typeface: its name, role, the weights Framework set up, example text, usage, a link to get it and any licensed font files. */
 function typeface(vm, t, fontFiles) {
-  const files = fontFiles.filter((f) => f.title.toLowerCase().includes(t.family.toLowerCase()));
+  const files = filesOf(t, fontFiles).usable;
   const weights = t.weights && t.weights.length ? `<ul class="bk-weights" aria-label="Available weights">${t.weights.map((w) => `<li>${e(WEIGHT_NAME[w] || "Weight")} <span class="muted">${e(w)}</span></li>`).join("")}</ul>` : "";
   return `<li class="type bk-type"><p class="bk-type__glyphs" aria-hidden="true">Aa</p><div class="bk-type__body"><p class="type__family">${e(t.family)}</p><p class="muted small">${e(TYPE_ROLE_LABEL[t.role] || "")}</p>${weights}<p class="bk-type__sample">${SAMPLE_TEXT}</p>${t.usage ? `<p class="small">${e(t.usage)}</p>` : ""}${isHttps(t.source_url) ? `<p class="small"><a class="text-link" href="${e(t.source_url)}" rel="noopener noreferrer" target="_blank">Get this font<span class="visually-hidden"> (${e(t.family)}, opens the font provider)</span></a></p>` : ""}${files.length ? `<div class="logo-card__actions">${files.map((a) => downloadLink(vm, a, `Download ${e(upper(a.format))}`)).join("")}</div>` : ""}</div></li>`;
+}
+
+const ALPHABET = ["ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789 & ! ? @ #"];
+const STYLE_LABEL = { normal: "Normal", italic: "Italic" };
+const NO_SHARE_NOTE = "This font’s licence doesn’t allow sharing the file. Use the link to get it from its provider, or ask us.";
+
+/** One of the three typeface slots, laid out like a Logo card: a 16:9 specimen frame, then the role, family, weights and styles, characters, usage and downloads. */
+function typeCard(vm, def, raw, fonts, spec) {
+  const t = typefaceOf(raw);
+  const { all, usable } = filesOf(t, fonts);
+  const cls = spec ? `sp-${def.key}` : "";
+  const faces = spec ? spec.faces : [];
+  const weights = t.weights.length ? `<ul class="bk-weights" aria-label="Approved weights">${t.weights.map((w) => `<li>${e(WEIGHT_NAME[w] || "Weight")} <span class="muted">${e(w)}</span></li>`).join("")}</ul>` : "";
+  const styles = t.styles.length ? `<p class="muted small">Styles: ${e(t.styles.map((x) => STYLE_LABEL[x]).join(", "))}</p>` : "";
+  const lines = spec ? t.weights.filter((w) => faces.some((f) => f.weight === w && f.style === "normal")).map((w) => `<p class="tf-card__weight ${cls} fw-w${w}"><span class="tf-card__wname">${e(WEIGHT_NAME[w])} ${e(w)}</span> The quick brown fox jumps over the lazy dog</p>`).join("") : "";
+  const stage = `<div class="tf-card__stage${spec ? "" : " tf-card__stage--fallback"}"><p class="tf-card__aa ${cls}">Aa Bb Cc 123</p>${spec ? "" : `<span class="tag tf-card__flag">Fallback preview</span>`}</div>`;
+  const note = spec
+    ? `<p class="tf-card__note muted small" data-font-check="fwb-${e(def.key)}" data-ok="Specimen set in the font file Framework uploaded for you." data-fail="Fallback preview: your font file couldn’t be loaded here, so this is not ${e(t.family)}.">Specimen set in the font file Framework uploaded for you.</p>`
+    : `<p class="tf-card__note muted small">Fallback preview: shown in this page’s own typeface, not in ${e(t.family)}.${all.length ? "" : " No font file has been added."}</p>`;
+  const chars = `<div class="tf-card__chars ${cls}">${ALPHABET.map((l) => `<p>${e(l)}</p>`).join("")}</div>`;
+  const get = isHttps(t.source_url) ? `<p class="small"><a class="text-link" href="${e(t.source_url)}" rel="noopener noreferrer" target="_blank">Get this font<span class="visually-hidden"> (${e(t.family)}, opens the font provider)</span></a></p>` : "";
+  const dl = `${usable.length ? `<div class="lv-card__actions">${usable.map((a) => downloadLink(vm, a, `Download ${e(upper(a.format))}`)).join("")}</div>` : ""}${all.length > usable.length ? `<p class="muted small">${e(NO_SHARE_NOTE)}</p>` : ""}`;
+  return `<li class="tf-card tf-card--has">${stage}<div class="tf-card__body"><p class="lv-card__no" aria-hidden="true">${e(def.no)}</p><h3 class="lv-card__title">${e(def.title)}</h3><p class="tf-card__family">${e(t.family)}</p><p class="lv-card__desc muted">${e(def.desc)}</p>${weights}${styles}${chars}${lines}${t.usage ? `<p class="small">${e(t.usage)}</p>` : ""}${note}${get}${dl}</div></li>`;
+}
+
+/** A slot with no typeface yet: restrained, nothing invented. The Accent slot says it is optional. */
+function emptyTypeCard(def) {
+  return `<li class="tf-card tf-card--empty"><div class="tf-card__stage tf-card__stage--empty"><span class="muted small">Not added yet</span></div><div class="tf-card__body"><p class="lv-card__no" aria-hidden="true">${e(def.no)}</p><h3 class="lv-card__title">${e(def.title)}</h3><p class="lv-card__status"><span class="tag">${def.optional ? "Optional" : "Not added yet"}</span></p><p class="lv-card__desc muted">${e(def.desc)}</p></div></li>`;
+}
+
+const LEVELS = [["Heading 1", "h1", "primary", 700, "Largest", "Headlines that stand out"], ["Heading 2", "h2", "primary", 600, "Large", "Section headlines"], ["Heading 3", "h3", "primary", 600, "Medium", "Sub-headings"], ["Body Text", "body", "secondary", 400, "Base", "Paragraphs and everyday communication read comfortably when the body font and size stay steady."], ["Caption / Small Label", "caption", "secondary", 400, "Smallest", "Captions, labels and fine print"]];
+
+/** The Typography Hierarchy: how the approved fonts work together. Illustrative: no approved type scale is stored, so no sizes or line heights are shown as specifications. */
+function hierarchy(bySlot, specimen) {
+  const fallbackNote = [];
+  const rows = LEVELS.map(([name, key, slot, weight, size, sample]) => {
+    const use = bySlot[slot] ? slot : bySlot.primary ? "primary" : bySlot.secondary ? "secondary" : null; // a missing role uses the one the brand has
+    const t = use ? bySlot[use] : null;
+    const real = use && specimen[use];
+    if (use && !real && !fallbackNote.includes(t.family)) fallbackNote.push(t.family);
+    const used = t ? `${use === "primary" ? "Primary" : "Secondary"} Typeface · ${t.family}` : "";
+    return `<div class="tf-level"><div class="tf-level__meta"><p class="tf-level__name">${e(name)}</p><p class="muted small">${e(used)}</p><p class="muted small">Relative size: ${e(size)}</p></div><p class="tf-level__sample tf-l-${key}${real ? ` sp-${use} fw-w${weight}` : ""}">${e(sample)}</p></div>`;
+  }).join("");
+  return `<div class="tf-hier" id="typography-hierarchy"><h3 class="tf-hier__title">Typography Hierarchy</h3><p class="muted">How your approved fonts work together, from the largest headline to the smallest label.</p><p class="muted small"><strong>Illustrative preview.</strong> A formal type scale hasn’t been recorded for your brand, so these sizes and weights show the intended hierarchy only. They are not approved specifications.</p>${fallbackNote.length ? `<p class="muted small">Rows set in ${e(fallbackNote.join(" and "))} use a standard typeface here, because no font file is available to preview.</p>` : ""}<div class="tf-levels">${rows}</div></div>`;
 }
 
 function docRow(vm, a) {
@@ -195,7 +240,8 @@ function bkSection(def, inner) {
  * @param brand   getClientBrand() result
  * @param o       { canUpload, uploadCount, brandName, canRequest, csrf, requests: { [key]: newest request }, notice: "sent" | "dup" | "" }
  */
-export function brandingOverview(vm, brand, { canUpload = false, uploadCount = 0, brandName = "", canRequest = false, csrf = "", requests = {}, notice = "" } = {}) {
+export function brandingOverview(vm, brand, o = {}) {
+  const { canUpload = false, uploadCount = 0, brandName = "", canRequest = false, csrf = "", requests = {}, notice = "" } = o;
   const live = Boolean(brand.published);
   const head = `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1><p class="lead">${live ? `${brandName ? `The approved ${e(brandName)} brand` : "Your approved brand"}: logos, typography, colours and more. Download what you need, any time.` : "Your brand kit in nine parts. Anything that isn’t here yet can be requested below."}</p></header>`;
   const banner = notice === "sent" ? `<p class="form-banner" role="status">Request sent. Framework will follow up.</p>` : notice === "dup" ? `<p class="form-banner" role="status">That request is already open, so we didn’t send it twice.</p>` : "";
@@ -223,12 +269,24 @@ export function brandingOverview(vm, brand, { canUpload = false, uploadCount = 0
   const examples = filled < 4 ? `<p class="muted small">Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation. They are not your logos and are not available to download.</p>` : "";
   const parts = [bkSection(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${control("brand-logos", logoFiles.length > 0)}`)];
 
-  // 02 Typography and 03 Brand Colours: the existing typography and colour data (and font files).
-  if (type.length || fonts.length) {
-    const unlisted = fontFiles.filter((f) => !type.some((t) => f.title.toLowerCase().includes(t.family.toLowerCase())));
+  // 02 Typography: three typeface slots (Primary, Secondary, Accent), the hierarchy preview, older typefaces and fonts that belong to no typeface; then 03 Brand Colours.
+  const typeList = type.map(typefaceOf);
+  const bySlot = {}; const loose = [];
+  for (const t of typeList) { if (t.slot && !bySlot[t.slot]) bySlot[t.slot] = t; else loose.push(t); }
+  const specimen = specimenSlots(type, fonts);
+  const owned = new Set(typeList.flatMap((t) => filesOf(t, fonts).all.map((f) => f.id)));
+  const unlisted = fontFiles.filter((f) => !owned.has(f.id));
+  if (typeList.length || fonts.length) {
     const note = fonts.some((f) => !f.canDownload) ? `<p class="muted small">Some fonts can’t be shared as files because of their licence. Use the link beside each one to get it from its provider, or ask us.</p>` : "";
-    parts.push(bkSection(def.typography, `${type.length ? `<ul class="types bk-types">${type.map((t) => typeface(vm, t, fontFiles)).join("")}</ul><p class="muted small">Example text is shown in this page’s own typeface, for layout only. Download or install the font to see it as designed.</p>` : ""}${unlisted.length ? `<ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}${control("brand-typography", true)}`));
-  } else parts.push(bkSection(def.typography, emptyState(def.typography.empty) + control("brand-typography", false)));
+    const slotCards = `<ul class="tf-grid">${TYPE_SLOT_DEFS.map((d) => (bySlot[d.key] ? typeCard(vm, d, bySlot[d.key], fonts, specimen[d.key]) : emptyTypeCard(d))).join("")}</ul>`;
+    const hier = bySlot.primary || bySlot.secondary ? hierarchy(bySlot, specimen) : "";
+    const othersHtml = loose.length ? `<p class="acc__group">Other typefaces</p><p class="muted small">${Object.keys(bySlot).length ? "These typefaces aren’t assigned to a role." : "Framework hasn’t assigned these typefaces to a role yet."}</p><ul class="types bk-types">${loose.map((t) => typeface(vm, t, fontFiles)).join("")}</ul><p class="muted small">Example text is shown in this page’s own typeface, for layout only. It is not set in the font.</p>` : "";
+    parts.push(bkSection(def.typography, `${slotCards}${hier}${othersHtml}${unlisted.length ? `<p class="acc__group">Font files</p><ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}${control("brand-typography", typeList.length > 0)}`));
+  } else {
+    const price = pricingBlock(activePricing("typography", o.pricing), control("brand-typography", false));
+    const share = canUpload ? `<p class="muted small">Already have your fonts? <a class="text-link" href="${e(href(vm, "/branding/uploads"))}">Share them with Framework</a>.</p>` : "";
+    parts.push(bkSection(def.typography, emptyState(def.typography.empty) + (price || control("brand-typography", false)) + share));
+  }
   parts.push(bkSection(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : emptyState(def.colours.empty) + control("brand-colours", false)));
 
   // 04 Tagline: text content is not stored yet, so this always shows its empty state.

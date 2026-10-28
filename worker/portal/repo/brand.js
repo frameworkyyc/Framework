@@ -26,6 +26,9 @@ export const TONES = ["light", "dark", "colour", "mono"];
 export const UPLOAD_CATEGORIES = ["logo", "fonts", "colours", "guidelines", "stationery", "signature", "other"];
 export const COLOUR_ROLES = ["primary", "secondary", "accent", "neutral"];
 export const TYPE_ROLES = ["logo", "heading", "subheading", "body", "other"];
+export const TYPE_SLOTS = ["primary", "secondary", "accent"]; // the three typeface slots of the client page; an older typeface with no slot is shown under "Other typefaces", never guessed into one
+export const TYPE_STYLES = ["normal", "italic"];
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const REQUEST_STATUSES = ["new", "contacted", "closed", "declined"];
 const MAX_COLOURS = 16, MAX_TYPEFACES = 12;
 
@@ -50,16 +53,27 @@ export function normaliseColours(list) {
 
 export function normaliseTypography(list) {
   if (!Array.isArray(list) || list.length > MAX_TYPEFACES) return fail("invalid_typography");
-  const out = [];
+  const out = [], slotsSeen = new Set();
   for (const t of list) {
     if (!t || typeof t !== "object") return fail("invalid_typography");
     const family = validateName(t.family, 80), role = validateEnum(t.role, TYPE_ROLES);
     const usage = validateText(t.usage, 300), source = validateHttpsUrl(t.source_url);
     const weights = t.weights === undefined || t.weights === null ? [] : t.weights;
+    const slot = t.slot === undefined || t.slot === null || t.slot === "" ? null : validateEnum(t.slot, TYPE_SLOTS);
+    const styles = t.styles === undefined || t.styles === null ? [] : t.styles;
+    const fileIds = t.file_ids === undefined || t.file_ids === null ? [] : t.file_ids;
     if (!family || !role || usage === undefined || source === undefined || !Array.isArray(weights) || weights.length > 9 || !weights.every((w) => Number.isInteger(w) && w >= 100 && w <= 900 && w % 100 === 0)) return fail("invalid_typography");
-    out.push({ family, role, weights: [...new Set(weights)].sort((a, b) => a - b), usage, source_url: source });
+    if ((t.slot !== undefined && t.slot !== null && t.slot !== "" && !slot) || (slot && slotsSeen.has(slot)) || !Array.isArray(styles) || !styles.every((x) => TYPE_STYLES.includes(x)) || !Array.isArray(fileIds) || fileIds.length > 6 || !fileIds.every((x) => typeof x === "string" && UUID_LIKE.test(x))) return fail("invalid_typography");
+    if (slot) slotsSeen.add(slot);
+    out.push({ family, role, slot, weights: [...new Set(weights)].sort((a, b) => a - b), styles: TYPE_STYLES.filter((x) => styles.includes(x)), usage, source_url: source, file_ids: [...new Set(fileIds.map((x) => x.toLowerCase()))] });
   }
   return ok({ value: out });
+}
+
+/** The ids of an organization's live font files: a typeface may only point at these (checked by the Admin API when it saves; the client page also ignores any id that is not one of its published fonts). */
+export async function liveFontAssetIds(db, organizationId) {
+  requireOrgId(organizationId);
+  return new Set((await db.prepare("SELECT id FROM brand_assets WHERE organization_id = ? AND kind = 'font' AND deleted_at IS NULL").bind(organizationId).all()).results.map((r) => r.id));
 }
 
 /** The optional brand name used in generated file names: single-line text of up to 60 characters that leaves letters or digits for a file name. null = none (the organization's name is used). */
