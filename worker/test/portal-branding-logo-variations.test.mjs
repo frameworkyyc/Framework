@@ -49,7 +49,7 @@ async function setup() {
 }
 /** The four cards of the Logos section, in page order. */
 const cards = (html) => {
-  const logos = html.slice(html.indexOf('id="logos"'), html.indexOf('id="colours"'));
+  const logos = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
   const parts = logos.split('<li class="lv-card ').slice(1).map((p) => '<li class="lv-card ' + p);
   return parts.map((p) => ({ html: p, has: p.startsWith('<li class="lv-card lv-card--has"'), title: (/lv-card__title">([^<]+)</.exec(p) || [])[1] }));
 };
@@ -101,7 +101,7 @@ test("with nothing published every client sees the four Framework examples, labe
       assert.ok(!/lv-card__stage--logo/.test(x.html));
     });
     assert.match(html, /Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation\. They are not your logos and are not available to download\./);
-    assert.match(html, /<span class="acc__sum">Not added yet<\/span>/);
+    assert.match(html, /<h2 class="bk-sec__title" id="h-logo"><span class="visually-hidden">01 <\/span>Logo<\/h2>/);
   }
   assert.deepEqual(cards(await (await bob.get("/portal/o/beta/branding")).text()).map((x) => x.title), ["Primary Logo", "Secondary Logo", "Simplified Logo", "Sub-mark"]);
 });
@@ -123,7 +123,7 @@ test("Admin assigns each file with 'Logo type': every type lands on its own card
     assert.equal([...(await (await s.ann.get(base)).text()).matchAll(/logo-examples\/framework-/g)].length, 4 - filled.size, "only the other examples remain"); assert.match(card.html, /<span class="tag">Available<\/span>/); assert.match(card.html, /Download PNG/);
     assert.ok(!/Example: Framework|logo-examples/.test(card.html), "the Framework example is gone from a real logo");
   }
-  assert.match(await (await s.ann.get(base)).text(), /<span class="acc__sum">4 of 4 variations · PNG<\/span>/);
+  assert.deepEqual(cards(await (await s.ann.get(base)).text()).map((x) => x.has), [true, true, true, true]);
   assert.ok(!/Example: Framework|logo-examples/.test(await (await s.ann.get(base)).text()), "no example text or image once all four are real");
 });
 
@@ -206,7 +206,6 @@ test("existing logos keep working: files with an explicit older type land on the
   assert.ok(html.includes("/branding/files/11111111-1111-4111-8111-111111111111"), "the untyped file is still listed and downloadable");
   assert.equal((await s.ann.get(`${base}/files/11111111-1111-4111-8111-111111111111`)).status, 200);
   assert.ok(html.includes(`/branding/files/${old.json.id}"`));
-  assert.match(html, /<span class="acc__sum">1 of 4 variations · PNG<\/span>/);
   // Admin can place the untyped file on a card by choosing a type; it then leaves the list
   const fixed = await s.call(`/clients/${s.A.id}/branding/assets/11111111-1111-4111-8111-111111111111/update`, { method: "POST", json: { logo_role: "icon" } });
   assert.equal(fixed.status, 200, JSON.stringify(fixed.json));
@@ -236,7 +235,7 @@ test("Admin can move a file to another card: choosing a different Logo type rena
 test("the request workflow is unchanged under the cards: an owner can request logos (or more variations), the status replaces the button, duplicates are refused and a member is told to ask an owner", async () => {
   const s = await setup();
   let html = await (await s.ann.get(base)).text();
-  const logosEmpty = html.slice(html.indexOf('id="logos"'), html.indexOf('id="colours"'));
+  const logosEmpty = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
   assert.match(logosEmpty, /<summary class="btn btn--small">Request<span/);
   assert.match(await (await s.mia.get(base)).text(), /Ask an owner of your organization to send a request for this section/);
   const send = (b, extra = {}) => b.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-logos", ...extra });
@@ -244,7 +243,7 @@ test("the request workflow is unchanged under the cards: an owner can request lo
   assert.equal((await send(s.ann)).headers.get("Location"), `${base}?requested=0`, "a second press is the friendly 'already open'");
   assert.equal((await send(s.mia, { csrf: csrfOf(await (await s.mia.get(base)).text()) })).status, 403, "members cannot request");
   html = await (await s.ann.get(base)).text();
-  assert.match(html.slice(html.indexOf('id="logos"'), html.indexOf('id="colours"')), /class="tag">Requested</);
+  assert.match(html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"')), /class="tag">Requested</);
   // with a real logo the button offers additions or changes
   const s2 = await setup(); await s2.publishKit(s2.A); await s2.upload(s2.A, s2.logo("primary"), "p.png", S2());
   assert.match((await (await s2.ann.get(base)).text()).slice(0), /Request additions or changes/);
@@ -263,7 +262,7 @@ test("layout and a11y wiring: one column on a phone, two on a tablet, four on a 
   const s = await setup();
   const html = await (await s.ann.get(base)).text();
   assert.ok(!/\sstyle=|<script[^>]*>[^<]|onclick=/i.test(html.replace(/<script[^>]*src=[^>]*><\/script>/g, "")), "no inline style, script or handler");
-  const logos = html.slice(html.indexOf('id="logos"'), html.indexOf('id="colours"'));
+  const logos = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
   assert.equal([...logos.matchAll(/<h3 class="lv-card__title">/g)].length, 4);
   assert.equal([...logos.matchAll(/alt="Example: the Framework /g)].length, 4, "every example image has a descriptive alternative text");
 });
@@ -273,7 +272,7 @@ test("Admin cards: the page shows four permanent cards with the client page's te
   assert.match(shared, /export const LOGO_VARIATIONS/);
   assert.match(read("worker/portal/branding-live.js"), /import \{ LOGO_VARIATIONS \} from "..\/..\/admin\/assets\/logo-variations.js"/, "the client page and Admin share one catalogue");
   assert.match(ui, /import \{ LOGO_VARIATIONS \} from "\.\/logo-variations\.js"/);
-  assert.match(ui, /function logoCard\(def, files\)/); assert.match(ui, /function openLogoUpload\(def\)/);
+  assert.match(ui, /function logoCard\(def, files\)/); assert.match(ui, /const openLogoUpload = \(def\) => openUpload\(/);
   assert.match(ui, /fixedRole: def\.role/, "the card chooses the logo type");
   assert.match(ui, /"Upload logo"/); assert.match(ui, /"Add format"/); assert.match(ui, /Manage files \(/); assert.match(ui, /Example: Framework/);
   assert.match(ui, /Other logo files \(/);
@@ -331,4 +330,114 @@ test("Admin picture preview: a logo image is shown inline from the existing down
   assert.match(dl.headers.get("Content-Disposition"), /attachment/); assert.equal(count(), before + 1, "a real download is still recorded");
   assert.equal((await s.call(`/clients/${s.A.id}/branding/assets/${guide.json.id}/download?preview=1`)).status, 404, "only logos are ever shown as pictures");
   assert.equal((await s.call(`/clients/${s.B.id}/branding/assets/${up.json.id}/download?preview=1`)).status, 404, "another client's file is never reachable");
+});
+
+/* ------------------------------------------------------------------ the nine numbered sections */
+
+const SECTIONS = [["01", "logo", "Logo"], ["02", "typography", "Typography"], ["03", "colours", "Brand Colours"], ["04", "tagline", "Tagline"], ["05", "imagery", "Brand Imagery"], ["06", "layout", "Layout System"], ["07", "textures", "Textures"], ["08", "iconography", "Iconography"], ["09", "style", "Design Style"]];
+const sectionHtml = (html, key) => { const i = html.indexOf(`<section class="bk-sec" id="${key}"`); const j = html.indexOf("</section>", i); return html.slice(i, j); };
+
+test("the nine sections are one shared catalogue: exact numbers, names and order for the client page and Admin, all always shown", async () => {
+  const { BRAND_SECTIONS } = await import("../../admin/assets/brand-sections.js");
+  assert.deepEqual(BRAND_SECTIONS.map((d) => [d.no, d.key, d.title]), SECTIONS);
+  for (const d of BRAND_SECTIONS) { assert.ok(d.desc.length > 20 && d.desc.length < 140, d.key); assert.equal(d.id, d.key); }
+  const ui = read("admin/assets/branding.js");
+  assert.match(ui, /import \{ BRAND_SECTIONS, SECTION_FILE_KEYS, sectionOf \} from "\.\/brand-sections\.js"/);
+  assert.match(ui, /logoSection\(\), typographySection\(\), coloursSection\(\), taglineSection\(\), \.\.\.\["imagery", "layout", "textures", "iconography", "style"\]\.map/, "Admin lists the same nine, in order");
+  assert.ok(ui.indexOf("logoSection(), typographySection()") < ui.lastIndexOf("otherFilesSection()"), "documents and other files come after the nine");
+  const s = await setup();
+  for (const b of [s.ann, s.mia]) {
+    const html = await (await b.get(base)).text();
+    assert.deepEqual([...html.matchAll(/<section class="bk-sec" id="(\w+)"/g)].map((m) => m[1]), SECTIONS.map((x) => x[1]));
+    assert.deepEqual([...html.matchAll(/<p class="bk-sec__no" aria-hidden="true">(\d\d)</g)].map((m) => m[1]), SECTIONS.map((x) => x[0]));
+  }
+});
+
+test("empty sections: every section but Logo (which shows its four examples) says 'Not added yet' with its own sentence, in one consistent block", async () => {
+  const s = await setup();
+  const html = await (await s.ann.get(base)).text();
+  const { BRAND_SECTIONS } = await import("../../admin/assets/brand-sections.js");
+  for (const d of BRAND_SECTIONS.filter((x) => x.key !== "logo")) {
+    const sec = sectionHtml(html, d.key);
+    assert.ok(sec.includes('<div class="bk-empty"><p class="bk-empty__title">Not added yet</p>'), d.key);
+    assert.ok(sec.includes(d.empty.replace(/’/g, "’")), d.key + " empty sentence");
+    assert.ok(!/<a |Download/.test(sec), d.key + " has no downloads");
+  }
+});
+
+test("files Admin places in sections 05 to 09 show in that section only: previews for images, a file tile otherwise, downloads, never in the other-files list, other clients never see them", async () => {
+  const s = await setup(); await s.publishKit(s.A); await s.publishKit(s.B);
+  const put = (org, section, name, bytes, extra = {}) => s.upload(org, { kind: "other", title: extra.title || name.replace(/\..*/, ""), section, published: true, ...extra }, name, bytes);
+  const img = await put(s.A, "imagery", "Hero.png", S.png(), { title: "Hero photo" });
+  const lay = await put(s.A, "layout", "Grid.pdf", S.pdf(), { title: "Grid guide" });
+  const tex = await put(s.A, "textures", "Paper.svg", S.svg(), { title: "Paper" });
+  const ico = await put(s.A, "iconography", "Icons.png", S.png(9, 9), { title: "Icon set" });
+  const sty = await put(s.A, "style", "Mood.webp", S.webp(), { title: "Mood board" });
+  for (const r of [img, lay, tex, ico, sty]) assert.equal(r.status, 201, JSON.stringify(r.json));
+  const legacy = await s.upload(s.A, { kind: "other", title: "Old brochure", published: true }, "brochure.pdf", S.pdf());
+  const theirs = await put(s.B, "imagery", "Beta.png", S.png(7, 7), { title: "Beta photo" });
+  const html = await (await s.ann.get(base)).text();
+  const inSec = (key, id) => sectionHtml(html, key).includes(`/branding/files/${id}`);
+  assert.ok(inSec("imagery", img.json.id) && inSec("layout", lay.json.id) && inSec("textures", tex.json.id) && inSec("iconography", ico.json.id) && inSec("style", sty.json.id));
+  assert.ok(!inSec("imagery", lay.json.id) && !inSec("layout", img.json.id), "each file only in its own section");
+  assert.match(sectionHtml(html, "imagery"), new RegExp(`<img src="/portal/o/alpha/branding/files/${img.json.id}\\?preview=1" alt="Hero photo"`));
+  assert.match(sectionHtml(html, "layout"), /bk-tile__ext">PDF</, "a PDF is a file tile, not a picture");
+  assert.match(sectionHtml(html, "imagery"), /Download<span class="visually-hidden"> Hero photo \(PNG/);
+  const more = html.slice(html.indexOf('id="additional"'));
+  assert.ok(more.includes(legacy.json.id), "an older 'other' file with no section stays under Documents and other files");
+  for (const id of [img, lay, tex, ico, sty]) assert.ok(!more.includes(id.json.id), "a placed file is not repeated there");
+  assert.ok(!html.includes(theirs.json.id) && !html.includes("Beta photo"), "another client's file is not in this page");
+  assert.equal((await s.ann.get(`${base}/files/${img.json.id}?preview=1`)).status, 200);
+  assert.equal((await s.ann.get(`${base}/files/${theirs.json.id}?preview=1`)).status, 404, "nor reachable");
+  assert.equal((await s.bob.get(`${base}/files/${img.json.id}`)).status, 404);
+  assert.equal((await s.ann.get(`${base}/files/${legacy.json.id}?preview=1`)).status, 404, "a file with no section is never shown as a picture");
+  assert.equal((await s.ann.get(`${base}/files/${legacy.json.id}`)).status, 200, "but it still downloads");
+});
+
+test("Admin places, moves and removes a file from a section explicitly: nothing is reclassified silently, other kinds can't be placed, unknown sections are refused", async () => {
+  const s = await setup(); await s.publishKit(s.A);
+  const old = await s.upload(s.A, { kind: "other", title: "Older file", published: true }, "o.png", S.png());
+  assert.equal((await s.call(`/clients/${s.A.id}/branding`)).json.assets.find((a) => a.id === old.json.id).variantKey, null, "unplaced stays unplaced");
+  const nameBefore = s.w.db.raw.prepare("SELECT original_name FROM brand_assets WHERE id = ?").get(old.json.id).original_name;
+  const move = (section) => s.call(`/clients/${s.A.id}/branding/assets/${old.json.id}/update`, { method: "POST", json: { section } });
+  assert.equal((await move("textures")).status, 200);
+  const row = () => s.w.db.raw.prepare("SELECT variant_key, original_name, kind FROM brand_assets WHERE id = ?").get(old.json.id);
+  assert.deepEqual([row().variant_key, row().original_name, row().kind], ["section-textures", nameBefore, "other"], "only the placement changes, not the name or kind");
+  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "textures"), /branding\/files\//);
+  assert.equal((await move("style")).status, 200); assert.equal(row().variant_key, "section-style");
+  const renamed = await s.call(`/clients/${s.A.id}/branding/assets/${old.json.id}/update`, { method: "POST", json: { title: "Better name" } });
+  assert.equal(renamed.status, 200); assert.equal(row().variant_key, "section-style", "renaming keeps the section");
+  assert.equal((await move(null)).status, 200); assert.equal(row().variant_key, null, "taken back out of the section");
+  assert.equal((await move("tagline")).json.error, "invalid_section");
+  assert.equal((await move("logo")).json.error, "invalid_section");
+  const font = await s.upload(s.A, { kind: "font", title: "Face", downloadable: false, published: true }, "f.ttf", S.ttf());
+  assert.equal((await s.call(`/clients/${s.A.id}/branding/assets/${font.json.id}/update`, { method: "POST", json: { section: "imagery" } })).json.error, "invalid_section", "only 'other' files can be placed");
+  assert.equal((await s.upload(s.A, { kind: "guideline", title: "G", section: "imagery" }, "g.pdf", S.pdf())).json.error, "invalid_section");
+  assert.equal((await s.upload(s.A, { kind: "other", title: "Q", section: "bogus" }, "q.png", S.png())).json.error, "invalid_section");
+});
+
+test("typography and colours: families, weights, example text and codes render; HEX and RGB each have a copy control; fonts keep their downloads", async () => {
+  const s = await setup();
+  await brand.saveBrandKit(s.w.db, s.A.id, { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }, { name: "Signal", role: "accent", hex: "#B3261E", note: "" }], typography: [{ role: "heading", family: "Switzer", weights: [400, 700], usage: "Headings", source_url: null }] }, ADMIN);
+  await s.upload(s.A, { kind: "font", title: "Switzer Regular", downloadable: true, license_note: "OFL", published: true }, "f.ttf", S.ttf());
+  assert.ok((await brand.setBrandKitStatus(s.w.db, s.A.id, "published", ADMIN)).ok);
+  const html = await (await s.ann.get(base)).text();
+  const type = sectionHtml(html, "typography");
+  assert.match(type, /type__family">Switzer</); assert.match(type, /Regular <span class="muted">400<\/span>/); assert.match(type, /Bold <span class="muted">700<\/span>/);
+  assert.match(type, /bk-type__sample">The quick brown fox/); assert.match(type, /Download TTF/);
+  const col = sectionHtml(html, "colours");
+  assert.match(col, /data-copy="#0A0A0A"/); assert.match(col, /data-copy="10, 10, 10"/); assert.match(col, /data-copy="179, 38, 30"/); assert.match(col, /RGB <code>10, 10, 10<\/code>/);
+  assert.match(sectionHtml(html, "tagline"), /bk-empty/, "the tagline stays empty: text isn't stored yet");
+});
+
+test("requests, uploads and permissions are unchanged by the nine-section layout", async () => {
+  const s = await setup();
+  const html = await (await s.ann.get(base)).text();
+  assert.match(sectionHtml(html, "logo"), /<summary class="btn btn--small">Request<span/);
+  assert.match(sectionHtml(html, "typography"), /<summary class="btn btn--small">Request<span/);
+  assert.match(sectionHtml(html, "colours"), /<summary class="btn btn--small">Request<span/);
+  assert.match(html.slice(html.indexOf('id="guidelines"')), /<summary class="btn btn--small">Request<span/);
+  assert.match(html, /href="\/portal\/o\/alpha\/branding\/uploads"/);
+  assert.match(await (await s.mia.get(base)).text(), /Ask an owner of your organization/);
+  assert.equal((await s.bob.get("/portal/o/alpha/branding")).status, 404, "another organization still can't open it");
 });

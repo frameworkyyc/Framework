@@ -9,6 +9,7 @@ import { crumb } from "./guided.js";
 import { UPLOAD_CATEGORIES } from "./repo/brand.js";
 import { BRAND_REQUESTS } from "./brand-services.js";
 import { LOGO_VARIATIONS } from "../../admin/assets/logo-variations.js";
+import { BRAND_SECTIONS, sectionOf } from "../../admin/assets/brand-sections.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const MB = 1024 * 1024;
@@ -72,26 +73,23 @@ function swatch(c) {
   // so it never depends on being seen. The Copy button is added by script; without script the code is still selectable text.
   const light = parseInt(c.hex.slice(1, 3), 16) > 235 && parseInt(c.hex.slice(3, 5), 16) > 235 && parseInt(c.hex.slice(5, 7), 16) > 235;
   return `<li class="swatch"><svg class="swatch__chip${light ? " swatch__chip--edge" : ""}" viewBox="0 0 100 60" role="img" aria-label="${e(c.name)}, ${e(c.hex)}" focusable="false"><rect width="100" height="60" fill="${e(c.hex)}"/></svg>
-<div class="swatch__body"><p class="swatch__name">${e(c.name)}</p><p class="muted small">${e(COLOUR_ROLE_LABEL[c.role] || "")}</p><p class="swatch__code"><code>${e(c.hex)}</code> <button class="copy" type="button" data-copy="${e(c.hex)}" hidden>Copy<span class="visually-hidden"> ${e(c.name)} ${e(c.hex)}</span></button></p><p class="muted small">RGB ${e(rgb(c.hex))}</p>${c.note ? `<p class="small">${e(c.note)}</p>` : ""}</div></li>`;
+<div class="swatch__body"><p class="swatch__name">${e(c.name)}</p><p class="muted small">${e(COLOUR_ROLE_LABEL[c.role] || "")}</p><p class="swatch__code"><code>${e(c.hex)}</code> <button class="copy" type="button" data-copy="${e(c.hex)}" hidden>Copy<span class="visually-hidden"> ${e(c.name)} ${e(c.hex)}</span></button></p><p class="swatch__code muted small">RGB <code>${e(rgb(c.hex))}</code> <button class="copy" type="button" data-copy="${e(rgb(c.hex))}" hidden>Copy<span class="visually-hidden"> ${e(c.name)} RGB ${e(rgb(c.hex))}</span></button></p>${c.note ? `<p class="small">${e(c.note)}</p>` : ""}</div></li>`;
 }
 
+const WEIGHT_NAME = { 100: "Thin", 200: "Extra Light", 300: "Light", 400: "Regular", 500: "Medium", 600: "Semibold", 700: "Bold", 800: "Extra Bold", 900: "Black" };
+const SAMPLE_TEXT = "The quick brown fox jumps over the lazy dog";
+
+/** One typeface: its name, role, the weights Framework set up, example text, usage, a link to get it and any licensed font files. */
 function typeface(vm, t, fontFiles) {
   const files = fontFiles.filter((f) => f.title.toLowerCase().includes(t.family.toLowerCase()));
-  const weights = t.weights && t.weights.length ? `Weights ${t.weights.join(", ")}` : "";
-  return `<li class="type"><p class="type__family">${e(t.family)}</p><p class="muted small">${e([TYPE_ROLE_LABEL[t.role], weights].filter(Boolean).join(" · "))}</p>${t.usage ? `<p class="small">${e(t.usage)}</p>` : ""}${isHttps(t.source_url) ? `<p class="small"><a class="text-link" href="${e(t.source_url)}" rel="noopener noreferrer" target="_blank">Get this font<span class="visually-hidden"> (${e(t.family)}, opens the font provider)</span></a></p>` : ""}${files.length ? `<div class="logo-card__actions">${files.map((a) => downloadLink(vm, a, `Download ${e(upper(a.format))}`)).join("")}</div>` : ""}</li>`;
+  const weights = t.weights && t.weights.length ? `<ul class="bk-weights" aria-label="Available weights">${t.weights.map((w) => `<li>${e(WEIGHT_NAME[w] || "Weight")} <span class="muted">${e(w)}</span></li>`).join("")}</ul>` : "";
+  return `<li class="type bk-type"><p class="bk-type__glyphs" aria-hidden="true">Aa</p><div class="bk-type__body"><p class="type__family">${e(t.family)}</p><p class="muted small">${e(TYPE_ROLE_LABEL[t.role] || "")}</p>${weights}<p class="bk-type__sample">${SAMPLE_TEXT}</p>${t.usage ? `<p class="small">${e(t.usage)}</p>` : ""}${isHttps(t.source_url) ? `<p class="small"><a class="text-link" href="${e(t.source_url)}" rel="noopener noreferrer" target="_blank">Get this font<span class="visually-hidden"> (${e(t.family)}, opens the font provider)</span></a></p>` : ""}${files.length ? `<div class="logo-card__actions">${files.map((a) => downloadLink(vm, a, `Download ${e(upper(a.format))}`)).join("")}</div>` : ""}</div></li>`;
 }
 
 function docRow(vm, a) {
   return `<li class="file-row"><div class="file-row__main"><p class="file-row__name">${e(a.title)}</p><p class="muted small">${e(upper(a.format))} · ${e(fileSize(a.size))}${a.usageNote ? ` · ${e(a.usageNote)}` : ""}</p></div>${downloadLink(vm, a, "Download")}</li>`;
 }
 
-/**
- * One accordion section: a native <details>, so it opens and closes with no script and is keyboard- and screen-reader-operable. It is rendered closed (compact on a
- * phone); /assets/js/portal-branding.js only opens the one a link (#hash) points at. `summary` is the concise line shown while closed.
- */
-function section(id, title, summary, intro, inner, open = false) {
-  return `<details class="acc" id="${id}"${open ? " open" : ""}><summary class="acc__head"><span class="acc__text"><h2 class="acc__title">${e(title)}</h2><span class="acc__sum">${e(summary)}</span></span><span class="acc__chev" aria-hidden="true"></span></summary><div class="acc__body">${intro ? `<p class="muted brand-section__intro">${e(intro)}</p>` : ""}${inner}</div></details>`;
-}
 const count = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const list = (items) => items.join(" · ");
 
@@ -168,23 +166,38 @@ function requestControl(vm, def, { r, canRequest, csrf, label, primary = false }
 <p class="step-nav"><button class="btn btn--primary" type="submit">Send request</button></p></form></details>`;
 }
 
-const SECTION_COPY = Object.freeze({
-  "brand-colours": "No brand colours have been added yet.",
-  "brand-typography": "No typefaces or fonts have been added yet.",
+const MORE_COPY = Object.freeze({
   "brand-guidelines": "No guidelines or documents have been added yet.",
   "brand-additional": "No additional brand assets have been added yet.",
 });
 
+/** A file placed in a brand section (imagery, layout, textures, iconography, design style): a picture tile with its name and a download, or a file tile when it is not an image. */
+function fileTile(vm, a, key) {
+  const picture = IMAGE_FORMATS.includes(a.format);
+  const stage = picture
+    ? `<div class="bk-tile__stage bk-tile__stage--${e(key)}"><img src="${e(previewUrl(vm, a))}" alt="${e(a.title)}" loading="lazy" decoding="async"></div>`
+    : `<div class="bk-tile__stage bk-tile__stage--file"><span class="bk-tile__ext">${e(upper(a.format))}</span></div>`;
+  return `<li class="bk-tile">${stage}<div class="bk-tile__body"><p class="bk-tile__name">${e(a.title)}</p><p class="muted small">${e(upper(a.format))} · ${e(fileSize(a.size))}${a.usageNote ? ` · ${e(a.usageNote)}` : ""}</p><div class="logo-card__actions">${downloadLink(vm, a, "Download")}</div></div></li>`;
+}
+
+const emptyState = (text) => `<div class="bk-empty"><p class="bk-empty__title">Not added yet</p><p class="muted">${e(text)}</p></div>`;
+
+/** One of the nine numbered sections: a large two-digit number, the title, a short description, then the section's content or its empty state. All nine are always shown. */
+function bkSection(def, inner) {
+  return `<section class="bk-sec" id="${e(def.id)}" aria-labelledby="h-${e(def.id)}"><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">${e(def.no)}</p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-${e(def.id)}"><span class="visually-hidden">${e(def.no)} </span>${e(def.title)}</h2><p class="bk-sec__desc muted">${e(def.desc)}</p></div></header><div class="bk-sec__body">${inner}</div></section>`;
+}
+
 /**
- * The Branding dashboard. Every client always sees the same five sections, whatever Framework has published for them: a section with files shows them (with the
- * existing viewing and download links), an empty one says so and is open so its Request button is in view, and every section lets an owner request additions or
- * changes. A Full Brand Kit request sits at the bottom.
+ * The Branding page: a digital brand guidelines document of nine numbered sections (Logo, Typography, Brand Colours, Tagline, Brand Imagery, Layout System, Textures,
+ * Iconography, Design Style), always all nine, in this order, whatever Framework has published. A section with content shows it (with the existing viewing,
+ * copying and download links); an empty one says so. Below them, files that belong to no section (guidelines, documents, packages, other files) stay listed, each
+ * group with its request control, and nothing is moved or hidden by guesswork.
  * @param brand   getClientBrand() result
  * @param o       { canUpload, uploadCount, brandName, canRequest, csrf, requests: { [key]: newest request }, notice: "sent" | "dup" | "" }
  */
 export function brandingOverview(vm, brand, { canUpload = false, uploadCount = 0, brandName = "", canRequest = false, csrf = "", requests = {}, notice = "" } = {}) {
   const live = Boolean(brand.published);
-  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1><p class="lead">${live ? `${brandName ? `The approved ${e(brandName)} brand` : "Your approved brand"}: logos, colours, fonts and guidelines. Download what you need, any time.` : "Your logos, colours, fonts and guidelines in one place. Anything that isn’t here yet can be requested below."}</p></header>`;
+  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1><p class="lead">${live ? `${brandName ? `The approved ${e(brandName)} brand` : "Your approved brand"}: logos, typography, colours and more. Download what you need, any time.` : "Your brand kit in nine parts. Anything that isn’t here yet can be requested below."}</p></header>`;
   const banner = notice === "sent" ? `<p class="form-banner" role="status">Request sent. Framework will follow up.</p>` : notice === "dup" ? `<p class="form-banner" role="status">That request is already open, so we didn’t send it twice.</p>` : "";
 
   const assets = live ? brand.assets || [] : [];
@@ -193,51 +206,50 @@ export function brandingOverview(vm, brand, { canUpload = false, uploadCount = 0
   const fontFiles = fonts.filter((a) => a.canDownload);
   const type = live ? brand.typography || [] : [];
   const guideDocs = ["guideline", "document"].map((k) => [k, assets.filter((a) => a.kind === k)]).filter(([, l]) => l.length);
-  const extraDocs = ["package", "other"].map((k) => [k, assets.filter((a) => a.kind === k)]).filter(([, l]) => l.length);
+  const extraDocs = ["package", "other"].map((k) => [k, assets.filter((a) => a.kind === k && !sectionOf(a))]).filter(([, l]) => l.length);
   const reqDef = (key) => BRAND_REQUESTS.find((d) => d.key === key);
-  const isOpen = (key) => requests[key] && (requests[key].status === "new" || requests[key].status === "contacted");
-  const sum = (key, text) => (isOpen(key) ? `${text} · Request open` : text);
   const control = (key, hasContent) => requestControl(vm, reqDef(key), { r: requests[key], canRequest, csrf, label: hasContent ? "Request additions or changes" : "Request" });
   const groups = (docs) => docs.map(([k, l]) => `${docs.length > 1 ? `<p class="acc__group">${e(DOC_LABEL[k])}</p>` : ""}<ul class="file-list">${l.map((a) => docRow(vm, a)).join("")}</ul>`).join("");
-  const empty = (key) => `<div class="empty"><strong>Nothing here yet</strong>${e(SECTION_COPY[key])}</div>`;
-  const total = (docs) => docs.reduce((n, [, l]) => n + l.length, 0);
+  const def = Object.fromEntries(BRAND_SECTIONS.map((d) => [d.key, d]));
 
-  const parts = [];
+  // 01 Logo: the four variation cards, then any older logo files that have no type.
   const logoFiles = assets.filter((a) => a.kind === "logo");
   const byVariation = new Map(LOGO_VARIATIONS.map((d) => [d.key, []]));
   const unassigned = [];
   for (const a of logoFiles) { const k = variationOf(a); if (k) byVariation.get(k).push(a); else unassigned.push(a); }
   const filled = LOGO_VARIATIONS.filter((d) => byVariation.get(d.key).length).length;
-  const logoFormats = [...new Set(logoFiles.slice().sort(byFormat).map((x) => upper(x.format)))];
-  const logoSummary = filled ? list([`${filled} of 4 variations`, logoFormats.join(", ")]) : unassigned.length ? count(logoGroups(unassigned).length, "logo") : "Not added yet";
   const cards = LOGO_VARIATIONS.map((d) => (byVariation.get(d.key).length ? variationCard(vm, d, byVariation.get(d.key)) : exampleCard(d))).join("");
   const others = unassigned.length ? `<p class="acc__group">Other logo files</p><ul class="logo-grid">${logoGroups(unassigned).map((g) => logoCard(vm, g)).join("")}</ul>` : "";
   const examples = filled < 4 ? `<p class="muted small">Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation. They are not your logos and are not available to download.</p>` : "";
-  // The Logos section is always open: its four cards are the page's centrepiece.
-  parts.push(section("logos", "Logos", sum("brand-logos", logoSummary), "Four logo variations, each for a different use.", `<ul class="lv-grid">${cards}</ul>${examples}${others}${control("brand-logos", logoFiles.length > 0)}`, true));
+  const parts = [bkSection(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${control("brand-logos", logoFiles.length > 0)}`)];
 
-  if (colours.length) parts.push(section("colours", "Colours", sum("brand-colours", count(colours.length, "colour")), "", `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}`));
-  else parts.push(section("colours", "Colours", sum("brand-colours", "Not added yet"), "", empty("brand-colours") + control("brand-colours", false), true));
-
+  // 02 Typography and 03 Brand Colours: the existing typography and colour data (and font files).
   if (type.length || fonts.length) {
     const unlisted = fontFiles.filter((f) => !type.some((t) => f.title.toLowerCase().includes(t.family.toLowerCase())));
     const note = fonts.some((f) => !f.canDownload) ? `<p class="muted small">Some fonts can’t be shared as files because of their licence. Use the link beside each one to get it from its provider, or ask us.</p>` : "";
-    const names = type.map((t) => t.family);
-    parts.push(section("typography", "Typography & Fonts", sum("brand-typography", names.length ? list([count(names.length, "typeface"), names.slice(0, 2).join(", ") + (names.length > 2 ? "…" : "")]) : count(fontFiles.length, "font file")), "", `${type.length ? `<ul class="types">${type.map((t) => typeface(vm, t, fontFiles)).join("")}</ul>` : ""}${unlisted.length ? `<ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}${control("brand-typography", true)}`));
-  } else parts.push(section("typography", "Typography & Fonts", sum("brand-typography", "Not added yet"), "", empty("brand-typography") + control("brand-typography", false), true));
+    parts.push(bkSection(def.typography, `${type.length ? `<ul class="types bk-types">${type.map((t) => typeface(vm, t, fontFiles)).join("")}</ul><p class="muted small">Example text is shown in this page’s own typeface, for layout only. Download or install the font to see it as designed.</p>` : ""}${unlisted.length ? `<ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}${control("brand-typography", true)}`));
+  } else parts.push(bkSection(def.typography, emptyState(def.typography.empty) + control("brand-typography", false)));
+  parts.push(bkSection(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : emptyState(def.colours.empty) + control("brand-colours", false)));
 
-  if (guideDocs.length) parts.push(section("guidelines", "Brand Guidelines & Documents", sum("brand-guidelines", count(total(guideDocs), "file")), "How to use your brand consistently.", groups(guideDocs) + control("brand-guidelines", true)));
-  else parts.push(section("guidelines", "Brand Guidelines & Documents", sum("brand-guidelines", "Not added yet"), "", empty("brand-guidelines") + control("brand-guidelines", false), true));
+  // 04 Tagline: text content is not stored yet, so this always shows its empty state.
+  parts.push(bkSection(def.tagline, emptyState(def.tagline.empty)));
 
-  if (extraDocs.length) parts.push(section("additional", "Additional Brand Assets", sum("brand-additional", count(total(extraDocs), "file")), "", groups(extraDocs) + control("brand-additional", true)));
-  else parts.push(section("additional", "Additional Brand Assets", sum("brand-additional", "Not added yet"), "", empty("brand-additional") + control("brand-additional", false), true));
+  // 05 to 09: files an admin placed in the section.
+  for (const key of ["imagery", "layout", "textures", "iconography", "style"]) {
+    const files = assets.filter((a) => sectionOf(a) === key);
+    parts.push(bkSection(def[key], files.length ? `<ul class="bk-tiles bk-tiles--${key}">${files.map((a) => fileTile(vm, a, key)).join("")}</ul>` : emptyState(def[key].empty)));
+  }
 
+  const nav = `<nav class="bk-nav" aria-label="Brand kit sections"><ol>${BRAND_SECTIONS.map((d) => `<li><a href="#${e(d.id)}"><span class="bk-nav__no" aria-hidden="true">${e(d.no)}</span> ${e(d.title)}</a></li>`).join("")}</ol></nav>`;
+  const more = `<section class="bk-more" aria-labelledby="h-more"><h2 class="h2" id="h-more">Documents and other files</h2><p class="muted">Guidelines, documents and other files from Framework that aren’t part of the nine sections above.</p>
+<div class="bk-more__group" id="guidelines"><h3 class="h3">Brand guidelines &amp; documents</h3>${guideDocs.length ? groups(guideDocs) : emptyState(MORE_COPY["brand-guidelines"])}${control("brand-guidelines", guideDocs.length > 0)}</div>
+<div class="bk-more__group" id="additional"><h3 class="h3">Additional brand assets</h3>${extraDocs.length ? groups(extraDocs) : emptyState(MORE_COPY["brand-additional"])}${control("brand-additional", extraDocs.length > 0)}</div></section>`;
   const share = canUpload
     ? `<aside class="brand-aside" aria-labelledby="h-share"><h2 class="h3" id="h-share">Have brand materials of your own?</h2><p class="muted">Share your existing logo, fonts or guidelines and Framework will review them.</p><p><a class="btn" href="${e(href(vm, "/branding/uploads"))}">Upload your materials${uploadCount ? ` (${uploadCount} shared)` : ""}</a></p></aside>`
     : "";
   const kit = `<section class="brand-kit" aria-labelledby="h-kit"><h2 class="h2" id="h-kit">Need a complete brand identity?</h2><p class="muted">Logo, colours, typography and guidelines, designed together as one system.</p>${requestControl(vm, reqDef("brand-full-kit"), { r: requests["brand-full-kit"], canRequest, csrf, label: "Request full brand kit", primary: true })}</section>`;
   const meta = brand.publishedAt && live ? `<p class="muted small">Last published ${e(dateOnly(brand.publishedAt))}.</p>` : "";
-  return head + banner + `<div class="acc-list">${parts.join("")}</div>` + meta + share + kit;
+  return head + banner + nav + `<div class="bk">${parts.join("")}</div>` + more + meta + share + kit;
 }
 
 /* ------------------------------------------------------------------ the uploads area */
