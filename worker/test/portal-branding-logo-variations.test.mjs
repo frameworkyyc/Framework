@@ -604,7 +604,12 @@ test("Admin typography wiring: slots, styles, file choice and hierarchy-free sav
   const ui = read("admin/assets/branding.js"), shared = read("admin/assets/brand-sections.js");
   assert.match(shared, /TYPE_SLOT_DEFS/); assert.match(ui, /TYPE_SLOT_DEFS\.filter\(\(d\) => !rows\.some\(\(r\) => r\.slot === d\.key\)\)\.map\(\(d\) => button\(`Add \$\{d\.title\}`/);
   assert.match(ui, /slot: t\.slot \|\| null/); assert.match(ui, /styles: t\.styles/); assert.match(ui, /file_ids: t\.file_ids/); assert.match(ui, /Approved styles/); assert.match(ui, /Short usage description/);
-  assert.ok(read("assets/js/portal-branding.js").includes("data-font-check") && read("assets/js/portal-branding.js").includes("document.fonts.load"), "a failed font load is stated, not hidden");
+  const js = read("assets/js/portal-branding.js");
+  assert.ok(js.includes("data-font-check") && js.includes("document.fonts"), "the card judges the real font faces");
+  assert.doesNotMatch(js, /document\.fonts\.load\(/, "no longer decided by what the browser matches for one weight and style");
+  assert.match(js, /f\.load\(\)\.then\(function \(\) \{ return true; \}, function \(\) \{ return false; \}\)/); assert.match(js, /r\.some\(Boolean\) \? ok\(\) : fail\(\)/, "fallback only when every face fails; the real-font state returns when one loads");
+  assert.match(js, /if \(!faces\.length\) return;/, "no faces to judge: the card stays as rendered");
+  assert.match(read("assets/css/portal.css"), /\.tf-card__stage--fallback \.tf-card__aa:not\(\[class\*="sp-"\]\) \{ font-family: var\(--font-display\); \}/, "a specimen with a loaded font family is never overridden by the fallback face");
 });
 
 /* ------------------------------------------------------------------ navigation dividers and example previews */
