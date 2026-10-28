@@ -682,3 +682,13 @@ test("03 Brand Colours: at most six swatches in a balanced grid: 3 columns from 
   assert.match(css, /@container \(max-width: 220px\) \{ \.swatch__code \{ display: block; \} \.swatch__code \.copy:not\(\[hidden\]\) \{ display: block;/);
   assert.match(css, /\.bk-eg--colours \.swatches \{ margin: 0; \}/, "the example palette uses the same grid");
 });
+
+test("Admin status messages have one 1px border and no ring around it when a script focuses them; interactive elements keep their focus rings", () => {
+  const css = read("admin/assets/admin.css");
+  assert.match(css, /\.adm-msg \{[^}]*border: 1px solid var\(--hairline\)/);
+  assert.match(css, /\.adm-msg:focus \{ outline: none; \}/, "a focused message gets no second outline");
+  assert.doesNotMatch(css, /\.adm-msg[^{]*\{[^}]*border: 2px/, "success, info, warning and error all stay one 1px border");
+  assert.match(css, /\.adm-msg\.is-warning, \.adm-msg\.is-error \{ border-color: var\(--ink\); font-weight: 500; \}/);
+  for (const sel of [".adm-icon-btn:focus-visible", ".adm-small:focus-visible", ".adm-linkbtn:focus-visible", ".adm-choice:focus-within"]) assert.ok(css.includes(sel), sel + " keeps its focus ring");
+  assert.match(read("assets/css/styles.css"), /:focus-visible \{\s*outline: 2px solid var\(--ink\);/, "the site-wide keyboard focus ring is unchanged");
+});
