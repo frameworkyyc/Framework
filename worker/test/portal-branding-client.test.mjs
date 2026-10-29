@@ -72,7 +72,7 @@ test("no brand kit: all nine numbered sections show in order, each with a clean 
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("content-security-policy"), PORTAL_CSP, "no script on the empty page");
   const html = await res.text();
-  const secs = [...html.matchAll(/<section class="bk-sec" id="(\w+)"[^>]*><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">(\d\d)<\/p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-\w+"><span class="visually-hidden">\d\d <\/span>([^<]+)<\/h2>/g)].map((m) => m.slice(1));
+  const secs = [...html.matchAll(/<section class="bk-sec" id="(\w+)"[^>]*><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">(\d\d)<\/p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-\w+"><span class="visually-hidden">\d\d <\/span>([^<]+?) <span class="bk-req[^>]*>[\s\S]*?<\/span><\/h2>/g)].map((m) => m.slice(1));
   assert.deepEqual(secs, [["logo", "01", "Logo"], ["typography", "02", "Typography"], ["colours", "03", "Brand Colours"], ["tagline", "04", "Tagline"], ["imagery", "05", "Brand Imagery"], ["layout", "06", "Layout System"], ["textures", "07", "Textures"], ["iconography", "08", "Iconography"], ["style", "09", "Design Style"]], "all nine, in order, with their two-digit numbers");
   assert.equal([...html.matchAll(/<p class="bk-sec__desc muted">/g)].length, 9, "each has a short description");
   assert.equal([...html.matchAll(/<p class="bk-empty__title">Not added yet<\/p>/g)].length, 2, "only the two other-files groups; every section shows an example instead");

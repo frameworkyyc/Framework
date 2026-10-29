@@ -7,10 +7,11 @@
 import { e } from "./ui.js";
 import { crumb } from "./guided.js";
 import { UPLOAD_CATEGORIES } from "./repo/brand.js";
-import { BRAND_REQUESTS } from "./brand-services.js";
+import { BRAND_REQUESTS, BRANDING_SERVICES } from "./brand-services.js";
 import { LOGO_VARIATIONS } from "../../admin/assets/logo-variations.js";
 import { BRAND_SECTIONS, TYPE_SLOT_DEFS, sectionOf } from "../../admin/assets/brand-sections.js";
 import { typefaceOf, filesOf, specimenSlots, faceOf, WEIGHT_NAME } from "./brand-type.js";
+import { requirementsFor, completionOf, REQUIREMENT_LABEL } from "./brand-requirements.js";
 import { designOffer, designOfferList, requestKeyOf, priceLabel, ESTIMATE_NOTE } from "./branding-pricing.js";
 import { exampleTypeCard, exampleColours, exampleTagline, exampleImagery, exampleLayout, exampleTextures, exampleIcons, exampleStyle, EXAMPLE_LABEL } from "./brand-examples.js";
 
@@ -247,9 +248,18 @@ function taglineBlock(t) {
 
 const emptyState = (text) => `<div class="bk-empty"><p class="bk-empty__title">Not added yet</p><p class="muted">${e(text)}</p></div>`;
 
+const serviceName = (key) => { const q = BRANDING_SERVICES.find((x) => x.key === key); if (q) return q.title; const r = BRAND_REQUESTS.find((x) => x.key === key); return r ? r.section : key; };
+
+/** The small "Required" / "Recommended" label beside a section name; when a request of this client makes a Recommended section Required, it says why (the service's own title). */
+function requirementTag(req) {
+  if (!req) return "";
+  const why = req.becauseOf && req.becauseOf.length ? `<span class="bk-req__why"> · for your ${e(req.becauseOf.map((k) => serviceName(k)).join(" and "))} request</span>` : "";
+  return ` <span class="bk-req bk-req--${e(req.level)}"><span class="visually-hidden">(</span>${e(REQUIREMENT_LABEL[req.level] || "")}${why}<span class="visually-hidden">)</span></span>`;
+}
+
 /** One of the nine numbered sections: a large two-digit number, the title, a short description, then the section's content or its empty state. All nine are always shown. */
-function bkSection(def, inner) {
-  return `<section class="bk-sec" id="${e(def.id)}" aria-labelledby="h-${e(def.id)}"><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">${e(def.no)}</p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-${e(def.id)}"><span class="visually-hidden">${e(def.no)} </span>${e(def.title)}</h2><p class="bk-sec__desc muted">${e(def.desc)}</p></div></header><div class="bk-sec__body">${inner}</div></section>`;
+function bkSection(def, inner, req = null) {
+  return `<section class="bk-sec" id="${e(def.id)}" aria-labelledby="h-${e(def.id)}"><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">${e(def.no)}</p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-${e(def.id)}"><span class="visually-hidden">${e(def.no)} </span>${e(def.title)}${requirementTag(req)}</h2><p class="bk-sec__desc muted">${e(def.desc)}</p></div></header><div class="bk-sec__body">${inner}</div></section>`;
 }
 
 /**
@@ -274,6 +284,9 @@ export function brandingOverview(vm, brand, o = {}) {
   const guideDocs = ["guideline", "document"].map((k) => [k, assets.filter((a) => a.kind === k)]).filter(([, l]) => l.length);
   const extraDocs = ["package", "other"].map((k) => [k, assets.filter((a) => a.kind === k && !sectionOf(a))]).filter(([, l]) => l.length);
   const reqDef = (key) => BRAND_REQUESTS.find((d) => d.key === key);
+  // Required / Recommended per section for this client (defaults, plus sections a service they have open genuinely depends on: see brand-requirements.js).
+  const reqs = requirementsFor(Object.values(requests), o.requirementTable);
+  const sec = (d, inner) => bkSection(d, inner, reqs[d.key]);
   const control = (key, hasContent) => requestControl(vm, reqDef(key), { r: requests[key], canRequest, csrf, label: hasContent ? "Request additions or changes" : "Request" });
   // Design-service pricing (Admin -> Settings -> Service Pricing): a quiet note with the price beside the request button, only for a section the client has nothing in yet and only when
   // that service has a stored price. Uploading existing branding is always free and always offered next to it.
@@ -296,7 +309,7 @@ export function brandingOverview(vm, brand, o = {}) {
   const LOGO_PRICE = { primary: "logo-primary", secondary: "logo-secondary", simplified: "logo-simplified", submark: "logo-submark" };
   const missingLogos = LOGO_VARIATIONS.filter((d) => !byVariation.get(d.key).length).map((d) => ({ entry: pricing[LOGO_PRICE[d.key]], action: offerRequest(LOGO_PRICE[d.key]) }));
   const logoOffer = designOfferList(missingLogos, { lead: filled ? "Framework can design the logo variations you don’t have yet." : "Framework can design your logo.", uploadHref });
-  const parts = [bkSection(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${logoOffer}${logoFiles.length > 0 || !logoOffer ? control("brand-logos", logoFiles.length > 0) : ""}`)];
+  const parts = [sec(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${logoOffer}${logoFiles.length > 0 || !logoOffer ? control("brand-logos", logoFiles.length > 0) : ""}`)];
 
   // 02 Typography: three typeface slots (Primary, Secondary, Accent), the hierarchy preview, older typefaces and fonts that belong to no typeface; then 03 Brand Colours.
   const typeList = type.map(typefaceOf);
@@ -311,23 +324,34 @@ export function brandingOverview(vm, brand, o = {}) {
   if (typeList.length || fonts.length) {
     const note = fonts.some((f) => !f.canDownload) ? `<p class="muted small">Some fonts can’t be shared as files because of their licence. Use the link beside each one to get it from its provider, or ask us.</p>` : "";
     const othersHtml = loose.length ? `<p class="acc__group">Other typefaces</p><p class="muted small">${Object.keys(bySlot).length ? "These typefaces aren’t assigned to a role." : "Framework hasn’t assigned these typefaces to a role yet."}</p><ul class="types bk-types">${loose.map((t) => typeface(vm, t, fontFiles)).join("")}</ul><p class="muted small">Example text is shown in this page’s own typeface, for layout only. It is not set in the font.</p>` : "";
-    parts.push(bkSection(def.typography, `${slotCards}${hier}${othersHtml}${unlisted.length ? `<p class="acc__group">Font files</p><ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}${control("brand-typography", typeList.length > 0)}`));
+    parts.push(sec(def.typography, `${slotCards}${hier}${othersHtml}${unlisted.length ? `<p class="acc__group">Font files</p><ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}${control("brand-typography", typeList.length > 0)}`));
   } else {
     const share = canUpload ? `<p class="muted small">Already have your fonts? <a class="text-link" href="${e(href(vm, "/branding/uploads"))}">Share them with Framework</a>.</p>` : "";
-    parts.push(bkSection(def.typography, `<p class="muted">${e(def.typography.empty)} Here is an example of a typography system, set in Framework’s own typefaces.</p>${slotCards}${hier}${offer("typography") || control("brand-typography", false)}${share}`));
+    parts.push(sec(def.typography, `<p class="muted">${e(def.typography.empty)} Here is an example of a typography system, set in Framework’s own typefaces.</p>${slotCards}${hier}${offer("typography") || control("brand-typography", false)}${share}`));
   }
-  parts.push(bkSection(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : exampleColours() + (offer("colours") || control("brand-colours", false))));
+  parts.push(sec(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : exampleColours() + (offer("colours") || control("brand-colours", false))));
 
   // 04 Tagline: the approved tagline (kit published), or the labelled Framework example while none has been added.
-  parts.push(bkSection(def.tagline, live && brand.tagline ? taglineBlock(brand.tagline) : exampleTagline() + offer("tagline")));
+  parts.push(sec(def.tagline, live && brand.tagline ? taglineBlock(brand.tagline) : exampleTagline() + offer("tagline")));
 
   // 05 to 09: files an admin placed in the section.
   for (const key of ["imagery", "layout", "textures", "iconography", "style"]) {
     const files = assets.filter((a) => sectionOf(a) === key);
-    parts.push(bkSection(def[key], files.length ? `<ul class="bk-tiles bk-tiles--${key}">${files.map((a) => fileTile(vm, a, key)).join("")}</ul>` : SECTION_EXAMPLE[key]() + offer(key)));
+    parts.push(sec(def[key], files.length ? `<ul class="bk-tiles bk-tiles--${key}">${files.map((a) => fileTile(vm, a, key)).join("")}</ul>` : SECTION_EXAMPLE[key]() + offer(key)));
   }
 
-  const nav = `<nav class="bk-nav" aria-label="Brand kit sections"><ol>${BRAND_SECTIONS.map((d) => `<li><a href="#${e(d.id)}"><span class="bk-nav__no" aria-hidden="true">${e(d.no)}</span> ${e(d.title)}</a></li>`).join("")}</ol></nav>`;
+  // Completion beside each section in the navigation: Logo counts its four slots (1/4 to 3/4, a checkmark at 4/4); every other section shows a checkmark only once the client has real
+  // published content in it. Examples never count, nothing shows while a section is empty, and a request never completes a section (see brand-requirements.js).
+  const comp = completionOf({ logoFilled: filled, typefaces: typeList.length, fontFiles: fonts.length, colours: colours.length, tagline: live && brand.tagline ? brand.tagline.primary : null,
+    files: Object.fromEntries(["imagery", "layout", "textures", "iconography", "style"].map((k) => [k, assets.filter((a) => sectionOf(a) === k).length])) });
+  const CHECK = `<svg class="bk-nav__tick" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M3 8.6l3.2 3.2L13 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"/></svg>`;
+  const markOf = (d) => {
+    const c = comp[d.key];
+    if (c.done) return `<span class="bk-nav__mark bk-nav__mark--done">${CHECK}<span class="visually-hidden">, complete</span></span>`;
+    if (d.key === "logo" && c.count > 0) return `<span class="bk-nav__mark"><span aria-hidden="true">${c.count}/${c.total}</span><span class="visually-hidden">, ${c.count} of ${c.total} logo variations added</span></span>`;
+    return "";
+  };
+  const nav = `<nav class="bk-nav" aria-label="Brand kit sections"><ol>${BRAND_SECTIONS.map((d) => `<li><a href="#${e(d.id)}"><span class="bk-nav__no" aria-hidden="true">${e(d.no)}</span> ${e(d.title)}${markOf(d)}<span class="visually-hidden">, ${e(REQUIREMENT_LABEL[reqs[d.key].level].toLowerCase())}</span></a></li>`).join("")}</ol></nav>`;
   const more = `<section class="bk-more" aria-labelledby="h-more"><h2 class="h2" id="h-more">Documents and other files</h2><p class="muted">Guidelines, documents and other files from Framework that aren’t part of the nine sections above.</p>
 <div class="bk-more__group" id="guidelines"><h3 class="h3">Brand guidelines &amp; documents</h3>${guideDocs.length ? groups(guideDocs) : emptyState(MORE_COPY["brand-guidelines"])}${control("brand-guidelines", guideDocs.length > 0)}</div>
 <div class="bk-more__group" id="additional"><h3 class="h3">Additional brand assets</h3>${extraDocs.length ? groups(extraDocs) : emptyState(MORE_COPY["brand-additional"])}${control("brand-additional", extraDocs.length > 0)}</div></section>`;
