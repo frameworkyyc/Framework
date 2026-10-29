@@ -35,19 +35,20 @@ async function setup({ migrated = true, storage = true } = {}) {
   await w.invite(A, "ann@alpha.test", "owner");
   const ann = w.browser(); await ann.signIn(w.user(1, "ann@alpha.test"));
   if (migrated) w.db.raw.exec(MIGRATION);
+  const hooks = {};
   const call = async (path, { method = "GET", json, form, headers = {} } = {}) => {
     const h = { Origin: ORIGIN, "Cf-Access-Jwt-Assertion": sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, iat: nowS(), exp: nowS() + 600 }), ...(method !== "GET" ? { "X-Framework-Admin": "1" } : {}), ...headers };
     let body;
     if (form) { const packed = new Response(form); const buf = new Uint8Array(await packed.arrayBuffer()); h["Content-Type"] = packed.headers.get("Content-Type"); h["Content-Length"] = String(buf.length); body = buf; }
     else if (json !== undefined) { h["Content-Type"] = "application/json"; body = JSON.stringify(json); }
-    const res = await handleAdmin(new Request(ORIGIN + "/api/admin" + path, { method, headers: h, body }), w.env, {});
+    const res = await handleAdmin(new Request(ORIGIN + "/api/admin" + path, { method, headers: h, body }), w.env, hooks);
     const type = res.headers.get("Content-Type") || "";
     return { status: res.status, headers: res.headers, json: type.includes("json") ? await res.json() : null, bytes: type.includes("json") ? null : new Uint8Array(await res.arrayBuffer()) };
   };
   const base = (org) => `/clients/${org.id}/websites`;
   const create = (org, body) => call(base(org), { method: "POST", json: body });
   const shot = (org, id, name, bytes) => { const f = new FormData(); f.append("file", new File([bytes], name)); return call(`${base(org)}/${id}/screenshot`, { method: "POST", form: f }); };
-  return { w, bucket, A, Bo, ann, call, base, create, shot };
+  return { w, bucket, A, Bo, ann, call, base, create, shot, hooks };
 }
 const SITE = { name: "Main website", url: "https://alpha.example.ca", origin: "client", status: "live" };
 
@@ -264,4 +265,35 @@ test("the new Admin pages are valid JavaScript modules (they are loaded by the b
     const r = spawnSync(process.execPath, ["--check", file], { encoding: "utf8" });
     assert.equal(r.status, 0, `${f}.js: ${r.stderr}`);
   }
+});
+
+test("Admin can see what the portal's live-preview check sees for a website: verdict, redirect chain and the framing headers only (never cached, never page content)", async () => {
+  const s = await setup();
+  const id = (await s.create(s.A, { ...SITE })).json.id;
+  const html = (h = {}, st = 200) => new Response("<html>SECRET-BODY</html>", { status: st, headers: { "Content-Type": "text/html", ...h } });
+  const calls = [];
+  s.hooks.previewFetch = async (url) => { calls.push(url); return html({ "X-Frame-Options": "SAMEORIGIN", "Content-Security-Policy": "frame-ancestors 'self'; default-src 'none'", "Set-Cookie": "s=1", "X-Secret": "nope" }); };
+  const r = await s.call(`${s.base(s.A)}/${id}/preview-check`);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json, { embeddable: false, reason: "blocked", status: 200, hops: [{ host: "alpha.example.ca", status: 200 }], error: null, xFrameOptions: "SAMEORIGIN", frameAncestors: ["frame-ancestors 'self'"], contentType: "text/html" });
+  assert.ok(!JSON.stringify(r.json).includes("SECRET") && !JSON.stringify(r.json).includes("Set-Cookie") && !JSON.stringify(r.json).includes("nope"));
+  s.hooks.previewFetch = async () => html(); await s.call(`${s.base(s.A)}/${id}/preview-check`);
+  const again = await s.call(`${s.base(s.A)}/${id}/preview-check`);
+  assert.equal(again.json.embeddable, true, "never cached: the second answer reflects the website now");
+  s.hooks.previewFetch = async () => html({}, 530);
+  const down = await s.call(`${s.base(s.A)}/${id}/preview-check`);
+  assert.deepEqual([down.json.reason, down.json.status], ["status", 530], "a platform error status is shown, which is how a same-zone fetch problem would look");
+  s.hooks.previewFetch = async () => { throw Object.assign(new Error("secret network detail"), { name: "TypeError" }); };
+  const gone = await s.call(`${s.base(s.A)}/${id}/preview-check`);
+  assert.equal(gone.json.reason, "unreachable"); assert.equal(gone.json.error, "TypeError"); assert.ok(!JSON.stringify(gone.json).includes("secret network detail"), "only the error's name, never its message");
+  assert.equal((await s.call(`${s.base(s.Bo)}/${id}/preview-check`)).status, 404, "another organization's website is not found");
+  assert.equal((await s.call(`${s.base(s.A)}/${id}/preview-check`, { method: "POST", json: {} })).status, 405, "read-only");
+  const dev = (await s.create(s.A, { name: "New", origin: "framework", status: "in_development" })).json.id;
+  assert.equal((await s.call(`${s.base(s.A)}/${dev}/preview-check`)).status, 404, "nothing to check without an address");
+});
+
+test("the Admin page offers a Check live preview button, and its source is valid JavaScript", () => {
+  const src = read("admin/assets/websites.js");
+  assert.match(src, /Check live preview/); assert.match(src, /preview-check/);
+  assert.ok(!/innerHTML/.test(src), "server text is never inserted as HTML");
 });
