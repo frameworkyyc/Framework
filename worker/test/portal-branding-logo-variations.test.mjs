@@ -785,3 +785,22 @@ test("Admin tagline form: primary, add/remove alternates (up to six), usage guid
   assert.match(ui, /caps\(\)\.sections !== false/); assert.match(ui, /sections_unavailable/); assert.ok(!/waiting for approval/.test(ui), "the old placeholder notice is gone");
   assert.match(read("migrations/portal/0009_brand_sections.sql"), /ALTER TABLE brand_kits ADD COLUMN sections_json TEXT CHECK \(sections_json IS NULL OR \(json_valid\(sections_json\) AND json_type\(sections_json\) = 'object' AND length\(sections_json\) <= 12000\)\);/);
 });
+
+test("Admin status messages have one 1px border and no ring around it when a script focuses them; interactive elements keep their focus rings", () => {
+  const css = read("admin/assets/admin.css");
+  assert.match(css, /\.adm-msg \{[^}]*border: 1px solid var\(--hairline\)/);
+  assert.match(css, /\.adm-msg:focus \{ outline: none; \}/, "a focused message gets no second outline");
+  assert.doesNotMatch(css, /\.adm-msg[^{]*\{[^}]*border: 2px/, "success, info, warning and error all stay one 1px border");
+  assert.match(css, /\.adm-msg\.is-warning, \.adm-msg\.is-error \{ border-color: var\(--ink\); font-weight: 500; \}/);
+  for (const sel of [".adm-icon-btn:focus-visible", ".adm-small:focus-visible", ".adm-linkbtn:focus-visible", ".adm-choice:focus-within"]) assert.ok(css.includes(sel), sel + " keeps its focus ring");
+  assert.match(read("assets/css/styles.css"), /:focus-visible \{\s*outline: 2px solid var\(--ink\);/, "the site-wide keyboard focus ring is unchanged");
+});
+
+test("Admin Branding opens with every section and list collapsed (the nine numbered sections, New uploads and Service requests); only a click or a Manage files jump opens one", () => {
+  const ui = read("admin/assets/branding.js");
+  const first = ui.slice(ui.indexOf("if (first) {"), ui.indexOf("const publish = "));
+  assert.ok(!/opened\.add\(/.test(first), "nothing is opened on arrival");
+  assert.match(ui, /open: opened\.has\(id\)/, "a section opens only when it is in the clicked set");
+  assert.match(ui, /chip\("pending", `\$\{fresh\} new`/, "the new-uploads count stays in its heading");
+  assert.match(ui, /chip\("pending", `\$\{open\} open`/, "the open-requests count stays in its heading");
+});

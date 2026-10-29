@@ -648,9 +648,7 @@ export async function render(orgId, ctx) {
     const openRequests = data.requests.filter((r) => r.status === "new" || r.status === "contacted").length;
     if (first) {
       first = false;
-      opened.add("br-s-logo");
-      if (newUploads) opened.add("br-uploads");
-      if (openRequests) opened.add("br-requests");
+      // every section and list starts collapsed (the new-uploads and open-requests counts stay in their headings); only a click, or a "Manage files" jump, opens one
     }
     const publish = !canWrite() ? null : h("button", { class: publishedKit ? "btn btn--secondary adm-small" : "btn btn--primary adm-small", type: "button", onclick: () => perform({
       confirm: publishedKit
