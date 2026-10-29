@@ -10,6 +10,7 @@
  *   POST /clients/:org/websites/:id/archive | restore hide or bring back a website (nothing is deleted)
  *   POST /clients/:org/websites/:id/screenshot        multipart: file (png, jpg or webp, up to 5 MB)   set or replace the screenshot
  *   POST /clients/:org/websites/:id/screenshot/remove removes the screenshot (the stored image is deleted at once)
+ *   GET  /clients/:org/websites/:id/preview-check     what the portal's live-preview check sees for this website, from the Worker (verdict, redirect chain, framing headers; never cached)
  *   GET  /clients/:org/websites/:id/screenshot        the screenshot as an inline picture
  * "No website" is not stored: a client with no rows simply has none. A database without migration 0011 answers { available: false }: nothing else runs.
  */
@@ -17,6 +18,7 @@ import { getOrganizationById } from "./repo/orgs.js";
 import { UUID } from "./repo/common.js";
 import * as sites from "./repo/websites.js";
 import * as wfiles from "./website-files.js";
+import { diagnoseEmbeddable } from "./website-preview.js";
 import { json, err, sameOriginWrite, readJson, readUpload } from "./admin-branding.js";
 
 const MAX_UPLOAD = wfiles.SCREENSHOT_MAX_BYTES + 256 * 1024;
@@ -47,6 +49,7 @@ export async function handleWebsitesApi(request, env, principal, path, deps = {}
   if (rest.length === 0) route = request.method === "GET" ? { kind: "view", method: "GET" } : { kind: "create", method: "POST" };
   else if (rest.length === 2 && ["update", "archive", "restore"].includes(rest[1])) route = { kind: rest[1], method: "POST", target: rest[0] };
   else if (rest.length === 2 && rest[1] === "screenshot") route = request.method === "GET" ? { kind: "screenshot_view", method: "GET", target: rest[0] } : { kind: "screenshot_set", method: "POST", target: rest[0] };
+  else if (rest.length === 2 && rest[1] === "preview-check") route = { kind: "preview_check", method: "GET", target: rest[0] };
   else if (rest.length === 3 && rest[1] === "screenshot" && rest[2] === "remove") route = { kind: "screenshot_remove", method: "POST", target: rest[0] };
   if (!route) return null;
   if (request.method !== route.method) return json({ error: "method_not_allowed", message: "That method is not allowed here." }, 405, { Allow: route.method });
@@ -93,6 +96,15 @@ export async function handleWebsitesApi(request, env, principal, path, deps = {}
     if (route.kind === "screenshot_remove") {
       const r = await wfiles.adminRemoveScreenshot(svc, { organizationId: orgRow.id, websiteId: route.target, actor });
       return r.ok ? json({ ok: true }) : fromFailure(r);
+    }
+    if (route.kind === "preview_check") {
+      // What the portal's live-preview check sees FROM THE WORKER for this website (never cached): the verdict, the redirect chain and the framing headers only.
+      const site = await sites.getWebsiteAdmin(db, orgRow.id, route.target);
+      if (!site || !site.url) return err(404, "not_found", "That website has no web address to check.");
+      let portalOrigin = null;
+      try { portalOrigin = new URL(env.PORTAL_BASE_URL).origin; } catch { /* not configured */ }
+      const r = await diagnoseEmbeddable(site.url, { fetch: deps.previewFetch || (deps.fetch ? null : fetch), portalOrigin });
+      return json({ embeddable: r.embeddable, reason: r.reason, status: r.status, hops: r.hops || [], error: r.error || null, xFrameOptions: r.summary ? r.summary.xFrameOptions : null, frameAncestors: r.summary ? r.summary.frameAncestors : [], contentType: r.summary ? r.summary.contentType : null });
     }
     if (route.kind === "screenshot_view") {
       const r = await wfiles.adminScreenshotResponse(svc, { organizationId: orgRow.id, websiteId: route.target });

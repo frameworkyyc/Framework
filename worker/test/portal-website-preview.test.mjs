@@ -10,7 +10,7 @@ import * as S from "./helpers/sample-files.mjs";
 import * as sites from "../portal/repo/websites.js";
 import * as WF from "../portal/website-files.js";
 import { PORTAL_CSP, securityHeaders } from "../portal/http.js";
-import { checkEmbeddable, framingAllowed, previewableUrl, frameSources } from "../portal/website-preview.js";
+import { checkEmbeddable, diagnoseEmbeddable, framingAllowed, previewableUrl, frameSources } from "../portal/website-preview.js";
 
 const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
 const MIGRATION = read("migrations/portal-proposed/0011_websites.sql");
@@ -45,7 +45,7 @@ test("only public https website names are ever contacted: no IP addresses, local
 test("checkEmbeddable: allowed, blocked, wrong type, error status, unreachable, no fetch; the body is never read", async () => {
   const P = "https://staging.frameworkco.ca", U = "https://alpha.example.ca/";
   const ok = await checkEmbeddable(U, { fetch: stub({ [U]: html() }), portalOrigin: P });
-  assert.deepEqual(ok, { embeddable: true, reason: "ok", frameOrigins: ["https://alpha.example.ca"] });
+  assert.deepEqual(ok, { embeddable: true, reason: "ok", frameOrigins: ["https://alpha.example.ca"], status: 200 });
   let cancelled = false, read2 = false;
   const spy = () => { const r = html(); return new Proxy(r, { get: (t, k) => (k === "text" || k === "json" || k === "arrayBuffer" ? () => { read2 = true; } : k === "body" ? { cancel: async () => { cancelled = true; } } : typeof t[k] === "function" ? t[k].bind(t) : t[k]) }); };
   await checkEmbeddable(U, { fetch: stub({ [U]: spy }), portalOrigin: P });
@@ -190,4 +190,34 @@ test("the preview module has no inline script or style, and the portal's own ori
   const page = await (await s.ann.get("/portal/o/alpha/website")).text();
   for (const tag of iframes(page)) assert.ok(!/allow-same-origin/.test(tag));
   assert.ok(!/<script|\sstyle=|\son[a-z]+=/i.test(page));
+});
+
+test("the check reports the HTTP status it saw (so a platform error is visible) and a same-zone problem reads as a status, not as a block", async () => {
+  const P = "https://staging.frameworkco.ca";
+  const r = await checkEmbeddable("https://frameworkco.ca/", { fetch: stub({ "https://frameworkco.ca/": html({}, 530) }), portalOrigin: P });
+  assert.deepEqual(r, { embeddable: false, reason: "status", frameOrigins: [], status: 530 });
+  const d = await diagnoseEmbeddable("https://frameworkco.ca/", { fetch: stub({ "https://frameworkco.ca/": html({ "X-Frame-Options": "DENY" }) }), portalOrigin: P });
+  assert.equal(d.reason, "blocked"); assert.equal(d.summary.xFrameOptions, "DENY"); assert.deepEqual(d.hops, [{ host: "frameworkco.ca", status: 200 }]);
+  assert.equal((await diagnoseEmbeddable("http://x.example.ca/", { fetch: stub({}), portalOrigin: P })).reason, "address_not_checkable");
+  assert.equal((await diagnoseEmbeddable("https://x.example.ca/", { portalOrigin: P })).reason, "unavailable");
+});
+
+test("each fresh check is logged with words and a status code only (never the address); a cached answer is not logged again", async () => {
+  const lines = []; const orig = console.log; console.log = (l) => lines.push(l);
+  try {
+    const s = await setup({ previewFetch: stub({ "https://alpha.example.ca/": html({}, 530) }) });
+    await s.add(LIVE);
+    await s.ann.get("/portal/o/alpha/website");
+  } finally { console.log = orig; }
+  const evt = lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).find((x) => x && x.evt === "website.preview");
+  assert.ok(evt, "logged");
+  assert.deepEqual([evt.outcome, evt.reason, evt.status], ["fallback", "status", 530]);
+  assert.ok(!lines.join("\n").includes("alpha.example.ca"), "the website's address is never logged");
+});
+
+test("the Worker is configured so a fetch to its own zone reaches the website (Cloudflare: otherwise it goes to the zone's origin, ignoring Workers)", () => {
+  const cfg = read("wrangler.jsonc");
+  assert.match(cfg, /"compatibility_flags":\s*\["global_fetch_strictly_public"\]/);
+  const src = ["worker/index.js", "worker/assessment.js", "worker/card.js"].map(read).join("\n");
+  assert.ok(!/fetch\(["`']https?:\/\/(www\.)?frameworkco\.ca/.test(src), "nothing else in the Worker fetches its own zone");
 });

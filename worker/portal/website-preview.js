@@ -56,31 +56,41 @@ export function framingAllowed(headers, portalOrigin, siteOrigin) {
   return true;
 }
 
+/** The framing-relevant parts of a response, for the Admin check and the logs: only these headers, nothing else is kept. */
+function framingSummary(res) {
+  const csp = res.headers.get("content-security-policy") || "";
+  const ancestors = csp.split(",").map((p) => p.split(";").map((x) => x.trim()).find((x) => /^frame-ancestors(\s|$)/i.test(x))).filter(Boolean);
+  return { xFrameOptions: res.headers.get("x-frame-options") || null, frameAncestors: ancestors, contentType: (res.headers.get("content-type") || "").split(";")[0].trim() || null };
+}
+
 async function inspectSite(rawUrl, { fetch: doFetch, portalOrigin }) {
-  const origins = [];
+  const origins = [], hops = [];
   let url = previewableUrl(rawUrl);
+  const done = (embeddable, reason, extra = {}) => ({ embeddable, reason, frameOrigins: embeddable ? origins : [], status: hops.length ? hops[hops.length - 1].status : null, hops, ...extra });
   for (let hop = 0; url && hop <= MAX_HOPS; hop++) {
     if (!origins.includes(url.origin)) origins.push(url.origin);
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
     let res;
     try { res = await doFetch(url.href, { method: "GET", redirect: "manual", signal: ctl.signal, headers: { Accept: "text/html", "User-Agent": "Framework-Portal-Preview-Check/1.0 (+https://frameworkco.ca)" } }); }
-    catch { return { embeddable: false, reason: "unreachable", frameOrigins: [] }; }
+    catch (e) { hops.push({ host: url.hostname, status: null }); return done(false, "unreachable", { error: e && e.name ? String(e.name) : "Error" }); }
     finally { clearTimeout(timer); }
+    hops.push({ host: url.hostname, status: res.status });
     if (res.status >= 300 && res.status < 400) {
       try { await res.body?.cancel(); } catch { /* nothing to read */ }
       let next = null;
       try { next = previewableUrl(new URL(res.headers.get("location") || "", url).href); } catch { next = null; }
-      if (!next) return { embeddable: false, reason: "redirect", frameOrigins: [] };
+      if (!next) return done(false, "redirect");
       url = next;
       continue;
     }
     try { await res.body?.cancel(); } catch { /* the body is never read */ }
-    if (res.status < 200 || res.status > 299) return { embeddable: false, reason: "status", frameOrigins: [] };
-    if (!/^text\/html\b/i.test(res.headers.get("content-type") || "")) return { embeddable: false, reason: "not_html", frameOrigins: [] };
-    if (!framingAllowed(res.headers, portalOrigin, url.origin)) return { embeddable: false, reason: "blocked", frameOrigins: [] };
-    return { embeddable: true, reason: "ok", frameOrigins: origins };
+    const summary = framingSummary(res);
+    if (res.status < 200 || res.status > 299) return done(false, "status", { summary });
+    if (!/^text\/html\b/i.test(res.headers.get("content-type") || "")) return done(false, "not_html", { summary });
+    if (!framingAllowed(res.headers, portalOrigin, url.origin)) return done(false, "blocked", { summary });
+    return done(true, "ok", { summary });
   }
-  return { embeddable: false, reason: "redirect", frameOrigins: [] };
+  return done(false, "redirect");
 }
 
 /**
@@ -88,17 +98,27 @@ async function inspectSite(rawUrl, { fetch: doFetch, portalOrigin }) {
  * the page then shows its fallback. `cache` is the Workers Cache API default cache (or any object with match/put); absent means no caching.
  */
 export async function checkEmbeddable(rawUrl, { fetch: doFetch, portalOrigin, cache } = {}) {
-  const none = (reason) => ({ embeddable: false, reason, frameOrigins: [] });
+  const none = (reason) => ({ embeddable: false, reason, frameOrigins: [], status: null });
   if (typeof doFetch !== "function" || !portalOrigin || !previewableUrl(rawUrl)) return none("unavailable");
   const key = cache ? new Request(`https://preview-check.framework.invalid/v1/${encodeURIComponent(portalOrigin)}/${encodeURIComponent(rawUrl)}`) : null;
   try {
-    if (key) { const hit = await cache.match(key); if (hit) { const j = await hit.json(); if (j && typeof j.embeddable === "boolean" && Array.isArray(j.frameOrigins)) return j; } }
+    if (key) { const hit = await cache.match(key); if (hit) { const j = await hit.json(); if (j && typeof j.embeddable === "boolean" && Array.isArray(j.frameOrigins)) return { status: null, ...j, cached: true }; } }
   } catch { /* a cache miss is fine */ }
   let result;
-  try { result = await inspectSite(rawUrl, { fetch: doFetch, portalOrigin }); } catch { result = none("unreachable"); }
+  try { const r = await inspectSite(rawUrl, { fetch: doFetch, portalOrigin }); result = { embeddable: r.embeddable, reason: r.reason, frameOrigins: r.frameOrigins, status: r.status }; } catch { result = none("unreachable"); }
   try { if (key) await cache.put(key, new Response(JSON.stringify(result), { headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${result.embeddable ? TTL_OK : TTL_NO}` } })); } catch { /* caching is best effort */ }
   return result;
 }
 
 /** The frame-src sources to add to the page's CSP: only https origins this module itself produced. */
 export const frameSources = (preview) => (preview && preview.embeddable ? preview.frameOrigins.filter((o) => /^https:\/\/[a-z0-9.-]+$/.test(o)) : []);
+
+/**
+ * The full, UNCACHED picture of one website for Framework Admin ("Check live preview"): the verdict, why, the redirect chain (host and status only) and the framing-relevant headers the
+ * website sent. Used to see exactly what the portal's check sees from the Worker, since that is not what a visitor's browser or a developer's laptop sees.
+ */
+export async function diagnoseEmbeddable(rawUrl, { fetch: doFetch, portalOrigin } = {}) {
+  if (typeof doFetch !== "function" || !portalOrigin) return { embeddable: false, reason: "unavailable", frameOrigins: [], status: null, hops: [] };
+  if (!previewableUrl(rawUrl)) return { embeddable: false, reason: "address_not_checkable", frameOrigins: [], status: null, hops: [] };
+  try { return await inspectSite(rawUrl, { fetch: doFetch, portalOrigin }); } catch { return { embeddable: false, reason: "unreachable", frameOrigins: [], status: null, hops: [] }; }
+}
