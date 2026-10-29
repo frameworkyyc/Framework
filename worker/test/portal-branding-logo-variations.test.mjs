@@ -138,7 +138,7 @@ test("Secondary needs no migration: it is stored as an unset logo_role with a 's
   assert.throws(() => s.w.db.raw.prepare("INSERT INTO brand_assets (id, organization_id, kind, title, logo_role, format, content_type, size_bytes, sha256, storage_key, original_name, created_by) VALUES (?, ?, 'logo', 't', 'secondary', 'png', 'image/png', 1, ?, ?, 'x.png', 'a')").run(crypto.randomUUID(), s.A.id, "a".repeat(64), "org/" + "a".repeat(40)), "the database CHECK still allows only the three older values, which is why no migration is needed");
   const bad = await s.upload(s.A, s.logo("tertiary"), "x.png", S.png());
   assert.deepEqual([bad.status, bad.json.error], [422, "invalid_logo_role"]);
-  assert.deepEqual(readdirSync(new URL("../../migrations/portal/", import.meta.url)).filter((f) => f.endsWith(".sql")).sort(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql"], "no new migration");
+  assert.deepEqual(readdirSync(new URL("../../migrations/portal/", import.meta.url)).filter((f) => f.endsWith(".sql")).sort(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql", "0010_service_pricing.sql"], "no new migration");
 });
 
 test("several formats in one variation: every format downloads, the preview uses an image format, and a PDF-only variation shows a plain tile with its download", async () => {
@@ -568,6 +568,7 @@ test("Typography Hierarchy: five levels in order, illustrative (no approved scal
 
 test("empty typography: a restrained empty state with the existing request button and a way to share fonts; no price is shown by default; a member is told to ask an owner", async () => {
   const s = await setup(); await publishOnly(s, s.A);
+  s.w.db.raw.exec("DROP TABLE service_prices"); // a database without the pricing migration: no price anywhere
   const html = await (await s.ann.get(base)).text(); const type = sectionHtml(html, "typography");
   assert.match(type, /No typefaces have been added yet\./); assert.match(type, /<summary class="btn btn--primary">Request Design<span/); assert.match(type, /href="\/portal\/o\/alpha\/branding\/uploads">Upload them for free/); assert.ok(!/Share them with Framework/.test(type), "one upload link, not two");
   assert.equal([...type.matchAll(/tf-card--example/g)].length, 3, "three muted Framework examples"); assert.ok(!/tf-card--has/.test(type), "nothing is presented as the client's");

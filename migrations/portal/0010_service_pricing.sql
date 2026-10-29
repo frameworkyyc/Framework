@@ -1,5 +1,5 @@
 -- Branding service pricing: one global, Admin-editable price per Branding service, and a record of the price shown with each service request.
--- PROPOSED, NOT APPLIED anywhere. Staging first, after approval; Production follows the manual Production workflow after its own approval. See worker/portal/BRANDING-FILES.md.
+-- Approved; applied to Staging. Production: only by the manual Production workflow. See worker/portal/BRANDING-FILES.md.
 -- Two additive changes, nothing existing is altered or removed:
 --   1. service_prices: one row per service (13: the four logos, the other eight sections, the complete brand kit), holding a price type (starting_at, custom_quote
 --      or included) and, for starting_at only, a whole-dollar CAD amount. Global: it belongs to Framework, not to a client. Seeded with Framework's starting prices.
