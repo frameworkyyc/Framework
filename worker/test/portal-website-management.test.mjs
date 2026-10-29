@@ -20,17 +20,16 @@ const jwk = { ...pair.publicKey.export({ format: "jwk" }), kid: "k1", alg: "RS25
 const nowS = () => Math.floor(Date.now() / 1000);
 const sign = (c) => { const h = b64u(JSON.stringify({ alg: "RS256", kid: "k1", typ: "JWT" })), p = b64u(JSON.stringify(c)); return `${h}.${p}.${b64u(createSign("RSA-SHA256").update(h + "." + p).sign(pair.privateKey))}`; };
 const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
-const M11 = read("migrations/portal-proposed/0011_websites.sql"), M12 = read("migrations/portal-proposed/0012_website_management.sql");
+const M11 = read("migrations/portal/0011_websites.sql"), M12 = read("migrations/portal/0012_website_management.sql");
 const rowsOf = (w, q, ...p) => w.db.raw.prepare(q).all(...p).map((r) => ({ ...r }));
 const UUID0 = "00000000-0000-4000-8000-000000000000";
 
 async function setup({ m12 = true, flag = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld();
+  const w = await makeWorld({ skip: m12 ? [] : ["0012_website_management.sql"] });
   const bucket = fakeR2();
   Object.assign(w.env, { PORTAL_FILES: bucket, PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   if (flag) w.env.PORTAL_WEBSITE = "1";
-  w.db.raw.exec(M11); if (m12) w.db.raw.exec(M12);
   const A = await w.org("alpha", "Alpha Co"), Bo = await w.org("beta", "Beta Co");
   await w.invite(A, "ann@alpha.test", "owner"); await w.invite(A, "mia@alpha.test", "member"); await w.invite(Bo, "bob@beta.test", "owner");
   const ann = w.browser(), mia = w.browser(), bob = w.browser(), anon = w.browser();
@@ -318,7 +317,7 @@ test("the new sections add no scripts or inline styles, keep the strict CSP, and
 test("migration 0012 is additive: two new tables and four seed rows, nothing existing is changed or removed", async () => {
   const sql = M12.replace(/--.*$/gm, "");
   assert.ok(!/\bDROP\b|(?<!ON )\b(DELETE|UPDATE)\b|\bALTER\b|\bRENAME\b/i.test(sql), "no destructive or altering statement");
-  const w = await makeWorld(); w.db.raw.exec(M11);
+  const w = await makeWorld({ skip: ["0012_website_management.sql"] });
   const before = rowsOf(w, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").map((r) => r.name);
   const prices = rowsOf(w, "SELECT * FROM service_prices ORDER BY service_key");
   w.db.raw.exec(M12); w.db.raw.exec(M12); // and idempotent

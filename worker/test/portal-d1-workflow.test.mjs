@@ -126,21 +126,21 @@ test("script: remote info must match the expected name AND id", () => {
 });
 test("script: pending migrations - the pending list must be a tail of the known, ordered list; apply needs at least one", () => {
   const ALL = F;
-  assert.equal(ALL.length, 10);
-  assert.match(checkPendingBefore(listOf(...ALL), "apply"), /0001.*0002.*0003.*0004.*0005.*0006.*0007.*0008.*0009.*0010/, "an empty database takes all ten");
+  assert.equal(ALL.length, 12);
+  assert.match(checkPendingBefore(listOf(...ALL), "apply"), /0001.*0002.*0003.*0004.*0005.*0006.*0007.*0008.*0009.*0010.*0011.*0012/, "an empty database takes all twelve");
   throwsFail(() => checkPendingBefore(LIST_PENDING, "apply"), /not the next ones in order/, "0001 alone pending would mean 0002 onwards were applied without it");
-  assert.match(checkPendingBefore(listOf(...ALL.slice(4)), "apply"), /0005.*0006.*0007.*0008.*0009.*0010/, "a database at 0004: 0005 to 0010 pending");
-  assert.match(checkPendingBefore(listOf(...ALL.slice(1)), "apply"), /0002.*0010/, "a database that has only 0001");
-  assert.match(checkPendingBefore(listOf(ALL[9]), "apply"), /0010/, "only the last one pending");
+  assert.match(checkPendingBefore(listOf(...ALL.slice(4)), "apply"), /0005.*0006.*0007.*0008.*0009.*0010.*0011.*0012/, "a database at 0004: 0005 to 0012 pending");
+  assert.match(checkPendingBefore(listOf(...ALL.slice(1)), "apply"), /0002.*0012/, "a database that has only 0001");
+  assert.match(checkPendingBefore(listOf(ALL[11]), "apply"), /0012/, "only the last one pending");
   assert.match(checkPendingBefore(listOf(...ALL.slice(4)), "verify-only"), /0005/);
   assert.match(checkPendingBefore(LIST_NONE, "verify-only"), /none/);
   throwsFail(() => checkPendingBefore(LIST_NONE, "apply"), /at least one pending/, "nothing to apply means apply refuses to run");
-  throwsFail(() => checkPendingBefore(listOf(ALL[4], ALL[5], ALL[6], ALL[8], ALL[9]), "apply"), /not the next ones in order/); // 0008 missing: not a tail
-  throwsFail(() => checkPendingBefore(listOf(ALL[4], ALL[6], ALL[7], ALL[8], ALL[9]), "apply"), /not the next ones in order/); // 0006 skipped
+  throwsFail(() => checkPendingBefore(listOf(ALL[4], ALL[5], ALL[6], ALL[8], ALL[9], ALL[10], ALL[11]), "apply"), /not the next ones in order/); // 0008 missing: not a tail
+  throwsFail(() => checkPendingBefore(listOf(ALL[4], ALL[6], ALL[7], ALL[8], ALL[9], ALL[10], ALL[11]), "apply"), /not the next ones in order/); // 0006 skipped
   throwsFail(() => checkPendingBefore(listOf(ALL[1], ALL[2], ALL[3]), "apply"), /not the next ones in order/, "0002 to 0004 pending would mean 0005 onwards were applied first");
-  throwsFail(() => checkPendingBefore(listOf(...ALL.slice(4), "0011_something.sql"), "apply"), /unexpected pending/);
+  throwsFail(() => checkPendingBefore(listOf(...ALL.slice(4), "0013_something.sql"), "apply"), /unexpected pending/);
   throwsFail(() => checkPendingBefore(listOf("0001_create_feedback_responses.sql"), "verify-only"), /unexpected pending/);
-  throwsFail(() => checkPendingBefore(listOf(...ALL.slice(4)).replace(ALL[4], "0011_x.sql"), "verify-only"), /unexpected pending/);
+  throwsFail(() => checkPendingBefore(listOf(...ALL.slice(4)).replace(ALL[4], "0013_x.sql"), "verify-only"), /unexpected pending/);
   throwsFail(() => checkPendingBefore("something unexpected", "verify-only"), /unrecognised/);
   throwsFail(() => checkPendingBefore("", "apply"), /unrecognised/);
   throwsFail(() => checkPendingBefore(LIST_PENDING + LIST_NONE, "apply"), /contradictory/);

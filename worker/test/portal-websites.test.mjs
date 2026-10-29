@@ -23,18 +23,17 @@ const nowS = () => Math.floor(Date.now() / 1000);
 const sign = (c) => { const h = b64u(JSON.stringify({ alg: "RS256", kid: "k1", typ: "JWT" })), p = b64u(JSON.stringify(c)); return `${h}.${p}.${b64u(createSign("RSA-SHA256").update(h + "." + p).sign(pair.privateKey))}`; };
 const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
 const rowsOf = (w, q, ...p) => w.db.raw.prepare(q).all(...p).map((r) => ({ ...r }));
-const MIGRATION = read("migrations/portal-proposed/0011_websites.sql");
+const MIGRATION = read("migrations/portal/0011_websites.sql");
 
 async function setup({ migrated = true, storage = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld();
+  const w = await makeWorld({ skip: migrated ? [] : ["0011_websites.sql", "0012_website_management.sql"] }); // every test world starts fully migrated; "unmigrated" is a database as it was before 0011
   const bucket = fakeR2();
   Object.assign(w.env, { PORTAL_BRANDING: "1", PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   if (storage) w.env.PORTAL_FILES = bucket;
   const A = await w.org("alpha", "Alpha Co"), Bo = await w.org("beta", "Beta Co");
   await w.invite(A, "ann@alpha.test", "owner");
   const ann = w.browser(); await ann.signIn(w.user(1, "ann@alpha.test"));
-  if (migrated) w.db.raw.exec(MIGRATION);
   const hooks = {};
   const call = async (path, { method = "GET", json, form, headers = {} } = {}) => {
     const h = { Origin: ORIGIN, "Cf-Access-Jwt-Assertion": sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, iat: nowS(), exp: nowS() + 600 }), ...(method !== "GET" ? { "X-Framework-Admin": "1" } : {}), ...headers };
