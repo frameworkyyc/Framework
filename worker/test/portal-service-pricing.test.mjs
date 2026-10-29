@@ -62,8 +62,13 @@ test("the catalogue: thirteen services in section order with Framework's startin
   for (const bad of [{ type: "starting_at", priceCad: 0 }, { type: "starting_at", priceCad: 12.5 }, { type: "starting_at", priceCad: null }, { type: "starting_at", priceCad: 1000001 }, { type: "bogus" }, null]) assert.equal(P.priceLabel(bad), "");
   assert.deepEqual(P.pricingFrom([{ service_key: "typography", price_type: "starting_at", price_cad: 250 }, { service_key: "nope", price_type: "included", price_cad: null }, { service_key: "colours", price_type: "starting_at", price_cad: 0 }]).typography.label, "Starting at $250 CAD");
   assert.deepEqual(Object.keys(P.pricingFrom([{ service_key: "typography", price_type: "starting_at", price_cad: 250 }, { service_key: "nope", price_type: "included", price_cad: null }, { service_key: "colours", price_type: "starting_at", price_cad: 0 }])), ["typography"], "unknown services and invalid rows are never shown");
-  assert.deepEqual(P.pricingFrom([]), {}); assert.equal(P.designOffer(null), ""); assert.equal(P.designOfferList([{ entry: null }], { lead: "x" }), "");
-  assert.match(P.designOffer({ key: "typography", name: "<b>Typography</b>", type: "starting_at", priceCad: 250 }, { action: "<i>ACT</i>", uploadHref: "/up" }), /&lt;b&gt;typography&lt;\/b&gt;/, "names are escaped");
+  assert.deepEqual(P.pricingFrom([]), {});
+  const box = P.offerBox({ name: "<b>Typography</b>", description: "Fonts & roles", entry: { type: "starting_at", priceCad: 250 }, level: "required", action: "<i>ACT</i>", uploadHref: "/up" });
+  assert.match(box, /&lt;b&gt;typography&lt;\/b&gt;/, "names are escaped"); assert.match(box, /Framework can create your &lt;b&gt;typography&lt;\/b&gt; for you\./); assert.match(box, /Fonts &amp; roles/); assert.match(box, /<i>ACT<\/i>/);
+  assert.match(box, /Starting at \$250 CAD/); assert.match(box, /Starting prices are estimates/); assert.match(box, /bk-offer__free[\s\S]*Upload your existing branding for free/);
+  const soft = P.offerBox({ name: "Tagline", description: "d", entry: null, level: "recommended", action: "", uploadHref: "" });
+  assert.match(soft, /Want help with your tagline\?/, "softer wording for a Recommended section"); assert.ok(!/bk-offer__price|bk-offer__estimate|bk-offer__free/.test(soft), "no price, no estimate wording and no upload block when there is nothing to show");
+  assert.equal(P.OFFER_COPY.required.note, "Needed to use your brand consistently."); assert.equal(P.OFFER_COPY.recommended.note, "Optional, but it makes your brand stronger.");
 });
 
 test("migration 0010 is additive: it seeds the thirteen starting prices, enforces its rules, adds a nullable snapshot column, and leaves existing requests untouched", async () => {
@@ -163,19 +168,19 @@ test("client Branding with nothing added: every section offers its design servic
   const esc = (t) => t.replace(/[$.]/g, "\\$&");
   const price = (key) => `Starting at ${new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(PRICES[key])} CAD`;
   const logo = sectionHtml(html, "logo");
-  for (const [name, key] of [["Primary Logo", "logo-primary"], ["Secondary Logo", "logo-secondary"], ["Simplified Logo", "logo-simplified"], ["Sub-mark", "logo-submark"]]) assert.match(logo, new RegExp(`bk-design__name">${name}<\\/span> <span class="bk-design__price">${esc(price(key))}`), name);
-  assert.match(logo, /Framework can design your logo\./);
+  for (const [name, key] of [["Primary Logo", "logo-primary"], ["Secondary Logo", "logo-secondary"], ["Simplified Logo", "logo-simplified"], ["Sub-mark", "logo-submark"]]) assert.match(logo, new RegExp(`bk-offer__name">${name}<\\/span> <span class="bk-offer__price bk-offer__price--inline">${esc(price(key))}`), name);
+  assert.match(logo, /Framework can create your logo for you\./, "Required: firmer wording"); assert.match(logo, /class="bk-status"><span class="bk-status__text">Logo not yet provided<\/span>/);
   for (const [sec, key] of [["typography", "typography"], ["colours", "colours"], ["tagline", "tagline"], ["imagery", "imagery"], ["layout", "layout"], ["textures", "textures"], ["iconography", "iconography"], ["style", "style"]]) {
     const h = sectionHtml(html, sec);
-    assert.match(h, new RegExp(`bk-design__price">${esc(price(key))}<`), sec + " shows its price");
-    assert.match(h, /Starting prices are estimates, not final quotes\./, sec + " says it is an estimate");
-    assert.match(h, /<summary class="btn btn--small">Request design<span class="visually-hidden">: [^<]+ design<\/span>/, sec + " has the request button with an accessible name");
+    assert.match(h, new RegExp(`bk-offer__price">${esc(price(key))}<`), sec + " shows its price");
+    assert.match(h, /bk-offer__estimate">Starting prices are estimates, not final quotes\./, sec + " says it is an estimate");
+    assert.match(h, /<summary class="btn btn--primary">Request Design<span class="visually-hidden">: [^<]+ design<\/span>/, sec + " has the black request button with an accessible name");
     assert.match(h, /Upload your existing branding for free/, sec + " offers the free upload"); assert.match(h, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   }
-  assert.match(logo, /Upload your existing logos for free/);
+  assert.match(logo, /Upload your existing branding for free/); assert.equal([...html.matchAll(/branding\/uploads">Upload your existing/g)].length, 9, "one free-upload link per section, none repeated");
   assert.ok(!/\$\d/.test([...html.matchAll(/<h[12][^>]*>[\s\S]*?<\/h[12]>/g)].map((m) => m[0]).join(" ")), "no price in any heading");
   assert.ok(!/\$\d/.test(html.slice(html.indexOf('class="bk-nav"'), html.indexOf("</nav>", html.indexOf('class="bk-nav"')))), "none in the section navigation");
-  assert.match(html.slice(html.indexOf('class="brand-kit"')), /bk-design__price">Starting at \$2,500 CAD</, "the complete kit shows its price");
+  assert.match(html.slice(html.indexOf('class="brand-kit"')), /bk-kitprice__price">Starting at \$2,500 CAD</, "the complete kit shows its price");
   assert.ok(!/checkout|payment|pay now|buy now|add to cart|invoice/i.test(html.replace(/<nav[\s\S]*?<\/nav>/g, "").replace(/<a [^>]*>[^<]*<\/a>/g, "")), "nothing like a checkout");
 });
 
@@ -183,9 +188,9 @@ test("completed branding gets no pricing prompt: a section with the client's con
   const s = await setup();
   await s.publish(s.alpha, { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }], typography: [{ role: "heading", slot: "primary", family: "Inter", weights: [400], styles: ["normal"], usage: "", source_url: "https://example.com", file_ids: [] }], sections: { tagline: { primary: "Clear thinking.", alternates: [], guidelines: "" } } });
   const html = await (await s.ann.get(base("alpha"))).text();
-  for (const sec of ["colours", "typography", "tagline"]) assert.ok(!/bk-design/.test(sectionHtml(html, sec)), sec + " is done: no offer");
-  assert.match(sectionHtml(html, "imagery"), /bk-design/, "an empty section still offers it");
-  assert.match(html.slice(html.indexOf('class="brand-kit"')), /bk-design__price/, "the complete kit is still offered while sections are missing");
+  for (const sec of ["colours", "typography", "tagline"]) assert.ok(!/bk-offer/.test(sectionHtml(html, sec)) && /bk-status--done/.test(sectionHtml(html, sec)), sec + " is done: a quiet complete line and no offer");
+  assert.match(sectionHtml(html, "imagery"), /bk-offer/, "an empty section still offers it");
+  assert.match(html.slice(html.indexOf('class="brand-kit"')), /bk-kitprice__price/, "the complete kit is still offered while sections are missing");
 });
 
 test("prices follow Admin: a changed price, Custom Quote and Included show at once on every client's page; an unpriced database shows no offers at all", async () => {
@@ -194,14 +199,15 @@ test("prices follow Admin: a changed price, Custom Quote and Included show at on
   assert.equal((await s.setPrices([{ key: "layout", type: "starting_at", priceCad: 425 }, { key: "textures", type: "custom_quote" }, { key: "iconography", type: "included" }])).status, 200);
   for (const [b, slug] of [[s.ann, "alpha"], [s.bob, "beta"]]) {
     const html = await (await b.get(base(slug))).text();
-    assert.match(sectionHtml(html, "layout"), /bk-design__price">Starting at \$425 CAD</); assert.match(sectionHtml(html, "textures"), /bk-design__price">Custom quote</); assert.match(sectionHtml(html, "iconography"), /bk-design__price">Included</);
+    assert.match(sectionHtml(html, "layout"), /bk-offer__price">Starting at \$425 CAD</); assert.match(sectionHtml(html, "textures"), /bk-offer__price">Custom quote</); assert.match(sectionHtml(html, "iconography"), /bk-offer__price">Included</);
     assert.match(sectionHtml(html, "imagery"), /Starting at \$300 CAD/, "global: both clients see the same");
   }
   const bare = await setup({ migrated: false });
   await bare.publish(bare.alpha);
   const html = await (await bare.ann.get(base("alpha"))).text();
-  assert.ok(!/bk-design|Starting at|Request design/.test(html), "without the table: no prices and no new buttons");
-  assert.match(sectionHtml(html, "colours"), /<summary class="btn btn--small">Request<span/, "the existing request button is unchanged");
+  assert.ok(!/Starting at|bk-offer__price|bk-offer__estimate|bk-kitprice/.test(html), "without the table: no price and no estimate wording anywhere");
+  assert.match(sectionHtml(html, "colours"), /<summary class="btn btn--primary">Request Design<span/, "the offer and its request button remain, without a price");
+  assert.match(sectionHtml(html, "colours"), /Upload your existing branding for free/);
 });
 
 test("requesting a priced service records the service and the price shown, takes it only from the server, and is reviewed in Admin", async () => {
@@ -257,6 +263,6 @@ test("Admin Settings wiring: Settings is a real module with the hub and the Serv
   assert.ok(!/style:|\.style\b|innerHTML|insertAdjacentHTML/.test(ui), "no inline styles and no HTML injection");
   assert.match(css, /\.adm-pricing__row/); assert.match(css, /@media \(max-width: 720px\)[^}]*adm-pricing__row/);
   const portalCss = read("assets/css/portal.css");
-  assert.match(portalCss, /\.bk-design \{/); assert.ok(!/bk-price/.test(portalCss), "the earlier prominent price block is gone");
+  assert.match(portalCss, /\.bk-offer \{/); assert.ok(!/bk-design/.test(portalCss)); assert.ok(!/bk-price/.test(portalCss), "the earlier prominent price block is gone");
   assert.ok(!/stripe|paypal|payment_intent/i.test(ui + read("worker/portal/branding-pricing.js") + read("worker/portal/admin-pricing.js")), "no payment processing");
 });

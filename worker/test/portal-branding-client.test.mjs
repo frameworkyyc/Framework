@@ -72,13 +72,13 @@ test("no brand kit: all nine numbered sections show in order, each with a clean 
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("content-security-policy"), PORTAL_CSP, "no script on the empty page");
   const html = await res.text();
-  const secs = [...html.matchAll(/<section class="bk-sec" id="(\w+)"[^>]*><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">(\d\d)<\/p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-\w+"><span class="visually-hidden">\d\d <\/span>([^<]+?) <span class="bk-req[^>]*>[\s\S]*?<\/span><\/h2>/g)].map((m) => m.slice(1));
+  const secs = [...html.matchAll(/<section class="bk-sec" id="(\w+)"[^>]*><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">(\d\d)<\/p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-\w+"><span class="visually-hidden">\d\d <\/span>([^<]+)<\/h2>/g)].map((m) => m.slice(1));
   assert.deepEqual(secs, [["logo", "01", "Logo"], ["typography", "02", "Typography"], ["colours", "03", "Brand Colours"], ["tagline", "04", "Tagline"], ["imagery", "05", "Brand Imagery"], ["layout", "06", "Layout System"], ["textures", "07", "Textures"], ["iconography", "08", "Iconography"], ["style", "09", "Design Style"]], "all nine, in order, with their two-digit numbers");
   assert.equal([...html.matchAll(/<p class="bk-sec__desc muted">/g)].length, 9, "each has a short description");
   assert.equal([...html.matchAll(/<p class="bk-empty__title">Not added yet<\/p>/g)].length, 2, "only the two other-files groups; every section shows an example instead");
   assert.equal([...html.matchAll(/<span class="bk-eg__tag">Example: Framework<\/span>/g)].length, 7, "seven example panels (Logo and Typography show example cards)"); assert.equal([...html.matchAll(/tf-card--example/g)].length, 3);
   assert.match(html, /<nav class="bk-nav" aria-label="Brand kit sections">/); assert.equal([...html.matchAll(/<li><a href="#\w+"><span class="bk-nav__no"/g)].length, 9);
-  assert.equal([...html.matchAll(/<summary class="btn btn--small">Request<span/g)].length, 5, "a Request button where a request exists: Logo, Typography, Colours, guidelines and additional assets");
+  assert.equal([...html.matchAll(/<summary class="btn btn--primary">Request Design<span/g)].length, 12, "a Request Design button for each of the four logo variations and the eight other sections"); assert.equal([...html.matchAll(/<summary class="btn btn--small">Request<span/g)].length, 2, "and the guidelines and additional-assets requests");
   assert.match(html, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   assert.match(html, /Need a complete brand identity\?/); assert.match(html, /Request full brand kit/);
   assert.ok(!/logo-grid|data-copy|Download (SVG|PNG|PDF|WEBP|JPG)|lv-card--has/.test(html), "no library chrome, no copy buttons and no download buttons");

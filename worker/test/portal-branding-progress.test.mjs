@@ -53,7 +53,7 @@ const nav = (html) => {
   const ol = html.slice(html.indexOf('class="bk-nav"'), html.indexOf("</nav>", html.indexOf('class="bk-nav"')));
   return Object.fromEntries([...ol.matchAll(/<li><a href="#(\w+)">([\s\S]*?)<\/a><\/li>/g)].map((m) => [m[1], { mark: /bk-nav__mark--done/.test(m[2]) ? "check" : (/aria-hidden="true">(\d\/4)</.exec(m[2]) || [, ""])[1], sr: [...m[2].matchAll(/visually-hidden">([^<]*)</g)].map((x) => x[1]).join("|"), html: m[2] }]));
 };
-const tags = (html) => Object.fromEntries(KEYS.map((k) => { const i = html.indexOf(`<section class="bk-sec" id="${k}"`); const t = /<h2 class="bk-sec__title"[^>]*>([\s\S]*?)<\/h2>/.exec(html.slice(i)); return [k, (/class="bk-req bk-req--(\w+)">([\s\S]*?)<\/span>(?:<\/span>)?/.exec(t[1]) || [])[1]]; }));
+const tags = (html) => Object.fromEntries(KEYS.map((k) => { const i = html.indexOf(`<section class="bk-sec" id="${k}"`); return [k, (/class="bk-req bk-req--(\w+)"/.exec(html.slice(i)) || [])[1]]; }));
 
 test("defaults: Logo, Typography and Brand Colours are Required; the other six are Recommended", () => {
   assert.deepEqual(DEFAULT_REQUIREMENT, { logo: "required", typography: "required", colours: "required", tagline: "recommended", imagery: "recommended", layout: "recommended", textures: "recommended", iconography: "recommended", style: "recommended" });
@@ -165,4 +165,87 @@ test("design and safety: text only (no colours, bars or inline styles), the navi
   const vm = { base: "/portal/o/alpha" };
   const html = brandingOverview(vm, { published: true, assets: [], colours: [], typography: [] }, { canRequest: true, csrf: "t", requests: { x: { serviceKey: "x", status: "new" } }, requirementTable: { x: ["tagline"] } });
   assert.ok(!/<script|<img[^>]*onerror/i.test(html.slice(html.indexOf("bk-req")))); assert.match(html, /for your x request/, "an unknown service key is shown as plain escaped text");
+});
+
+/* ------------------------------------------------------------------ the status line and the design offer */
+const NAMES = { logo: "Logo", typography: "Typography", colours: "Brand Colours", tagline: "Tagline", imagery: "Brand Imagery", layout: "Layout System", textures: "Textures", iconography: "Iconography", style: "Design Style" };
+const secOf = (html, k) => { const i = html.indexOf(`<section class="bk-sec" id="${k}"`); return html.slice(i, html.indexOf("</section>", i)); };
+const bodyOf = (html, k) => { const x = secOf(html, k); return x.slice(x.indexOf('<div class="bk-sec__body">') + 26); };
+
+test("an incomplete section opens with its status and Required / Recommended label, then the offer, then the examples: in that order, in all nine sections", async () => {
+  const s = await setup();
+  await s.publish();
+  const html = await s.page();
+  for (const k of KEYS) {
+    const body = bodyOf(html, k);
+    const label = DEFAULT_REQUIREMENT[k] === "required" ? "Required" : "Recommended";
+    assert.ok(body.startsWith(`<p class="bk-status"><span class="bk-status__text">${NAMES[k]} not yet provided</span> <span class="bk-req bk-req--${DEFAULT_REQUIREMENT[k]}">`), k + ": the status is the first thing under the heading, with its label beside it");
+    assert.match(body.slice(0, 400), new RegExp(`${label}`), k);
+    const offer = body.indexOf('<div class="bk-offer'), eg = Math.min(...["bk-eg", "lv-grid", "tf-grid"].map((c) => (body.indexOf(`class="${c}`) < 0 ? 1e9 : body.indexOf(`class="${c}`))));
+    assert.ok(offer > 0 && offer < eg, k + ": the offer comes before the examples");
+    assert.equal([...body.matchAll(/branding\/uploads"/g)].length, 1, k + ": exactly one upload link");
+    assert.match(body.slice(body.indexOf('<div class="bk-offer')), /bk-offer__free"><p>Already have [^<]+\? <a class="text-link"[^>]*>Upload your existing branding for free<\/a>\./, k + ": the free upload sits in its own separated block");
+    assert.match(body, /<summary class="btn btn--primary">Request Design<span/, k + ": a black Request Design button");
+  }
+});
+
+test("messaging: firmer for Required sections, softer for Recommended; the logo offer lists only the missing variations, each with its own price and button", async () => {
+  const s = await setup();
+  await s.publish();
+  let html = await s.page();
+  for (const k of ["typography", "colours"]) { const b = bodyOf(html, k); assert.match(b, /Needed to use your brand consistently\./); assert.match(b, new RegExp(`<h3 class="bk-offer__lead">Framework can create your ${NAMES[k].toLowerCase()} for you\\.</h3>`)); assert.ok(!/Want help/.test(b)); }
+  for (const k of ["tagline", "imagery", "layout", "textures", "iconography", "style"]) { const b = bodyOf(html, k); assert.match(b, /Optional, but it makes your brand stronger\./); assert.match(b, new RegExp(`<h3 class="bk-offer__lead">Want help with your ${NAMES[k].toLowerCase()}\\?</h3>`)); assert.ok(!/Needed to use/.test(b)); }
+  assert.match(bodyOf(html, "logo"), /<h3 class="bk-offer__lead">Framework can create your logo for you\.<\/h3>/);
+  assert.equal([...bodyOf(html, "logo").matchAll(/bk-offer__item"/g)].length, 4);
+  await s.logo("primary"); await s.logo("icon");
+  html = await s.page();
+  const logo = bodyOf(html, "logo");
+  assert.match(logo, /^<p class="bk-status"><span class="bk-status__text">2 of 4 logo variations provided<\/span>/);
+  assert.deepEqual([...logo.matchAll(/bk-offer__name">([^<]+)</g)].map((m) => m[1]), ["Secondary Logo", "Simplified Logo"], "only the variations still missing");
+  assert.match(logo, /<h3 class="bk-offer__lead">Framework can design the logo variations you’re missing\.<\/h3>/);
+  assert.equal([...logo.matchAll(/<summary class="btn btn--primary">Request Design</g)].length, 2);
+  assert.equal([...logo.matchAll(/branding\/uploads"/g)].length, 1);
+});
+
+test("a complete section shows one quiet line and no offer, and keeps its change request; the page never offers what is already done", async () => {
+  const s = await setup();
+  await s.publish({ colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }], typography: [{ role: "heading", slot: "primary", family: "Inter", weights: [400], styles: ["normal"], usage: "", source_url: "https://example.com", file_ids: [] }], sections: { tagline: { primary: "Clear thinking.", alternates: [], guidelines: null } } });
+  for (const r of ["primary", "secondary", "simplified", "icon"]) await s.logo(r);
+  const html = await s.page();
+  for (const k of ["logo", "typography", "colours", "tagline"]) {
+    const b = bodyOf(html, k);
+    assert.ok(b.startsWith(`<p class="bk-status bk-status--done"><svg`), k + ": a quiet complete line");
+    assert.match(b.slice(0, 600), new RegExp(`${NAMES[k]} complete</span>`)); assert.ok(!/bk-offer|Request Design|not yet provided|Needed to use|Optional, but/.test(b), k + ": no offer or prompt");
+  }
+  for (const k of ["logo", "typography", "colours"]) assert.match(bodyOf(html, k), /Request additions or changes/, k + " keeps its existing change request");
+  assert.match(bodyOf(html, "imagery"), /^<p class="bk-status">/, "an incomplete section still opens with its status");
+});
+
+test("existing requests, prices and snapshots are preserved: an open whole-section request shows its status instead of a second button, and a new Request Design records the price shown", async () => {
+  const s = await setup();
+  await s.publish();
+  s.w.db.raw.exec(read("migrations/portal-proposed/0010_service_pricing.sql"));
+  const csrf = csrfOf(await s.page());
+  await s.ann.post(`${base}/request`, { csrf, section: "brand-typography", note: "earlier request" });
+  await s.ann.post(`${base}/request`, { csrf, section: "brand-logos" });
+  let html = await s.page();
+  assert.match(bodyOf(html, "typography"), /class="tag">Requested</); assert.ok(!/<summary class="btn btn--primary">Request Design/.test(bodyOf(html, "typography")), "no second button beside an open request");
+  assert.match(bodyOf(html, "typography"), /Starting at \$250 CAD/, "the price is still shown with the offer");
+  const logo = bodyOf(html, "logo");
+  assert.match(logo, /class="tag">Requested</); assert.ok(!/<summary class="btn btn--primary">Request Design/.test(logo), "an open logos request covers the section");
+  assert.equal(await (async () => { const r = await s.ann.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-svc-tagline", note: "Please" }); return r.headers.get("Location"); })(), `${base}?requested=1`);
+  const row = s.w.db.raw.prepare("SELECT service_key, price_snapshot FROM service_requests WHERE service_key = 'brand-svc-tagline'").get();
+  assert.equal(JSON.parse(row.price_snapshot).label, "Starting at $250 CAD");
+  html = await s.page();
+  assert.match(bodyOf(html, "tagline"), /class="tag">Requested</);
+  assert.equal(s.w.db.raw.prepare("SELECT count(*) n FROM service_requests").get().n, 3);
+});
+
+test("design: monochrome and minimal: no colours, boxes or inline styles in the new component; one hairline around the free upload", () => {
+  const css = read("assets/css/portal.css");
+  const block = css.slice(css.indexOf("/* Branding sections that are not complete"), css.indexOf(".bk-kitprice__price"));
+  assert.ok(block.length > 800, "the component's rules are together");
+  assert.ok(!/#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(|box-shadow|background/.test(block), "no colours, shadows or fills");
+  assert.equal([...block.matchAll(/border(?:-top)?: 1px solid var\(--hairline\)/g)].length, 2, "only the free-upload divider and the separators between logo rows");
+  assert.match(block, /\.bk-offer__action \.brq > summary \{ min-height: 48px/); assert.ok(!/style="/.test(read("worker/portal/branding-pricing.js")));
 });

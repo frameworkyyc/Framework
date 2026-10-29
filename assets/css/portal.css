@@ -857,18 +857,33 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-tag__guide p { margin: 0 0 12px; max-width: 40em; }
 .bk-tag__guide p:last-child { margin-bottom: 0; }
 
-/* Design-service pricing: a quiet note beside the request button of a section the client has nothing in yet (never in a heading). Same type as the surrounding text, muted price. */
-.bk-design { margin: var(--space-3) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--hairline); max-width: 40em; }
-.bk-design > p { margin: 0 0 6px; }
-.bk-design__line { font-size: 16px; }
-.bk-design__price { color: var(--slate); font-weight: 500; white-space: nowrap; }
-.bk-design__list { margin: var(--space-2) 0; padding: 0; list-style: none; }
-.bk-design__item { padding: var(--space-2) 0; border-top: 1px solid var(--hairline); }
-.bk-design__item:first-child { border-top: 0; padding-top: 0; }
-.bk-design__item-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
-.bk-design__name { font-weight: 600; }
-.bk-design .brq { margin-top: var(--space-2); }
-.bk-design__item .brq { margin-top: 6px; }
+/* Branding sections that are not complete open with a status line (what is missing + Required / Recommended) and Framework's design offer; complete ones show one quiet line. Monochrome, one hairline (around the free upload), no boxes. */
+.bk-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 4px; font-size: 17px; font-weight: 600; line-height: 1.3; }
+.bk-status .bk-req { margin-left: 0; }
+.bk-status--done { font-weight: 500; font-size: 15px; color: var(--slate); }
+.bk-status--done .bk-nav__tick { color: var(--ink); }
+.bk-status__note { margin: 0 0 var(--space-3); color: var(--slate); font-size: 15px; }
+.bk-offer { margin: var(--space-3) 0 var(--space-5); max-width: 40em; }
+.bk-offer > * { margin-top: 0; }
+.bk-offer__lead { margin: 0 0 6px; font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.2; letter-spacing: -0.01em; }
+.bk-offer--recommended .bk-offer__lead { font-weight: 500; font-size: 20px; }
+.bk-offer__desc { margin: 0 0 var(--space-2); color: var(--slate); }
+.bk-offer__price { margin: 0 0 var(--space-2); font-size: 18px; font-weight: 600; }
+.bk-offer__price--inline { margin: 0; font-size: 16px; font-weight: 500; color: var(--slate); }
+.bk-offer__action .brq { margin-top: 0; }
+.bk-offer__action .brq > summary { min-height: 48px; padding: 0 28px; }
+.bk-offer__action .brq__status { margin: 0; }
+.bk-offer__estimate { margin: var(--space-2) 0 0; font-size: 13px; color: var(--slate); }
+.bk-offer__free { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--hairline); }
+.bk-offer__free p { margin: 0; font-size: 15px; color: var(--slate); }
+.bk-offer__list { list-style: none; margin: var(--space-2) 0 0; padding: 0; }
+.bk-offer__item { display: grid; gap: 8px; padding: var(--space-2) 0; }
+.bk-offer__item + .bk-offer__item { border-top: 1px solid var(--hairline); }
+.bk-offer__item-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.bk-offer__name { font-weight: 600; font-size: 17px; }
+@media (min-width: 600px) { .bk-offer__item { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px 24px; } }
+.bk-kitprice { margin: 0 0 6px; font-size: 16px; }
+.bk-kitprice__price { color: var(--slate); font-weight: 500; white-space: nowrap; }
 
 /* Branding progress: a quiet completion mark beside a section in the navigation (a fraction for the Logo slots, a checkmark when done) and a small Required / Recommended label beside each section name. Text only, no colours or bars. */
 .bk-nav__mark { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--slate); font-variant-numeric: tabular-nums; white-space: nowrap; }
