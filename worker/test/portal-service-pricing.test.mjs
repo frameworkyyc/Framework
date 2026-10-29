@@ -67,7 +67,7 @@ test("the catalogue: thirteen services in section order with Framework's startin
   assert.equal(svc.offerTitle, "Professional Typography Design"); assert.deepEqual(svc.upload, ["Already have your fonts?", "Upload them for free"]);
   const box = P.offerBox({ service: { ...svc, offerTitle: "<b>Professional Typography Design</b>" }, entry: { type: "starting_at", priceCad: 250 }, action: "<i>ACT</i>", uploadHref: "/up" });
   assert.match(box, /<h3 class="bk-offer__title">&lt;b&gt;Professional Typography Design&lt;\/b&gt;<\/h3>/, "titles are escaped"); assert.match(box, /<i>ACT<\/i>/);
-  assert.match(box, /<p class="bk-offer__price">Starting at \$250 CAD<\/p>/); assert.match(box, /<p class="bk-offer__estimate">Starting prices are estimates, not final quotes\.<\/p>/); assert.match(box, /bk-offer__free"><p>Already have your fonts\? <a class="text-link" href="\/up">Upload them for free<\/a>\.<\/p>/);
+  assert.match(box, /<p class="bk-offer__price">Starting at \$250 CAD<\/p>/); assert.ok(!/estimate/.test(box), "no disclaimer inside an offer: one general note sits on the page"); assert.match(box, /bk-offer__free"><p>Already have your fonts\? <a class="text-link" href="\/up">Upload them for free<\/a>\.<\/p>/);
   assert.ok(!/<p class="bk-offer__desc|Framework can|Needed to use|Optional, but/.test(box), "no description, lead or messaging paragraphs");
   const bare = P.offerBox({ service: P.pricingService("tagline"), entry: null, action: "", uploadHref: "" });
   assert.ok(!/bk-offer__price|bk-offer__estimate|bk-offer__free/.test(bare), "no price, estimate line or upload block when there is nothing to show"); assert.match(bare, /Professional Tagline Development/);
@@ -172,11 +172,11 @@ test("client Branding with nothing added: every section offers its design servic
   const price = (key) => `Starting at ${new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(PRICES[key])} CAD`;
   const logo = sectionHtml(html, "logo");
   for (const [name, key, title] of [["Primary Logo", "logo-primary", "Primary Logo Design"], ["Secondary Logo", "logo-secondary", "Secondary Logo Design"], ["Simplified Logo", "logo-simplified", "Simplified Logo Design"], ["Sub-mark", "logo-submark", "Sub-mark Design"]]) assert.match(logo, new RegExp(`bk-offer__title">${title}<\\/h3><p class="bk-offer__price">${esc(price(key))}`), name);
-  assert.match(logo, /class="bk-status"><span class="bk-status__text">Logo not yet provided<\/span>/);
+  assert.match(logo, /Logo <span class="bk-req bk-req--required">/); assert.ok(!/not yet provided/.test(html));
   for (const [sec, key] of [["typography", "typography"], ["colours", "colours"], ["tagline", "tagline"], ["imagery", "imagery"], ["layout", "layout"], ["textures", "textures"], ["iconography", "iconography"], ["style", "style"]]) {
     const h = sectionHtml(html, sec);
     assert.match(h, new RegExp(`bk-offer__price">${esc(price(key))}<`), sec + " shows its price");
-    assert.match(h, /bk-offer__estimate">Starting prices are estimates, not final quotes\./, sec + " says it is an estimate");
+    assert.ok(!/estimates, not final quotes/.test(h), sec + " carries no disclaimer of its own");
     assert.match(h, /<summary class="btn btn--primary">Request Design<span class="visually-hidden">: [^<]+ design<\/span>/, sec + " has the black request button with an accessible name");
     assert.match(h, /Already have [^<]+\? <a class="text-link" href="\/portal\/o\/alpha\/branding\/uploads">Upload (them|it) for free<\/a>\./, sec + " offers the free upload"); assert.match(h, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   }
@@ -191,7 +191,7 @@ test("completed branding gets no pricing prompt: a section with the client's con
   const s = await setup();
   await s.publish(s.alpha, { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }], typography: [{ role: "heading", slot: "primary", family: "Inter", weights: [400], styles: ["normal"], usage: "", source_url: "https://example.com", file_ids: [] }], sections: { tagline: { primary: "Clear thinking.", alternates: [], guidelines: "" } } });
   const html = await (await s.ann.get(base("alpha"))).text();
-  for (const sec of ["colours", "typography", "tagline"]) assert.ok(!/bk-offer/.test(sectionHtml(html, sec)) && /bk-status--done/.test(sectionHtml(html, sec)), sec + " is done: a quiet complete line and no offer");
+  for (const sec of ["colours", "typography", "tagline"]) assert.ok(!/bk-offer/.test(sectionHtml(html, sec)) && /<span class="bk-done">/.test(sectionHtml(html, sec)), sec + " is done: a checkmark and Complete, and no offer");
   assert.match(sectionHtml(html, "imagery"), /bk-offer/, "an empty section still offers it");
   assert.match(html.slice(html.indexOf('class="brand-kit"')), /bk-kitprice__price/, "the complete kit is still offered while sections are missing");
 });
