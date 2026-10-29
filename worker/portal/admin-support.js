@@ -124,7 +124,7 @@ export async function handleSupportApi(request, env, principal, path, deps = {})
     if (["attach", "download"].includes(route.kind) && !env.PORTAL_FILES) return err(503, "storage_unavailable", "File storage is not available on this deployment.");
 
     if (route.kind === "list") {
-      return json({ available: true, capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", storage: Boolean(env.PORTAL_FILES) }, organization: { id: org.id, name: org.name }, requests: (await sup.listRequestsAdmin(db, org.id)).map(publicRequest), summary: await sup.adminSupportSummary(db, org.id) });
+      return json({ available: true, capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", storage: Boolean(env.PORTAL_FILES) }, organization: { id: org.id, name: org.name }, requests: await (async () => { const names = await sup.listRequestWebsiteNames(db, org.id); return (await sup.listRequestsAdmin(db, org.id)).map((r) => ({ ...publicRequest(r), websiteName: names.get(r.id) || null })); })(), summary: await sup.adminSupportSummary(db, org.id) });
     }
     if (route.kind === "thread") {
       const t = await sup.getAdminThread(db, org.id, route.target);

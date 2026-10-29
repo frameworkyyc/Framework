@@ -4,7 +4,7 @@
  * price really changed. A database without migration 0010 reads as "not available" with no rows, so the client page shows no prices and nothing else is affected.
  */
 import { newId, isoTime, ok, fail, validActor } from "./common.js";
-import { PRICING_TYPES, PRICING_KEYS, MAX_PRICE_CAD, pricingService, pricingFrom } from "../branding-pricing.js";
+import { PRICING_TYPES, PRICING_KEYS, MAX_PRICE_CAD, pricingService, pricingFrom, typesFor } from "../branding-pricing.js";
 
 /** @returns {Promise<{available: boolean, rows: {service_key: string, price_type: string, price_cad: number|null, updated_by: string, updated_at: string}[]}>} */
 export async function listPrices(db) {
@@ -25,7 +25,7 @@ export async function loadPricing(db) {
 function clean(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { error: "invalid_service" };
   if (typeof raw.key !== "string" || !PRICING_KEYS.includes(raw.key)) return { error: "invalid_service" };
-  if (!PRICING_TYPES.includes(raw.type)) return { error: "invalid_type" };
+  if (!PRICING_TYPES.includes(raw.type) || !typesFor(pricingService(raw.key)).includes(raw.type)) return { error: "invalid_type" };
   if (raw.type !== "starting_at") return { key: raw.key, type: raw.type, priceCad: null };
   const n = raw.priceCad;
   if (!Number.isInteger(n) || n < 1 || n > MAX_PRICE_CAD) return { error: "invalid_price" };

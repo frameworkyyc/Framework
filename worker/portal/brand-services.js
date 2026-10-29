@@ -22,7 +22,7 @@ export const BRAND_REQUESTS = Object.freeze([
   Object.freeze({ key: "brand-additional", section: "Additional Brand Assets", title: "Brand request: Additional Brand Assets" }),
   Object.freeze({ key: "brand-full-kit", section: "Full Brand Kit", title: "Brand request: Full Brand Kit" }),
   // One request per priced design service (branding-pricing.js requestKeyOf), so Admin sees exactly which service was asked for. The complete kit keeps brand-full-kit above.
-  ...PRICING_SERVICES.filter((s) => s.key !== "brand-kit" && s.section !== "website").map((s) => Object.freeze({ key: requestKeyOf(s.key), section: `${s.name} design`, title: `Design request: ${s.name}` })),
+  ...PRICING_SERVICES.filter((s) => s.key !== "brand-kit" && s.section !== "website" && s.section !== "addon").map((s) => Object.freeze({ key: requestKeyOf(s.key), section: `${s.name} design`, title: `Design request: ${s.name}` })),
 ]);
 
 const ALL = [...BRANDING_SERVICES, ...BRAND_REQUESTS];

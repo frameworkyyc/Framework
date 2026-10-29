@@ -1,4 +1,4 @@
-/* Framework Admin — Settings: /admin/settings (the hub) and /admin/settings/service-pricing (Service Pricing).
+/* Framework Admin — Settings: /admin/settings (the hub) and /admin/settings/service-pricing (Service Pricing) and /admin/settings/additional-services (the catalogue of optional services on the client's Website page).
    Service Pricing: one global price per Branding service, in Canadian dollars, applied to every client. Three types: Starting at (with an amount), Custom Quote and
    Included. The client's Branding page shows the price quietly beside the request button for a section the client has nothing in yet, and records it with the request.
    A price is a starting estimate, not a quote: there is no checkout, payment or invoicing. Server text is never inserted as HTML. */
@@ -21,6 +21,7 @@ const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 export async function render(ctx) {
   const path = ctx.url.pathname.replace(/\/+$/, "");
   if (path === "/admin/settings/service-pricing") return pricingPage(ctx);
+  if (path === "/admin/settings/additional-services") return servicesPage(ctx);
   if (path === "/admin/settings") return hub();
   return { title: "Not found", node: h("div", { class: "adm-page" }, h("h1", { class: "adm-title", tabindex: "-1" }, "Not found"), h("p", { class: "adm-sub" }, "There is nothing at this address."), h("p", null, h("a", { class: "adm-link", href: "/admin/settings", "data-link": "" }, "Back to Settings"))) };
 }
@@ -31,6 +32,7 @@ function hub() {
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Settings"), h("p", { class: "adm-sub" }, "Settings that apply to every client."))),
     h("ul", { class: "adm-settings__list", "aria-label": "Settings" },
       item("/admin/settings/service-pricing", "Service Pricing", "The starting price of each Branding design service, in Canadian dollars."),
+      item("/admin/settings/additional-services", "Additional Services", "The optional services listed on every client’s Website page: name, short description and order. Prices are set in Service Pricing."),
       item("/admin/approved-emails", "Approved Emails", "The addresses that may be invited to a client portal or receive its emails."))) };
 }
 
@@ -57,7 +59,7 @@ async function pricingPage(ctx) {
       const x = state.get(s.key);
       const typeId = `sp-type-${s.key}`, priceId = `sp-price-${s.key}`, errId = `sp-err-${s.key}`;
       const select = h("select", { id: typeId, class: "input", disabled: editable ? null : true, onchange: () => { x.type = select.value; price.disabled = !editable || x.type !== "starting_at"; if (x.type === "starting_at" && !x.price && s.defaultCad) { x.price = String(s.defaultCad); price.value = x.price; } clearError(); refresh(); } },
-        data.types.map((t) => h("option", { value: t.key, selected: t.key === x.type ? true : null }, t.label)));
+        (s.types ? data.types.filter((t) => s.types.includes(t.key)) : data.types).map((t) => h("option", { value: t.key, selected: t.key === x.type ? true : null }, t.label)));
       const price = h("input", { id: priceId, class: "input adm-pricing__amount", type: "text", inputmode: "numeric", autocomplete: "off", maxlength: "7", value: x.type === "starting_at" ? x.price : "", disabled: editable && x.type === "starting_at" ? null : true, "aria-describedby": errId, oninput: () => { x.price = price.value.trim(); clearError(); refresh(); } });
       const err = h("p", { class: "adm-field__error", id: errId, role: "alert", hidden: true });
       const clearError = () => { err.hidden = true; price.removeAttribute("aria-invalid"); };
@@ -71,9 +73,9 @@ async function pricingPage(ctx) {
     row.fields = new Map();
 
     const group = (title, no, services) => h("section", { class: "adm-pricing__group", "aria-labelledby": `sp-h-${no}` },
-      h("h2", { class: "adm-pricing__h", id: `sp-h-${no}` }, no === "kit" || no === "website" ? null : h("span", { class: "adm-bk-no", text: no }), title),
+      h("h2", { class: "adm-pricing__h", id: `sp-h-${no}` }, no === "kit" || no === "website" || no === "addon" ? null : h("span", { class: "adm-bk-no", text: no }), title),
       h("ul", { class: "adm-pricing__list" }, services.map(row)));
-    const groups = BRAND_SECTIONS.map((sec) => group(sec.title, sec.no, data.services.filter((s) => s.section === sec.key))).concat(group("Complete Brand Kit", "kit", data.services.filter((s) => s.section === "all")), group("Website", "website", data.services.filter((s) => s.section === "website")));
+    const groups = BRAND_SECTIONS.map((sec) => group(sec.title, sec.no, data.services.filter((s) => s.section === sec.key))).concat(group("Complete Brand Kit", "kit", data.services.filter((s) => s.section === "all")), group("Website", "website", data.services.filter((s) => s.section === "website")), group("Additional services", "addon", data.services.filter((s) => s.section === "addon")));
 
     const form = h("form", { class: "adm-form adm-pricing__form", novalidate: true, "aria-label": "Service prices", onsubmit: async (ev) => {
       ev.preventDefault();
@@ -114,4 +116,66 @@ async function pricingPage(ctx) {
   await load();
   root.removeAttribute("aria-busy");
   return { title: "Service Pricing", node: root };
+}
+
+
+/* ------------------------------------------------------------------ Additional Services */
+
+const SERVICE_ERRORS = {
+  invalid_name: "Give the service a name (up to 60 characters).", invalid_description: "Write a short description (up to 240 characters).", invalid_sort_order: "Use a whole number from 0 to 9999 for the order.",
+  invalid_enabled: "Choose whether clients see it.", invalid_service: "That service isn’t in the catalogue.", unavailable: "The catalogue isn’t available on this deployment yet, so nothing was changed.", writes_disabled: "Changes are switched off on this site.",
+};
+const serviceErrorText = (e) => SERVICE_ERRORS[e && e.code] || (e && e.data && SERVICE_ERRORS[e.data.error]) || "That didn’t work and nothing was changed. Please try again.";
+
+async function servicesPage(ctx) {
+  const root = h("div", { class: "adm-page adm-services" });
+  const say = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
+  const speak = (text, tone = "info") => { say.textContent = text; say.className = "adm-msg is-" + tone; say.setAttribute("role", tone === "error" ? "alert" : "status"); say.hidden = !text; if (text) say.focus({ preventScroll: true }); };
+  let busy = false;
+
+  async function load() {
+    let data;
+    try { data = await api("/additional-services"); } catch (err) { root.replaceChildren(errorState(err, () => ctx.retry())); return; }
+    draw(data);
+  }
+
+  function draw(data) {
+    const editable = data.available && Boolean(data.capabilities && data.capabilities.writes);
+    const card = (s) => {
+      const id = "as-" + s.key;
+      const name = h("input", { id: id + "-name", class: "input", type: "text", maxlength: "60", value: s.name, autocomplete: "off", disabled: editable ? null : true });
+      const desc = h("textarea", { id: id + "-desc", class: "input", rows: "3", maxlength: "240", disabled: editable ? null : true }, s.description);
+      const order = h("input", { id: id + "-order", class: "input", type: "number", min: "0", max: "9999", value: String(s.sortOrder), disabled: editable ? null : true });
+      const shown = h("input", { id: id + "-on", type: "checkbox", checked: s.enabled ? true : null, disabled: editable ? null : true });
+      const save = h("button", { class: "btn btn--primary adm-small", type: "submit", disabled: editable ? null : true }, "Save");
+      return h("form", { class: "adm-form adm-services__item", novalidate: true, "aria-label": s.name, onsubmit: async (ev) => {
+        ev.preventDefault();
+        if (busy) return;
+        busy = true; save.disabled = true;
+        let outcome;
+        try { await api("/additional-services", { method: "POST", body: { key: s.key, name: name.value, description: desc.value, enabled: shown.checked, sort_order: Number(order.value) } }); outcome = { tone: "success", text: `Saved ${name.value.trim() || s.name}. Clients see the change straight away.` }; } catch (err) { outcome = { tone: "error", text: serviceErrorText(err) }; }
+        try { draw(await api("/additional-services")); } catch { /* the old view stays; the message says what happened */ }
+        busy = false; speak(outcome.text, outcome.tone);
+      } },
+      h("div", { class: "adm-field" }, h("label", { for: id + "-name", text: "Name" }), name),
+      h("div", { class: "adm-field" }, h("label", { for: id + "-desc", text: "Short description" }), desc),
+      h("div", { class: "adm-field" }, h("label", { class: "adm-choice", for: id + "-on" }, shown, " Shown to clients")),
+      h("div", { class: "adm-field" }, h("label", { for: id + "-order", text: "Order (lowest first)" }), order),
+      h("div", { class: "adm-actions" }, save),
+      h("p", { class: "adm-pricing__meta", text: s.stored && s.updatedAt ? `Updated ${fmtDate(s.updatedAt)}${s.updatedBy && !/^migration/.test(s.updatedBy) ? ` by ${s.updatedBy}` : ""}` : "Built-in default" }));
+    };
+    root.replaceChildren(...[
+      h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin · Settings"), h("h1", { class: "adm-title", tabindex: "-1" }, "Additional Services"),
+        h("p", { class: "adm-sub" }, "The optional services listed under “Additional Services” on every client’s Website page. Each has a Request Service button; a request goes to Framework like any other and never authorizes work. A price appears only if you set one in Service Pricing."))),
+      data.available ? null : h("p", { class: "adm-banner" }, "The catalogue can’t be edited on this deployment yet (its database migration hasn’t been applied). Clients see the built-in defaults shown below."),
+      data.available && !data.capabilities.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at the services, but not change them.") : null,
+      say,
+      h("div", { class: "adm-services__list" }, data.services.map(card)),
+    ].filter(Boolean));
+  }
+
+  root.setAttribute("aria-busy", "true");
+  await load();
+  root.removeAttribute("aria-busy");
+  return { title: "Additional Services", node: root };
 }

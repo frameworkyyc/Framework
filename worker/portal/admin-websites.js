@@ -18,13 +18,16 @@ import { getOrganizationById } from "./repo/orgs.js";
 import { UUID } from "./repo/common.js";
 import * as sites from "./repo/websites.js";
 import * as wfiles from "./website-files.js";
+import * as packages from "./repo/website-packages.js";
 import { diagnoseEmbeddable } from "./website-preview.js";
 import { json, err, sameOriginWrite, readJson, readUpload } from "./admin-branding.js";
 
 const MAX_UPLOAD = wfiles.SCREENSHOT_MAX_BYTES + 256 * 1024;
+const MAX_PACKAGE_UPLOAD = wfiles.PACKAGE_MAX_BYTES + 256 * 1024;
 const STATUS = {
   not_found: 404, conflict: 409, too_many: 409,
   invalid_input: 422, invalid_name: 422, invalid_url: 422, invalid_origin: 422, invalid_status: 422, invalid_managed_by_framework: 422, invalid_published: 422, invalid_date: 422, invalid_party: 422, invalid_text: 422, invalid_sort_order: 422, invalid_combination: 422,
+  archive_encrypted: 422, archive_unsupported: 422, archive_unsafe_entry: 422, archive_entries: 422, archive_too_large: 422, invalid_published: 422,
   type_not_allowed: 415, invalid_name_file: 422, content_mismatch: 422, active_content: 422, image_dimensions: 422, empty_file: 422, no_file: 400, file_too_large: 413,
   storage_unavailable: 503, storage_write_failed: 502, storage_read_failed: 502, storage_delete_failed: 502,
 };
@@ -32,12 +35,14 @@ const fromFailure = (r) => (STATUS[r.error] ? err(STATUS[r.error], r.error === "
 
 async function view(env, org) {
   const db = env.PORTAL_DB;
+  const pkgs = await packages.listPackagesAdmin(db, org.id);
   return {
     available: true,
     organization: { id: org.id, name: org.name, slug: org.slug },
     capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", storage: Boolean(env.PORTAL_FILES) },
-    limits: { maxWebsites: sites.MAX_WEBSITES, screenshotMaxBytes: wfiles.SCREENSHOT_MAX_BYTES },
-    websites: await sites.listWebsitesAdmin(db, org.id),
+    limits: { maxWebsites: sites.MAX_WEBSITES, screenshotMaxBytes: wfiles.SCREENSHOT_MAX_BYTES, packageMaxBytes: wfiles.PACKAGE_MAX_BYTES },
+    websites: (await sites.listWebsitesAdmin(db, org.id)).map((w) => ({ ...w, package: pkgs.get(w.id) || null })),
+    packagesAvailable: await packages.packagesAvailable(db),
   };
 }
 
@@ -49,6 +54,8 @@ export async function handleWebsitesApi(request, env, principal, path, deps = {}
   if (rest.length === 0) route = request.method === "GET" ? { kind: "view", method: "GET" } : { kind: "create", method: "POST" };
   else if (rest.length === 2 && ["update", "archive", "restore"].includes(rest[1])) route = { kind: rest[1], method: "POST", target: rest[0] };
   else if (rest.length === 2 && rest[1] === "screenshot") route = request.method === "GET" ? { kind: "screenshot_view", method: "GET", target: rest[0] } : { kind: "screenshot_set", method: "POST", target: rest[0] };
+  else if (rest.length === 2 && rest[1] === "package") route = { kind: "package_set", method: "POST", target: rest[0] };
+  else if (rest.length === 3 && rest[1] === "package" && ["publish", "remove"].includes(rest[2])) route = { kind: "package_" + rest[2], method: "POST", target: rest[0] };
   else if (rest.length === 2 && rest[1] === "preview-check") route = { kind: "preview_check", method: "GET", target: rest[0] };
   else if (rest.length === 3 && rest[1] === "screenshot" && rest[2] === "remove") route = { kind: "screenshot_remove", method: "POST", target: rest[0] };
   if (!route) return null;
@@ -105,6 +112,25 @@ export async function handleWebsitesApi(request, env, principal, path, deps = {}
       try { portalOrigin = new URL(env.PORTAL_BASE_URL).origin; } catch { /* not configured */ }
       const r = await diagnoseEmbeddable(site.url, { fetch: deps.previewFetch || (deps.fetch ? null : fetch), portalOrigin });
       return json({ embeddable: r.embeddable, reason: r.reason, status: r.status, hops: r.hops || [], error: r.error || null, xFrameOptions: r.summary ? r.summary.xFrameOptions : null, frameAncestors: r.summary ? r.summary.frameAncestors : [], contentType: r.summary ? r.summary.contentType : null });
+    }
+    if (route.kind.startsWith("package") && !(await packages.packagesAvailable(db))) return err(409, "unavailable", "Website downloads aren’t available on this deployment yet. Nothing was changed.");
+    if (route.kind.startsWith("package") && route.kind !== "package_publish" && !env.PORTAL_FILES) return err(503, "storage_unavailable", "File storage is not available on this deployment.");
+    if (route.kind === "package_set") {
+      const read = await readUpload(request, { withMeta: false, max: MAX_PACKAGE_UPLOAD });
+      if (read.response) return read.response;
+      const r = await wfiles.adminSetPackage(svc, { organizationId: orgRow.id, websiteId: route.target, actor, file: read.file });
+      return r.ok ? json({ ok: true, name: r.name }) : (r.error === "invalid_name" ? err(422, "invalid_name_file", "The change was not made.") : fromFailure(r));
+    }
+    if (route.kind === "package_publish") {
+      const read = await readJson(request, ["published"]);
+      if (read.response) return read.response;
+      if (typeof read.body.published !== "boolean") return err(422, "invalid_published", "The change was not made.");
+      const r = await packages.setPackagePublished(db, orgRow.id, route.target, read.body.published, actor, { now });
+      return r.ok ? json({ ok: true, changed: !r.unchanged }) : fromFailure(r);
+    }
+    if (route.kind === "package_remove") {
+      const r = await wfiles.adminRemovePackage(svc, { organizationId: orgRow.id, websiteId: route.target, actor });
+      return r.ok ? json({ ok: true }) : fromFailure(r);
     }
     if (route.kind === "screenshot_view") {
       const r = await wfiles.adminScreenshotResponse(svc, { organizationId: orgRow.id, websiteId: route.target });
