@@ -785,3 +785,11 @@ test("Admin status messages have one 1px border and no ring around it when a scr
   for (const sel of [".adm-icon-btn:focus-visible", ".adm-small:focus-visible", ".adm-linkbtn:focus-visible", ".adm-choice:focus-within"]) assert.ok(css.includes(sel), sel + " keeps its focus ring");
   assert.match(read("assets/css/styles.css"), /:focus-visible \{\s*outline: 2px solid var\(--ink\);/, "the site-wide keyboard focus ring is unchanged");
 });
+
+test("Admin Branding opens with all nine numbered sections collapsed; only a click (or a Manage files jump) opens one", () => {
+  const ui = read("admin/assets/branding.js");
+  const first = ui.slice(ui.indexOf("if (first) {"), ui.indexOf("const publish = "));
+  assert.ok(!/opened\.add\("br-s-/.test(first), "no numbered section is opened on arrival");
+  assert.match(first, /opened\.add\("br-uploads"\)/, "new uploads still open their own list");
+  assert.match(first, /opened\.add\("br-requests"\)/, "open requests still open their own list");
+});

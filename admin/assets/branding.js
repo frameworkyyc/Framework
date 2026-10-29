@@ -648,7 +648,7 @@ export async function render(orgId, ctx) {
     const openRequests = data.requests.filter((r) => r.status === "new" || r.status === "contacted").length;
     if (first) {
       first = false;
-      opened.add("br-s-logo");
+      // the nine numbered sections all start collapsed; only a section the person clicks (or a "Manage files" jump) opens
       if (newUploads) opened.add("br-uploads");
       if (openRequests) opened.add("br-requests");
     }
