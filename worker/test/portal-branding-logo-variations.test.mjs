@@ -796,10 +796,11 @@ test("Admin status messages have one 1px border and no ring around it when a scr
   assert.match(read("assets/css/styles.css"), /:focus-visible \{\s*outline: 2px solid var\(--ink\);/, "the site-wide keyboard focus ring is unchanged");
 });
 
-test("Admin Branding opens with all nine numbered sections collapsed; only a click (or a Manage files jump) opens one", () => {
+test("Admin Branding opens with every section and list collapsed (the nine numbered sections, New uploads and Service requests); only a click or a Manage files jump opens one", () => {
   const ui = read("admin/assets/branding.js");
   const first = ui.slice(ui.indexOf("if (first) {"), ui.indexOf("const publish = "));
-  assert.ok(!/opened\.add\("br-s-/.test(first), "no numbered section is opened on arrival");
-  assert.match(first, /opened\.add\("br-uploads"\)/, "new uploads still open their own list");
-  assert.match(first, /opened\.add\("br-requests"\)/, "open requests still open their own list");
+  assert.ok(!/opened\.add\(/.test(first), "nothing is opened on arrival");
+  assert.match(ui, /open: opened\.has\(id\)/, "a section opens only when it is in the clicked set");
+  assert.match(ui, /chip\("pending", `\$\{fresh\} new`/, "the new-uploads count stays in its heading");
+  assert.match(ui, /chip\("pending", `\$\{open\} open`/, "the open-requests count stays in its heading");
 });
