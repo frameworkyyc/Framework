@@ -258,8 +258,8 @@ function requirementTag(req) {
 }
 
 /** One of the nine numbered sections: a large two-digit number, the title, a short description, then the section's content or its empty state. All nine are always shown. */
-function bkSection(def, inner, prefix = "") {
-  return `<section class="bk-sec" id="${e(def.id)}" aria-labelledby="h-${e(def.id)}"><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">${e(def.no)}</p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-${e(def.id)}"><span class="visually-hidden">${e(def.no)} </span>${e(def.title)}</h2><p class="bk-sec__desc muted">${e(def.desc)}</p></div></header><div class="bk-sec__body">${prefix}${inner}</div></section>`;
+function bkSection(def, inner, prefix = "", badge = "") {
+  return `<section class="bk-sec" id="${e(def.id)}" aria-labelledby="h-${e(def.id)}"><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">${e(def.no)}</p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-${e(def.id)}"><span class="visually-hidden">${e(def.no)} </span>${e(def.title)}${badge}</h2><p class="bk-sec__desc muted">${e(def.desc)}</p></div></header><div class="bk-sec__body">${prefix}${inner}</div></section>`;
 }
 
 /**
@@ -299,13 +299,13 @@ export function brandingOverview(vm, brand, o = {}) {
   const typeCount = type.length, logoSlots = new Set(assets.filter((a) => a.kind === "logo").map(variationOf).filter(Boolean)).size;
   const comp = completionOf({ logoFilled: logoSlots, typefaces: typeCount, fontFiles: fonts.length, colours: colours.length, tagline: live && brand.tagline ? brand.tagline.primary : null,
     files: Object.fromEntries(["imagery", "layout", "textures", "iconography", "style"].map((k) => [k, assets.filter((a) => sectionOf(a) === k).length])) });
-  const statusLine = (d) => {
-    const c = comp[d.key], r = reqs[d.key], tag = requirementTag(r);
-    if (c.done) return `<p class="bk-status bk-status--done">${CHECK}<span class="bk-status__text">Complete</span></p>`;
-    const text = d.key === "logo" && c.count > 0 ? `${c.count} of ${c.total} logo variations provided` : `${d.title} not yet provided`;
-    return `<p class="bk-status"><span class="bk-status__text">${e(text)}</span>${tag}</p>`;
+  // Beside each section's heading: a small Required / Recommended label (with the Logo's 1/4 to 3/4 count) while it is incomplete, or a checkmark and "Complete". A complete section has no offer.
+  const badgeOf = (d) => {
+    const c = comp[d.key];
+    if (c.done) return ` <span class="bk-done">${CHECK}<span>Complete</span></span>`;
+    return requirementTag(reqs[d.key]) + (d.key === "logo" && c.count > 0 ? ` <span class="bk-req__count"><span class="visually-hidden">, </span>${c.count}/${c.total}<span class="visually-hidden"> logo variations provided</span></span>` : "");
   };
-  const sec = (d, inner, offerHtml = "") => bkSection(d, inner, statusLine(d) + (comp[d.key].done ? "" : offerHtml));
+  const sec = (d, inner, offerHtml = "") => bkSection(d, inner, comp[d.key].done ? "" : offerHtml, badgeOf(d));
   const offer = (key) => offerBox({ service: pricingService(key), entry: pricing[key], action: offerAction(key, LEGACY[key]), uploadHref });
   const groups = (docs) => docs.map(([k, l]) => `${docs.length > 1 ? `<p class="acc__group">${e(DOC_LABEL[k])}</p>` : ""}<ul class="file-list">${l.map((a) => docRow(vm, a)).join("")}</ul>`).join("");
   const def = Object.fromEntries(BRAND_SECTIONS.map((d) => [d.key, d]));
@@ -369,10 +369,13 @@ export function brandingOverview(vm, brand, o = {}) {
     : "";
   // The complete-kit price is shown only while something is still missing: with all nine sections done there is nothing to sell.
   const allDone = filled === 4 && typeList.length > 0 && colours.length > 0 && Boolean(live && brand.tagline) && ["imagery", "layout", "textures", "iconography", "style"].every((k) => assets.some((a) => sectionOf(a) === k));
-  const kitPrice = !allDone && priceLabel(pricing["brand-kit"]) ? `<p class="bk-kitprice"><span class="bk-kitprice__price">${e(priceLabel(pricing["brand-kit"]))}</span></p><p class="muted small">${e(ESTIMATE_NOTE)}</p>` : "";
+  const kitPrice = !allDone && priceLabel(pricing["brand-kit"]) ? `<p class="bk-kitprice"><span class="bk-kitprice__price">${e(priceLabel(pricing["brand-kit"]))}</span></p>` : "";
   const kit = `<section class="brand-kit" aria-labelledby="h-kit"><h2 class="h2" id="h-kit">Need a complete brand identity?</h2><p class="muted">Logo, colours, typography and guidelines, designed together as one system.</p>${kitPrice}${requestControl(vm, reqDef("brand-full-kit"), { r: requests["brand-full-kit"], canRequest, csrf, label: "Request full brand kit", primary: true })}</section>`;
   const meta = brand.publishedAt && live ? `<p class="muted small">Last published ${e(dateOnly(brand.publishedAt))}.</p>` : "";
-  return head + banner + nav + `<div class="bk">${parts.join("")}</div>` + more + meta + share + kit;
+  // One subtle, general note about starting prices for the whole page, shown only when a price is visible somewhere on it.
+  const priceShown = ["typography", "colours", "tagline", "imagery", "layout", "textures", "iconography", "style"].some((k) => !comp[k].done && priceLabel(pricing[k])) || missingLogos.some((r) => priceLabel(r.entry)) && !comp.logo.done || Boolean(kitPrice);
+  const pricingNote = priceShown ? `<p class="bk-pricing-note">${e(ESTIMATE_NOTE)}</p>` : "";
+  return head.replace(/<\/header>$/, `${pricingNote}</header>`) + banner + nav + `<div class="bk">${parts.join("")}</div>` + more + meta + share + kit;
 }
 
 /* ------------------------------------------------------------------ the uploads area */

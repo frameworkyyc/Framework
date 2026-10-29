@@ -857,13 +857,13 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-tag__guide p { margin: 0 0 12px; max-width: 40em; }
 .bk-tag__guide p:last-child { margin-bottom: 0; }
 
-/* Branding sections that are not complete open with one status line (what is missing + Required / Recommended) and a compact service offer: title and price beside the black Request Design
-   button, one small estimate line, and a single hairline above the free upload. A complete section shows only a check and "Complete". Monochrome, no boxes. */
-.bk-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 var(--space-2); font-size: 17px; font-weight: 600; line-height: 1.3; }
-.bk-status .bk-req { margin-left: 0; }
-.bk-status--done { margin-bottom: var(--space-3); gap: 8px; font-weight: 500; font-size: 15px; color: var(--slate); }
-.bk-status--done .bk-nav__tick { color: var(--ink); }
-.bk-offer { margin: 0 0 var(--space-5); max-width: 44em; }
+/* Branding sections: a small Required / Recommended label beside the heading (or a check and "Complete"), then, for an incomplete section, a compact service offer: title and price beside the black
+   Request Design button, and one hairline above the free upload. One general starting-price note sits under the page introduction. Monochrome, no boxes. */
+.bk-done { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; vertical-align: middle; font-family: var(--font-body); font-size: 14px; font-weight: 500; letter-spacing: 0; line-height: 1.2; color: var(--slate); }
+.bk-done .bk-nav__tick { color: var(--ink); }
+.bk-req__count { margin-left: 8px; vertical-align: middle; font-family: var(--font-body); font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--slate); font-variant-numeric: tabular-nums; }
+.bk-pricing-note { margin: var(--space-2) 0 0; font-size: 13px; color: var(--slate); }
+.bk-offer { margin: var(--space-2) 0 var(--space-5); max-width: 44em; }
 .bk-offer__row { display: grid; gap: 12px 24px; align-items: center; }
 @media (min-width: 600px) { .bk-offer__row { grid-template-columns: minmax(0, 1fr) auto; } }
 .bk-offer__text { min-width: 0; }
@@ -872,7 +872,6 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-offer__action .brq { margin-top: 0; }
 .bk-offer__action .brq > summary { min-height: 48px; padding: 0 28px; }
 .bk-offer__action .brq__status { margin: 0; }
-.bk-offer__estimate { margin: var(--space-2) 0 0; font-size: 12px; color: var(--slate); }
 .bk-offer__free { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--hairline); }
 .bk-offer__free p { margin: 0; font-size: 15px; color: var(--slate); }
 .bk-offer__list { list-style: none; margin: 0; padding: 0; }

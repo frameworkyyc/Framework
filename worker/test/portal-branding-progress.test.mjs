@@ -172,19 +172,19 @@ const NAMES = { logo: "Logo", typography: "Typography", colours: "Brand Colours"
 const secOf = (html, k) => { const i = html.indexOf(`<section class="bk-sec" id="${k}"`); return html.slice(i, html.indexOf("</section>", i)); };
 const bodyOf = (html, k) => { const x = secOf(html, k); return x.slice(x.indexOf('<div class="bk-sec__body">') + 26); };
 
-test("an incomplete section opens with its status and Required / Recommended label, then the offer, then the examples: in that order, in all nine sections", async () => {
+test("an incomplete section shows its Required / Recommended label beside the heading, then the offer, then the examples: in all nine sections, with no status message", async () => {
   const s = await setup();
   await s.publish();
   const html = await s.page();
+  assert.ok(!/not yet provided|bk-status/.test(html), "no 'not yet provided' status anywhere");
   for (const k of KEYS) {
-    const body = bodyOf(html, k);
-    const label = DEFAULT_REQUIREMENT[k] === "required" ? "Required" : "Recommended";
-    assert.ok(body.startsWith(`<p class="bk-status"><span class="bk-status__text">${NAMES[k]} not yet provided</span> <span class="bk-req bk-req--${DEFAULT_REQUIREMENT[k]}">`), k + ": the status is the first thing under the heading, with its label beside it");
-    assert.match(body.slice(0, 400), new RegExp(`${label}`), k);
+    const sec = secOf(html, k), body = bodyOf(html, k), h2 = /<h2 class="bk-sec__title"[^>]*>([\s\S]*?)<\/h2>/.exec(sec)[1];
+    assert.match(h2, new RegExp(`^<span class="visually-hidden">\\d\\d </span>${NAMES[k]} <span class="bk-req bk-req--${DEFAULT_REQUIREMENT[k]}"><span class="visually-hidden">\\(</span>${DEFAULT_REQUIREMENT[k] === "required" ? "Required" : "Recommended"}`), k + ": the label sits beside the main heading");
+    assert.ok(body.startsWith('<div class="bk-offer">'), k + ": the offer is the first thing under the introduction");
     const offer = body.indexOf('<div class="bk-offer'), eg = Math.min(...["bk-eg", "lv-grid", "tf-grid"].map((c) => (body.indexOf(`class="${c}`) < 0 ? 1e9 : body.indexOf(`class="${c}`))));
-    assert.ok(offer > 0 && offer < eg, k + ": the offer comes before the examples");
+    assert.ok(offer === 0 && offer < eg, k + ": the offer comes before the examples");
     assert.equal([...body.matchAll(/branding\/uploads"/g)].length, 1, k + ": exactly one upload link");
-    assert.match(body.slice(body.indexOf('<div class="bk-offer')), /bk-offer__free"><p>Already have [^<]+\? <a class="text-link"[^>]*>Upload (them|it) for free<\/a>\./, k + ": the free upload sits in its own separated block");
+    assert.match(body, /bk-offer__free"><p>Already have [^<]+\? <a class="text-link"[^>]*>Upload (them|it) for free<\/a>\./, k + ": the free upload sits in its own separated block");
     assert.match(body, /<summary class="btn btn--primary">Request Design<span/, k + ": a black Request Design button");
   }
 });
@@ -200,35 +200,35 @@ test("the compact offer: status line, one service title with its price and the b
   for (const k of Object.keys(TITLES)) {
     const b = bodyOf(html, k);
     assert.match(b, new RegExp(`<div class="bk-offer"><div class="bk-offer__row"><div class="bk-offer__text"><h3 class="bk-offer__title">${TITLES[k]}</h3><p class="bk-offer__price">Starting at \\$\\d[\\d,]* CAD</p></div><div class="bk-offer__action"><details class="brq"><summary class="btn btn--primary">Request Design<span`), k + ": title, price and button in one row");
-    assert.match(b, /<p class="bk-offer__estimate">Starting prices are estimates, not final quotes\.<\/p><div class="bk-offer__free">/, k + ": a minimal estimate line right above the separated upload line");
-    assert.ok(!/bk-offer__desc|bk-offer__lead|bk-status__note|Needed to use|Optional, but|Framework can|Want help|confirms the scope/.test(b), k + ": no description, lead or explanatory messaging");
+    assert.match(b, /<\/div><\/div><div class="bk-offer__free">/, k + ": the separated upload line follows the row directly");
+    assert.ok(!/bk-offer__desc|bk-offer__lead|bk-status|bk-offer__estimate|estimates, not final quotes|Needed to use|Optional, but|Framework can|Want help|confirms the scope/.test(secOf(html, k)), k + ": no description, lead, status, per-section disclaimer or explanatory messaging");
   }
   for (const k of Object.keys(UPLOAD)) assert.ok(bodyOf(html, k).includes(UPLOAD[k]), k + ": its own free-upload line");
   const logo = bodyOf(html, "logo");
   assert.deepEqual([...logo.matchAll(/bk-offer__title">([^<]+)</g)].map((m) => m[1]), ["Primary Logo Design", "Secondary Logo Design", "Simplified Logo Design", "Sub-mark Design"]);
-  assert.equal([...logo.matchAll(/<summary class="btn btn--primary">Request Design</g)].length, 4); assert.equal([...logo.matchAll(/bk-offer__estimate/g)].length, 1, "one estimate line for the whole list"); assert.equal([...logo.matchAll(/bk-offer__free/g)].length, 1, "one upload line for the whole list");
+  assert.equal([...logo.matchAll(/<summary class="btn btn--primary">Request Design</g)].length, 4); assert.equal([...logo.matchAll(/bk-offer__free/g)].length, 1, "one upload line for the whole list");
   assert.match(logo, /Already have your logos\? <a class="text-link"[^>]*>Upload them for free<\/a>\./);
   await s.logo("primary"); await s.logo("icon");
   html = await s.page();
   const two = bodyOf(html, "logo");
-  assert.match(two, /^<p class="bk-status"><span class="bk-status__text">2 of 4 logo variations provided<\/span>/);
+  assert.match(secOf(html, "logo"), /Logo <span class="bk-req bk-req--required">[\s\S]*?<\/span><\/span> <span class="bk-req__count"><span class="visually-hidden">, <\/span>2\/4<span class="visually-hidden"> logo variations provided<\/span><\/span><\/h2>/, "the Logo keeps its progress count beside its label");
+  assert.equal([...html.matchAll(/<p class="bk-pricing-note">Starting prices are estimates, not final quotes\.<\/p>/g)].length, 1, "one general note for the whole page"); assert.ok(html.indexOf("bk-pricing-note") < html.indexOf('class="bk-nav"'), "under the page introduction");
   assert.deepEqual([...two.matchAll(/bk-offer__title">([^<]+)</g)].map((m) => m[1]), ["Secondary Logo Design", "Simplified Logo Design"], "only the variations still missing");
   assert.equal([...two.matchAll(/branding\/uploads"/g)].length, 1);
 });
 
-test("a complete section shows one quiet line and no offer, and keeps its change request; the page never offers what is already done", async () => {
+test("a complete section shows a checkmark and Complete beside its heading and no offer, and keeps its change request; the page never offers what is already done", async () => {
   const s = await setup();
   await s.publish({ colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }], typography: [{ role: "heading", slot: "primary", family: "Inter", weights: [400], styles: ["normal"], usage: "", source_url: "https://example.com", file_ids: [] }], sections: { tagline: { primary: "Clear thinking.", alternates: [], guidelines: null } } });
   for (const r of ["primary", "secondary", "simplified", "icon"]) await s.logo(r);
   const html = await s.page();
   for (const k of ["logo", "typography", "colours", "tagline"]) {
-    const b = bodyOf(html, k);
-    assert.ok(b.startsWith(`<p class="bk-status bk-status--done"><svg`), k + ": a quiet complete line");
-    assert.ok(b.startsWith('<p class="bk-status bk-status--done"><svg') && /<\/svg><span class="bk-status__text">Complete<\/span><\/p>/.test(b.slice(0, 500)), k + ": only the checkmark and 'Complete'");
-    assert.ok(!/bk-req/.test(b.slice(0, b.indexOf("</p>"))), k + ": no Required / Recommended label once complete"); assert.ok(!/bk-offer|Request Design|not yet provided/.test(b), k + ": no offer or prompt");
+    const h2 = /<h2 class="bk-sec__title"[^>]*>([\s\S]*?)<\/h2>/.exec(secOf(html, k))[1], b = bodyOf(html, k);
+    assert.ok(h2.endsWith(`${NAMES[k]} <span class="bk-done"><svg class="bk-nav__tick" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M3 8.6l3.2 3.2L13 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"/></svg><span>Complete</span></span>`), k + ": beside the heading, only the checkmark and 'Complete'");
+    assert.ok(!/bk-req/.test(h2), k + ": no Required / Recommended label once complete"); assert.ok(!/bk-offer|Request Design|not yet provided|bk-status/.test(b), k + ": no offer or prompt");
   }
   for (const k of ["logo", "typography", "colours"]) assert.match(bodyOf(html, k), /Request additions or changes/, k + " keeps its existing change request");
-  assert.match(bodyOf(html, "imagery"), /^<p class="bk-status">/, "an incomplete section still opens with its status");
+  assert.ok(bodyOf(html, "imagery").startsWith('<div class="bk-offer">') && /bk-req--recommended/.test(secOf(html, "imagery")), "an incomplete section still shows its label and offer");
 });
 
 test("existing requests, prices and snapshots are preserved: an open whole-section request shows its status instead of a second button, and a new Request Design records the price shown", async () => {
@@ -253,7 +253,7 @@ test("existing requests, prices and snapshots are preserved: an open whole-secti
 
 test("design: monochrome and minimal: no colours, boxes or inline styles in the new component; one hairline around the free upload", () => {
   const css = read("assets/css/portal.css");
-  const block = css.slice(css.indexOf("/* Branding sections that are not complete"), css.indexOf(".bk-kitprice__price"));
+  const block = css.slice(css.indexOf("/* Branding sections: a small Required"), css.indexOf(".bk-kitprice__price"));
   assert.ok(block.length > 800, "the component's rules are together");
   assert.ok(!/#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(|box-shadow|background/.test(block), "no colours, shadows or fills");
   assert.equal([...block.matchAll(/border(?:-top)?: 1px solid var\(--hairline\)/g)].length, 2, "only the free-upload divider and the separators between logo rows");

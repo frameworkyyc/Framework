@@ -101,7 +101,7 @@ test("with nothing published every client sees the four Framework examples, labe
       assert.ok(!/lv-card__stage--logo/.test(x.html));
     });
     assert.match(html, /Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation\. They are not your logos and are not available to download\./);
-    assert.match(html, /<h2 class="bk-sec__title" id="h-logo"><span class="visually-hidden">01 <\/span>Logo<\/h2>/);
+    assert.match(html, /<h2 class="bk-sec__title" id="h-logo"><span class="visually-hidden">01 <\/span>Logo <span class="bk-req bk-req--required">/);
   }
   assert.deepEqual(cards(await (await bob.get("/portal/o/beta/branding")).text()).map((x) => x.title), ["Primary Logo", "Secondary Logo", "Simplified Logo", "Sub-mark"]);
 });

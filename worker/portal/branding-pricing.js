@@ -80,19 +80,17 @@ const freeUpload = (href, [lead, link]) => (href ? `<div class="bk-offer__free">
 const row = (title, entry, action) => `<div class="bk-offer__row"><div class="bk-offer__text"><h3 class="bk-offer__title">${e(title)}</h3>${entry && priceLabel(entry) ? `<p class="bk-offer__price">${e(priceLabel(entry))}</p>` : ""}</div><div class="bk-offer__action">${action || ""}</div></div>`;
 
 /**
- * The compact service offer under a section's status line: the service title, its price (when it has one) and the black Request Design button on one row, a small estimate line, and,
+ * The compact service offer under a section's status line: the service title, its price (when it has one) and the black Request Design button on one row, and,
  * visually separated, the free way to share what the client already has. Shown only for an incomplete section. `action` is the already-built request control (the button, or the
- * status of a request that is already open). With no stored price the price and the estimate line are left out; the title, button and free upload remain.
+ * status of a request that is already open). With no stored price the price is left out; the title, button and free upload remain. The one general note about starting prices is shown once, on the page (branding-live.js).
  * @param {{ service: object, entry?: object|null, action: string, uploadHref?: string }} o
  */
 export function offerBox({ service, entry = null, action = "", uploadHref = "" }) {
-  const priced = entry && priceLabel(entry);
-  return `<div class="bk-offer">${row(service.offerTitle, entry, action)}${priced ? `<p class="bk-offer__estimate">${e(ESTIMATE_NOTE)}</p>` : ""}${freeUpload(uploadHref, service.upload)}</div>`;
+  return `<div class="bk-offer">${row(service.offerTitle, entry, action)}${freeUpload(uploadHref, service.upload)}</div>`;
 }
 
-/** The same offer for several services at once (the logo variations the client doesn't have yet): one row per variation, one estimate line, one free-upload line. */
+/** The same offer for several services at once (the logo variations the client doesn't have yet): one row per variation, one free-upload line. */
 export function offerList({ rows, extra = "", uploadHref = "", upload }) {
-  const priced = (rows || []).some((r) => r.entry && priceLabel(r.entry));
   const items = (rows || []).map((r) => `<li class="bk-offer__item">${row(r.title, r.entry, r.action)}</li>`).join("");
-  return `<div class="bk-offer"><ul class="bk-offer__list">${items}</ul>${extra}${priced ? `<p class="bk-offer__estimate">${e(ESTIMATE_NOTE)}</p>` : ""}${freeUpload(uploadHref, upload)}</div>`;
+  return `<div class="bk-offer"><ul class="bk-offer__list">${items}</ul>${extra}${freeUpload(uploadHref, upload)}</div>`;
 }
