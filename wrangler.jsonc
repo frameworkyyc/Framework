@@ -36,7 +36,10 @@
     "PORTAL_INVITE_SENDING": "1",
     // Release 2 (client launch): the client-facing Branding section (view and download published brand assets, upload existing brand materials, request a quote).
     // Needs migrations 0005/0006 and the PORTAL_FILES binding (both in place). Exactly "1" or absent: absent returns Branding to a "Coming soon" page. Rollback: delete this line.
-    "PORTAL_BRANDING": "1"
+    "PORTAL_BRANDING": "1",
+    // Website release: the client-facing Website section (the client's websites, live preview, downloadable website files, change and support requests, Additional Services).
+    // Needs migrations 0011 and 0012 and the PORTAL_FILES binding. Exactly "1" or absent: absent returns Website to a "Coming soon" page. Rollback: delete this line (a one-line revert PR).
+    "PORTAL_WEBSITE": "1"
   },
   // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
   // redact_query_string keeps ?code= / ?invitation_token= out of platform logs; invocation_logs is OFF because the automatic per-request record

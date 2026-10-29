@@ -244,7 +244,7 @@ test("the Admin client page links to Websites with counts, and the client list a
   assert.match(ui, /Separate from where it stands/); assert.match(ui, /Never put passwords or logins here/);
 });
 
-test("the Website section stays hidden from clients while PORTAL_WEBSITE is off: no content, no navigation, and the flag is on Staging only", async () => {
+test("the Website section stays hidden from clients while PORTAL_WEBSITE is off: no content, no navigation, and the flag is set to 1 in the config", async () => {
   const s = await setup();
   await s.create(s.A, { ...SITE, published: true });
   for (const path of ["/portal/o/alpha/website", "/portal/o/alpha/websites", "/portal/o/alpha/website/1"]) { const r = await s.ann.get(path); const t = await r.text(); assert.ok(!/alpha\.example\.ca|Main website/.test(t), path + " shows nothing of the websites"); }
@@ -252,8 +252,8 @@ test("the Website section stays hidden from clients while PORTAL_WEBSITE is off:
   assert.ok(!/alpha\.example\.ca|Main website/.test(home), "nothing about a website reaches the client's home");
   assert.ok(/Coming soon[^<]*<\/span>[^<]*Website/.test(home) || /Website/.test(home), "Website stays among the coming-soon sections");
   const w = JSON.parse(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1"));
-  assert.ok(!("PORTAL_WEBSITE" in w.vars), "Production (top-level vars) never has the flag");
-  assert.equal(w.previews.vars.PORTAL_WEBSITE, "1", "Staging has it");
+  assert.equal(w.vars.PORTAL_WEBSITE, "1", "Production has it (approved for the website release)");
+  assert.equal(w.previews.vars.PORTAL_WEBSITE, "1", "Staging has it too");
 });
 
 test("the new Admin pages are valid JavaScript modules (they are loaded by the browser, so a slip here would only show up there)", async () => {
