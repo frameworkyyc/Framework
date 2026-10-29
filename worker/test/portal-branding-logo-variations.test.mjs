@@ -101,7 +101,7 @@ test("with nothing published every client sees the four Framework examples, labe
       assert.ok(!/lv-card__stage--logo/.test(x.html));
     });
     assert.match(html, /Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation\. They are not your logos and are not available to download\./);
-    assert.match(html, /<h2 class="bk-sec__title" id="h-logo"><span class="visually-hidden">01 <\/span>Logo<\/h2>/);
+    assert.match(html, /<h2 class="bk-sec__title" id="h-logo"><span class="visually-hidden">01 <\/span>Logo <span class="bk-req bk-req--required">/);
   }
   assert.deepEqual(cards(await (await bob.get("/portal/o/beta/branding")).text()).map((x) => x.title), ["Primary Logo", "Secondary Logo", "Simplified Logo", "Sub-mark"]);
 });
@@ -138,7 +138,7 @@ test("Secondary needs no migration: it is stored as an unset logo_role with a 's
   assert.throws(() => s.w.db.raw.prepare("INSERT INTO brand_assets (id, organization_id, kind, title, logo_role, format, content_type, size_bytes, sha256, storage_key, original_name, created_by) VALUES (?, ?, 'logo', 't', 'secondary', 'png', 'image/png', 1, ?, ?, 'x.png', 'a')").run(crypto.randomUUID(), s.A.id, "a".repeat(64), "org/" + "a".repeat(40)), "the database CHECK still allows only the three older values, which is why no migration is needed");
   const bad = await s.upload(s.A, s.logo("tertiary"), "x.png", S.png());
   assert.deepEqual([bad.status, bad.json.error], [422, "invalid_logo_role"]);
-  assert.deepEqual(readdirSync(new URL("../../migrations/portal/", import.meta.url)).filter((f) => f.endsWith(".sql")).sort(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql"], "no new migration");
+  assert.deepEqual(readdirSync(new URL("../../migrations/portal/", import.meta.url)).filter((f) => f.endsWith(".sql")).sort(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql", "0010_service_pricing.sql"], "no new migration");
 });
 
 test("several formats in one variation: every format downloads, the preview uses an image format, and a PDF-only variation shows a plain tile with its download", async () => {
@@ -236,7 +236,7 @@ test("the request workflow is unchanged under the cards: an owner can request lo
   const s = await setup();
   let html = await (await s.ann.get(base)).text();
   const logosEmpty = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
-  assert.match(logosEmpty, /<summary class="btn btn--small">Request<span/);
+  assert.match(logosEmpty, /<summary class="btn btn--primary">Request Design<span/, "each missing variation has its own black Request Design button");
   assert.match(await (await s.mia.get(base)).text(), /Ask an owner of your organization to send a request for this section/);
   const send = (b, extra = {}) => b.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-logos", ...extra });
   assert.equal((await send(s.ann)).headers.get("Location"), `${base}?requested=1`);
@@ -361,7 +361,8 @@ test("empty sections show a muted Framework example, labelled 'Example: Framewor
     const sec = sectionHtml(html, d.key);
     assert.ok(sec.includes('<div class="bk-eg bk-eg--'), d.key + " has its example panel");
     assert.ok(sec.includes('<span class="tag">Not added yet</span> <span class="bk-eg__tag">Example: Framework</span>'), d.key + " is labelled an example");
-    assert.ok(!/Download|data-copy|<a /.test(sec), d.key + " offers nothing to download or copy");
+    const eg = sec.slice(sec.indexOf('<div class="bk-eg')); // the offer above it carries the free-upload link; the example itself carries nothing
+    assert.ok(!/Download|data-copy|<a /.test(eg), d.key + " offers nothing to download or copy");
     assert.ok(!/bk-empty/.test(sec), d.key + " no longer shows a bare empty state");
   }
   const type = sectionHtml(html, "typography");
@@ -436,9 +437,9 @@ test("typography and colours: families, weights, example text and codes render; 
 test("requests, uploads and permissions are unchanged by the nine-section layout", async () => {
   const s = await setup();
   const html = await (await s.ann.get(base)).text();
-  assert.match(sectionHtml(html, "logo"), /<summary class="btn btn--small">Request<span/);
-  assert.match(sectionHtml(html, "typography"), /<summary class="btn btn--small">Request<span/);
-  assert.match(sectionHtml(html, "colours"), /<summary class="btn btn--small">Request<span/);
+  assert.match(sectionHtml(html, "logo"), /<summary class="btn btn--primary">Request Design<span/);
+  assert.match(sectionHtml(html, "typography"), /<summary class="btn btn--primary">Request Design<span/);
+  assert.match(sectionHtml(html, "colours"), /<summary class="btn btn--primary">Request Design<span/);
   assert.match(html.slice(html.indexOf('id="guidelines"')), /<summary class="btn btn--small">Request<span/);
   assert.match(html, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   assert.match(await (await s.mia.get(base)).text(), /Ask an owner of your organization/);
@@ -567,8 +568,9 @@ test("Typography Hierarchy: five levels in order, illustrative (no approved scal
 
 test("empty typography: a restrained empty state with the existing request button and a way to share fonts; no price is shown by default; a member is told to ask an owner", async () => {
   const s = await setup(); await publishOnly(s, s.A);
+  s.w.db.raw.exec("DROP TABLE service_prices"); // a database without the pricing migration: no price anywhere
   const html = await (await s.ann.get(base)).text(); const type = sectionHtml(html, "typography");
-  assert.match(type, /No typefaces have been added yet\./); assert.match(type, /<summary class="btn btn--small">Request<span/); assert.match(type, /href="\/portal\/o\/alpha\/branding\/uploads">Share them with Framework/);
+  assert.match(type, /No typefaces have been added yet\./); assert.match(type, /<summary class="btn btn--primary">Request Design<span/); assert.match(type, /href="\/portal\/o\/alpha\/branding\/uploads">Upload them for free/); assert.ok(!/Share them with Framework/.test(type), "one upload link, not two");
   assert.equal([...type.matchAll(/tf-card--example/g)].length, 3, "three muted Framework examples"); assert.ok(!/tf-card--has/.test(type), "nothing is presented as the client's");
   assert.match(type, /Switzer/); assert.match(type, /General Sans/); assert.match(type, /Semibold <span class="muted">600/); assert.match(type, /Medium <span class="muted">500/);
   assert.match(type, /This uses Framework’s typography/); assert.ok(!/Download|data-copy/.test(type.replace(/Download or install/g, "")), "examples are never downloadable");
@@ -576,28 +578,6 @@ test("empty typography: a restrained empty state with the existing request butto
   assert.match(sectionHtml(await (await s.mia.get(base)).text(), "typography"), /Ask an owner of your organization/);
   assert.equal((await s.ann.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-typography" })).status, 303, "the existing request workflow");
   assert.match(sectionHtml(await (await s.ann.get(base)).text(), "typography"), /class="tag">Requested</);
-});
-
-test("pricing presentation is designed but inactive: every provisional price is off, labels follow the three presentations, and a price only renders when explicitly activated", async () => {
-  const P = await import("../portal/branding-pricing.js");
-  assert.deepEqual(Object.fromEntries(Object.values(P.BRANDING_PRICING).map((x) => [x.name, x.priceCad])), { "Primary Logo Design": 500, "Secondary Logo": 150, "Simplified Logo": 150, "Sub-mark": 150, "Typography System": 250, "Brand Colour Palette": 200, "Tagline Development": 250, "Brand Imagery Direction": 300, "Layout System": 350, "Textures & Patterns": 150, Iconography: 250, "Design Style Guide": 350, "Framework Brand Kit": 2500 });
-  assert.ok(Object.values(P.BRANDING_PRICING).every((x) => x.active === false && x.type === "starting_at"), "nothing is live and nothing is assumed included");
-  assert.equal(P.activePricing("typography"), null);
-  assert.equal(P.priceLabel(P.BRANDING_PRICING.typography), "Starting at $250 CAD"); assert.equal(P.priceLabel(P.BRANDING_PRICING["brand-kit"]), "Starting at $2,500 CAD");
-  assert.equal(P.priceLabel({ type: "custom_quote" }), "Custom quote"); assert.equal(P.priceLabel({ type: "included" }), "Included"); assert.equal(P.priceLabel({ type: "starting_at", priceCad: 0 }), ""); assert.equal(P.priceLabel({ type: "bogus" }), "");
-  assert.equal(P.pricingBlock(P.BRANDING_PRICING.typography, "<x>"), "", "inactive renders nothing");
-  const on = { ...P.BRANDING_PRICING.typography, active: true };
-  const block = P.pricingBlock(on, '<p class="req">ACTION</p>');
-  assert.match(block, /Typography System/); assert.match(block, /Starting at \$250 CAD/); assert.match(block, /approved typeface roles, hierarchy and usage guidance/); assert.match(block, /A starting price, not a quote/); assert.match(block, /ACTION/);
-  const kit = P.pricingBlock({ ...P.BRANDING_PRICING["brand-kit"], active: true });
-  assert.match(kit, /Not included: original photography production, bespoke illustration, custom typefaces, extensive icon libraries/); assert.doesNotMatch(kit, /unlimited|revision|turnaround|days/i, "no scope or timing promised that isn't defined");
-  const { brandingOverview } = await import("../portal/branding-live.js");
-  const vm = { base: "/portal/o/alpha" };
-  const withPrice = brandingOverview(vm, { published: true, assets: [], colours: [], typography: [] }, { canRequest: true, csrf: "t", requests: {}, pricing: { typography: on } });
-  assert.match(sectionHtml(withPrice, "typography"), /bk-price[\s\S]*Starting at \$250 CAD[\s\S]*<summary class="btn btn--small">Request/, "the price sits with the existing request button");
-  assert.ok(!/bk-price/.test(sectionHtml(withPrice, "colours")), "no prices beside other section headings");
-  const withTypes = brandingOverview(vm, { published: true, assets: [], colours: [], typography: [TF({ slot: "primary" })] }, { canRequest: true, csrf: "t", requests: {}, pricing: { typography: on } });
-  assert.ok(!/bk-price/.test(withTypes), "completed typography shows no sales block");
 });
 
 test("Admin typography wiring: slots, styles, file choice and hierarchy-free save; the three roles come from one shared catalogue", () => {

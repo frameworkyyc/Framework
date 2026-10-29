@@ -576,7 +576,7 @@ export async function render(orgId, ctx) {
     const note = h("textarea", { id: "br-rq-n-" + r.id.slice(0, 8), class: "input adm-brand__textarea", maxlength: "1000", rows: "2" }, r.adminNote || "");
     return h("li", { class: "adm-brand__item" },
       h("div", { class: "adm-brand__main" }, h("p", { class: "adm-brand__name", text: r.service }), h("p", { class: "adm-brand__chips" }, chip(r.status === "new" ? "pending" : r.status === "contacted" ? "warn" : "plain", REQUEST_STATUS[r.status])),
-        h("p", { class: "adm-brand__meta", text: `Requested ${fmtDateTime(r.createdAt)}` }), r.note ? h("p", { class: "adm-brand__quote" }, h("span", { class: "adm-muted", text: "Client note: " }), r.note) : null),
+        h("p", { class: "adm-brand__meta", text: `Requested ${fmtDateTime(r.createdAt)}` }), r.priceShown ? h("p", { class: "adm-brand__meta", text: `Price shown to the client: ${r.priceShown.label} (an estimate, not a quote)` }) : null, r.note ? h("p", { class: "adm-brand__quote" }, h("span", { class: "adm-muted", text: "Client note: " }), r.note) : null),
       canWrite() ? h("form", { class: "adm-form adm-brand__form adm-brand__form--tight", novalidate: true, "aria-label": "Update request for " + r.service, onsubmit: (ev) => {
         ev.preventDefault();
         perform({ request: () => api(`${base}/requests/${encodeURIComponent(r.id)}/update`, { method: "POST", body: { status: status.value, admin_note: note.value.trim() || null } }), success: `Request for ${r.service} updated.`, onError: (err) => (err.code === "already_open" ? "That would duplicate another open request for the same service." : null) });
@@ -586,7 +586,7 @@ export async function render(orgId, ctx) {
   function requestsSection() {
     const open = data.requests.filter((r) => r.status === "new" || r.status === "contacted").length;
     const body = [
-      h("p", { class: "adm-sub" }, "“Request a quote” submissions from the client’s Owners. There’s no pricing or payment: follow up with the client directly and record where it stands."),
+      h("p", { class: "adm-sub" }, "Design requests and “Request a quote” submissions from the client’s Owners. A request shows the starting price the client saw when there was one. It is an estimate, not a quote, and there is no checkout or payment: follow up with the client directly and record where it stands."),
       data.requests.length ? h("ul", { class: "adm-brand__list" }, data.requests.map(requestRecord)) : h("p", { class: "adm-muted" }, "No service requests yet."),
     ];
     return section("br-requests", "Service requests", [open ? chip("pending", `${open} open`, "info") : null, chip("plain", plural(data.requests.length, "request"))], body);

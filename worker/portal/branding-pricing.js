@@ -1,44 +1,51 @@
 /**
- * Pricing presentation for Framework's branding services (DESIGN ONLY for now: every entry is inactive, so the client page shows no price anywhere).
+ * Pricing for Framework's branding services: the catalogue (which services exist, in the order of the nine Branding sections), the three ways a price is presented,
+ * and the quiet note the client's Branding page shows beside the request button for a service the client doesn't have yet.
  *
- * The prices below are PROVISIONAL starting prices in Canadian dollars, kept in one place so they can be changed without touching the page code. An entry is shown to
- * clients only when its `active` is exactly true, and nothing here turns that on: publishing a price needs Framework's explicit approval. A later step can move this
- * table into Admin-managed storage (service, description, price, type, deliverables, availability) without changing how the page uses it (see BRANDING-FILES.md).
+ * The prices themselves are Admin-managed data (Admin -> Settings -> Service Pricing, table service_prices, migration 0010), global to every client and in Canadian
+ * dollars. The page shows a price only for a service that has a stored row, so a database without that table shows no prices anywhere. `DEFAULT_CAD` below is only what
+ * the Admin editor offers as "default" beside each field; nothing is shown to a client from it.
  *
  * Three presentations:
  *   starting_at   "Starting at $250 CAD"  a predictable baseline scope
  *   custom_quote  "Custom quote"          needs discovery or variable production
- *   included      "Included"              covered by an active client agreement; set per client by Admin, never assumed (so it is not used by default)
- * A price is a starting point, never an accepted quote. Requests go through the existing human-managed Branding request: submitting one is not accepting a quote or authorizing payment.
+ *   included      "Included"              covered by an active client agreement
+ * A price is a starting point, never an accepted quote. Requests go through the existing human-managed Branding request: submitting one is not accepting a quote or
+ * authorizing payment, and there is no checkout, payment or invoicing here.
  */
 import { e } from "./ui.js";
 
 export const PRICING_TYPES = Object.freeze(["starting_at", "custom_quote", "included"]);
+export const PRICING_TYPE_LABEL = Object.freeze({ starting_at: "Starting at", custom_quote: "Custom quote", included: "Included" });
+export const MAX_PRICE_CAD = 1000000;
 
-const svc = (key, section, name, priceCad, description, requestKey) => Object.freeze({ key, section, name, type: "starting_at", priceCad, description, requestKey, active: false });
+/** `offerTitle` is the service's name in the client's offer; `upload` is the two halves of the free-upload line ("Already have your fonts?" + "Upload them for free"). */
+const svc = (key, section, name, defaultCad, description, offerTitle, upload) => Object.freeze({ key, section, name, defaultCad, description, offerTitle, upload: Object.freeze(upload) });
+const LOGOS = ["Already have your logos?", "Upload them for free"];
 
-export const BRANDING_PRICING = Object.freeze({
-  "logo-primary": svc("logo-primary", "logo", "Primary Logo Design", 500, "Your main brand identity, designed for websites, marketing materials and official communications.", "brand-logos"),
-  "logo-secondary": svc("logo-secondary", "logo", "Secondary Logo", 150, "An alternative logo arrangement for spaces where the primary layout doesn’t fit.", "brand-logos"),
-  "logo-simplified": svc("logo-simplified", "logo", "Simplified Logo", 150, "A reduced wordmark-only variation for cleaner applications.", "brand-logos"),
-  "logo-submark": svc("logo-submark", "logo", "Sub-mark", 150, "A compact brand symbol for favicons, social profiles and small applications.", "brand-logos"),
-  typography: svc("typography", "typography", "Typography System", 250, "A professionally selected and structured typography system, including approved typeface roles, hierarchy and usage guidance.", "brand-typography"),
-  colours: svc("colours", "colours", "Brand Colour Palette", 200, "A considered colour palette with exact values and usage guidance.", "brand-colours"),
-  tagline: svc("tagline", "tagline", "Tagline Development", 250, "A tagline that sums up your brand, with guidance on how to use it.", "brand-colours"),
-  imagery: svc("imagery", "imagery", "Brand Imagery Direction", 300, "Imagery direction and curated visual references. Original photography is not included.", "brand-additional"),
-  layout: svc("layout", "layout", "Layout System", 350, "Grids, spacing and composition guidelines for consistent designs.", "brand-additional"),
-  textures: svc("textures", "textures", "Textures & Patterns", 150, "Approved textures, patterns and backgrounds.", "brand-additional"),
-  iconography: svc("iconography", "iconography", "Iconography", 250, "A consistent icon style with a starter set. Extensive icon libraries are not included.", "brand-additional"),
-  style: svc("style", "style", "Design Style Guide", 350, "Your brand direction and visual principles, documented with examples.", "brand-additional"),
-  "brand-kit": Object.freeze({
-    key: "brand-kit", section: "all", name: "Framework Brand Kit", type: "starting_at", priceCad: 2500, requestKey: "brand-full-kit", active: false,
-    description: "A cohesive brand identity developed and documented for consistent use across digital and print applications.",
-    // The package scope is NOT final: deliverables follow the nine sections; the revision allowance is to be defined by Framework before this is offered.
-    deliverables: ["Logo", "Typography", "Brand Colours", "Tagline", "Brand Imagery", "Layout System", "Textures", "Iconography", "Design Style"],
-    revisions: null,
-    exclusions: ["Original photography production", "Bespoke illustration", "Custom typefaces", "Extensive icon libraries"],
-  }),
-});
+/** In display order. `section` is the Branding section key (admin/assets/brand-sections.js), or "all" for the complete kit. */
+export const PRICING_SERVICES = Object.freeze([
+  svc("logo-primary", "logo", "Primary Logo", 500, "Your main brand identity, designed for websites, marketing materials and official communications.", "Primary Logo Design", LOGOS),
+  svc("logo-secondary", "logo", "Secondary Logo", 150, "An alternative logo arrangement for spaces where the primary layout doesn’t fit.", "Secondary Logo Design", LOGOS),
+  svc("logo-simplified", "logo", "Simplified Logo", 150, "A reduced wordmark-only variation for cleaner applications.", "Simplified Logo Design", LOGOS),
+  svc("logo-submark", "logo", "Sub-mark", 150, "A compact brand symbol for favicons, social profiles and small applications.", "Sub-mark Design", LOGOS),
+  svc("typography", "typography", "Typography", 250, "A selected and structured typography system, with typeface roles, hierarchy and usage guidance.", "Professional Typography Design", ["Already have your fonts?", "Upload them for free"]),
+  svc("colours", "colours", "Brand Colours", 200, "A considered colour palette with exact values and usage guidance.", "Professional Colour Palette Design", ["Already have your brand colours?", "Upload them for free"]),
+  svc("tagline", "tagline", "Tagline", 250, "A tagline that sums up your brand, with guidance on how to use it.", "Professional Tagline Development", ["Already have a tagline?", "Upload it for free"]),
+  svc("imagery", "imagery", "Brand Imagery", 300, "Imagery direction and curated visual references. Original photography is not included.", "Professional Imagery Direction", ["Already have brand imagery?", "Upload it for free"]),
+  svc("layout", "layout", "Layout System", 350, "Grids, spacing and composition guidelines for consistent designs.", "Professional Layout System Design", ["Already have a layout system?", "Upload it for free"]),
+  svc("textures", "textures", "Textures", 150, "Approved textures, patterns and backgrounds.", "Professional Texture & Pattern Design", ["Already have textures?", "Upload them for free"]),
+  svc("iconography", "iconography", "Iconography", 250, "A consistent icon style with a starter set. Extensive icon libraries are not included.", "Professional Icon Design", ["Already have icons?", "Upload them for free"]),
+  svc("style", "style", "Design Style", 350, "Your brand direction and visual principles, documented with examples.", "Professional Design Style Guide", ["Already have a design style guide?", "Upload it for free"]),
+  svc("brand-kit", "all", "Complete Brand Kit", 2500, "A cohesive brand identity developed and documented across all nine sections.", "Complete Brand Kit", ["Already have a brand kit?", "Upload it for free"]),
+]);
+
+export const PRICING_KEYS = Object.freeze(PRICING_SERVICES.map((s) => s.key));
+export const pricingService = (key) => PRICING_SERVICES.find((s) => s.key === key) || null;
+
+/** The service_requests key a pricing service is requested under: the complete kit keeps its existing key; every other service has its own, so Admin sees which one was asked for. */
+export const requestKeyOf = (key) => (key === "brand-kit" ? "brand-full-kit" : `brand-svc-${key}`);
+export const pricingKeyOfRequest = (requestKey) => PRICING_SERVICES.find((s) => requestKeyOf(s.key) === requestKey)?.key || null;
 
 const CAD = new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 });
 
@@ -47,19 +54,43 @@ export function priceLabel(entry) {
   if (!entry || !PRICING_TYPES.includes(entry.type)) return "";
   if (entry.type === "included") return "Included";
   if (entry.type === "custom_quote") return "Custom quote";
-  return Number.isInteger(entry.priceCad) && entry.priceCad > 0 ? `Starting at ${CAD.format(entry.priceCad).replace(/ /g, " ")} CAD` : "";
+  return Number.isInteger(entry.priceCad) && entry.priceCad > 0 && entry.priceCad <= MAX_PRICE_CAD ? `Starting at ${CAD.format(entry.priceCad).replace(/ /g, " ")} CAD` : "";
 }
 
-/** The entry for a service, only when it has been explicitly activated. */
-export const activePricing = (key, catalogue = BRANDING_PRICING) => { const x = catalogue[key]; return x && x.active === true && priceLabel(x) ? x : null; };
+/**
+ * Stored rows -> the entries the page may show, keyed by service: only services that have a valid stored row (so an unmigrated database yields {}).
+ * @param {Array<{service_key: string, price_type: string, price_cad: number|null}>} rows
+ */
+export function pricingFrom(rows) {
+  const out = {};
+  for (const r of rows || []) {
+    const s = pricingService(r.service_key);
+    const entry = s && { ...s, type: r.price_type, priceCad: r.price_cad };
+    if (entry && priceLabel(entry)) out[s.key] = Object.freeze({ ...entry, label: priceLabel(entry) });
+  }
+  return out;
+}
+
+/** What is stored with a service request so Admin can see what the client was shown. */
+export const priceSnapshot = (entry) => (entry ? { service: entry.key, name: entry.name, type: entry.type, priceCad: entry.type === "starting_at" ? entry.priceCad : null, label: priceLabel(entry) } : null);
+
+export const ESTIMATE_NOTE = "Starting prices are estimates, not final quotes.";
+
+const freeUpload = (href, [lead, link]) => (href ? `<div class="bk-offer__free"><p>${e(lead)} <a class="text-link" href="${e(href)}">${e(link)}</a>.</p></div>` : "");
+const row = (title, entry, action) => `<div class="bk-offer__row"><div class="bk-offer__text"><h3 class="bk-offer__title">${e(title)}</h3>${entry && priceLabel(entry) ? `<p class="bk-offer__price">${e(priceLabel(entry))}</p>` : ""}</div><div class="bk-offer__action">${action || ""}</div></div>`;
 
 /**
- * The quiet pricing note shown inside a section, next to the request action, for a service the client doesn't have yet. `action` is the already-built request control
- * (the existing Branding request). Returns "" for an inactive or unknown entry, so nothing is shown by default.
+ * The compact service offer under a section's status line: the service title, its price (when it has one) and the black Request Design button on one row, and,
+ * visually separated, the free way to share what the client already has. Shown only for an incomplete section. `action` is the already-built request control (the button, or the
+ * status of a request that is already open). With no stored price the price is left out; the title, button and free upload remain. The one general note about starting prices is shown once, on the page (branding-live.js).
+ * @param {{ service: object, entry?: object|null, action: string, uploadHref?: string }} o
  */
-export function pricingBlock(entry, action = "") {
-  if (!entry || entry.active !== true || !priceLabel(entry)) return "";
-  const scope = Array.isArray(entry.deliverables) && entry.deliverables.length
-    ? `<p class="muted small">Covers ${e(entry.deliverables.join(", "))}.${Array.isArray(entry.exclusions) && entry.exclusions.length ? ` Not included: ${e(entry.exclusions.join(", ").toLowerCase())}.` : ""}</p>` : "";
-  return `<div class="bk-price"><h3 class="bk-price__name">${e(entry.name)}</h3><p class="bk-price__label">${e(priceLabel(entry))}</p><p class="muted">${e(entry.description)}</p>${scope}<p class="muted small">A starting price, not a quote. Framework reviews every request and confirms the scope with you before any work begins.</p>${action}</div>`;
+export function offerBox({ service, entry = null, action = "", uploadHref = "" }) {
+  return `<div class="bk-offer">${row(service.offerTitle, entry, action)}${freeUpload(uploadHref, service.upload)}</div>`;
+}
+
+/** The same offer for several services at once (the logo variations the client doesn't have yet): one row per variation, one free-upload line. */
+export function offerList({ rows, extra = "", uploadHref = "", upload }) {
+  const items = (rows || []).map((r) => `<li class="bk-offer__item">${row(r.title, r.entry, r.action)}</li>`).join("");
+  return `<div class="bk-offer"><ul class="bk-offer__list">${items}</ul>${extra}${freeUpload(uploadHref, upload)}</div>`;
 }

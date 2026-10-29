@@ -796,10 +796,6 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .tf-l-caption { font-family: var(--font-body); font-size: 13px; line-height: 1.4; letter-spacing: .04em; text-transform: uppercase; }
 .fw-w100 { font-weight: 100; } .fw-w200 { font-weight: 200; } .fw-w300 { font-weight: 300; } .fw-w400 { font-weight: 400; } .fw-w500 { font-weight: 500; }
 .fw-w600 { font-weight: 600; } .fw-w700 { font-weight: 700; } .fw-w800 { font-weight: 800; } .fw-w900 { font-weight: 900; }
-.bk-price { margin: var(--space-3) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--hairline); max-width: 40em; }
-.bk-price__name { margin: 0 0 4px; font-family: var(--font-display); font-weight: 600; font-size: 20px; }
-.bk-price__label { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
-.bk-price p { margin: 0 0 8px; }
 
 /* Examples: what a section looks like when professionally developed, shown while the client has no approved content. Muted grey panels (never reduced opacity), a small
    "Example: Framework" label, no links, no copy buttons, no downloads. Approved content replaces them. Framework's own typefaces are the portal's Switzer and General Sans. */
@@ -860,3 +856,36 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-tag__alt { margin: 0; flex: 1 1 12em; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(20px, 2.6vw, 26px); line-height: 1.2; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .bk-tag__guide p { margin: 0 0 12px; max-width: 40em; }
 .bk-tag__guide p:last-child { margin-bottom: 0; }
+
+/* Branding sections: a small Required / Recommended label beside the heading (or a check and "Complete"), then, for an incomplete section, a compact service offer: title and price beside the black
+   Request Design button, and one hairline above the free upload. One general starting-price note sits under the page introduction. Monochrome, no boxes. */
+.bk-done { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; vertical-align: middle; font-family: var(--font-body); font-size: 14px; font-weight: 500; letter-spacing: 0; line-height: 1.2; color: var(--slate); }
+.bk-done .bk-nav__tick { color: var(--ink); }
+.bk-req__count { margin-left: 8px; vertical-align: middle; font-family: var(--font-body); font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--slate); font-variant-numeric: tabular-nums; }
+.bk-pricing-note { margin: var(--space-2) 0 0; font-size: 13px; color: var(--slate); }
+.bk-offer { margin: var(--space-2) 0 var(--space-5); max-width: 44em; }
+.bk-offer__row { display: grid; gap: 12px 24px; align-items: center; }
+@media (min-width: 600px) { .bk-offer__row { grid-template-columns: minmax(0, 1fr) auto; } }
+.bk-offer__text { min-width: 0; }
+.bk-offer__title { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 20px; line-height: 1.2; letter-spacing: -0.01em; }
+.bk-offer__price { margin: 2px 0 0; font-size: 16px; font-weight: 500; color: var(--slate); }
+.bk-offer__action .brq { margin-top: 0; }
+.bk-offer__action .brq > summary { min-height: 48px; padding: 0 28px; }
+.bk-offer__action .brq__status { margin: 0; }
+.bk-offer__free { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--hairline); }
+.bk-offer__free p { margin: 0; font-size: 15px; color: var(--slate); }
+.bk-offer__list { list-style: none; margin: 0; padding: 0; }
+.bk-offer__item { padding: var(--space-2) 0; }
+.bk-offer__item:first-child { padding-top: 0; }
+.bk-offer__item + .bk-offer__item { border-top: 1px solid var(--hairline); }
+.bk-kitprice { margin: 0 0 6px; font-size: 16px; }
+.bk-kitprice__price { color: var(--slate); font-weight: 500; white-space: nowrap; }
+
+/* Branding progress: a quiet completion mark beside a section in the navigation (a fraction for the Logo slots, a checkmark when done) and a small Required / Recommended label beside each section name. Text only, no colours or bars. */
+.bk-nav__mark { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--slate); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bk-nav__mark--done { color: var(--ink); }
+@media (min-width: 600px) { .bk-nav__mark { margin-left: 10px; } } /* three columns: the mark follows its own section name instead of floating toward the next column */
+.bk-nav__tick { display: block; flex: none; }
+.bk-req { display: inline-block; margin-left: 12px; vertical-align: middle; font-family: var(--font-body); font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; line-height: 1.2; color: var(--slate); }
+.bk-req--required { color: var(--ink); }
+.bk-req__why { font-weight: 500; letter-spacing: .02em; text-transform: none; color: var(--slate); }

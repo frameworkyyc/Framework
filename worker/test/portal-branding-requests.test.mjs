@@ -43,9 +43,10 @@ async function setup() {
   return { w, bucket, alpha, beta, ann, mia, bob, csrf, send, admin };
 }
 
-test("the catalogue: six request keys that are valid stored keys, known to the server and titled for Admin", () => {
-  assert.deepEqual(BRAND_REQUESTS.map((r) => r.key), ["brand-logos", "brand-colours", "brand-typography", "brand-guidelines", "brand-additional", "brand-full-kit"]);
-  for (const r of BRAND_REQUESTS) { assert.match(r.key, /^[a-z0-9-]{2,60}$/); assert.ok(isKnownBrandingService(r.key)); assert.match(brandingService(r.key).title, /^Brand request: /); }
+test("the catalogue: six section request keys plus one per priced design service, all valid stored keys, known to the server and titled for Admin", () => {
+  assert.deepEqual(BRAND_REQUESTS.slice(0, 6).map((r) => r.key), ["brand-logos", "brand-colours", "brand-typography", "brand-guidelines", "brand-additional", "brand-full-kit"]);
+  assert.deepEqual(BRAND_REQUESTS.slice(6).map((r) => r.key), ["logo-primary", "logo-secondary", "logo-simplified", "logo-submark", "typography", "colours", "tagline", "imagery", "layout", "textures", "iconography", "style"].map((k) => "brand-svc-" + k), "the complete kit keeps brand-full-kit");
+  for (const r of BRAND_REQUESTS) { assert.match(r.key, /^[a-z0-9-]{2,60}$/); assert.ok(isKnownBrandingService(r.key)); assert.match(brandingService(r.key).title, /^(Brand|Design) request: /); }
   assert.equal(isKnownBrandingService("brand-everything"), false); assert.equal(isKnownBrandingService("__proto__"), false);
   assert.ok(isKnownBrandingService("business-card-design"), "the earlier quote services still exist");
 });
@@ -63,7 +64,7 @@ test("an owner requests an empty section: the request is stored for the right or
   assert.match(html, /Request sent\. Framework will follow up\./);
   const logos = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
   assert.match(logos, /class="tag">Requested</); assert.ok(!/<summary class="btn/.test(logos), "no button while the request is open");
-  assert.match(html.slice(html.indexOf('id="colours"'), html.indexOf('id="tagline"')), /<summary class="btn btn--small">Request<span/, "other sections keep their button");
+  assert.match(html.slice(html.indexOf('id="colours"'), html.indexOf('id="tagline"')), /<summary class="btn btn--primary">Request Design<span/, "other sections keep their button");
 });
 
 test("no accidental duplicates: pressing it again, or twice at once, leaves exactly one open request and says so", async () => {
@@ -169,7 +170,7 @@ test("the request area is plain, scriptless HTML: no inline script or style, a l
   const html = await res.text();
   assert.ok(!html.includes("<script>alert(1)"), "the note is not rendered anywhere");
   assert.ok(!/\sstyle=|<script|\son[a-z]+=/.test(html.replace(/<link[^>]*>/g, "")), "no inline style, script or handler");
-  assert.match(html, /<label for="req-brand-colours">Anything we should know\? \(optional\)<\/label><textarea id="req-brand-colours" name="note" rows="3" maxlength="1000">/);
+  assert.match(html, /<label for="req-brand-svc-colours">Anything we should know\? \(optional\)<\/label><textarea id="req-brand-svc-colours" name="note" rows="3" maxlength="1000">/);
   assert.equal(res.headers.get("content-security-policy"), PORTAL_CSP, "no script is needed or allowed on the page");
   assert.equal([...html.matchAll(/id="req-brand-[a-z-]+"/g)].length, new Set([...html.matchAll(/id="req-brand-[a-z-]+"/g)].map((m) => m[0])).size, "unique ids");
 });
