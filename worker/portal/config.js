@@ -74,6 +74,11 @@ export function brandingEnabled(env) {
   return !!env && text(env.PORTAL_BRANDING) === "1";
 }
 
+/** The client-facing Website section is live only where PORTAL_WEBSITE is exactly "1". Independent of PORTAL_SERVICES and PORTAL_BRANDING; unset everywhere until it is approved. */
+export function websiteEnabled(env) {
+  return !!env && text(env.PORTAL_WEBSITE) === "1";
+}
+
 /** The Client Services area (hub, contact, and later invoices and support requests) is live only where PORTAL_SERVICES is exactly "1" (Staging). */
 export function servicesEnabled(env) {
   return !!env && text(env.PORTAL_SERVICES) === "1";

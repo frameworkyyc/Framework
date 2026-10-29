@@ -5,7 +5,7 @@
  * Returns null (= "not mine"; worker/index.js then answers portalNotFound(), never the static site) when the portal is off, or the request is not for the portal or not on the
  * portal host. When it IS enabled but misconfigured it fails closed with a generic 503 for portal paths.
  */
-import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled, servicesEnabled } from "./config.js";
+import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled, servicesEnabled, websiteEnabled } from "./config.js";
 import { errorPage, newRef, redirect, checkSameSiteMutation, securityHeaders } from "./http.js";
 import { handleLogin, handleCallback, handleLogout } from "./auth.js";
 import { requireSession, requireOrgAccess, dbCall, Unavailable, unavailablePage, notFoundPage } from "./guard.js";
@@ -34,6 +34,8 @@ import { loadPricing } from "./repo/prices.js";
 import { listClientInvoices, clientInvoiceSummary } from "./repo/invoices.js";
 import { clientDownloadInvoice } from "./invoice-files.js";
 import { invoiceStatusLine, supportStatusLine } from "./services-live.js";
+import { listClientWebsites, getClientWebsite } from "./repo/client-websites.js";
+import { clientScreenshotResponse } from "./website-files.js";
 import * as supportRepo from "./repo/support.js";
 import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./support-files.js";
 import { dispatchNotifications } from "./service-notifications.js";
@@ -92,6 +94,7 @@ async function noAccess(ctx) {
 const SOON = comingSoonKeys().join("|");
 const brandingOn = (ctx) => brandingEnabled(ctx.env);
 const servicesOn = (ctx) => servicesEnabled(ctx.env);
+const websiteOn = (ctx) => websiteEnabled(ctx.env);
 
 /** Save one questionnaire step. Every check below runs on the server for every save; the organization comes from the membership, never the form. */
 async function saveProfile(ctx, a, stepId) {
@@ -357,6 +360,25 @@ const BRANDING_ROUTES = [
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/files\/([^/]+)$/, action: "branding.view", run: (ctx, a, id) => downloadBrandFile(ctx, a, id, "asset") },
 ];
 
+/* ------------------------------------------------------------------ Website (Phase 2; only where PORTAL_WEBSITE is on) */
+
+const WEBSITE_ROUTES = [
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website$/, action: "website.view", run: async (ctx, a) => pages.websitePage(ctx, a, { sites: await listClientWebsites(ctx.db, a.membership.organizationId) }) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/screenshot$/, action: "website.view", run: async (ctx, a, id) => {
+      if (!UUID.test(id)) return notFoundPage(ctx);
+      if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
+      const res = await clientScreenshotResponse(brandDeps(ctx), { role: a.membership.role, organizationId: a.membership.organizationId, websiteId: id });
+      return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
+    },
+  },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)$/, action: "website.view", run: async (ctx, a, id) => {
+      if (!UUID.test(id)) return notFoundPage(ctx);
+      const one = await getClientWebsite(ctx.db, a.membership.organizationId, id); // another organization's, unpublished and archived websites are all "not found"
+      return one ? pages.websitePage(ctx, a, { one }) : notFoundPage(ctx);
+    },
+  },
+];
+
 /** The Invoices card status on the hub, or "" when invoices cannot be read (a database without migration 0007): the card then stays "Coming soon". */
 async function invoiceSummary(ctx, a) {
   try { return await dbCall(() => clientInvoiceSummary(ctx.db, a.membership.organizationId, { now: ctx.now })); }
@@ -458,6 +480,7 @@ const SERVICES_ROUTES = [
 
 const ORG_ROUTES = [
   ...BRANDING_ROUTES,
+  ...WEBSITE_ROUTES,
   ...SERVICES_ROUTES,
   { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => {
       // One read serves both the greeting's name fallback and the module progress. null (unreadable) shows "Progress unavailable", never 0%.
