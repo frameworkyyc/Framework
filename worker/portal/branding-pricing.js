@@ -19,23 +19,25 @@ export const PRICING_TYPES = Object.freeze(["starting_at", "custom_quote", "incl
 export const PRICING_TYPE_LABEL = Object.freeze({ starting_at: "Starting at", custom_quote: "Custom quote", included: "Included" });
 export const MAX_PRICE_CAD = 1000000;
 
-const svc = (key, section, name, defaultCad, description) => Object.freeze({ key, section, name, defaultCad, description });
+/** `offerTitle` is the service's name in the client's offer; `upload` is the two halves of the free-upload line ("Already have your fonts?" + "Upload them for free"). */
+const svc = (key, section, name, defaultCad, description, offerTitle, upload) => Object.freeze({ key, section, name, defaultCad, description, offerTitle, upload: Object.freeze(upload) });
+const LOGOS = ["Already have your logos?", "Upload them for free"];
 
 /** In display order. `section` is the Branding section key (admin/assets/brand-sections.js), or "all" for the complete kit. */
 export const PRICING_SERVICES = Object.freeze([
-  svc("logo-primary", "logo", "Primary Logo", 500, "Your main brand identity, designed for websites, marketing materials and official communications."),
-  svc("logo-secondary", "logo", "Secondary Logo", 150, "An alternative logo arrangement for spaces where the primary layout doesn’t fit."),
-  svc("logo-simplified", "logo", "Simplified Logo", 150, "A reduced wordmark-only variation for cleaner applications."),
-  svc("logo-submark", "logo", "Sub-mark", 150, "A compact brand symbol for favicons, social profiles and small applications."),
-  svc("typography", "typography", "Typography", 250, "A selected and structured typography system, with typeface roles, hierarchy and usage guidance."),
-  svc("colours", "colours", "Brand Colours", 200, "A considered colour palette with exact values and usage guidance."),
-  svc("tagline", "tagline", "Tagline", 250, "A tagline that sums up your brand, with guidance on how to use it."),
-  svc("imagery", "imagery", "Brand Imagery", 300, "Imagery direction and curated visual references. Original photography is not included."),
-  svc("layout", "layout", "Layout System", 350, "Grids, spacing and composition guidelines for consistent designs."),
-  svc("textures", "textures", "Textures", 150, "Approved textures, patterns and backgrounds."),
-  svc("iconography", "iconography", "Iconography", 250, "A consistent icon style with a starter set. Extensive icon libraries are not included."),
-  svc("style", "style", "Design Style", 350, "Your brand direction and visual principles, documented with examples."),
-  svc("brand-kit", "all", "Complete Brand Kit", 2500, "A cohesive brand identity developed and documented across all nine sections."),
+  svc("logo-primary", "logo", "Primary Logo", 500, "Your main brand identity, designed for websites, marketing materials and official communications.", "Primary Logo Design", LOGOS),
+  svc("logo-secondary", "logo", "Secondary Logo", 150, "An alternative logo arrangement for spaces where the primary layout doesn’t fit.", "Secondary Logo Design", LOGOS),
+  svc("logo-simplified", "logo", "Simplified Logo", 150, "A reduced wordmark-only variation for cleaner applications.", "Simplified Logo Design", LOGOS),
+  svc("logo-submark", "logo", "Sub-mark", 150, "A compact brand symbol for favicons, social profiles and small applications.", "Sub-mark Design", LOGOS),
+  svc("typography", "typography", "Typography", 250, "A selected and structured typography system, with typeface roles, hierarchy and usage guidance.", "Professional Typography Design", ["Already have your fonts?", "Upload them for free"]),
+  svc("colours", "colours", "Brand Colours", 200, "A considered colour palette with exact values and usage guidance.", "Professional Colour Palette Design", ["Already have your brand colours?", "Upload them for free"]),
+  svc("tagline", "tagline", "Tagline", 250, "A tagline that sums up your brand, with guidance on how to use it.", "Professional Tagline Development", ["Already have a tagline?", "Upload it for free"]),
+  svc("imagery", "imagery", "Brand Imagery", 300, "Imagery direction and curated visual references. Original photography is not included.", "Professional Imagery Direction", ["Already have brand imagery?", "Upload it for free"]),
+  svc("layout", "layout", "Layout System", 350, "Grids, spacing and composition guidelines for consistent designs.", "Professional Layout System Design", ["Already have a layout system?", "Upload it for free"]),
+  svc("textures", "textures", "Textures", 150, "Approved textures, patterns and backgrounds.", "Professional Texture & Pattern Design", ["Already have textures?", "Upload them for free"]),
+  svc("iconography", "iconography", "Iconography", 250, "A consistent icon style with a starter set. Extensive icon libraries are not included.", "Professional Icon Design", ["Already have icons?", "Upload them for free"]),
+  svc("style", "style", "Design Style", 350, "Your brand direction and visual principles, documented with examples.", "Professional Design Style Guide", ["Already have a design style guide?", "Upload it for free"]),
+  svc("brand-kit", "all", "Complete Brand Kit", 2500, "A cohesive brand identity developed and documented across all nine sections.", "Complete Brand Kit", ["Already have a brand kit?", "Upload it for free"]),
 ]);
 
 export const PRICING_KEYS = Object.freeze(PRICING_SERVICES.map((s) => s.key));
@@ -72,31 +74,25 @@ export function pricingFrom(rows) {
 /** What is stored with a service request so Admin can see what the client was shown. */
 export const priceSnapshot = (entry) => (entry ? { service: entry.key, name: entry.name, type: entry.type, priceCad: entry.type === "starting_at" ? entry.priceCad : null, label: priceLabel(entry) } : null);
 
-export const ESTIMATE_NOTE = "Starting prices are estimates, not final quotes. Framework confirms the scope and price with you before any work begins.";
+export const ESTIMATE_NOTE = "Starting prices are estimates, not final quotes.";
 
-/** Messaging by requirement: stronger for a Required section, softer for a Recommended one. */
-export const OFFER_COPY = Object.freeze({
-  required: Object.freeze({ note: "Needed to use your brand consistently.", lead: (name) => `Framework can create your ${name} for you.` }),
-  recommended: Object.freeze({ note: "Optional, but it makes your brand stronger.", lead: (name) => `Want help with your ${name}?` }),
-});
-
-const freeUpload = (href, what) => (href ? `<div class="bk-offer__free"><p>Already have ${e(what)}? <a class="text-link" href="${e(href)}">Upload your existing branding for free</a>.</p></div>` : "");
+const freeUpload = (href, [lead, link]) => (href ? `<div class="bk-offer__free"><p>${e(lead)} <a class="text-link" href="${e(href)}">${e(link)}</a>.</p></div>` : "");
+const row = (title, entry, action) => `<div class="bk-offer__row"><div class="bk-offer__text"><h3 class="bk-offer__title">${e(title)}</h3>${entry && priceLabel(entry) ? `<p class="bk-offer__price">${e(priceLabel(entry))}</p>` : ""}</div><div class="bk-offer__action">${action || ""}</div></div>`;
 
 /**
- * The service offer under a section's status line: what Framework can provide, the price (when the service has one), the request button, the estimate note, and, visually
- * separated, the free way to share what the client already has. Shown only for an incomplete section. `action` is the already-built request control (a black "Request Design" button, or
- * the status of a request that is already open). With no stored price the price line and the estimate note are simply left out; the offer and the free upload remain.
- * @param {{ name: string, description: string, entry?: object|null, level: "required"|"recommended", action: string, uploadHref?: string, what?: string }} o
+ * The compact service offer under a section's status line: the service title, its price (when it has one) and the black Request Design button on one row, a small estimate line, and,
+ * visually separated, the free way to share what the client already has. Shown only for an incomplete section. `action` is the already-built request control (the button, or the
+ * status of a request that is already open). With no stored price the price and the estimate line are left out; the title, button and free upload remain.
+ * @param {{ service: object, entry?: object|null, action: string, uploadHref?: string }} o
  */
-export function offerBox({ name, description, entry = null, level, action = "", uploadHref = "", what = "" }) {
-  const copy = OFFER_COPY[level] || OFFER_COPY.recommended;
-  const label = entry ? priceLabel(entry) : "";
-  return `<div class="bk-offer bk-offer--${e(level)}"><h3 class="bk-offer__lead">${e(copy.lead(name.toLowerCase()))}</h3><p class="bk-offer__desc">${e(description)}</p>${label ? `<p class="bk-offer__price">${e(label)}</p>` : ""}<div class="bk-offer__action">${action}</div>${label ? `<p class="bk-offer__estimate">${e(ESTIMATE_NOTE)}</p>` : ""}${freeUpload(uploadHref, what || `your ${name.toLowerCase()}`)}</div>`;
+export function offerBox({ service, entry = null, action = "", uploadHref = "" }) {
+  const priced = entry && priceLabel(entry);
+  return `<div class="bk-offer">${row(service.offerTitle, entry, action)}${priced ? `<p class="bk-offer__estimate">${e(ESTIMATE_NOTE)}</p>` : ""}${freeUpload(uploadHref, service.upload)}</div>`;
 }
 
-/** The same offer for several services at once (the logo variations the client doesn't have yet): one row per variation with its own price and request button. */
-export function offerList({ lead, description = "", level, rows, extra = "", uploadHref = "", what = "" }) {
+/** The same offer for several services at once (the logo variations the client doesn't have yet): one row per variation, one estimate line, one free-upload line. */
+export function offerList({ rows, extra = "", uploadHref = "", upload }) {
   const priced = (rows || []).some((r) => r.entry && priceLabel(r.entry));
-  const items = (rows || []).map((r) => `<li class="bk-offer__item"><div class="bk-offer__item-head"><span class="bk-offer__name">${e(r.name)}</span>${r.entry && priceLabel(r.entry) ? ` <span class="bk-offer__price bk-offer__price--inline">${e(priceLabel(r.entry))}</span>` : ""}</div><div class="bk-offer__action">${r.action || ""}</div></li>`).join("");
-  return `<div class="bk-offer bk-offer--${e(level)}"><h3 class="bk-offer__lead">${e(lead)}</h3>${description ? `<p class="bk-offer__desc">${e(description)}</p>` : ""}<ul class="bk-offer__list">${items}</ul>${extra}${priced ? `<p class="bk-offer__estimate">${e(ESTIMATE_NOTE)}</p>` : ""}${freeUpload(uploadHref, what)}</div>`;
+  const items = (rows || []).map((r) => `<li class="bk-offer__item">${row(r.title, r.entry, r.action)}</li>`).join("");
+  return `<div class="bk-offer"><ul class="bk-offer__list">${items}</ul>${extra}${priced ? `<p class="bk-offer__estimate">${e(ESTIMATE_NOTE)}</p>` : ""}${freeUpload(uploadHref, upload)}</div>`;
 }

@@ -63,12 +63,15 @@ test("the catalogue: thirteen services in section order with Framework's startin
   assert.deepEqual(P.pricingFrom([{ service_key: "typography", price_type: "starting_at", price_cad: 250 }, { service_key: "nope", price_type: "included", price_cad: null }, { service_key: "colours", price_type: "starting_at", price_cad: 0 }]).typography.label, "Starting at $250 CAD");
   assert.deepEqual(Object.keys(P.pricingFrom([{ service_key: "typography", price_type: "starting_at", price_cad: 250 }, { service_key: "nope", price_type: "included", price_cad: null }, { service_key: "colours", price_type: "starting_at", price_cad: 0 }])), ["typography"], "unknown services and invalid rows are never shown");
   assert.deepEqual(P.pricingFrom([]), {});
-  const box = P.offerBox({ name: "<b>Typography</b>", description: "Fonts & roles", entry: { type: "starting_at", priceCad: 250 }, level: "required", action: "<i>ACT</i>", uploadHref: "/up" });
-  assert.match(box, /&lt;b&gt;typography&lt;\/b&gt;/, "names are escaped"); assert.match(box, /Framework can create your &lt;b&gt;typography&lt;\/b&gt; for you\./); assert.match(box, /Fonts &amp; roles/); assert.match(box, /<i>ACT<\/i>/);
-  assert.match(box, /Starting at \$250 CAD/); assert.match(box, /Starting prices are estimates/); assert.match(box, /bk-offer__free[\s\S]*Upload your existing branding for free/);
-  const soft = P.offerBox({ name: "Tagline", description: "d", entry: null, level: "recommended", action: "", uploadHref: "" });
-  assert.match(soft, /Want help with your tagline\?/, "softer wording for a Recommended section"); assert.ok(!/bk-offer__price|bk-offer__estimate|bk-offer__free/.test(soft), "no price, no estimate wording and no upload block when there is nothing to show");
-  assert.equal(P.OFFER_COPY.required.note, "Needed to use your brand consistently."); assert.equal(P.OFFER_COPY.recommended.note, "Optional, but it makes your brand stronger.");
+  const svc = P.pricingService("typography");
+  assert.equal(svc.offerTitle, "Professional Typography Design"); assert.deepEqual(svc.upload, ["Already have your fonts?", "Upload them for free"]);
+  const box = P.offerBox({ service: { ...svc, offerTitle: "<b>Professional Typography Design</b>" }, entry: { type: "starting_at", priceCad: 250 }, action: "<i>ACT</i>", uploadHref: "/up" });
+  assert.match(box, /<h3 class="bk-offer__title">&lt;b&gt;Professional Typography Design&lt;\/b&gt;<\/h3>/, "titles are escaped"); assert.match(box, /<i>ACT<\/i>/);
+  assert.match(box, /<p class="bk-offer__price">Starting at \$250 CAD<\/p>/); assert.match(box, /<p class="bk-offer__estimate">Starting prices are estimates, not final quotes\.<\/p>/); assert.match(box, /bk-offer__free"><p>Already have your fonts\? <a class="text-link" href="\/up">Upload them for free<\/a>\.<\/p>/);
+  assert.ok(!/<p class="bk-offer__desc|Framework can|Needed to use|Optional, but/.test(box), "no description, lead or messaging paragraphs");
+  const bare = P.offerBox({ service: P.pricingService("tagline"), entry: null, action: "", uploadHref: "" });
+  assert.ok(!/bk-offer__price|bk-offer__estimate|bk-offer__free/.test(bare), "no price, estimate line or upload block when there is nothing to show"); assert.match(bare, /Professional Tagline Development/);
+  assert.deepEqual(P.PRICING_SERVICES.map((x) => x.offerTitle), ["Primary Logo Design", "Secondary Logo Design", "Simplified Logo Design", "Sub-mark Design", "Professional Typography Design", "Professional Colour Palette Design", "Professional Tagline Development", "Professional Imagery Direction", "Professional Layout System Design", "Professional Texture & Pattern Design", "Professional Icon Design", "Professional Design Style Guide", "Complete Brand Kit"]);
 });
 
 test("migration 0010 is additive: it seeds the thirteen starting prices, enforces its rules, adds a nullable snapshot column, and leaves existing requests untouched", async () => {
@@ -168,16 +171,16 @@ test("client Branding with nothing added: every section offers its design servic
   const esc = (t) => t.replace(/[$.]/g, "\\$&");
   const price = (key) => `Starting at ${new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(PRICES[key])} CAD`;
   const logo = sectionHtml(html, "logo");
-  for (const [name, key] of [["Primary Logo", "logo-primary"], ["Secondary Logo", "logo-secondary"], ["Simplified Logo", "logo-simplified"], ["Sub-mark", "logo-submark"]]) assert.match(logo, new RegExp(`bk-offer__name">${name}<\\/span> <span class="bk-offer__price bk-offer__price--inline">${esc(price(key))}`), name);
-  assert.match(logo, /Framework can create your logo for you\./, "Required: firmer wording"); assert.match(logo, /class="bk-status"><span class="bk-status__text">Logo not yet provided<\/span>/);
+  for (const [name, key, title] of [["Primary Logo", "logo-primary", "Primary Logo Design"], ["Secondary Logo", "logo-secondary", "Secondary Logo Design"], ["Simplified Logo", "logo-simplified", "Simplified Logo Design"], ["Sub-mark", "logo-submark", "Sub-mark Design"]]) assert.match(logo, new RegExp(`bk-offer__title">${title}<\\/h3><p class="bk-offer__price">${esc(price(key))}`), name);
+  assert.match(logo, /class="bk-status"><span class="bk-status__text">Logo not yet provided<\/span>/);
   for (const [sec, key] of [["typography", "typography"], ["colours", "colours"], ["tagline", "tagline"], ["imagery", "imagery"], ["layout", "layout"], ["textures", "textures"], ["iconography", "iconography"], ["style", "style"]]) {
     const h = sectionHtml(html, sec);
     assert.match(h, new RegExp(`bk-offer__price">${esc(price(key))}<`), sec + " shows its price");
     assert.match(h, /bk-offer__estimate">Starting prices are estimates, not final quotes\./, sec + " says it is an estimate");
     assert.match(h, /<summary class="btn btn--primary">Request Design<span class="visually-hidden">: [^<]+ design<\/span>/, sec + " has the black request button with an accessible name");
-    assert.match(h, /Upload your existing branding for free/, sec + " offers the free upload"); assert.match(h, /href="\/portal\/o\/alpha\/branding\/uploads"/);
+    assert.match(h, /Already have [^<]+\? <a class="text-link" href="\/portal\/o\/alpha\/branding\/uploads">Upload (them|it) for free<\/a>\./, sec + " offers the free upload"); assert.match(h, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   }
-  assert.match(logo, /Upload your existing branding for free/); assert.equal([...html.matchAll(/branding\/uploads">Upload your existing/g)].length, 9, "one free-upload link per section, none repeated");
+  assert.match(logo, /Already have your logos\? <a class="text-link"[^>]*>Upload them for free<\/a>/); assert.equal([...html.matchAll(/branding\/uploads">Upload (them|it) for free/g)].length, 9, "one free-upload link per section, none repeated");
   assert.ok(!/\$\d/.test([...html.matchAll(/<h[12][^>]*>[\s\S]*?<\/h[12]>/g)].map((m) => m[0]).join(" ")), "no price in any heading");
   assert.ok(!/\$\d/.test(html.slice(html.indexOf('class="bk-nav"'), html.indexOf("</nav>", html.indexOf('class="bk-nav"')))), "none in the section navigation");
   assert.match(html.slice(html.indexOf('class="brand-kit"')), /bk-kitprice__price">Starting at \$2,500 CAD</, "the complete kit shows its price");
@@ -207,7 +210,7 @@ test("prices follow Admin: a changed price, Custom Quote and Included show at on
   const html = await (await bare.ann.get(base("alpha"))).text();
   assert.ok(!/Starting at|bk-offer__price|bk-offer__estimate|bk-kitprice/.test(html), "without the table: no price and no estimate wording anywhere");
   assert.match(sectionHtml(html, "colours"), /<summary class="btn btn--primary">Request Design<span/, "the offer and its request button remain, without a price");
-  assert.match(sectionHtml(html, "colours"), /Upload your existing branding for free/);
+  assert.match(sectionHtml(html, "colours"), /Already have your brand colours\? <a [^>]*>Upload them for free<\/a>/);
 });
 
 test("requesting a priced service records the service and the price shown, takes it only from the server, and is reviewed in Admin", async () => {
