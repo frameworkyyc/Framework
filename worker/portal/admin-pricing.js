@@ -8,7 +8,7 @@
  *   POST /service-pricing   { prices: [{key, type, priceCad}] }   any subset of the 13 services; all-or-nothing; unchanged entries write nothing
  */
 import { listPrices, savePrices } from "./repo/prices.js";
-import { PRICING_SERVICES, PRICING_TYPES, PRICING_TYPE_LABEL, MAX_PRICE_CAD } from "./branding-pricing.js";
+import { PRICING_SERVICES, PRICING_TYPES, PRICING_TYPE_LABEL, MAX_PRICE_CAD, typesFor } from "./branding-pricing.js";
 import { json, err, sameOriginWrite, readJson } from "./admin-branding.js";
 
 const STATUS = { invalid_service: 422, invalid_type: 422, invalid_price: 422, unavailable: 409 };
@@ -42,7 +42,7 @@ export async function handleServicePricingApi(request, env, principal, path, dep
       available: list.available,
       services: PRICING_SERVICES.map((s) => {
         const row = stored.get(s.key);
-        return { key: s.key, section: s.section, name: s.name, description: s.description, defaultCad: s.defaultCad, type: row ? row.price_type : s.defaultType, priceCad: row ? row.price_cad : s.defaultCad, defaultType: s.defaultType, stored: Boolean(row), updatedBy: row ? row.updated_by : null, updatedAt: row ? row.updated_at : null };
+        return { key: s.key, section: s.section, name: s.name, description: s.description, defaultCad: s.defaultCad, type: row ? row.price_type : s.defaultType, priceCad: row ? row.price_cad : s.defaultCad, defaultType: s.defaultType, types: typesFor(s), stored: Boolean(row), updatedBy: row ? row.updated_by : null, updatedAt: row ? row.updated_at : null };
       }),
       types: PRICING_TYPES.map((t) => ({ key: t, label: PRICING_TYPE_LABEL[t] })),
       capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1" },

@@ -96,9 +96,9 @@ export const SUPPORT_ERRORS = Object.freeze({
   too_many_attachments: `A request can have up to ${MAX_ATTACHMENTS} attachments in total.`, closed: "This request is closed. Please start a new one.",
   not_allowed: "You can’t do that.", not_found: "That request wasn’t found.",
 });
-const when = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("en-CA", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Edmonton" }); };
-const statusTag = (st) => `<span class="req-status req-status--${e(st)}">${e(STATUS_LABEL[st] || st)}</span>`;
-const notice = () => `<p class="req-notice" role="note"><strong>Requests don’t authorize work.</strong> ${e(SUBMISSION_NOTICE)}</p>`;
+export const when = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("en-CA", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Edmonton" }); };
+export const statusTag = (st) => `<span class="req-status req-status--${e(st)}">${e(STATUS_LABEL[st] || st)}</span>`;
+export const notice = () => `<p class="req-notice" role="note"><strong>Requests don’t authorize work.</strong> ${e(SUBMISSION_NOTICE)}</p>`;
 
 export function requestsList(vm, items) {
   const head = `<header class="page-head page-head--compact">${crumb(vm, [["Client Services", "/services"], ["Support & Change Requests"]])}<h1 class="h1 h1--section">Support &amp; Change Requests</h1><p class="lead">Ask for help or a change, and follow what happens.</p></header>`;
@@ -121,25 +121,25 @@ export function requestForm(vm, { values = {}, error = "", csrf = "" } = {}) {
 <p class="step-nav"><button class="btn btn--primary" type="submit">Send request</button> <a class="btn" href="${e(href(vm, "/services/requests"))}">Cancel</a></p></form>`;
 }
 
-function messageHtml(vm, thread, m) {
+function messageHtml(vm, thread, m, root) {
   if (m.kind === "status") return `<li class="msg msg--status"><p><strong>Status: ${e(STATUS_LABEL[m.statusTo] || m.statusTo)}</strong> <span class="muted small">${e(when(m.createdAt))}</span></p>${m.body ? `<p class="msg__body">${e(m.body)}</p>` : ""}</li>`;
   const mine = m.authorType === "client";
-  const files = thread.attachments.filter((a) => a.messageId === m.id).map((a) => `<li><a class="text-link" href="${e(href(vm, `/services/requests/${thread.request.id}/files/${a.id}`))}" download>${e(a.name)}</a> <span class="muted small">(${e(fileSize(a.size))})</span></li>`).join("");
+  const files = thread.attachments.filter((a) => a.messageId === m.id).map((a) => `<li><a class="text-link" href="${e(href(vm, `${root}/${thread.request.id}/files/${a.id}`))}" download>${e(a.name)}</a> <span class="muted small">(${e(fileSize(a.size))})</span></li>`).join("");
   return `<li class="msg ${mine ? "msg--client" : "msg--staff"}"><p class="msg__who"><strong>${e(mine ? m.authorName || "Your team" : "Framework")}</strong> <span class="muted small">${e(when(m.createdAt))}</span></p><p class="msg__body">${e(m.body)}</p>${files ? `<ul class="msg__files">${files}</ul>` : ""}</li>`;
 }
 
 /** @param o { csrf, error, flash } */
-export function requestThread(vm, thread, { csrf = "", error = "", flash = "" } = {}) {
+export function requestThread(vm, thread, { csrf = "", error = "", flash = "", root = "/services/requests", trail = [["Client Services", "/services"], ["Support & Change Requests", "/services/requests"]], about = "" } = {}) {
   const r = thread.request;
-  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Client Services", "/services"], ["Support & Change Requests", "/services/requests"], [r.title]])}<h1 class="h1 h1--section">${e(r.title)}</h1><p class="req-meta">${statusTag(r.status)} <span class="muted small">${e(CATEGORY_LABEL[r.category] || "")} · Sent ${e(when(r.createdAt))}</span></p><p class="lead">${e(STATUS_HELP[r.status] || "")}</p></header>`;
+  const head = `<header class="page-head page-head--compact">${crumb(vm, [...trail, [r.title]])}<h1 class="h1 h1--section">${e(r.title)}</h1><p class="req-meta">${statusTag(r.status)} <span class="muted small">${e(CATEGORY_LABEL[r.category] || "")}${about ? ` · ${e(about)}` : ""} · Sent ${e(when(r.createdAt))}</span></p><p class="lead">${e(STATUS_HELP[r.status] || "")}</p></header>`;
   const banner = error ? `<p class="form-banner form-banner--error" role="alert" tabindex="-1" data-error-summary>${e(SUPPORT_ERRORS[error] || "That couldn’t be sent. Please try again.")}</p>`
     : flash === "sent" ? `<p class="form-banner" role="status">Your request was sent. We’ll reply here.</p>` : flash === "replied" ? `<p class="form-banner" role="status">Your message was sent.</p>` : flash === "partial" ? `<p class="form-banner form-banner--error" role="alert">Your message was sent, but an attachment couldn’t be stored. You can send it again as a new message.</p>` : "";
   const warn = scopeOf(r.category) === "change" ? notice() : "";
-  const conv = `<ol class="thread" aria-label="Conversation">${thread.messages.map((m) => messageHtml(vm, thread, m)).join("")}</ol>`;
+  const conv = `<ol class="thread" aria-label="Conversation">${thread.messages.map((m) => messageHtml(vm, thread, m, root)).join("")}</ol>`;
   const left = MAX_ATTACHMENTS - thread.attachments.length;
   const reply = r.closed
-    ? `<p class="muted">This request is ${r.status === "declined" ? "closed" : "complete"}. For anything else, <a class="text-link" href="${e(href(vm, "/services/requests/new"))}">start a new request</a>.</p>`
-    : `<form class="req-form" method="post" action="${e(href(vm, `/services/requests/${r.id}/reply`))}" enctype="multipart/form-data" novalidate><input type="hidden" name="csrf" value="${e(csrf)}"><h2 class="h3" id="rp-h">Reply</h2><div class="questions"><div class="field"><label for="rp-body">Your message</label><textarea id="rp-body" name="body" rows="5" maxlength="${MAX_BODY}" required></textarea></div>${left > 0 ? `<div class="field"><label for="rp-files">Attachments <span class="field__opt">Optional</span></label><span class="field__hint" id="rp-files-h">${left} more allowed on this request.</span><input id="rp-files" name="file" type="file" multiple aria-describedby="rp-files-h"></div>` : `<p class="muted small">This request has reached its limit of ${MAX_ATTACHMENTS} attachments.</p>`}</div><p class="step-nav"><button class="btn btn--primary" type="submit">Send message</button></p></form>`;
+    ? `<p class="muted">This request is ${r.status === "declined" ? "closed" : "complete"}. For anything else, <a class="text-link" href="${e(href(vm, root === "/services/requests" ? "/services/requests/new" : "/website"))}">start a new request</a>.</p>`
+    : `<form class="req-form" method="post" action="${e(href(vm, `${root}/${r.id}/reply`))}" enctype="multipart/form-data" novalidate><input type="hidden" name="csrf" value="${e(csrf)}"><h2 class="h3" id="rp-h">Reply</h2><div class="questions"><div class="field"><label for="rp-body">Your message</label><textarea id="rp-body" name="body" rows="5" maxlength="${MAX_BODY}" required></textarea></div>${left > 0 ? `<div class="field"><label for="rp-files">Attachments <span class="field__opt">Optional</span></label><span class="field__hint" id="rp-files-h">${left} more allowed on this request.</span><input id="rp-files" name="file" type="file" multiple aria-describedby="rp-files-h"></div>` : `<p class="muted small">This request has reached its limit of ${MAX_ATTACHMENTS} attachments.</p>`}</div><p class="step-nav"><button class="btn btn--primary" type="submit">Send message</button></p></form>`;
   return `${head}${banner}${warn}${conv}${reply}`;
 }
 

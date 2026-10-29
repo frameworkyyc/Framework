@@ -155,12 +155,28 @@ export async function brandingUploadsPage(ctx, a, o = {}) {
 }
 
 /** The Website section: `sites` is every website Framework published for this organization (the empty list is the "no website" state); `one` is a single website's own page. */
-export async function websitePage(ctx, a, { sites = [], one = null, preview = null } = {}) {
+export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null } = {}) {
   const vm = liveModel(ctx, a, {});
   const single = one || (sites.length === 1 ? sites[0] : null);
   // The live preview needs the page to be allowed to frame that one website: its verified origins go into THIS response's CSP only (frame-src); no other page and no global policy changes.
   const frameSrc = single ? frameSources(preview) : [];
-  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", body: one ? websiteLive.websiteDetail(vm, one, preview) : websiteLive.websiteOverview(vm, sites, preview), vm, ref: "website", frameSrc });
+  const extra = { management, services: services ? { ...services, csrf: await csrfFor(ctx.cfg, a.session) } : null };
+  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", body: one ? websiteLive.websiteDetail(vm, one, preview, extra) : websiteLive.websiteOverview(vm, sites, preview, extra), vm, ref: "website", frameSrc });
+}
+/** Change and support requests about a website: the existing support workflow (same statuses, thread and attachments), under the Website section. */
+export async function websiteRequestsPage(ctx, a, items) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: "Website requests", active: "home", body: websiteLive.requestsList(vm, items), vm, ref: "website" });
+}
+export async function websiteRequestFormPage(ctx, a, site, kind, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  return shell(ctx, a, { title: kind === "support" ? "Get support" : "Request a change", active: "home", body: websiteLive.requestForm(vm, site, kind, { ...o, csrf }), vm, status: o.status || 200, script: o.error ? FOCUS_SCRIPT : null, ref: "website" });
+}
+export async function websiteRequestThreadPage(ctx, a, thread, site, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  return shell(ctx, a, { title: thread.request.title, active: "home", body: servicesLive.requestThread(vm, thread, { ...o, csrf, root: websiteLive.WEBSITE_REQUEST_ROOT, trail: websiteLive.WEBSITE_REQUEST_TRAIL, about: site ? site.name : "" }), vm, status: o.status || 200, script: o.error ? FOCUS_SCRIPT : null, ref: "website" });
 }
 
 /** The Client Services hub. `live`: which parts have data behind them (see services-live.js). */

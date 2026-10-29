@@ -42,12 +42,12 @@ export async function attachInspected(deps, { organizationId, requestId, message
 }
 
 /** A new request with optional attachments. deps: { db, bucket, env?, now? } */
-export async function clientCreateRequest(deps, { role, organizationId, userId, category, title, description, files = [] }) {
+export async function clientCreateRequest(deps, { role, organizationId, userId, category, title, description, websiteId = null, files = [] }) {
   if (!can(role, "support.submit")) return fail("forbidden");
   const checked = await inspectAll(files);
   if (!checked.ok) return checked;
   if (checked.files.length && !deps.bucket) return fail("storage_unavailable");
-  const made = await sup.createRequest(deps.db, organizationId, userId, { category, title, description }, { now: deps.now });
+  const made = await sup.createRequest(deps.db, organizationId, userId, { category, title, description, websiteId }, { now: deps.now });
   if (!made.ok) return made;
   const att = await attachInspected(deps, { organizationId, requestId: made.id, messageId: made.messageId, uploaderType: "client", files: checked.files });
   return ok({ id: made.id, attached: att.attached, attachmentsFailed: att.failed });

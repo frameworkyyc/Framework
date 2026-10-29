@@ -11,6 +11,7 @@ import { readOnlyDb } from "./admin-clients.js";
 import { profileProgress } from "./profile-schema.js";
 import { listRequestsAllAdmin, adminSupportTotals, CATEGORY_LABEL, STATUS_LABEL } from "./repo/support.js";
 import { brandingService, BRAND_REQUESTS } from "./brand-services.js";
+import { listServicesAdmin, requestKeyOfService } from "./repo/portal-services.js";
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
 const part = async (fn) => { try { return await fn(); } catch { return null; } };
@@ -78,8 +79,9 @@ async function requestsPart(env, rdb) {
     const from = `FROM service_requests r JOIN organizations o ON o.id = r.organization_id WHERE ${BRANDING_OPEN} AND ${LIVE}`;
     const total = (await rdb.prepare(`SELECT count(*) AS n ${from}`).first()).n;
     const rows = (await rdb.prepare(`SELECT r.id, r.service_key, r.status, r.created_at, o.id AS organization_id, o.name AS org_name ${from} ORDER BY r.created_at DESC, r.id LIMIT ?`).bind(REQUEST_LIMIT).all()).results;
-    const section = (key) => { const d = BRAND_REQUESTS.find((x) => x.key === key); return d ? d.section : (brandingService(key) || { title: key }).title; };
-    return { total, items: rows.map((r) => ({ kind: "branding", id: r.id, organizationId: r.organization_id, orgName: r.org_name, type: `Branding: ${section(r.service_key)}`, status: r.status, statusLabel: BRANDING_STATUS[r.status] || r.status, createdAt: r.created_at })) };
+    const names = new Map((await listServicesAdmin(rdb)).services.map((x) => [requestKeyOfService(x.key), x.name]));
+    const section = (key) => { const d = BRAND_REQUESTS.find((x) => x.key === key); return d ? d.section : (brandingService(key) || { title: names.get(key) || key }).title; };
+    return { total, items: rows.map((r) => ({ kind: "branding", id: r.id, organizationId: r.organization_id, orgName: r.org_name, type: names.has(r.service_key) ? `Additional service: ${section(r.service_key)}` : `Branding: ${section(r.service_key)}`, status: r.status, statusLabel: BRANDING_STATUS[r.status] || r.status, createdAt: r.created_at })) };
   });
   const support = await part(async () => {
     const [totals, list] = [await adminSupportTotals(env.PORTAL_DB), await listRequestsAllAdmin(env.PORTAL_DB, { scope: "open", limit: 200 })];
