@@ -64,7 +64,7 @@ test("an owner requests an empty section: the request is stored for the right or
   assert.match(html, /Request sent\. Framework will follow up\./);
   const logos = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
   assert.match(logos, /class="tag">Requested</); assert.ok(!/<summary class="btn/.test(logos), "no button while the request is open");
-  assert.match(html.slice(html.indexOf('id="colours"'), html.indexOf('id="tagline"')), /<summary class="btn btn--small">Request<span/, "other sections keep their button");
+  assert.match(html.slice(html.indexOf('id="colours"'), html.indexOf('id="tagline"')), /<summary class="btn btn--primary">Request Design<span/, "other sections keep their button");
 });
 
 test("no accidental duplicates: pressing it again, or twice at once, leaves exactly one open request and says so", async () => {
@@ -170,7 +170,7 @@ test("the request area is plain, scriptless HTML: no inline script or style, a l
   const html = await res.text();
   assert.ok(!html.includes("<script>alert(1)"), "the note is not rendered anywhere");
   assert.ok(!/\sstyle=|<script|\son[a-z]+=/.test(html.replace(/<link[^>]*>/g, "")), "no inline style, script or handler");
-  assert.match(html, /<label for="req-brand-colours">Anything we should know\? \(optional\)<\/label><textarea id="req-brand-colours" name="note" rows="3" maxlength="1000">/);
+  assert.match(html, /<label for="req-brand-svc-colours">Anything we should know\? \(optional\)<\/label><textarea id="req-brand-svc-colours" name="note" rows="3" maxlength="1000">/);
   assert.equal(res.headers.get("content-security-policy"), PORTAL_CSP, "no script is needed or allowed on the page");
   assert.equal([...html.matchAll(/id="req-brand-[a-z-]+"/g)].length, new Set([...html.matchAll(/id="req-brand-[a-z-]+"/g)].map((m) => m[0])).size, "unique ids");
 });

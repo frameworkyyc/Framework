@@ -12,7 +12,7 @@ import { LOGO_VARIATIONS } from "../../admin/assets/logo-variations.js";
 import { BRAND_SECTIONS, TYPE_SLOT_DEFS, sectionOf } from "../../admin/assets/brand-sections.js";
 import { typefaceOf, filesOf, specimenSlots, faceOf, WEIGHT_NAME } from "./brand-type.js";
 import { requirementsFor, completionOf, REQUIREMENT_LABEL } from "./brand-requirements.js";
-import { designOffer, designOfferList, requestKeyOf, priceLabel, ESTIMATE_NOTE } from "./branding-pricing.js";
+import { offerBox, offerList, requestKeyOf, priceLabel, pricingService, ESTIMATE_NOTE, OFFER_COPY } from "./branding-pricing.js";
 import { exampleTypeCard, exampleColours, exampleTagline, exampleImagery, exampleLayout, exampleTextures, exampleIcons, exampleStyle, EXAMPLE_LABEL } from "./brand-examples.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
@@ -258,8 +258,8 @@ function requirementTag(req) {
 }
 
 /** One of the nine numbered sections: a large two-digit number, the title, a short description, then the section's content or its empty state. All nine are always shown. */
-function bkSection(def, inner, req = null) {
-  return `<section class="bk-sec" id="${e(def.id)}" aria-labelledby="h-${e(def.id)}"><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">${e(def.no)}</p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-${e(def.id)}"><span class="visually-hidden">${e(def.no)} </span>${e(def.title)}${requirementTag(req)}</h2><p class="bk-sec__desc muted">${e(def.desc)}</p></div></header><div class="bk-sec__body">${inner}</div></section>`;
+function bkSection(def, inner, prefix = "") {
+  return `<section class="bk-sec" id="${e(def.id)}" aria-labelledby="h-${e(def.id)}"><header class="bk-sec__head"><p class="bk-sec__no" aria-hidden="true">${e(def.no)}</p><div class="bk-sec__intro"><h2 class="bk-sec__title" id="h-${e(def.id)}"><span class="visually-hidden">${e(def.no)} </span>${e(def.title)}</h2><p class="bk-sec__desc muted">${e(def.desc)}</p></div></header><div class="bk-sec__body">${prefix}${inner}</div></section>`;
 }
 
 /**
@@ -286,14 +286,27 @@ export function brandingOverview(vm, brand, o = {}) {
   const reqDef = (key) => BRAND_REQUESTS.find((d) => d.key === key);
   // Required / Recommended per section for this client (defaults, plus sections a service they have open genuinely depends on: see brand-requirements.js).
   const reqs = requirementsFor(Object.values(requests), o.requirementTable);
-  const sec = (d, inner) => bkSection(d, inner, reqs[d.key]);
   const control = (key, hasContent) => requestControl(vm, reqDef(key), { r: requests[key], canRequest, csrf, label: hasContent ? "Request additions or changes" : "Request" });
-  // Design-service pricing (Admin -> Settings -> Service Pricing): a quiet note with the price beside the request button, only for a section the client has nothing in yet and only when
-  // that service has a stored price. Uploading existing branding is always free and always offered next to it.
+  // Each incomplete section opens with a status line (what is missing, and whether it is Required or Recommended) and, directly under it, Framework's design offer: what we can provide,
+  // the price (Admin -> Settings -> Service Pricing; only when the service has one), a black Request Design button and the free way to upload what the client already has. The
+  // section's examples and guidelines follow below. A completed section shows only a quiet "complete" line, and the offer is hidden. Messaging is firmer for Required, softer for Recommended.
   const pricing = o.pricing || {};
   const uploadHref = canUpload ? href(vm, "/branding/uploads") : "";
-  const offerRequest = (pk) => requestControl(vm, reqDef(requestKeyOf(pk)), { r: requests[requestKeyOf(pk)], canRequest, csrf, label: "Request design" });
-  const offer = (pk) => designOffer(pricing[pk], { action: offerRequest(pk), uploadHref });
+  const LEGACY = { logo: "brand-logos", typography: "brand-typography", colours: "brand-colours" }; // earlier whole-section requests: while one is open its status shows instead of a second button
+  const legacyOpen = (key) => { const r = key && requests[key]; return r && (r.status === "new" || r.status === "contacted") ? requestControl(vm, reqDef(key), { r, canRequest, csrf, label: "" }) : ""; };
+  const offerAction = (pk, legacyKey) => legacyOpen(legacyKey) || requestControl(vm, reqDef(requestKeyOf(pk)), { r: requests[requestKeyOf(pk)], canRequest, csrf, label: "Request Design", primary: true });
+  const CHECK = `<svg class="bk-nav__tick" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M3 8.6l3.2 3.2L13 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"/></svg>`;
+  const typeCount = type.length, logoSlots = new Set(assets.filter((a) => a.kind === "logo").map(variationOf).filter(Boolean)).size;
+  const comp = completionOf({ logoFilled: logoSlots, typefaces: typeCount, fontFiles: fonts.length, colours: colours.length, tagline: live && brand.tagline ? brand.tagline.primary : null,
+    files: Object.fromEntries(["imagery", "layout", "textures", "iconography", "style"].map((k) => [k, assets.filter((a) => sectionOf(a) === k).length])) });
+  const statusLine = (d) => {
+    const c = comp[d.key], r = reqs[d.key], tag = requirementTag(r);
+    if (c.done) return `<p class="bk-status bk-status--done">${CHECK}<span class="bk-status__text">${e(d.title)} complete</span>${tag}</p>`;
+    const text = d.key === "logo" && c.count > 0 ? `${c.count} of ${c.total} logo variations provided` : `${d.title} not yet provided`;
+    return `<p class="bk-status"><span class="bk-status__text">${e(text)}</span>${tag}</p><p class="bk-status__note">${e(OFFER_COPY[r.level].note)}</p>`;
+  };
+  const sec = (d, inner, offerHtml = "") => bkSection(d, inner, statusLine(d) + (comp[d.key].done ? "" : offerHtml));
+  const offer = (key) => { const svc = pricingService(key); return offerBox({ name: svc.name, description: svc.description, entry: pricing[key], level: reqs[key].level, action: offerAction(key, LEGACY[key]), uploadHref }); };
   const groups = (docs) => docs.map(([k, l]) => `${docs.length > 1 ? `<p class="acc__group">${e(DOC_LABEL[k])}</p>` : ""}<ul class="file-list">${l.map((a) => docRow(vm, a)).join("")}</ul>`).join("");
   const def = Object.fromEntries(BRAND_SECTIONS.map((d) => [d.key, d]));
 
@@ -307,9 +320,9 @@ export function brandingOverview(vm, brand, o = {}) {
   const others = unassigned.length ? `<p class="acc__group">Other logo files</p><ul class="logo-grid">${logoGroups(unassigned).map((g) => logoCard(vm, g)).join("")}</ul>` : "";
   const examples = filled < 4 ? `<p class="muted small">Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation. They are not your logos and are not available to download.</p>` : "";
   const LOGO_PRICE = { primary: "logo-primary", secondary: "logo-secondary", simplified: "logo-simplified", submark: "logo-submark" };
-  const missingLogos = LOGO_VARIATIONS.filter((d) => !byVariation.get(d.key).length).map((d) => ({ entry: pricing[LOGO_PRICE[d.key]], action: offerRequest(LOGO_PRICE[d.key]) }));
-  const logoOffer = designOfferList(missingLogos, { lead: filled ? "Framework can design the logo variations you don’t have yet." : "Framework can design your logo.", uploadHref });
-  const parts = [sec(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${logoOffer}${logoFiles.length > 0 || !logoOffer ? control("brand-logos", logoFiles.length > 0) : ""}`)];
+  const missingLogos = LOGO_VARIATIONS.filter((d) => !byVariation.get(d.key).length).map((d) => ({ name: d.title, entry: pricing[LOGO_PRICE[d.key]], action: legacyOpen("brand-logos") ? "" : offerAction(LOGO_PRICE[d.key], null) }));
+  const logoOffer = offerList({ lead: filled ? "Framework can design the logo variations you’re missing." : OFFER_COPY[reqs.logo.level].lead("logo"), description: "A professionally designed logo, made to work on the web, in print and on social media.", level: reqs.logo.level, rows: missingLogos, extra: legacyOpen("brand-logos"), uploadHref, what: "your logos" });
+  const parts = [sec(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${logoFiles.length > 0 ? control("brand-logos", true) : ""}`, logoOffer)];
 
   // 02 Typography: three typeface slots (Primary, Secondary, Accent), the hierarchy preview, older typefaces and fonts that belong to no typeface; then 03 Brand Colours.
   const typeList = type.map(typefaceOf);
@@ -326,25 +339,21 @@ export function brandingOverview(vm, brand, o = {}) {
     const othersHtml = loose.length ? `<p class="acc__group">Other typefaces</p><p class="muted small">${Object.keys(bySlot).length ? "These typefaces aren’t assigned to a role." : "Framework hasn’t assigned these typefaces to a role yet."}</p><ul class="types bk-types">${loose.map((t) => typeface(vm, t, fontFiles)).join("")}</ul><p class="muted small">Example text is shown in this page’s own typeface, for layout only. It is not set in the font.</p>` : "";
     parts.push(sec(def.typography, `${slotCards}${hier}${othersHtml}${unlisted.length ? `<p class="acc__group">Font files</p><ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}${control("brand-typography", typeList.length > 0)}`));
   } else {
-    const share = canUpload ? `<p class="muted small">Already have your fonts? <a class="text-link" href="${e(href(vm, "/branding/uploads"))}">Share them with Framework</a>.</p>` : "";
-    parts.push(sec(def.typography, `<p class="muted">${e(def.typography.empty)} Here is an example of a typography system, set in Framework’s own typefaces.</p>${slotCards}${hier}${offer("typography") || control("brand-typography", false)}${share}`));
+    parts.push(sec(def.typography, `<p class="muted">${e(def.typography.empty)} Here is an example of a typography system, set in Framework’s own typefaces.</p>${slotCards}${hier}`, offer("typography")));
   }
-  parts.push(sec(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : exampleColours() + (offer("colours") || control("brand-colours", false))));
+  parts.push(sec(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : exampleColours(), offer("colours")));
 
   // 04 Tagline: the approved tagline (kit published), or the labelled Framework example while none has been added.
-  parts.push(sec(def.tagline, live && brand.tagline ? taglineBlock(brand.tagline) : exampleTagline() + offer("tagline")));
+  parts.push(sec(def.tagline, live && brand.tagline ? taglineBlock(brand.tagline) : exampleTagline(), offer("tagline")));
 
   // 05 to 09: files an admin placed in the section.
   for (const key of ["imagery", "layout", "textures", "iconography", "style"]) {
     const files = assets.filter((a) => sectionOf(a) === key);
-    parts.push(sec(def[key], files.length ? `<ul class="bk-tiles bk-tiles--${key}">${files.map((a) => fileTile(vm, a, key)).join("")}</ul>` : SECTION_EXAMPLE[key]() + offer(key)));
+    parts.push(sec(def[key], files.length ? `<ul class="bk-tiles bk-tiles--${key}">${files.map((a) => fileTile(vm, a, key)).join("")}</ul>` : SECTION_EXAMPLE[key](), offer(key)));
   }
 
   // Completion beside each section in the navigation: Logo counts its four slots (1/4 to 3/4, a checkmark at 4/4); every other section shows a checkmark only once the client has real
-  // published content in it. Examples never count, nothing shows while a section is empty, and a request never completes a section (see brand-requirements.js).
-  const comp = completionOf({ logoFilled: filled, typefaces: typeList.length, fontFiles: fonts.length, colours: colours.length, tagline: live && brand.tagline ? brand.tagline.primary : null,
-    files: Object.fromEntries(["imagery", "layout", "textures", "iconography", "style"].map((k) => [k, assets.filter((a) => sectionOf(a) === k).length])) });
-  const CHECK = `<svg class="bk-nav__tick" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M3 8.6l3.2 3.2L13 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square"/></svg>`;
+  // published content in it (the same completion the status lines use). Examples never count, and a request never completes a section (see brand-requirements.js).
   const markOf = (d) => {
     const c = comp[d.key];
     if (c.done) return `<span class="bk-nav__mark bk-nav__mark--done">${CHECK}<span class="visually-hidden">, complete</span></span>`;
@@ -360,7 +369,7 @@ export function brandingOverview(vm, brand, o = {}) {
     : "";
   // The complete-kit price is shown only while something is still missing: with all nine sections done there is nothing to sell.
   const allDone = filled === 4 && typeList.length > 0 && colours.length > 0 && Boolean(live && brand.tagline) && ["imagery", "layout", "textures", "iconography", "style"].every((k) => assets.some((a) => sectionOf(a) === k));
-  const kitPrice = !allDone && priceLabel(pricing["brand-kit"]) ? `<p class="bk-design__line"><span class="bk-design__price">${e(priceLabel(pricing["brand-kit"]))}</span></p><p class="muted small">${e(ESTIMATE_NOTE)}</p>` : "";
+  const kitPrice = !allDone && priceLabel(pricing["brand-kit"]) ? `<p class="bk-kitprice"><span class="bk-kitprice__price">${e(priceLabel(pricing["brand-kit"]))}</span></p><p class="muted small">${e(ESTIMATE_NOTE)}</p>` : "";
   const kit = `<section class="brand-kit" aria-labelledby="h-kit"><h2 class="h2" id="h-kit">Need a complete brand identity?</h2><p class="muted">Logo, colours, typography and guidelines, designed together as one system.</p>${kitPrice}${requestControl(vm, reqDef("brand-full-kit"), { r: requests["brand-full-kit"], canRequest, csrf, label: "Request full brand kit", primary: true })}</section>`;
   const meta = brand.publishedAt && live ? `<p class="muted small">Last published ${e(dateOnly(brand.publishedAt))}.</p>` : "";
   return head + banner + nav + `<div class="bk">${parts.join("")}</div>` + more + meta + share + kit;

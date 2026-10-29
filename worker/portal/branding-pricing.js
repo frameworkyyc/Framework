@@ -74,21 +74,29 @@ export const priceSnapshot = (entry) => (entry ? { service: entry.key, name: ent
 
 export const ESTIMATE_NOTE = "Starting prices are estimates, not final quotes. Framework confirms the scope and price with you before any work begins.";
 
+/** Messaging by requirement: stronger for a Required section, softer for a Recommended one. */
+export const OFFER_COPY = Object.freeze({
+  required: Object.freeze({ note: "Needed to use your brand consistently.", lead: (name) => `Framework can create your ${name} for you.` }),
+  recommended: Object.freeze({ note: "Optional, but it makes your brand stronger.", lead: (name) => `Want help with your ${name}?` }),
+});
+
+const freeUpload = (href, what) => (href ? `<div class="bk-offer__free"><p>Already have ${e(what)}? <a class="text-link" href="${e(href)}">Upload your existing branding for free</a>.</p></div>` : "");
+
 /**
- * The quiet design-service note: a short line, the price in muted text, the estimate wording, the request control, and always the free way to share what you already
- * have. Shown only for a service the client doesn't have yet and only when the service has a price entry. `action` is the already-built request control.
- * Returns "" for a missing entry, so nothing is shown by default.
+ * The service offer under a section's status line: what Framework can provide, the price (when the service has one), the request button, the estimate note, and, visually
+ * separated, the free way to share what the client already has. Shown only for an incomplete section. `action` is the already-built request control (a black "Request Design" button, or
+ * the status of a request that is already open). With no stored price the price line and the estimate note are simply left out; the offer and the free upload remain.
+ * @param {{ name: string, description: string, entry?: object|null, level: "required"|"recommended", action: string, uploadHref?: string, what?: string }} o
  */
-export function designOffer(entry, { action = "", uploadHref = "" } = {}) {
-  if (!entry || !priceLabel(entry)) return "";
-  const free = uploadHref ? `<p class="muted small">Already have this? <a class="text-link" href="${e(uploadHref)}">Upload your existing branding for free</a>.</p>` : "";
-  return `<div class="bk-design"><p class="bk-design__line">Framework can design your ${e(entry.name.toLowerCase())}. <span class="bk-design__price">${e(priceLabel(entry))}</span></p><p class="muted small">${e(ESTIMATE_NOTE)}</p>${action}${free}</div>`;
+export function offerBox({ name, description, entry = null, level, action = "", uploadHref = "", what = "" }) {
+  const copy = OFFER_COPY[level] || OFFER_COPY.recommended;
+  const label = entry ? priceLabel(entry) : "";
+  return `<div class="bk-offer bk-offer--${e(level)}"><h3 class="bk-offer__lead">${e(copy.lead(name.toLowerCase()))}</h3><p class="bk-offer__desc">${e(description)}</p>${label ? `<p class="bk-offer__price">${e(label)}</p>` : ""}<div class="bk-offer__action">${action}</div>${label ? `<p class="bk-offer__estimate">${e(ESTIMATE_NOTE)}</p>` : ""}${freeUpload(uploadHref, what || `your ${name.toLowerCase()}`)}</div>`;
 }
 
-/** The same note for several services at once (the logo variations the client doesn't have yet): one row per service, each with its own request control. */
-export function designOfferList(rows, { lead, uploadHref = "" } = {}) {
-  const live = (rows || []).filter((r) => r.entry && priceLabel(r.entry));
-  if (!live.length) return "";
-  const free = uploadHref ? `<p class="muted small">Already have these? <a class="text-link" href="${e(uploadHref)}">Upload your existing logos for free</a>.</p>` : "";
-  return `<div class="bk-design"><p class="bk-design__line">${e(lead)}</p><ul class="bk-design__list">${live.map((r) => `<li class="bk-design__item"><div class="bk-design__item-head"><span class="bk-design__name">${e(r.entry.name)}</span> <span class="bk-design__price">${e(priceLabel(r.entry))}</span></div>${r.action || ""}</li>`).join("")}</ul><p class="muted small">${e(ESTIMATE_NOTE)}</p>${free}</div>`;
+/** The same offer for several services at once (the logo variations the client doesn't have yet): one row per variation with its own price and request button. */
+export function offerList({ lead, description = "", level, rows, extra = "", uploadHref = "", what = "" }) {
+  const priced = (rows || []).some((r) => r.entry && priceLabel(r.entry));
+  const items = (rows || []).map((r) => `<li class="bk-offer__item"><div class="bk-offer__item-head"><span class="bk-offer__name">${e(r.name)}</span>${r.entry && priceLabel(r.entry) ? ` <span class="bk-offer__price bk-offer__price--inline">${e(priceLabel(r.entry))}</span>` : ""}</div><div class="bk-offer__action">${r.action || ""}</div></li>`).join("");
+  return `<div class="bk-offer bk-offer--${e(level)}"><h3 class="bk-offer__lead">${e(lead)}</h3>${description ? `<p class="bk-offer__desc">${e(description)}</p>` : ""}<ul class="bk-offer__list">${items}</ul>${extra}${priced ? `<p class="bk-offer__estimate">${e(ESTIMATE_NOTE)}</p>` : ""}${freeUpload(uploadHref, what)}</div>`;
 }
