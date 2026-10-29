@@ -249,3 +249,18 @@ test("design: monochrome and minimal: no colours, boxes or inline styles in the 
   assert.equal([...block.matchAll(/border(?:-top)?: 1px solid var\(--hairline\)/g)].length, 2, "only the free-upload divider and the separators between logo rows");
   assert.match(block, /\.bk-offer__action \.brq > summary \{ min-height: 48px/); assert.ok(!/style="/.test(read("worker/portal/branding-pricing.js")));
 });
+
+test("dependencies are minimal and never block: only genuine necessities are listed, and a request can always be sent whatever is or isn't complete", async () => {
+  assert.deepEqual(SERVICE_REQUIRES, { "business-card-design": ["logo", "colours"], "email-signature-design": ["logo", "colours"] }, "a card and a signature need the logo and the brand colours, nothing more");
+  assert.ok(Object.values(SERVICE_REQUIRES).every((secs) => secs.every((k) => DEFAULT_REQUIREMENT[k] === "required")), "so no Recommended section is made Required without a real need");
+  const s = await setup();
+  await s.publish();
+  const csrf = csrfOf(await s.page());
+  for (const section of ["business-card-design", "email-signature-design", "brand-svc-iconography", "brand-svc-style", "brand-svc-textures", "brand-svc-logo-submark", "brand-full-kit"]) {
+    assert.equal((await s.ann.post(`${base}/request`, { csrf, section })).headers.get("Location"), `${base}?requested=1`, section + " is accepted with nothing complete and every dependency missing");
+  }
+  const html = await s.page();
+  assert.ok(KEYS.every((k) => nav(html)[k].mark === ""), "and none of it completes a section");
+  assert.deepEqual(tags(html), DEFAULT_REQUIREMENT);
+  assert.match(bodyOf(html, "tagline"), /<summary class="btn btn--primary">Request Design<span/, "unrelated sections keep their button");
+});
