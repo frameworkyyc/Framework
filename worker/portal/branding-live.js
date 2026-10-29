@@ -11,7 +11,7 @@ import { BRAND_REQUESTS } from "./brand-services.js";
 import { LOGO_VARIATIONS } from "../../admin/assets/logo-variations.js";
 import { BRAND_SECTIONS, TYPE_SLOT_DEFS, sectionOf } from "../../admin/assets/brand-sections.js";
 import { typefaceOf, filesOf, specimenSlots, faceOf, WEIGHT_NAME } from "./brand-type.js";
-import { activePricing, pricingBlock } from "./branding-pricing.js";
+import { designOffer, designOfferList, requestKeyOf, priceLabel, ESTIMATE_NOTE } from "./branding-pricing.js";
 import { exampleTypeCard, exampleColours, exampleTagline, exampleImagery, exampleLayout, exampleTextures, exampleIcons, exampleStyle, EXAMPLE_LABEL } from "./brand-examples.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
@@ -275,6 +275,12 @@ export function brandingOverview(vm, brand, o = {}) {
   const extraDocs = ["package", "other"].map((k) => [k, assets.filter((a) => a.kind === k && !sectionOf(a))]).filter(([, l]) => l.length);
   const reqDef = (key) => BRAND_REQUESTS.find((d) => d.key === key);
   const control = (key, hasContent) => requestControl(vm, reqDef(key), { r: requests[key], canRequest, csrf, label: hasContent ? "Request additions or changes" : "Request" });
+  // Design-service pricing (Admin -> Settings -> Service Pricing): a quiet note with the price beside the request button, only for a section the client has nothing in yet and only when
+  // that service has a stored price. Uploading existing branding is always free and always offered next to it.
+  const pricing = o.pricing || {};
+  const uploadHref = canUpload ? href(vm, "/branding/uploads") : "";
+  const offerRequest = (pk) => requestControl(vm, reqDef(requestKeyOf(pk)), { r: requests[requestKeyOf(pk)], canRequest, csrf, label: "Request design" });
+  const offer = (pk) => designOffer(pricing[pk], { action: offerRequest(pk), uploadHref });
   const groups = (docs) => docs.map(([k, l]) => `${docs.length > 1 ? `<p class="acc__group">${e(DOC_LABEL[k])}</p>` : ""}<ul class="file-list">${l.map((a) => docRow(vm, a)).join("")}</ul>`).join("");
   const def = Object.fromEntries(BRAND_SECTIONS.map((d) => [d.key, d]));
 
@@ -287,7 +293,10 @@ export function brandingOverview(vm, brand, o = {}) {
   const cards = LOGO_VARIATIONS.map((d) => (byVariation.get(d.key).length ? variationCard(vm, d, byVariation.get(d.key)) : exampleCard(d))).join("");
   const others = unassigned.length ? `<p class="acc__group">Other logo files</p><ul class="logo-grid">${logoGroups(unassigned).map((g) => logoCard(vm, g)).join("")}</ul>` : "";
   const examples = filled < 4 ? `<p class="muted small">Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation. They are not your logos and are not available to download.</p>` : "";
-  const parts = [bkSection(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${control("brand-logos", logoFiles.length > 0)}`)];
+  const LOGO_PRICE = { primary: "logo-primary", secondary: "logo-secondary", simplified: "logo-simplified", submark: "logo-submark" };
+  const missingLogos = LOGO_VARIATIONS.filter((d) => !byVariation.get(d.key).length).map((d) => ({ entry: pricing[LOGO_PRICE[d.key]], action: offerRequest(LOGO_PRICE[d.key]) }));
+  const logoOffer = designOfferList(missingLogos, { lead: filled ? "Framework can design the logo variations you don’t have yet." : "Framework can design your logo.", uploadHref });
+  const parts = [bkSection(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${logoOffer}${logoFiles.length > 0 || !logoOffer ? control("brand-logos", logoFiles.length > 0) : ""}`)];
 
   // 02 Typography: three typeface slots (Primary, Secondary, Accent), the hierarchy preview, older typefaces and fonts that belong to no typeface; then 03 Brand Colours.
   const typeList = type.map(typefaceOf);
@@ -304,19 +313,18 @@ export function brandingOverview(vm, brand, o = {}) {
     const othersHtml = loose.length ? `<p class="acc__group">Other typefaces</p><p class="muted small">${Object.keys(bySlot).length ? "These typefaces aren’t assigned to a role." : "Framework hasn’t assigned these typefaces to a role yet."}</p><ul class="types bk-types">${loose.map((t) => typeface(vm, t, fontFiles)).join("")}</ul><p class="muted small">Example text is shown in this page’s own typeface, for layout only. It is not set in the font.</p>` : "";
     parts.push(bkSection(def.typography, `${slotCards}${hier}${othersHtml}${unlisted.length ? `<p class="acc__group">Font files</p><ul class="file-list">${unlisted.map((a) => docRow(vm, a)).join("")}</ul>` : ""}${note}${control("brand-typography", typeList.length > 0)}`));
   } else {
-    const price = pricingBlock(activePricing("typography", o.pricing), control("brand-typography", false));
     const share = canUpload ? `<p class="muted small">Already have your fonts? <a class="text-link" href="${e(href(vm, "/branding/uploads"))}">Share them with Framework</a>.</p>` : "";
-    parts.push(bkSection(def.typography, `<p class="muted">${e(def.typography.empty)} Here is an example of a typography system, set in Framework’s own typefaces.</p>${slotCards}${hier}${price || control("brand-typography", false)}${share}`));
+    parts.push(bkSection(def.typography, `<p class="muted">${e(def.typography.empty)} Here is an example of a typography system, set in Framework’s own typefaces.</p>${slotCards}${hier}${offer("typography") || control("brand-typography", false)}${share}`));
   }
-  parts.push(bkSection(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : exampleColours() + control("brand-colours", false)));
+  parts.push(bkSection(def.colours, colours.length ? `<ul class="swatches">${colours.map(swatch).join("")}</ul>${control("brand-colours", true)}` : exampleColours() + (offer("colours") || control("brand-colours", false))));
 
   // 04 Tagline: the approved tagline (kit published), or the labelled Framework example while none has been added.
-  parts.push(bkSection(def.tagline, live && brand.tagline ? taglineBlock(brand.tagline) : exampleTagline()));
+  parts.push(bkSection(def.tagline, live && brand.tagline ? taglineBlock(brand.tagline) : exampleTagline() + offer("tagline")));
 
   // 05 to 09: files an admin placed in the section.
   for (const key of ["imagery", "layout", "textures", "iconography", "style"]) {
     const files = assets.filter((a) => sectionOf(a) === key);
-    parts.push(bkSection(def[key], files.length ? `<ul class="bk-tiles bk-tiles--${key}">${files.map((a) => fileTile(vm, a, key)).join("")}</ul>` : SECTION_EXAMPLE[key]()));
+    parts.push(bkSection(def[key], files.length ? `<ul class="bk-tiles bk-tiles--${key}">${files.map((a) => fileTile(vm, a, key)).join("")}</ul>` : SECTION_EXAMPLE[key]() + offer(key)));
   }
 
   const nav = `<nav class="bk-nav" aria-label="Brand kit sections"><ol>${BRAND_SECTIONS.map((d) => `<li><a href="#${e(d.id)}"><span class="bk-nav__no" aria-hidden="true">${e(d.no)}</span> ${e(d.title)}</a></li>`).join("")}</ol></nav>`;
@@ -326,7 +334,10 @@ export function brandingOverview(vm, brand, o = {}) {
   const share = canUpload
     ? `<aside class="brand-aside" aria-labelledby="h-share"><h2 class="h3" id="h-share">Have brand materials of your own?</h2><p class="muted">Share your existing logo, fonts or guidelines and Framework will review them.</p><p><a class="btn" href="${e(href(vm, "/branding/uploads"))}">Upload your materials${uploadCount ? ` (${uploadCount} shared)` : ""}</a></p></aside>`
     : "";
-  const kit = `<section class="brand-kit" aria-labelledby="h-kit"><h2 class="h2" id="h-kit">Need a complete brand identity?</h2><p class="muted">Logo, colours, typography and guidelines, designed together as one system.</p>${requestControl(vm, reqDef("brand-full-kit"), { r: requests["brand-full-kit"], canRequest, csrf, label: "Request full brand kit", primary: true })}</section>`;
+  // The complete-kit price is shown only while something is still missing: with all nine sections done there is nothing to sell.
+  const allDone = filled === 4 && typeList.length > 0 && colours.length > 0 && Boolean(live && brand.tagline) && ["imagery", "layout", "textures", "iconography", "style"].every((k) => assets.some((a) => sectionOf(a) === k));
+  const kitPrice = !allDone && priceLabel(pricing["brand-kit"]) ? `<p class="bk-design__line"><span class="bk-design__price">${e(priceLabel(pricing["brand-kit"]))}</span></p><p class="muted small">${e(ESTIMATE_NOTE)}</p>` : "";
+  const kit = `<section class="brand-kit" aria-labelledby="h-kit"><h2 class="h2" id="h-kit">Need a complete brand identity?</h2><p class="muted">Logo, colours, typography and guidelines, designed together as one system.</p>${kitPrice}${requestControl(vm, reqDef("brand-full-kit"), { r: requests["brand-full-kit"], canRequest, csrf, label: "Request full brand kit", primary: true })}</section>`;
   const meta = brand.publishedAt && live ? `<p class="muted small">Last published ${e(dateOnly(brand.publishedAt))}.</p>` : "";
   return head + banner + nav + `<div class="bk">${parts.join("")}</div>` + more + meta + share + kit;
 }

@@ -102,7 +102,7 @@ const pick = (obj, keys) => Object.fromEntries(Object.entries(obj).filter(([k]) 
 
 const publicAsset = (a) => ({ id: a.id, kind: a.kind, title: a.title, variantKey: a.variantKey, logoRole: a.logoRole, orientation: a.orientation, tone: a.tone, transparent: a.transparent, usageNote: a.usageNote, downloadable: a.downloadable, licenseNote: a.licenseNote, format: a.format, size: a.size, sha256: a.sha256, originalName: a.originalName, published: a.published, sortOrder: a.sortOrder, createdAt: a.createdAt, createdBy: a.createdBy, updatedAt: a.updatedAt });
 const publicUpload = (u) => ({ id: u.id, category: u.category, name: u.originalName, format: u.format, size: u.size, sha256: u.sha256, held: u.status === "held", seen: Boolean(u.adminSeenAt), createdAt: u.createdAt, fontRightsAck: u.fontRightsAck, uploader: { email: u.uploaderEmail, name: u.uploaderName } });
-const publicRequest = (r) => ({ id: r.id, serviceKey: r.serviceKey, service: (brandingService(r.serviceKey) || { title: r.serviceKey }).title, status: r.status, note: r.note, createdAt: r.createdAt, handledBy: r.handledBy, handledAt: r.handledAt, adminNote: r.adminNote });
+const publicRequest = (r) => ({ id: r.id, serviceKey: r.serviceKey, service: (brandingService(r.serviceKey) || { title: r.serviceKey }).title, status: r.status, note: r.note, createdAt: r.createdAt, handledBy: r.handledBy, handledAt: r.handledAt, adminNote: r.adminNote, priceShown: r.priceShown || null });
 
 async function tablesPresent(db) {
   try { await db.prepare("SELECT 1 FROM brand_kits LIMIT 1").first(); return true; } catch { return false; }

@@ -494,11 +494,12 @@ export async function markUploadsSeen(db, organizationId, { now = new Date() } =
 
 /* ------------------------------------------------------------------ service requests ("Request a quote") */
 
-const request = (r) => ({ id: r.id, serviceKey: r.service_key, status: r.status, note: r.note, requestedBy: r.requested_by, createdAt: r.created_at, handledBy: r.handled_by, handledAt: r.handled_at, adminNote: r.admin_note });
-const REQUEST_COLUMNS = "id, service_key, status, note, requested_by, created_at, handled_by, handled_at, admin_note";
+const request = (r) => ({ id: r.id, serviceKey: r.service_key, status: r.status, note: r.note, requestedBy: r.requested_by, createdAt: r.created_at, handledBy: r.handled_by, handledAt: r.handled_at, adminNote: r.admin_note, priceShown: parseSnapshot(r.price_snapshot) });
+/** The price wording stored with a request (migration 0010), or null for a request without one (or a database without the column). */
+const parseSnapshot = (text) => { try { const o = typeof text === "string" ? JSON.parse(text) : null; return o && typeof o === "object" && typeof o.label === "string" ? { service: String(o.service || ""), name: String(o.name || ""), type: String(o.type || ""), priceCad: Number.isInteger(o.priceCad) ? o.priceCad : null, label: o.label } : null; } catch { return null; } };
 
 /** One open request per organization and service (a database rule, so it holds under concurrency). `isKnownService` is the catalogue check supplied by the caller. */
-export async function createServiceRequest(db, organizationId, userId, { serviceKey, note }, isKnownService, { now = new Date() } = {}) {
+export async function createServiceRequest(db, organizationId, userId, { serviceKey, note, priceSnapshot = null }, isKnownService, { now = new Date() } = {}) {
   requireOrgId(organizationId); requireUserId(userId);
   if (typeof isKnownService !== "function" || typeof serviceKey !== "string" || !isKnownService(serviceKey)) return fail("unknown_service");
   const text = validateText(note, 1000);
@@ -506,9 +507,14 @@ export async function createServiceRequest(db, organizationId, userId, { service
   const id = newId(), at = isoTime(now);
   try {
     const res = await db.batch([
-      db
-        .prepare("INSERT INTO service_requests (id, organization_id, service_key, status, note, requested_by, created_at) SELECT ?, ?, ?, 'new', ?, ?, ? WHERE EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')")
-        .bind(id, organizationId, serviceKey, text, userId, at, organizationId, userId),
+      // With a price shown (only possible once migration 0010 is applied: no price is shown without it) the price wording is stored alongside the request.
+      priceSnapshot
+        ? db
+            .prepare("INSERT INTO service_requests (id, organization_id, service_key, status, note, requested_by, created_at, price_snapshot) SELECT ?, ?, ?, 'new', ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')")
+            .bind(id, organizationId, serviceKey, text, userId, at, JSON.stringify(priceSnapshot), organizationId, userId)
+        : db
+            .prepare("INSERT INTO service_requests (id, organization_id, service_key, status, note, requested_by, created_at) SELECT ?, ?, ?, 'new', ?, ?, ? WHERE EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')")
+            .bind(id, organizationId, serviceKey, text, userId, at, organizationId, userId),
       auditAfterChange(db, { organizationId, actorType: "client", actorRef: userId, action: "service.requested", entityType: "service_request", entityId: id, visibility: "client", at }),
     ]);
     return res[0].meta.changes === 1 ? ok({ id }) : fail("not_allowed");
@@ -520,7 +526,7 @@ export async function createServiceRequest(db, organizationId, userId, { service
 
 export async function listServiceRequests(db, organizationId, { openOnly = false } = {}) {
   requireOrgId(organizationId);
-  const rows = (await db.prepare(`SELECT ${REQUEST_COLUMNS} FROM service_requests WHERE organization_id = ? ORDER BY created_at DESC, id`).bind(organizationId).all()).results.map(request);
+  const rows = (await db.prepare("SELECT * FROM service_requests WHERE organization_id = ? ORDER BY created_at DESC, id").bind(organizationId).all()).results.map(request);
   return openOnly ? rows.filter((r) => r.status === "new" || r.status === "contacted") : rows;
 }
 
