@@ -869,3 +869,12 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-design__name { font-weight: 600; }
 .bk-design .brq { margin-top: var(--space-2); }
 .bk-design__item .brq { margin-top: 6px; }
+
+/* Branding progress: a quiet completion mark beside a section in the navigation (a fraction for the Logo slots, a checkmark when done) and a small Required / Recommended label beside each section name. Text only, no colours or bars. */
+.bk-nav__mark { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--slate); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bk-nav__mark--done { color: var(--ink); }
+@media (min-width: 600px) { .bk-nav__mark { margin-left: 10px; } } /* three columns: the mark follows its own section name instead of floating toward the next column */
+.bk-nav__tick { display: block; flex: none; }
+.bk-req { display: inline-block; margin-left: 12px; vertical-align: middle; font-family: var(--font-body); font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; line-height: 1.2; color: var(--slate); }
+.bk-req--required { color: var(--ink); }
+.bk-req__why { font-weight: 500; letter-spacing: .02em; text-transform: none; color: var(--slate); }
