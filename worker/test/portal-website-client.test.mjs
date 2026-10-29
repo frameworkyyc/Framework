@@ -12,16 +12,15 @@ import * as WF from "../portal/website-files.js";
 import { PORTAL_CSP } from "../portal/http.js";
 
 const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
-const MIGRATION = read("migrations/portal-proposed/0011_websites.sql");
+const MIGRATION = read("migrations/portal/0011_websites.sql");
 const ADMIN = "admin@framework.test";
 const UUID0 = "00000000-0000-4000-8000-000000000000";
 
 async function setup({ flag = true, migrated = true, storage = true } = {}) {
-  const w = await makeWorld();
+  const w = await makeWorld({ skip: migrated ? [] : ["0011_websites.sql", "0012_website_management.sql"] });
   const bucket = fakeR2();
   if (flag) w.env.PORTAL_WEBSITE = "1";
   if (storage) w.env.PORTAL_FILES = bucket;
-  if (migrated) w.db.raw.exec(MIGRATION);
   const alpha = await w.org("alpha", "Alpha Co"), beta = await w.org("beta", "Beta Co");
   await w.invite(alpha, "ann@alpha.test", "owner"); await w.invite(alpha, "mia@alpha.test", "member"); await w.invite(beta, "bob@beta.test", "owner");
   const ann = w.browser(), mia = w.browser(), bob = w.browser(), anon = w.browser();

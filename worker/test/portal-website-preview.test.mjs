@@ -13,7 +13,7 @@ import { PORTAL_CSP, securityHeaders } from "../portal/http.js";
 import { checkEmbeddable, diagnoseEmbeddable, framingAllowed, previewableUrl, frameSources } from "../portal/website-preview.js";
 
 const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
-const MIGRATION = read("migrations/portal-proposed/0011_websites.sql");
+const MIGRATION = read("migrations/portal/0011_websites.sql");
 const ADMIN = "admin@framework.test";
 const H = (o) => new Headers(o);
 const html = (headers = {}, status = 200) => new Response("<html>SECRET-PAGE-BODY</html>", { status, headers: { "Content-Type": "text/html; charset=utf-8", ...headers } });
@@ -95,7 +95,7 @@ test("securityHeaders: frame-src is added only for plain https origins and only 
 
 async function setup({ previewFetch } = {}) {
   const w = await makeWorld();
-  w.env.PORTAL_WEBSITE = "1"; w.env.PORTAL_FILES = fakeR2(); w.db.raw.exec(MIGRATION);
+  w.env.PORTAL_WEBSITE = "1"; w.env.PORTAL_FILES = fakeR2();
   if (previewFetch) w.previewFetch = previewFetch;
   const alpha = await w.org("alpha", "Alpha Co");
   await w.invite(alpha, "ann@alpha.test", "owner");

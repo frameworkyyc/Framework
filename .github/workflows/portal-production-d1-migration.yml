@@ -1,7 +1,7 @@
 # Manually triggered Production portal D1 migration (framework-portal). NOT part of CI: it never runs automatically.
 #   * workflow_dispatch only. Default mode is verify-only (read-only: checks the target, lists pending migrations, lists tables).
 #   * "apply" additionally needs the database name typed exactly. It applies ONLY migrations that are actually pending, and only when the pre-checks pass:
-#       - the pending list must be a TAIL of the known, ordered list (0001 to 0010 in .github/scripts/portal-d1-check.mjs): nothing unknown, nothing skipped, nothing out of order;
+#       - the pending list must be a TAIL of the known, ordered list (0001 to 0012 in .github/scripts/portal-d1-check.mjs): nothing unknown, nothing skipped, nothing out of order;
 #       - the tables already in the database must be EXACTLY what the already-applied migrations create (an empty database when 0001 is pending; the 0001 tables when 0002 is next);
 #       - after applying, nothing may be pending and the tables and indexes must be exactly the expected sets.
 #     Anything else fails closed before any change is made. With nothing pending, apply refuses to run.
