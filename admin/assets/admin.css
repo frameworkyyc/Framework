@@ -335,7 +335,8 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-table--left td { padding-right: 20px; }
 .adm-table--left .adm-row-actions { justify-content: flex-start; flex-wrap: wrap; }
 .adm-table--left .adm-client__sub { max-width: 28em; }
-.adm-small:focus-visible, .adm-actions .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.adm-small:focus-visible, .adm-actions .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 0; }
+.btn--primary.adm-small:focus-visible, .adm-actions .btn--primary:focus-visible { outline-offset: 2px; }
 .adm-section + .adm-access, .adm-access + .adm-section { margin-top: clamp(48px, 6vw, 80px); }
 .adm-access .adm-section + .adm-section { margin-top: clamp(48px, 6vw, 72px); }
 .adm-access .adm-table { margin-top: 24px; }
