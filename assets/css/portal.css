@@ -121,6 +121,9 @@ main:focus { outline: none; } /* the skip link moves focus here so the next Tab 
 /* ---------- controls ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px; border: 1px solid var(--ink); border-radius: 0; background: transparent; color: var(--ink); font: 600 15px/1 var(--font-body); text-decoration: none; cursor: pointer; transition: background-color .15s ease, color .15s ease; }
 .btn:hover { background: var(--ink); color: var(--paper); }
+/* A button already has its own 1px border, so its focus ring sits on that border (no gap) and reads as one thicker frame, not a second box; a filled button has no visible border to thicken, so its ring keeps a 2px gap. */
+.btn:focus-visible { outline-offset: 0; }
+.btn--primary:focus-visible { outline-offset: 2px; }
 .btn--primary { background: var(--ink); color: var(--paper); }
 .btn--primary:hover { background: var(--paper); color: var(--ink); }
 .btn--small { min-height: 40px; padding: 0 16px; font-size: 14px; }
