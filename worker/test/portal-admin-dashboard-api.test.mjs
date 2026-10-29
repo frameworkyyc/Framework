@@ -105,7 +105,7 @@ test("the Overview page: loads each part independently, no HTML injection, no nu
   assert.match(ui, /\]\.filter\(Boolean\),\n/, "optional parts are filtered out before they reach the DOM");
   const modules = readFileSync(new URL("../../admin/assets/modules.js", import.meta.url), "utf8");
   assert.ok(!/testimonials/i.test(modules), "Testimonials is removed from Coming later (Client Feedback covers it)");
-  for (const id of ["projects", "leads", "settings"]) assert.match(modules, new RegExp(`id: "${id}"[^\\n]*enabled: false`), id + " stays registered but hidden until it is built");
+  for (const id of ["projects", "leads"]) assert.match(modules, new RegExp(`id: "${id}"[^\\n]*enabled: false`), id + " stays registered but hidden until it is built");
   for (const id of ["files", "changes"]) assert.ok(!new RegExp(`id: "${id}"`).test(modules), id + " is removed (covered by Branding/Invoices/Support and Support Requests)");
   const shell = strip(readFileSync(new URL("../../admin/assets/admin.js", import.meta.url), "utf8"));
   assert.ok(!/Coming later|adm-nav__later/.test(shell), "no Coming later heading and no placeholder links");

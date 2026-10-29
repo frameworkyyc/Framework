@@ -15,6 +15,8 @@ import * as brand from "./repo/brand.js";
 import { recordActivity } from "./repo/activity.js";
 import { inspectUpload, makeKey, putObject, getObject, deleteObject, listOrganizationKeys, fileResponse, StorageError, ADMIN_MAX_FILE_BYTES, limitsFromEnv, parseKey } from "./files/index.js";
 import { isKnownBrandingService } from "./brand-services.js";
+import { pricingKeyOfRequest, priceSnapshot } from "./branding-pricing.js";
+import { loadPricing } from "./repo/prices.js";
 import { getOrganizationById } from "./repo/orgs.js";
 import { listInvoiceStorageKeys } from "./repo/invoices.js";
 import { listSupportStorageKeys } from "./repo/support.js";
@@ -103,7 +105,10 @@ export async function clientDownloadAsset(deps, { role, organizationId, userId, 
 
 export async function clientRequestService(deps, { role, organizationId, userId, serviceKey, note }) {
   if (!can(role, "branding.request")) return denied();
-  return brand.createServiceRequest(deps.db, organizationId, userId, { serviceKey, note }, isKnownBrandingService, { now: deps.now });
+  // The price the client was shown is recorded with a priced design request: read here from the stored prices (never from the form), so it cannot be forged.
+  const pricingKey = pricingKeyOfRequest(serviceKey);
+  const entry = pricingKey ? (await loadPricing(deps.db))[pricingKey] : null;
+  return brand.createServiceRequest(deps.db, organizationId, userId, { serviceKey, note, priceSnapshot: priceSnapshot(entry) }, isKnownBrandingService, { now: deps.now });
 }
 
 /* ------------------------------------------------------------------ Framework Admin side (callers are behind Cloudflare Access and ADMIN_EMAILS) */

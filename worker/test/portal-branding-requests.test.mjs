@@ -43,9 +43,10 @@ async function setup() {
   return { w, bucket, alpha, beta, ann, mia, bob, csrf, send, admin };
 }
 
-test("the catalogue: six request keys that are valid stored keys, known to the server and titled for Admin", () => {
-  assert.deepEqual(BRAND_REQUESTS.map((r) => r.key), ["brand-logos", "brand-colours", "brand-typography", "brand-guidelines", "brand-additional", "brand-full-kit"]);
-  for (const r of BRAND_REQUESTS) { assert.match(r.key, /^[a-z0-9-]{2,60}$/); assert.ok(isKnownBrandingService(r.key)); assert.match(brandingService(r.key).title, /^Brand request: /); }
+test("the catalogue: six section request keys plus one per priced design service, all valid stored keys, known to the server and titled for Admin", () => {
+  assert.deepEqual(BRAND_REQUESTS.slice(0, 6).map((r) => r.key), ["brand-logos", "brand-colours", "brand-typography", "brand-guidelines", "brand-additional", "brand-full-kit"]);
+  assert.deepEqual(BRAND_REQUESTS.slice(6).map((r) => r.key), ["logo-primary", "logo-secondary", "logo-simplified", "logo-submark", "typography", "colours", "tagline", "imagery", "layout", "textures", "iconography", "style"].map((k) => "brand-svc-" + k), "the complete kit keeps brand-full-kit");
+  for (const r of BRAND_REQUESTS) { assert.match(r.key, /^[a-z0-9-]{2,60}$/); assert.ok(isKnownBrandingService(r.key)); assert.match(brandingService(r.key).title, /^(Brand|Design) request: /); }
   assert.equal(isKnownBrandingService("brand-everything"), false); assert.equal(isKnownBrandingService("__proto__"), false);
   assert.ok(isKnownBrandingService("business-card-design"), "the earlier quote services still exist");
 });

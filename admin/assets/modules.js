@@ -14,5 +14,5 @@ export const MODULES = [
   { id: "approved-emails", label: "Approved Emails", path: "/admin/approved-emails", enabled: true, load: () => import("./approved-emails.js") },
   { id: "projects", label: "Projects", path: "/admin/projects", enabled: false },
   { id: "leads", label: "Leads", path: "/admin/leads", enabled: false },
-  { id: "settings", label: "Settings", path: "/admin/settings", enabled: false },
+  { id: "settings", label: "Settings", path: "/admin/settings", enabled: true, load: () => import("./settings.js") },
 ];
