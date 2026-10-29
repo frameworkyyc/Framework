@@ -1,5 +1,5 @@
 -- Websites: the foundation for the Client Portal Website section (Phase 1: the database and Framework Admin; nothing is shown to clients yet).
--- PROPOSED, NOT APPLIED anywhere. Staging first, after approval; Production follows the manual Production workflow after its own approval. See worker/portal/WEBSITES.md.
+-- Approved; applied to Staging. Production: only by the manual Production workflow, after approval (the Production check knows it). See worker/portal/WEBSITES.md.
 -- Additive only: two new tables and one nullable column, nothing existing is changed or removed.
 --
 --   websites           One row per website of a client (a client can have several). "No website" is NOT stored: it is simply a client with no rows.

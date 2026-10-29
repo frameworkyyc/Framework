@@ -101,9 +101,9 @@ export class Browser {
   }
 }
 
-export async function makeWorld({ clock } = {}) {
+export async function makeWorld({ clock, skip = [] } = {}) {
   const c = clock || { t: T0, now() { return this.t; }, advance(s) { this.t = new Date(this.t.getTime() + s * 1000); } };
-  const db = openPortalDb();
+  const db = openPortalDb({ skip }); // `skip`: migration files to leave out, to build a database as it was before them
   const keys = await makeKeys();
   const workos = new FakeWorkos(keys, c);
   const env = {

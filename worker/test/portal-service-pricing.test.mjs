@@ -104,7 +104,7 @@ test("Admin API: lists all thirteen services with their prices and types; a data
   assert.deepEqual(r.json.types, [{ key: "starting_at", label: "Starting at" }, { key: "custom_quote", label: "Custom quote" }, { key: "included", label: "Included" }]);
   assert.deepEqual(r.json.services.slice(0, 13).map((x) => [x.key, x.type, x.priceCad]), P.PRICING_SERVICES.slice(0, 13).map((x) => [x.key, "starting_at", x.defaultCad]));
   assert.ok(r.json.services.slice(0, 13).every((x) => x.stored && x.name && x.description && x.section));
-  assert.deepEqual(r.json.services.slice(13, 17).map((x) => [x.key, x.type, x.priceCad, x.stored]), [["website-design", "custom_quote", null, false], ["website-redesign", "custom_quote", null, false], ["website-seo", "custom_quote", null, false], ["website-maintenance", "custom_quote", null, false]], "the website services are custom quotes until migration 0011 stores them")
+  assert.deepEqual(r.json.services.slice(13, 17).map((x) => [x.key, x.type, x.priceCad, x.stored]), [["website-design", "custom_quote", null, true], ["website-redesign", "custom_quote", null, true], ["website-seo", "custom_quote", null, true], ["website-maintenance", "custom_quote", null, true]], "the website services are custom quotes, stored by migration 0011")
   const bare = await setup({ migrated: false });
   const b = await bare.admin("/service-pricing");
   assert.equal(b.json.available, false); assert.deepEqual(b.json.services.map((x) => x.priceCad), P.PRICING_SERVICES.map((x) => x.defaultCad)); assert.ok(b.json.services.every((x) => !x.stored));
@@ -162,7 +162,7 @@ test("Admin API guards: writes need PORTAL_ADMIN_WRITES and the admin header; re
   const stranger = await handleAdmin(new Request(ORIGIN + "/api/admin/service-pricing", { headers: { "Cf-Access-Jwt-Assertion": sign({ iss: `https://${TEAM}`, aud: [AUD], email: "someone@else.test", exp: nowS() + 600, iat: nowS() }) } }), s.w.env, {});
   assert.equal(stranger.status, 403);
   assert.equal((await s.admin("/service-pricing", { method: "DELETE" })).status, 405);
-  assert.equal(rowsOf(s.w, "SELECT count(*) n FROM service_prices")[0].n, 13);
+  assert.equal(rowsOf(s.w, "SELECT count(*) n FROM service_prices")[0].n, 17);
 });
 
 test("client Branding with nothing added: every section offers its design service with a quiet price beside the request button, never in a heading, and always the free upload", async () => {

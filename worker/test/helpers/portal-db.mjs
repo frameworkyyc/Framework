@@ -12,10 +12,10 @@ export const migrationFiles = () => readdirSync(MIGRATIONS_DIR).filter((f) => /^
 /** Migrations that are written and reviewed but NOT applied anywhere yet (migrations/portal-proposed). Tests ask for them by name so the shipped list never changes by accident. */
 export const PROPOSED_DIR = new URL("../../../migrations/portal-proposed/", import.meta.url);
 
-export function openPortalDb({ migrate = true, proposed = [] } = {}) {
+export function openPortalDb({ migrate = true, proposed = [], skip = [] } = {}) {
   const raw = new DatabaseSync(":memory:");
   raw.exec("PRAGMA foreign_keys = ON");
-  if (migrate) for (const f of migrationFiles()) raw.exec(readFileSync(new URL(f, MIGRATIONS_DIR), "utf8"));
+  if (migrate) for (const f of migrationFiles().filter((x) => !skip.includes(x))) raw.exec(readFileSync(new URL(f, MIGRATIONS_DIR), "utf8"));
   if (migrate) for (const f of proposed) raw.exec(readFileSync(new URL(f, PROPOSED_DIR), "utf8"));
 
   const execute = (sql, params, mode) => {
