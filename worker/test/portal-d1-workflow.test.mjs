@@ -126,21 +126,21 @@ test("script: remote info must match the expected name AND id", () => {
 });
 test("script: pending migrations - the pending list must be a tail of the known, ordered list; apply needs at least one", () => {
   const ALL = F;
-  assert.equal(ALL.length, 8);
-  assert.match(checkPendingBefore(listOf(...ALL), "apply"), /0001.*0002.*0003.*0004.*0005.*0006.*0007.*0008/, "an empty database takes all eight");
+  assert.equal(ALL.length, 9);
+  assert.match(checkPendingBefore(listOf(...ALL), "apply"), /0001.*0002.*0003.*0004.*0005.*0006.*0007.*0008.*0009/, "an empty database takes all nine");
   throwsFail(() => checkPendingBefore(LIST_PENDING, "apply"), /not the next ones in order/, "0001 alone pending would mean 0002 onwards were applied without it");
-  assert.match(checkPendingBefore(listOf(...ALL.slice(4)), "apply"), /0005.*0006.*0007.*0008/, "Production today: 0005 to 0008 pending");
-  assert.match(checkPendingBefore(listOf(...ALL.slice(1)), "apply"), /0002.*0008/, "a database that has only 0001");
-  assert.match(checkPendingBefore(listOf(ALL[7]), "apply"), /0008/, "only the last one pending");
+  assert.match(checkPendingBefore(listOf(...ALL.slice(4)), "apply"), /0005.*0006.*0007.*0008.*0009/, "a database at 0004: 0005 to 0009 pending");
+  assert.match(checkPendingBefore(listOf(...ALL.slice(1)), "apply"), /0002.*0009/, "a database that has only 0001");
+  assert.match(checkPendingBefore(listOf(ALL[8]), "apply"), /0009/, "only the last one pending");
   assert.match(checkPendingBefore(listOf(...ALL.slice(4)), "verify-only"), /0005/);
   assert.match(checkPendingBefore(LIST_NONE, "verify-only"), /none/);
   throwsFail(() => checkPendingBefore(LIST_NONE, "apply"), /at least one pending/, "nothing to apply means apply refuses to run");
-  throwsFail(() => checkPendingBefore(listOf(ALL[4], ALL[5], ALL[6]), "apply"), /not the next ones in order/); // 0008 missing: not a tail
-  throwsFail(() => checkPendingBefore(listOf(ALL[4], ALL[6], ALL[7]), "apply"), /not the next ones in order/); // 0006 skipped
+  throwsFail(() => checkPendingBefore(listOf(ALL[4], ALL[5], ALL[6], ALL[8]), "apply"), /not the next ones in order/); // 0008 missing: not a tail
+  throwsFail(() => checkPendingBefore(listOf(ALL[4], ALL[6], ALL[7], ALL[8]), "apply"), /not the next ones in order/); // 0006 skipped
   throwsFail(() => checkPendingBefore(listOf(ALL[1], ALL[2], ALL[3]), "apply"), /not the next ones in order/, "0002 to 0004 pending would mean 0005 onwards were applied first");
-  throwsFail(() => checkPendingBefore(listOf(...ALL.slice(4), "0009_something.sql"), "apply"), /unexpected pending/);
+  throwsFail(() => checkPendingBefore(listOf(...ALL.slice(4), "0010_something.sql"), "apply"), /unexpected pending/);
   throwsFail(() => checkPendingBefore(listOf("0001_create_feedback_responses.sql"), "verify-only"), /unexpected pending/);
-  throwsFail(() => checkPendingBefore(listOf(...ALL.slice(4)).replace(ALL[4], "0009_x.sql"), "verify-only"), /unexpected pending/);
+  throwsFail(() => checkPendingBefore(listOf(...ALL.slice(4)).replace(ALL[4], "0010_x.sql"), "verify-only"), /unexpected pending/);
   throwsFail(() => checkPendingBefore("something unexpected", "verify-only"), /unrecognised/);
   throwsFail(() => checkPendingBefore("", "apply"), /unrecognised/);
   throwsFail(() => checkPendingBefore(LIST_PENDING + LIST_NONE, "apply"), /contradictory/);
@@ -179,7 +179,7 @@ test("script: after apply the tables and indexes must be exactly the expected se
 test("script: every expected table, index and migration file is exactly what the SQL files create, stage by stage", () => {
   const dir = new URL("migrations/portal/", root);
   const files = readdirSync(dir).filter((f) => /^\d{4}_.*\.sql$/.test(f)).sort();
-  assert.deepEqual(files, EXPECTED.migrations, "the migration folder and the expected list are the same files, in order (0001 to 0008, all known to the Production workflow since the rollout preparation)");
+  assert.deepEqual(files, EXPECTED.migrations, "the migration folder and the expected list are the same files, in order (0001 to 0009, all known to the Production workflow since the rollout preparation)");
   throwsFail(() => checkPendingBefore(listOf("0006_brand_name.sql"), "apply"), /not the next ones in order/);
   throwsFail(() => checkPendingBefore(listOf("0005_branding.sql", "0007_client_services.sql"), "apply"), /not the next ones in order/);
   for (const st of STAGES) {
