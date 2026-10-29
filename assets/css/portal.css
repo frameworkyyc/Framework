@@ -895,8 +895,20 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .ws__managed { font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); }
 .ws__name { margin-top: var(--space-3); }
 .ws__lead { margin: var(--space-2) 0 var(--space-3); }
-.ws__shot { display: block; max-width: 100%; height: auto; margin: var(--space-3) 0; border: 1px solid var(--hairline); }
 .ws__facts { max-width: 40em; }
 .ws__empty { max-width: 40em; margin-top: var(--space-4); }
 .ws__list { margin-top: var(--space-3); }
 .ws__back { margin-top: var(--space-4); }
+
+/* Website live preview: a desktop-style frame (browser bar, then the page), a screenshot in the same frame, or a plain card */
+.ws-frame { margin: var(--space-3) 0 var(--space-2); max-width: 56em; border: 1px solid var(--field-edge); background: var(--paper, #fff); }
+.ws-frame__bar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--hairline); background: #f3f3f2; min-width: 0; }
+.ws-frame__dots { display: inline-flex; gap: 6px; flex: none; } .ws-frame__dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--stone, #c9c9c6); display: block; }
+.ws-frame__url { flex: 1; min-width: 0; padding: 3px 10px; border: 1px solid var(--hairline); background: #fff; font-size: 12px; color: var(--slate); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-frame__view { position: relative; aspect-ratio: 16 / 10; background: #fff; overflow: hidden; }
+.ws-frame__page, .ws-frame__img { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; object-fit: cover; object-position: top; }
+.ws-frame__note { padding: 8px 12px; border-top: 1px solid var(--hairline); font-size: 13px; color: var(--slate); }
+.ws-card { margin: var(--space-3) 0 var(--space-2); max-width: 36em; padding: 20px; border: 1px solid var(--field-edge); }
+.ws-card__host { margin: 0 0 4px; font-size: 20px; font-weight: 600; overflow-wrap: anywhere; }
+.ws__visit { margin: var(--space-2) 0 var(--space-3); }
+@media (max-width: 560px) { .ws-frame__view { aspect-ratio: 3 / 4; } .ws-frame__dots { display: none; } }

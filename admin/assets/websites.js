@@ -1,6 +1,6 @@
 /* Framework Admin — a client's Websites: /admin/clients/:id/website. Framework staff keep each website of a client here (several per client): the address, where it stands (existing,
    in development or live), who built it, whether Framework manages it (a separate yes/no), the launch date, domain and hosting facts (information only, never passwords), notes,
-   and an optional screenshot. "No website" is simply a client with none added. Clients cannot see any of this yet: the Website section of the Client Portal is switched off.
+   and an optional screenshot. "No website" is simply a client with none added. Clients see published websites in the Website section of the Client Portal (where it is switched on), as a live preview when the website allows it, else this screenshot or a plain card.
    Server text is never inserted as HTML. */
 
 import { h, api, confirmDialog, errorState, fmtDate } from "./ui.js";
@@ -110,10 +110,10 @@ export async function render(orgId, ctx) {
     const url = `/api/admin${base}/${encodeURIComponent(site.id)}/screenshot?v=${encodeURIComponent(site.updatedAt || "")}`;
     return h("div", { class: "adm-ws__shot" },
       h("p", { class: "acc__group" }, "Screenshot"),
-      site.screenshot ? h("img", { class: "adm-ws__img", src: url, alt: `Screenshot of ${site.name}`, loading: "lazy" }) : h("p", { class: "adm-muted" }, "No screenshot yet. It is optional."),
+      site.screenshot ? h("img", { class: "adm-ws__img", src: url, alt: `Screenshot of ${site.name}`, loading: "lazy" }) : h("p", { class: "adm-muted" }, "No screenshot yet. It is optional: clients see a live preview of the website when it allows one, and this picture only when it does not."),
       site.screenshot ? h("p", { class: "adm-brand__meta", text: `${site.screenshot.name} · ${fmtSize(site.screenshot.size)}` }) : null,
       canWrite() && data.capabilities.storage ? [
-        field(input.id, site.screenshot ? "Replace the screenshot" : "Add a screenshot", input, "PNG, JPG or WebP, up to 5 MB."),
+        field(input.id, site.screenshot ? "Replace the screenshot" : "Add a screenshot", input, "PNG, JPG or WebP, up to 5 MB. Shown only when the website cannot be previewed live."),
         h("div", { class: "adm-actions" },
           h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => {
             const f = input.files && input.files[0];

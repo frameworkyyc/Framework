@@ -1,7 +1,7 @@
 /**
  * The client's Website page (Phase 2; only where PORTAL_WEBSITE is on). Rendered only from what the tenant guard already scoped to the member's OWN organization:
  * the websites Framework published for it (repo/client-websites.js: never management notes or storage details). No website at all is an empty state, not a record.
- * Like every portal page there is no inline style and no inline script; the screenshot is a plain image from an authorised route of this site.
+ * Like every portal page there is no inline style and no inline script; the live preview is a sandboxed frame of the website itself (see visual()), and the optional screenshot a plain image from an authorised route of this site.
  */
 import { e } from "./ui.js";
 import { crumb } from "./guided.js";
@@ -45,12 +45,34 @@ function facts(s) {
   return rows ? `<dl class="contact ws__facts">${rows}</dl>` : "";
 }
 
-const shot = (vm, s) => (s.hasScreenshot ? `<img class="ws__shot" src="${e(href(vm, `/website/${s.id}/screenshot`))}" alt="${e(`Screenshot of ${s.name}`)}" loading="lazy" decoding="async">` : "");
+const host = (s) => shortUrl(s.url).replace(/\/.*$/, "");
+const visit = (s, cls = "btn btn--primary") => (isWebUrl(s.url) ? `<a class="${cls}" href="${e(s.url)}" target="_blank" rel="noopener noreferrer">Visit website<span class="visually-hidden"> ${e(s.name)} (opens in a new tab)</span></a>` : "");
 
-function detailBody(vm, s) {
+/** The desktop-style frame around a preview: a browser bar with the address, then the page. `inner` is the live iframe or the screenshot. */
+const frame = (s, inner, note) => `<figure class="ws-frame"><div class="ws-frame__bar" aria-hidden="true"><span class="ws-frame__dots"><i></i><i></i><i></i></span><span class="ws-frame__url">${e(host(s))}</span></div><div class="ws-frame__view">${inner}</div>${note ? `<figcaption class="ws-frame__note">${note}</figcaption>` : ""}</figure>`;
+
+/**
+ * The picture of a website, best first: its live page in a sandboxed frame (only when the website itself permits framing: see website-preview.js); otherwise the optional uploaded
+ * screenshot; otherwise a plain card. The frame is lazy-loaded, has no referrer, no permissions, and a sandbox WITHOUT allow-same-origin, so the page inside can neither read the portal
+ * nor its cookies, whatever it is. A Visit website button always follows.
+ */
+function visual(vm, s, preview) {
+  if (!isWebUrl(s.url) && !s.hasScreenshot) return "";
+  if (preview && preview.embeddable && /^https:\/\//.test(s.url)) {
+    const iframe = `<iframe class="ws-frame__page" src="${e(s.url)}" title="${e(`Live preview of ${s.name}`)}" loading="lazy" referrerpolicy="no-referrer" allow="" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe>`;
+    return `${frame(s, iframe, "Live preview. Some features may not work inside the preview; use Visit website for the full site.")}<p class="ws__visit">${visit(s)}</p>`;
+  }
+  if (s.hasScreenshot) {
+    const img = `<img class="ws-frame__img" src="${e(href(vm, `/website/${s.id}/screenshot`))}" alt="${e(`Screenshot of ${s.name}`)}" loading="lazy" decoding="async">`;
+    return `${frame(s, img, "")}<p class="ws__visit">${visit(s)}</p>`;
+  }
+  return `<div class="ws-card"><p class="ws-card__host">${e(host(s))}</p><p class="muted">Open the website to see it in a new tab.</p><p class="ws__visit">${visit(s)}</p></div>`;
+}
+
+function detailBody(vm, s, preview) {
   return `<div class="ws__badges">${statusChip(s)}${managedChip(s)}</div>
 <p class="lead ws__lead">${e(statement(s))}</p>
-${shot(vm, s)}${facts(s)}`;
+${visual(vm, s, preview)}${facts(s)}`;
 }
 
 /** The empty state: no website has been added for this organization. */
@@ -66,15 +88,15 @@ function card(vm, s) {
 }
 
 /** /website: nothing yet (empty state), one website (shown in full), or several (a list; each opens its own page). */
-export function websiteOverview(vm, sites) {
+export function websiteOverview(vm, sites, preview = null) {
   const head = `<header class="page-head page-head--compact">${crumb(vm, [["Website"]])}<h1 class="h1 h1--section">Website</h1></header>`;
   if (!sites.length) return `${head}${emptyState()}`;
-  if (sites.length === 1) return `${head}<h2 class="h2 ws__name">${e(sites[0].name)}</h2>${detailBody(vm, sites[0])}`;
+  if (sites.length === 1) return `${head}<h2 class="h2 ws__name">${e(sites[0].name)}</h2>${detailBody(vm, sites[0], preview)}`;
   return `${head}<p class="lead">${e(`${sites.length} websites are listed for your business.`)}</p><ul class="hubs ws__list">${sites.map((s) => card(vm, s)).join("")}</ul>`;
 }
 
 /** /website/:id — one website in full (also reachable when it is the only one). */
-export function websiteDetail(vm, s) {
-  return `<header class="page-head page-head--compact">${crumb(vm, [["Website", "/website"], [s.name]])}<h1 class="h1 h1--section">${e(s.name)}</h1></header>${detailBody(vm, s)}
+export function websiteDetail(vm, s, preview = null) {
+  return `<header class="page-head page-head--compact">${crumb(vm, [["Website", "/website"], [s.name]])}<h1 class="h1 h1--section">${e(s.name)}</h1></header>${detailBody(vm, s, preview)}
 <p class="ws__back"><a class="text-link" href="${e(href(vm, "/website"))}"><span aria-hidden="true">←</span> Back to Website</a></p>`;
 }

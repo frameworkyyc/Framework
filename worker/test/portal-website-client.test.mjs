@@ -139,7 +139,7 @@ test("the screenshot: shown through an authorised route with sandboxed headers; 
   const id = await s.add(s.alpha, LIVE);
   await s.addShot(s.alpha, id);
   const page = await text(await s.ann.get("/portal/o/alpha/website"));
-  assert.ok(page.includes(`<img class="ws__shot" src="/portal/o/alpha/website/${id}/screenshot"`), "the image is a same-site route");
+  assert.ok(page.includes(`<img class="ws-frame__img" src="/portal/o/alpha/website/${id}/screenshot"`), "the image is a same-site route");
   assert.match(page, /alt="Screenshot of Main website"/);
   const img = await s.mia.get(`/portal/o/alpha/website/${id}/screenshot`);
   assert.equal(img.status, 200);
