@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 
 // The migrations Production may receive, IN ORDER, with exactly the tables and indexes each one creates. A run is allowed only when the pending list is a tail of this
 // list (for example 0002, 0003, 0004 on a database that already has 0001), and the tables already in the database must equal what the already-applied migrations create.
-// 0004 only adds columns to `invitations`, 0006 one column to `brand_kits` (no table or index). 0005-0008 are all additive. Anything else fails closed.
+// 0004 only adds columns to `invitations`, 0006 and 0009 one column to `brand_kits` (no table or index). 0005-0009 are all additive. Anything else fails closed.
 export const STAGES = Object.freeze([
   {
     file: "0001_portal_foundation.sql",
@@ -28,6 +28,7 @@ export const STAGES = Object.freeze([
     indexes: ["idx_invoices_org", "idx_service_notifications_pending", "idx_support_attachments_request", "idx_support_messages_request", "idx_support_requests_org"],
   },
   { file: "0008_approved_emails.sql", tables: ["approved_emails"], indexes: [] },
+  { file: "0009_brand_sections.sql", tables: [], indexes: [] }, // one nullable column on brand_kits
 ]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",
