@@ -29,14 +29,19 @@ import { readForm, readUpload, readUploads, declaredBodyProblem, MAX_PROFILE_FOR
 import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
 import { checkCsrf } from "./sessions.js";
 import { can } from "./policy.js";
-import { getClientBrand, listClientUploads, uploadUsage, getBrandKit, listServiceRequests } from "./repo/brand.js";
-import { loadPricing } from "./repo/prices.js";
+import { getClientBrand, listClientUploads, uploadUsage, getBrandKit, listServiceRequests, createServiceRequest } from "./repo/brand.js";
+import { loadPricing, listPrices } from "./repo/prices.js";
 import { listClientInvoices, clientInvoiceSummary } from "./repo/invoices.js";
 import { clientDownloadInvoice } from "./invoice-files.js";
 import { invoiceStatusLine, supportStatusLine } from "./services-live.js";
 import { listClientWebsites, getClientWebsite } from "./repo/client-websites.js";
 import { clientScreenshotResponse } from "./website-files.js";
 import { checkEmbeddable } from "./website-preview.js";
+import { kindOf, categoryOfKind } from "./website-live.js";
+import { clientPackageResponse } from "./website-files.js";
+import { getClientPackage } from "./repo/website-packages.js";
+import { listClientServices, requestKeyOfService, SERVICE_KEYS } from "./repo/portal-services.js";
+import { pricingFrom, priceSnapshot } from "./branding-pricing.js";
 import * as supportRepo from "./repo/support.js";
 import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./support-files.js";
 import { dispatchNotifications } from "./service-notifications.js";
@@ -371,8 +376,127 @@ async function previewOf(ctx, site, a) {
   return r;
 }
 
+/** Website management for one website: its downloadable files (if Framework published them), whether the member may send requests, and how their website requests stand. */
+async function websiteManagement(ctx, a, site) {
+  const org = a.membership.organizationId;
+  const [pkg, reqs] = await Promise.all([getClientPackage(ctx.db, org, site.id), supportRepo.listWebsiteRequests(ctx.db, org)]);
+  return { package: pkg, canRequest: can(a.membership.role, "support.submit"), requests: { total: reqs.length, open: reqs.filter((r) => !r.closed).length, unread: reqs.filter((r) => r.unreadForClient).length } };
+}
+
+/** The Additional Services grid: the shown services (Admin's catalogue), a price only where Admin set one (never "Included"), and whether the client already has an open request for each. */
+async function websiteServices(ctx, a) {
+  const org = a.membership.organizationId;
+  const items = await listClientServices(ctx.db);
+  if (!items.length) return null;
+  const prices = pricingFrom((await listPrices(ctx.db)).rows);
+  const open = new Set((await listServiceRequests(ctx.db, org, { openOnly: true })).map((r) => r.serviceKey));
+  const f = viewFilters(ctx.url);
+  return {
+    canRequest: can(a.membership.role, "website.request"), flash: f.requested ? "requested" : f.requestDup ? "dup" : "",
+    items: items.map((it) => { const p = prices[it.key]; const shown = p && p.type !== "included" ? p : null; return { ...it, price: shown ? shown.label : "", priceType: shown ? shown.type : "", requested: open.has(requestKeyOfService(it.key)) }; }),
+  };
+}
+
+async function postServiceRequest(ctx, a) {
+  const read = await readForm(ctx.request, MAX_FEEDBACK_FORM_BYTES);
+  if (read.error) return errorPage(read.error, { ref: ctx.ref });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) return errorPage(403, { ref: ctx.ref });
+  const key = read.fields.get("service") || "";
+  const shown = (await listClientServices(ctx.db)).map((x) => x.key);
+  if (!SERVICE_KEYS.includes(key) || !shown.includes(key)) return notFoundPage(ctx);
+  const priced = (pricingFrom((await listPrices(ctx.db)).rows))[key];
+  const snapshot = priced && priced.type !== "included" ? priceSnapshot(priced) : null;
+  const requestKey = requestKeyOfService(key);
+  const res = await createServiceRequest(ctx.db, a.membership.organizationId, a.session.userId, { serviceKey: requestKey, note: null, priceSnapshot: snapshot }, (k) => k === requestKey, { now: ctx.now });
+  const base = `/portal/o/${a.membership.slug}/website`;
+  if (!res.ok && res.error !== "already_requested") { logEvent({ evt: "website.service", outcome: "refused", reason: res.error, status: 400, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId }); return errorPage(400, { ref: ctx.ref }); }
+  logEvent({ evt: "website.service", outcome: res.ok ? "saved" : "duplicate", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  return redirect(`${base}?requested=${res.ok ? 1 : 0}#additional-services`);
+}
+
+async function postWebsiteRequest(ctx, a, siteId) {
+  if (!UUID.test(siteId)) return notFoundPage(ctx);
+  const site = await getClientWebsite(ctx.db, a.membership.organizationId, siteId);
+  if (!site) return notFoundPage(ctx);
+  const read = await readUploads(ctx.request, SUPPORT_BODY, supportRepo.MAX_ATTACHMENTS);
+  if (read.error) return pages.websiteRequestFormPage(ctx, a, site, "change", { error: read.error === 413 ? "file_too_large" : "invalid", status: read.error });
+  const kind = kindOf(read.fields.get("kind") || "");
+  if (!kind) return notFoundPage(ctx);
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) return errorPage(403, { ref: ctx.ref });
+  const values = { title: read.fields.get("title") || "", description: read.fields.get("description") || "" };
+  const res = await clientCreateRequest(brandDeps(ctx), { ...who(a), category: categoryOfKind(kind), ...values, websiteId: site.id, files: read.files });
+  if (!res.ok) {
+    if (res.error === "website_not_found") return notFoundPage(ctx);
+    const status = supportStatus(res.error);
+    logEvent({ evt: "website.request", outcome: "refused", reason: res.error, status, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return pages.websiteRequestFormPage(ctx, a, site, kind, { values, error: res.error, status });
+  }
+  logEvent({ evt: "website.request", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  await dispatchNotifications(ctx.env, ctx); // after the request is saved; it can never undo or delay it
+  return redirect(`/portal/o/${a.membership.slug}/website/requests/${res.id}?${res.attachmentsFailed ? "flash=partial" : "flash=sent"}`);
+}
+
+/** A website request's conversation: only a request that names a website, and only the client-visible messages (the shared support code does the rest). */
+async function showWebsiteThread(ctx, a, id, o = {}) {
+  if (!UUID.test(id)) return notFoundPage(ctx);
+  const org = a.membership.organizationId;
+  const site = await supportRepo.getRequestWebsite(ctx.db, org, id);
+  if (!site) return notFoundPage(ctx);
+  const thread = await supportRepo.getClientThread(ctx.db, org, id);
+  if (!thread) return notFoundPage(ctx);
+  if (thread.request.unreadForClient) await supportRepo.markClientRead(ctx.db, org, id, { now: ctx.now });
+  return pages.websiteRequestThreadPage(ctx, a, thread, site, { flash: viewFilters(ctx.url).flash, ...o });
+}
+
+async function postWebsiteReply(ctx, a, id) {
+  if (!UUID.test(id)) return notFoundPage(ctx);
+  if (!(await supportRepo.getRequestWebsite(ctx.db, a.membership.organizationId, id))) return notFoundPage(ctx);
+  const read = await readUploads(ctx.request, SUPPORT_BODY, supportRepo.MAX_ATTACHMENTS);
+  if (read.error) return showWebsiteThread(ctx, a, id, { error: read.error === 413 ? "file_too_large" : "invalid", status: read.error });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) return errorPage(403, { ref: ctx.ref });
+  const res = await clientReply(brandDeps(ctx), { ...who(a), requestId: id, body: read.fields.get("body") || "", files: read.files });
+  if (!res.ok) {
+    if (res.error === "not_found") return notFoundPage(ctx);
+    return showWebsiteThread(ctx, a, id, { error: res.error, status: supportStatus(res.error) });
+  }
+  logEvent({ evt: "website.reply", outcome: "saved", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  await dispatchNotifications(ctx.env, ctx);
+  return redirect(`/portal/o/${a.membership.slug}/website/requests/${id}?${res.attachmentsFailed ? "flash=partial" : "flash=replied"}`);
+}
+
 const WEBSITE_ROUTES = [
-  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website$/, action: "website.view", run: async (ctx, a) => { const sites = await listClientWebsites(ctx.db, a.membership.organizationId); return pages.websitePage(ctx, a, { sites, preview: sites.length === 1 ? await previewOf(ctx, sites[0], a) : null }); } },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website$/, action: "website.view", run: async (ctx, a) => {
+      const sites = await listClientWebsites(ctx.db, a.membership.organizationId);
+      const single = sites.length === 1 ? sites[0] : null;
+      return pages.websitePage(ctx, a, { sites, preview: single ? await previewOf(ctx, single, a) : null, management: single ? await websiteManagement(ctx, a, single) : (sites.length ? await websiteListManagement(ctx, a) : null), services: await websiteServices(ctx, a) });
+    } },
+  // Requests about a website (Request a change, Get support): the existing support workflow and permissions (support.view / support.submit), independent of PORTAL_SERVICES.
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/requests$/, action: "support.view", run: async (ctx, a) => pages.websiteRequestsPage(ctx, a, await supportRepo.listWebsiteRequests(ctx.db, a.membership.organizationId)) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/requests\/([^/]+)\/files\/([^/]+)$/, action: "support.view", run: async (ctx, a, rid, aid) => {
+      if (!UUID.test(rid || "") || !UUID.test(aid || "")) return notFoundPage(ctx);
+      if (!(await supportRepo.getRequestWebsite(ctx.db, a.membership.organizationId, rid))) return notFoundPage(ctx);
+      if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
+      const res = await clientDownloadAttachment(brandDeps(ctx), { ...who(a), requestId: rid, attachmentId: aid });
+      return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
+    } },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/requests\/([^/]+)\/reply$/, action: "support.view", postAction: "support.submit", bucket: "support", maxBody: () => SUPPORT_BODY,
+    run: async (ctx, a, id) => redirect(`/portal/o/${a.membership.slug}/website/requests/${id}`), post: (ctx, a, id) => postWebsiteReply(ctx, a, id) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/requests\/([^/]+)$/, action: "support.view", run: (ctx, a, id) => showWebsiteThread(ctx, a, id) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/services\/request$/, action: "website.view", postAction: "website.request", bucket: "support", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/website`), post: (ctx, a) => postServiceRequest(ctx, a) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/requests\/new$/, action: "support.submit", run: async (ctx, a, id) => {
+      if (!UUID.test(id)) return notFoundPage(ctx);
+      const kind = kindOf(viewFilters(ctx.url).kind || "");
+      const site = await getClientWebsite(ctx.db, a.membership.organizationId, id);
+      return site && kind ? pages.websiteRequestFormPage(ctx, a, site, kind, {}) : notFoundPage(ctx);
+    } },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/requests$/, action: "support.view", postAction: "support.submit", bucket: "support", maxBody: () => SUPPORT_BODY,
+    run: async (ctx, a, id) => redirect(`/portal/o/${a.membership.slug}/website/${id}`), post: (ctx, a, id) => postWebsiteRequest(ctx, a, id) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/files\/download$/, action: "website.view", run: async (ctx, a, id) => {
+      if (!UUID.test(id)) return notFoundPage(ctx);
+      if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
+      const res = await clientPackageResponse(brandDeps(ctx), { ...who(a), websiteId: id });
+      return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
+    } },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/screenshot$/, action: "website.view", run: async (ctx, a, id) => {
       if (!UUID.test(id)) return notFoundPage(ctx);
       if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
@@ -383,10 +507,16 @@ const WEBSITE_ROUTES = [
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)$/, action: "website.view", run: async (ctx, a, id) => {
       if (!UUID.test(id)) return notFoundPage(ctx);
       const one = await getClientWebsite(ctx.db, a.membership.organizationId, id); // another organization's, unpublished and archived websites are all "not found"
-      return one ? pages.websitePage(ctx, a, { one, preview: await previewOf(ctx, one, a) }) : notFoundPage(ctx);
+      return one ? pages.websitePage(ctx, a, { one, preview: await previewOf(ctx, one, a), management: await websiteManagement(ctx, a, one), services: await websiteServices(ctx, a) }) : notFoundPage(ctx);
     },
   },
 ];
+
+/** On the list of several websites: only the link to the website requests (each website's own page has its management actions). */
+async function websiteListManagement(ctx, a) {
+  const reqs = await supportRepo.listWebsiteRequests(ctx.db, a.membership.organizationId);
+  return { requests: { total: reqs.length, open: reqs.filter((r) => !r.closed).length, unread: reqs.filter((r) => r.unreadForClient).length } };
+}
 
 /** The Invoices card status on the hub, or "" when invoices cannot be read (a database without migration 0007): the card then stays "Coming soon". */
 async function invoiceSummary(ctx, a) {

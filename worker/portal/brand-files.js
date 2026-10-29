@@ -21,6 +21,7 @@ import { getOrganizationById } from "./repo/orgs.js";
 import { listInvoiceStorageKeys } from "./repo/invoices.js";
 import { listSupportStorageKeys } from "./repo/support.js";
 import { listWebsiteStorageKeys } from "./repo/websites.js";
+import { listPackageStorageKeys } from "./repo/website-packages.js";
 import { buildBrandFileName } from "../../admin/assets/brand-names.js";
 import { SECTION_FILE_KEYS, sectionOf, sectionVariantKey } from "../../admin/assets/brand-sections.js";
 
@@ -263,7 +264,7 @@ export async function deleteOrganizationFiles(deps, { organizationId, actor }) {
 
 /** Read-only: stored objects of this organization that no live row refers to (left behind by an interrupted write). */
 export async function findOrphanObjects(deps, { organizationId }) {
-  const live = new Set([...(await brand.listLiveStorageKeys(deps.db, organizationId)), ...(await listInvoiceStorageKeys(deps.db, organizationId)), ...(await listSupportStorageKeys(deps.db, organizationId)), ...(await listWebsiteStorageKeys(deps.db, organizationId))]);
+  const live = new Set([...(await brand.listLiveStorageKeys(deps.db, organizationId)), ...(await listInvoiceStorageKeys(deps.db, organizationId)), ...(await listSupportStorageKeys(deps.db, organizationId)), ...(await listWebsiteStorageKeys(deps.db, organizationId)), ...(await listPackageStorageKeys(deps.db, organizationId))]);
   const orphans = [];
   for await (const key of listOrganizationKeys(deps.bucket, organizationId)) if (!live.has(key)) orphans.push(key);
   return orphans;

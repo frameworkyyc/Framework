@@ -94,7 +94,7 @@ test("migration 0011 adds the four website services to the pricing editor as cus
   assert.deepEqual(PRICING_SERVICES.filter((x) => x.section === "website").map((x) => [x.key, x.name, x.defaultType]), [["website-design", "Website Design", "custom_quote"], ["website-redesign", "Website Redesign", "custom_quote"], ["website-seo", "SEO", "custom_quote"], ["website-maintenance", "Website Maintenance", "custom_quote"]]);
   assert.ok(!BRAND_REQUESTS.some((r) => /website/.test(r.key)), "they are not Branding requests");
   const r = await s.call("/service-pricing");
-  assert.equal(r.json.services.length, 17); assert.deepEqual(r.json.services.slice(13).map((x) => [x.key, x.section, x.type, x.priceCad, x.stored]), [["website-design", "website", "custom_quote", null, true], ["website-redesign", "website", "custom_quote", null, true], ["website-seo", "website", "custom_quote", null, true], ["website-maintenance", "website", "custom_quote", null, true]]);
+  assert.equal(r.json.services.length, 21); assert.deepEqual(r.json.services.slice(13, 17).map((x) => [x.key, x.section, x.type, x.priceCad, x.stored]), [["website-design", "website", "custom_quote", null, true], ["website-redesign", "website", "custom_quote", null, true], ["website-seo", "website", "custom_quote", null, true], ["website-maintenance", "website", "custom_quote", null, true]]);
   const saved = await s.call("/service-pricing", { method: "POST", json: { prices: [{ key: "website-seo", type: "starting_at", priceCad: 400 }] } });
   assert.equal(saved.status, 200); assert.deepEqual(saved.json.services.find((x) => x.key === "website-seo").priceCad, 400);
 });

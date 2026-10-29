@@ -10,6 +10,7 @@ const STATUS = { existing: "Existing website", in_development: "In development",
 const ORIGIN = { framework: "Built by Framework", client: "Built by the client or another company" };
 const PARTY = { framework: "Framework", client: "The client", unknown: "Not sure" };
 const MAX_SHOT = 5 * 1024 * 1024;
+const MAX_PACKAGE = 25 * 1024 * 1024;
 
 const ERROR_TEXT = {
   invalid_name: "Give the website a name (up to 80 characters).",
@@ -19,7 +20,10 @@ const ERROR_TEXT = {
   invalid_combination: "An existing or live website needs a web address, and a website in development is built by Framework.",
   too_many: "This client has as many websites as can be kept here. Archive one first.",
   not_found: "That website no longer exists. The page has been refreshed.", conflict: "That changed while you were working. The page has been refreshed.",
-  type_not_allowed: "Use a PNG, JPG or WebP picture.", content_mismatch: "The file’s contents don’t match its type. Export the picture again.", invalid_name_file: "That file name can’t be used.",
+  archive_encrypted: "That ZIP is password-protected, so it can’t be checked. Upload one without a password.", archive_unsupported: "That ZIP uses a format that can’t be checked. Save it again as a standard ZIP.",
+  archive_unsafe_entry: "That ZIP contains a file type that isn’t allowed (such as a program or installer) or an unsafe path.", archive_entries: "That ZIP has no files, or far too many.", archive_too_large: "That ZIP expands to far more than it should.",
+  unavailable: "Website downloads aren’t available on this site yet, so nothing was changed.",
+  type_not_allowed: "Use a PNG, JPG or WebP picture (a ZIP for the website files).", content_mismatch: "The file’s contents don’t match its type. Export the picture again.", invalid_name_file: "That file name can’t be used.",
   image_dimensions: "The picture is empty or far too large.", empty_file: "That file is empty.", file_too_large: "That picture is over 5 MB.", no_file: "Choose a picture first.",
   writes_disabled: "Changes are switched off on this site, so nothing was changed.", storage_unavailable: "File storage isn’t available on this site. Nothing was uploaded.",
   storage_write_failed: "The picture couldn’t be stored just now. Nothing was saved. Try again.", storage_read_failed: "The picture couldn’t be read just now.",
@@ -139,6 +143,31 @@ export async function render(orgId, ctx) {
       } }, r && !r.pending ? "Check again" : "Check live preview"), ...lines);
   }
 
+  /** The downloadable website files: one ZIP per website. A new file starts unpublished; publishing is a separate step, and only a published file is offered to the client. */
+  function packageBlock(site) {
+    if (!data.packagesAvailable) return h("div", { class: "adm-ws__pkg" }, h("p", { class: "acc__group" }, "Website files"), h("p", { class: "adm-muted", text: "Downloads for clients aren’t available on this site yet (a database change is waiting for approval)." }));
+    const pkg = site.package;
+    const input = h("input", { id: "ws-pkg-" + site.id.slice(0, 8), class: "input", type: "file", accept: ".zip,application/zip" });
+    return h("div", { class: "adm-ws__pkg" },
+      h("p", { class: "acc__group" }, "Website files"),
+      pkg ? h("p", { class: "adm-brand__meta", text: `${pkg.name} · ${fmtSize(pkg.size)} · ${pkg.published ? "Published: the client can download it" : "Not published: the client cannot see it"}` }) : h("p", { class: "adm-muted", text: "No file yet. The client sees a disabled Download button until you upload and publish a ZIP." }),
+      canWrite() && data.capabilities.storage ? [
+        field(input.id, pkg ? "Replace the file" : "Upload the website files", input, `A ZIP up to ${MAX_PACKAGE / 1024 / 1024} MB. It is checked, never opened or run. A new file starts unpublished.`),
+        h("div", { class: "adm-actions" },
+          h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => {
+            const f = input.files && input.files[0];
+            if (!f) { say(ERROR_TEXT.no_file.replace("picture", "ZIP file"), "error"); input.focus(); return; }
+            if (f.size > MAX_PACKAGE) { say("That ZIP is over 25 MB.", "error"); return; }
+            const body = new FormData(); body.append("file", f, f.name);
+            perform({ request: () => api(`${base}/${encodeURIComponent(site.id)}/package`, { method: "POST", body }), success: pkg ? "File replaced. It is not published yet." : "File saved. It is not published yet." });
+          } }, pkg ? "Replace file" : "Upload file"),
+          pkg ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => perform(pkg.published
+            ? { confirm: { title: "Withdraw this download?", body: "The client will no longer be able to download it.", details: [["Website", site.name], ["File", pkg.name]], confirmLabel: "Withdraw" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/package/publish`, { method: "POST", body: { published: false } }), success: "Download withdrawn." }
+            : { confirm: { title: "Publish this download?", body: "The client will be able to download this file from their Website page.", details: [["Website", site.name], ["File", pkg.name], ["Size", fmtSize(pkg.size)]], confirmLabel: "Publish" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/package/publish`, { method: "POST", body: { published: true } }), success: "Download published." }) }, pkg.published ? "Withdraw download" : "Publish download") : null,
+          pkg ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => perform({ confirm: { title: "Remove the website files?", body: "The file is deleted from storage and the client can no longer download it.", details: [["Website", site.name], ["File", pkg.name]], confirmLabel: "Remove file" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/package/remove`, { method: "POST", body: {} }), success: "File removed." }) }, "Remove file") : null),
+      ] : null);
+  }
+
   /** The screenshot: a preview, and a picture to set, replace or remove. */
   function screenshotBlock(site) {
     const input = h("input", { id: "ws-shot-" + site.id.slice(0, 8), class: "input", type: "file", accept: ".png,.jpg,.jpeg,.webp" });
@@ -174,7 +203,7 @@ export async function render(orgId, ctx) {
     const key = "ws-" + site.id;
     return h("details", { class: "adm-acc adm-ws", id: key, open: opened.has(key) ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add(key); else opened.delete(key); } },
       h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: site.name }), h("span", { class: "adm-acc__meta" }, chips)),
-      h("div", { class: "adm-acc__body" }, h("p", null, summary), archived ? null : siteForm(site), archived ? null : previewBlock(site), archived ? null : screenshotBlock(site), actions));
+      h("div", { class: "adm-acc__body" }, h("p", null, summary), archived ? null : siteForm(site), archived ? null : previewBlock(site), archived ? null : packageBlock(site), archived ? null : screenshotBlock(site), actions));
   }
 
   function draw() {
