@@ -22,7 +22,7 @@ const sign = (c) => { const h = b64u(JSON.stringify({ alg: "RS256", kid: "k1", t
 const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
 const rowsOf = (w, q, ...p) => w.db.raw.prepare(q).all(...p).map((r) => ({ ...r }));
 const base = (s) => `/portal/o/${s}/branding`;
-const MIGRATION = read("migrations/portal-proposed/0010_service_pricing.sql");
+const MIGRATION = read("migrations/portal/0010_service_pricing.sql");
 const sectionHtml = (html, key) => { const i = html.indexOf(`<section class="bk-sec" id="${key}"`); return html.slice(i, html.indexOf("</section>", i)); };
 
 const PRICES = { "logo-primary": 500, "logo-secondary": 150, "logo-simplified": 150, "logo-submark": 150, typography: 250, colours: 200, tagline: 250, imagery: 300, layout: 350, textures: 150, iconography: 250, style: 350, "brand-kit": 2500 };
@@ -35,7 +35,7 @@ async function setup({ migrated = true } = {}) {
   await w.invite(alpha, "ann@alpha.test", "owner"); await w.invite(alpha, "mia@alpha.test", "member"); await w.invite(beta, "bob@beta.test", "owner");
   const ann = w.browser(), mia = w.browser(), bob = w.browser();
   await ann.signIn(w.user(1, "ann@alpha.test")); await mia.signIn(w.user(2, "mia@alpha.test")); await bob.signIn(w.user(3, "bob@beta.test"));
-  if (migrated) w.db.raw.exec(MIGRATION);
+  if (!migrated) w.db.raw.exec("DROP TABLE service_prices; ALTER TABLE service_requests DROP COLUMN price_snapshot"); // a database as it is before migration 0010 (every test world starts fully migrated)
   const csrf = async (b, slug) => csrfOf(await (await b.get(base(slug))).text());
   const send = async (b, slug, fields = {}) => b.post(`${base(slug)}/request`, { csrf: await csrf(b, slug), ...fields });
   const admin = async (path, { method = "GET", json, headers = {} } = {}) => {

@@ -195,7 +195,6 @@ const UPLOAD = { typography: "Already have your fonts? <a class=\"text-link\" hr
 test("the compact offer: status line, one service title with its price and the black button on one row, a small estimate line, one separated upload line; no descriptions or repeated messaging", async () => {
   const s = await setup();
   await s.publish();
-  s.w.db.raw.exec(read("migrations/portal-proposed/0010_service_pricing.sql")); // the prices (an unmigrated database shows the same offer without price or estimate)
   let html = await s.page();
   for (const k of Object.keys(TITLES)) {
     const b = bodyOf(html, k);
@@ -234,7 +233,6 @@ test("a complete section shows a checkmark and Complete beside its heading and n
 test("existing requests, prices and snapshots are preserved: an open whole-section request shows its status instead of a second button, and a new Request Design records the price shown", async () => {
   const s = await setup();
   await s.publish();
-  s.w.db.raw.exec(read("migrations/portal-proposed/0010_service_pricing.sql"));
   const csrf = csrfOf(await s.page());
   await s.ann.post(`${base}/request`, { csrf, section: "brand-typography", note: "earlier request" });
   await s.ann.post(`${base}/request`, { csrf, section: "brand-logos" });
