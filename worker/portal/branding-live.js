@@ -12,7 +12,7 @@ import { LOGO_VARIATIONS } from "../../admin/assets/logo-variations.js";
 import { BRAND_SECTIONS, TYPE_SLOT_DEFS, sectionOf } from "../../admin/assets/brand-sections.js";
 import { typefaceOf, filesOf, specimenSlots, faceOf, WEIGHT_NAME } from "./brand-type.js";
 import { requirementsFor, completionOf, REQUIREMENT_LABEL } from "./brand-requirements.js";
-import { offerBox, offerList, requestKeyOf, priceLabel, pricingService, ESTIMATE_NOTE, OFFER_COPY } from "./branding-pricing.js";
+import { offerBox, offerList, requestKeyOf, priceLabel, pricingService, ESTIMATE_NOTE } from "./branding-pricing.js";
 import { exampleTypeCard, exampleColours, exampleTagline, exampleImagery, exampleLayout, exampleTextures, exampleIcons, exampleStyle, EXAMPLE_LABEL } from "./brand-examples.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
@@ -301,12 +301,12 @@ export function brandingOverview(vm, brand, o = {}) {
     files: Object.fromEntries(["imagery", "layout", "textures", "iconography", "style"].map((k) => [k, assets.filter((a) => sectionOf(a) === k).length])) });
   const statusLine = (d) => {
     const c = comp[d.key], r = reqs[d.key], tag = requirementTag(r);
-    if (c.done) return `<p class="bk-status bk-status--done">${CHECK}<span class="bk-status__text">${e(d.title)} complete</span>${tag}</p>`;
+    if (c.done) return `<p class="bk-status bk-status--done">${CHECK}<span class="bk-status__text">Complete</span></p>`;
     const text = d.key === "logo" && c.count > 0 ? `${c.count} of ${c.total} logo variations provided` : `${d.title} not yet provided`;
-    return `<p class="bk-status"><span class="bk-status__text">${e(text)}</span>${tag}</p><p class="bk-status__note">${e(OFFER_COPY[r.level].note)}</p>`;
+    return `<p class="bk-status"><span class="bk-status__text">${e(text)}</span>${tag}</p>`;
   };
   const sec = (d, inner, offerHtml = "") => bkSection(d, inner, statusLine(d) + (comp[d.key].done ? "" : offerHtml));
-  const offer = (key) => { const svc = pricingService(key); return offerBox({ name: svc.name, description: svc.description, entry: pricing[key], level: reqs[key].level, action: offerAction(key, LEGACY[key]), uploadHref }); };
+  const offer = (key) => offerBox({ service: pricingService(key), entry: pricing[key], action: offerAction(key, LEGACY[key]), uploadHref });
   const groups = (docs) => docs.map(([k, l]) => `${docs.length > 1 ? `<p class="acc__group">${e(DOC_LABEL[k])}</p>` : ""}<ul class="file-list">${l.map((a) => docRow(vm, a)).join("")}</ul>`).join("");
   const def = Object.fromEntries(BRAND_SECTIONS.map((d) => [d.key, d]));
 
@@ -320,8 +320,8 @@ export function brandingOverview(vm, brand, o = {}) {
   const others = unassigned.length ? `<p class="acc__group">Other logo files</p><ul class="logo-grid">${logoGroups(unassigned).map((g) => logoCard(vm, g)).join("")}</ul>` : "";
   const examples = filled < 4 ? `<p class="muted small">Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation. They are not your logos and are not available to download.</p>` : "";
   const LOGO_PRICE = { primary: "logo-primary", secondary: "logo-secondary", simplified: "logo-simplified", submark: "logo-submark" };
-  const missingLogos = LOGO_VARIATIONS.filter((d) => !byVariation.get(d.key).length).map((d) => ({ name: d.title, entry: pricing[LOGO_PRICE[d.key]], action: legacyOpen("brand-logos") ? "" : offerAction(LOGO_PRICE[d.key], null) }));
-  const logoOffer = offerList({ lead: filled ? "Framework can design the logo variations you’re missing." : OFFER_COPY[reqs.logo.level].lead("logo"), description: "A professionally designed logo, made to work on the web, in print and on social media.", level: reqs.logo.level, rows: missingLogos, extra: legacyOpen("brand-logos"), uploadHref, what: "your logos" });
+  const missingLogos = LOGO_VARIATIONS.filter((d) => !byVariation.get(d.key).length).map((d) => ({ title: pricingService(LOGO_PRICE[d.key]).offerTitle, entry: pricing[LOGO_PRICE[d.key]], action: legacyOpen("brand-logos") ? "" : offerAction(LOGO_PRICE[d.key], null) }));
+  const logoOffer = offerList({ rows: missingLogos, extra: legacyOpen("brand-logos"), uploadHref, upload: pricingService("logo-primary").upload });
   const parts = [sec(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${logoFiles.length > 0 ? control("brand-logos", true) : ""}`, logoOffer)];
 
   // 02 Typography: three typeface slots (Primary, Secondary, Accent), the hierarchy preview, older typefaces and fonts that belong to no typeface; then 03 Brand Colours.
