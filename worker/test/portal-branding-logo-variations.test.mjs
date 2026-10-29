@@ -101,7 +101,7 @@ test("with nothing published every client sees the four Framework examples, labe
       assert.ok(!/lv-card__stage--logo/.test(x.html));
     });
     assert.match(html, /Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation\. They are not your logos and are not available to download\./);
-    assert.match(html, /<h2 class="bk-sec__title" id="h-logo"><span class="visually-hidden">01 <\/span>Logo <span class="bk-req bk-req--required">/);
+    assert.match(html, /<h2 class="bk-sec__title" id="h-logo"><span class="visually-hidden">01 <\/span>Logo<\/h2>/);
   }
   assert.deepEqual(cards(await (await bob.get("/portal/o/beta/branding")).text()).map((x) => x.title), ["Primary Logo", "Secondary Logo", "Simplified Logo", "Sub-mark"]);
 });
@@ -236,7 +236,7 @@ test("the request workflow is unchanged under the cards: an owner can request lo
   const s = await setup();
   let html = await (await s.ann.get(base)).text();
   const logosEmpty = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
-  assert.match(logosEmpty, /<summary class="btn btn--small">Request<span/);
+  assert.match(logosEmpty, /<summary class="btn btn--primary">Request Design<span/, "each missing variation has its own black Request Design button");
   assert.match(await (await s.mia.get(base)).text(), /Ask an owner of your organization to send a request for this section/);
   const send = (b, extra = {}) => b.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-logos", ...extra });
   assert.equal((await send(s.ann)).headers.get("Location"), `${base}?requested=1`);
@@ -361,7 +361,8 @@ test("empty sections show a muted Framework example, labelled 'Example: Framewor
     const sec = sectionHtml(html, d.key);
     assert.ok(sec.includes('<div class="bk-eg bk-eg--'), d.key + " has its example panel");
     assert.ok(sec.includes('<span class="tag">Not added yet</span> <span class="bk-eg__tag">Example: Framework</span>'), d.key + " is labelled an example");
-    assert.ok(!/Download|data-copy|<a /.test(sec), d.key + " offers nothing to download or copy");
+    const eg = sec.slice(sec.indexOf('<div class="bk-eg')); // the offer above it carries the free-upload link; the example itself carries nothing
+    assert.ok(!/Download|data-copy|<a /.test(eg), d.key + " offers nothing to download or copy");
     assert.ok(!/bk-empty/.test(sec), d.key + " no longer shows a bare empty state");
   }
   const type = sectionHtml(html, "typography");
@@ -436,9 +437,9 @@ test("typography and colours: families, weights, example text and codes render; 
 test("requests, uploads and permissions are unchanged by the nine-section layout", async () => {
   const s = await setup();
   const html = await (await s.ann.get(base)).text();
-  assert.match(sectionHtml(html, "logo"), /<summary class="btn btn--small">Request<span/);
-  assert.match(sectionHtml(html, "typography"), /<summary class="btn btn--small">Request<span/);
-  assert.match(sectionHtml(html, "colours"), /<summary class="btn btn--small">Request<span/);
+  assert.match(sectionHtml(html, "logo"), /<summary class="btn btn--primary">Request Design<span/);
+  assert.match(sectionHtml(html, "typography"), /<summary class="btn btn--primary">Request Design<span/);
+  assert.match(sectionHtml(html, "colours"), /<summary class="btn btn--primary">Request Design<span/);
   assert.match(html.slice(html.indexOf('id="guidelines"')), /<summary class="btn btn--small">Request<span/);
   assert.match(html, /href="\/portal\/o\/alpha\/branding\/uploads"/);
   assert.match(await (await s.mia.get(base)).text(), /Ask an owner of your organization/);
@@ -568,7 +569,7 @@ test("Typography Hierarchy: five levels in order, illustrative (no approved scal
 test("empty typography: a restrained empty state with the existing request button and a way to share fonts; no price is shown by default; a member is told to ask an owner", async () => {
   const s = await setup(); await publishOnly(s, s.A);
   const html = await (await s.ann.get(base)).text(); const type = sectionHtml(html, "typography");
-  assert.match(type, /No typefaces have been added yet\./); assert.match(type, /<summary class="btn btn--small">Request<span/); assert.match(type, /href="\/portal\/o\/alpha\/branding\/uploads">Share them with Framework/);
+  assert.match(type, /No typefaces have been added yet\./); assert.match(type, /<summary class="btn btn--primary">Request Design<span/); assert.match(type, /href="\/portal\/o\/alpha\/branding\/uploads">Upload your existing branding for free/); assert.ok(!/Share them with Framework/.test(type), "one upload link, not two");
   assert.equal([...type.matchAll(/tf-card--example/g)].length, 3, "three muted Framework examples"); assert.ok(!/tf-card--has/.test(type), "nothing is presented as the client's");
   assert.match(type, /Switzer/); assert.match(type, /General Sans/); assert.match(type, /Semibold <span class="muted">600/); assert.match(type, /Medium <span class="muted">500/);
   assert.match(type, /This uses Framework’s typography/); assert.ok(!/Download|data-copy/.test(type.replace(/Download or install/g, "")), "examples are never downloadable");
