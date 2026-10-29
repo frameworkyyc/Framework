@@ -13,6 +13,7 @@ import * as live from "./profile-live.js";
 import * as brandingLive from "./branding-live.js";
 import * as servicesLive from "./services-live.js";
 import * as websiteLive from "./website-live.js";
+import { frameSources } from "./website-preview.js";
 import { brandingEnabled, servicesEnabled, websiteEnabled } from "./config.js";
 import { LIVE_AREAS } from "./guided-data.js";
 import { specimenSlots } from "./brand-type.js";
@@ -49,11 +50,11 @@ function liveModel(ctx, { session, membership: m, returning }, data = {}) {
   };
 }
 
-async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, styles = [], ref = null }) {
+async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, styles = [], ref = null, frameSrc = [] }) {
   const { session, membership: m } = a;
   // Header navigation of the connected portal: Home and Account (and Team for owners). Every other page is reached from Home.
   const list = [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: active === "account" || active === "team" ? active : "home", list }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), script, styles, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}` });
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: active === "account" || active === "team" ? active : "home", list }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), script, styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}` });
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null }) {
@@ -154,9 +155,12 @@ export async function brandingUploadsPage(ctx, a, o = {}) {
 }
 
 /** The Website section: `sites` is every website Framework published for this organization (the empty list is the "no website" state); `one` is a single website's own page. */
-export async function websitePage(ctx, a, { sites = [], one = null } = {}) {
+export async function websitePage(ctx, a, { sites = [], one = null, preview = null } = {}) {
   const vm = liveModel(ctx, a, {});
-  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", body: one ? websiteLive.websiteDetail(vm, one) : websiteLive.websiteOverview(vm, sites), vm, ref: "website" });
+  const single = one || (sites.length === 1 ? sites[0] : null);
+  // The live preview needs the page to be allowed to frame that one website: its verified origins go into THIS response's CSP only (frame-src); no other page and no global policy changes.
+  const frameSrc = single ? frameSources(preview) : [];
+  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", body: one ? websiteLive.websiteDetail(vm, one, preview) : websiteLive.websiteOverview(vm, sites, preview), vm, ref: "website", frameSrc });
 }
 
 /** The Client Services hub. `live`: which parts have data behind them (see services-live.js). */

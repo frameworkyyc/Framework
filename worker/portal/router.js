@@ -36,6 +36,7 @@ import { clientDownloadInvoice } from "./invoice-files.js";
 import { invoiceStatusLine, supportStatusLine } from "./services-live.js";
 import { listClientWebsites, getClientWebsite } from "./repo/client-websites.js";
 import { clientScreenshotResponse } from "./website-files.js";
+import { checkEmbeddable } from "./website-preview.js";
 import * as supportRepo from "./repo/support.js";
 import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./support-files.js";
 import { dispatchNotifications } from "./service-notifications.js";
@@ -362,8 +363,13 @@ const BRANDING_ROUTES = [
 
 /* ------------------------------------------------------------------ Website (Phase 2; only where PORTAL_WEBSITE is on) */
 
+/** Can this website be shown live in a frame? Only a live or existing website with an https address is ever checked; any trouble reads as "no" and the page falls back. */
+const previewOf = (ctx, site) => (site && site.url && site.status !== "in_development"
+  ? checkEmbeddable(site.url, { fetch: ctx.previewFetch, portalOrigin: ctx.cfg.origin, cache: ctx.previewCache })
+  : null);
+
 const WEBSITE_ROUTES = [
-  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website$/, action: "website.view", run: async (ctx, a) => pages.websitePage(ctx, a, { sites: await listClientWebsites(ctx.db, a.membership.organizationId) }) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website$/, action: "website.view", run: async (ctx, a) => { const sites = await listClientWebsites(ctx.db, a.membership.organizationId); return pages.websitePage(ctx, a, { sites, preview: sites.length === 1 ? await previewOf(ctx, sites[0]) : null }); } },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/screenshot$/, action: "website.view", run: async (ctx, a, id) => {
       if (!UUID.test(id)) return notFoundPage(ctx);
       if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
@@ -374,7 +380,7 @@ const WEBSITE_ROUTES = [
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)$/, action: "website.view", run: async (ctx, a, id) => {
       if (!UUID.test(id)) return notFoundPage(ctx);
       const one = await getClientWebsite(ctx.db, a.membership.organizationId, id); // another organization's, unpublished and archived websites are all "not found"
-      return one ? pages.websitePage(ctx, a, { one }) : notFoundPage(ctx);
+      return one ? pages.websitePage(ctx, a, { one, preview: await previewOf(ctx, one) }) : notFoundPage(ctx);
     },
   },
 ];
@@ -608,7 +614,7 @@ export async function handlePortal(request, env, deps = {}) {
   const cfg = readPortalConfig(env);
   if (url.origin !== cfg.origin) return null;
 
-  const ctx = { request, env, cfg, db: env.PORTAL_DB, url, now: deps.now || new Date(), fetch: deps.fetch || fetch, waitUntil: deps.waitUntil, ref, demo: demoEnabled(env, cfg) };
+  const ctx = { request, env, cfg, db: env.PORTAL_DB, url, now: deps.now || new Date(), fetch: deps.fetch || fetch, previewFetch: deps.previewFetch || (deps.fetch ? null : fetch), previewCache: deps.previewCache !== undefined ? deps.previewCache : (typeof caches !== "undefined" && caches.default) || null, waitUntil: deps.waitUntil, ref, demo: demoEnabled(env, cfg) };
   const started = Date.now();
   const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   let response;

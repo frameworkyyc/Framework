@@ -120,7 +120,7 @@ export const NAV = Object.freeze([
  * @param actions HTML for the right side of the bar (sign-out form, or the demo exit link) - already escaped by the caller
  * @param banner  HTML shown above the bar (the demo banner) - already escaped by the caller
  */
-export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions = "", banner = "", headers = {}, cookies = [], script = null, styles = [], feedbackHref = null }) {
+export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions = "", banner = "", headers = {}, cookies = [], script = null, styles = [], feedbackHref = null, frameSrc = [] }) {
   const items = nav.list || [...NAV, ...(nav.items || [])];
   const links = items.map((n) => `<li><a href="${e(nav.base + n.path)}"${n.key === nav.active ? ' aria-current="page"' : ""}>${e(n.label)}</a></li>`).join("");
   const html = `<!DOCTYPE html>
@@ -130,7 +130,7 @@ export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions
 <nav class="primary" aria-label="Portal"><ul>${links}</ul></nav>
 <div class="who"><span class="who__org">${e(who.org)}</span><span class="who__user">${e(who.user)}</span><div class="who__act">${actions}</div></div></div></header>
 <main id="main" class="wrap page" tabindex="-1">${bodyHtml}</main>${feedbackHref ? footerWithFeedback(feedbackHref) : footer}</body></html>`;
-  return new Response(html, { status: code, headers: securityHeaders({ ...headers, "Content-Type": "text/html; charset=utf-8", "Set-Cookie": cookies }, { scripts: !!script }) });
+  return new Response(html, { status: code, headers: securityHeaders({ ...headers, "Content-Type": "text/html; charset=utf-8", "Set-Cookie": cookies }, { scripts: !!script, frameSrc }) });
 }
 
 export { e };

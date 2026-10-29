@@ -33,7 +33,7 @@ export const PORTAL_CSP = [
 export const PORTAL_CSP_WITH_SCRIPT = PORTAL_CSP.replace("default-src 'none'; ", "default-src 'none'; script-src 'self'; ");
 
 /** Headers every portal response carries. `extra` may add headers (never weaken the fixed ones: they are applied last). */
-export function securityHeaders(extra = {}, { scripts = false } = {}) {
+export function securityHeaders(extra = {}, { scripts = false, frameSrc = [] } = {}) {
   const h = new Headers();
   for (const [k, v] of Object.entries(extra)) {
     if (Array.isArray(v)) v.forEach((x) => h.append(k, x));
@@ -41,7 +41,9 @@ export function securityHeaders(extra = {}, { scripts = false } = {}) {
   }
   h.set("Cache-Control", "no-store");
   h.set("Referrer-Policy", "no-referrer");
-  h.set("Content-Security-Policy", scripts ? PORTAL_CSP_WITH_SCRIPT : PORTAL_CSP);
+  // frameSrc: https origins a single page may frame (the Website page's live preview). Only plain https origins are accepted, so nothing can add a directive; every other page has no frame-src at all.
+  const frames = [...new Set(frameSrc)].filter((o) => typeof o === "string" && /^https:\/\/[a-z0-9.-]+$/.test(o));
+  h.set("Content-Security-Policy", (scripts ? PORTAL_CSP_WITH_SCRIPT : PORTAL_CSP) + (frames.length ? `; frame-src ${frames.join(" ")}` : ""));
   h.set("X-Content-Type-Options", "nosniff");
   h.set("X-Frame-Options", "DENY");
   h.set("X-Robots-Tag", "noindex, nofollow");
