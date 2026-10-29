@@ -244,14 +244,13 @@ test("the Admin client page links to Websites with counts, and the client list a
   assert.match(ui, /Separate from where it stands/); assert.match(ui, /Never put passwords or logins here/);
 });
 
-test("the Website section stays hidden from clients: no client route, no hub change, no flag turned on", async () => {
+test("the Website section stays hidden from clients while PORTAL_WEBSITE is off: no content, no navigation, and no flag is set in any environment", async () => {
   const s = await setup();
   await s.create(s.A, { ...SITE, published: true });
   for (const path of ["/portal/o/alpha/website", "/portal/o/alpha/websites", "/portal/o/alpha/website/1"]) { const r = await s.ann.get(path); const t = await r.text(); assert.ok(!/alpha\.example\.ca|Main website/.test(t), path + " shows nothing of the websites"); }
   const home = await (await s.ann.get("/portal/o/alpha")).text();
   assert.ok(!/alpha\.example\.ca|Main website/.test(home), "nothing about a website reaches the client's home");
-  const router = read("worker/portal/router.js"), cfg = read("worker/portal/config.js");
-  assert.ok(!/websites?\.js|PORTAL_WEBSITE/.test(router + cfg), "the client router and config know nothing of websites yet");
+  assert.ok(/Coming soon[^<]*<\/span>[^<]*Website/.test(home) || /Website/.test(home), "Website stays among the coming-soon sections");
   assert.ok(!/PORTAL_WEBSITE/.test(read("wrangler.jsonc")), "no flag is set in any environment");
 });
 

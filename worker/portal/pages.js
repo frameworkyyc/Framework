@@ -12,7 +12,8 @@ import * as guided from "./guided.js";
 import * as live from "./profile-live.js";
 import * as brandingLive from "./branding-live.js";
 import * as servicesLive from "./services-live.js";
-import { brandingEnabled, servicesEnabled } from "./config.js";
+import * as websiteLive from "./website-live.js";
+import { brandingEnabled, servicesEnabled, websiteEnabled } from "./config.js";
 import { LIVE_AREAS } from "./guided-data.js";
 import { specimenSlots } from "./brand-type.js";
 
@@ -25,8 +26,8 @@ async function signOutForm(ctx, session) {
   return `<form method="post" action="/portal/logout" class="signout"><input type="hidden" name="csrf" value="${e(token)}"><button class="btn" type="submit">Sign out</button></form>`;
 }
 
-/** The sections that are built for signed-in clients: Branding joins them only where PORTAL_BRANDING is on (Staging). */
-export const liveAreasFor = (ctx) => (brandingEnabled(ctx.env) ? [...LIVE_AREAS, "branding"] : LIVE_AREAS);
+/** The sections that are built for signed-in clients: Branding joins them only where PORTAL_BRANDING is on, Website only where PORTAL_WEBSITE is on. */
+export const liveAreasFor = (ctx) => [...LIVE_AREAS, ...(brandingEnabled(ctx.env) ? ["branding"] : []), ...(websiteEnabled(ctx.env) ? ["website"] : [])];
 
 /** The view-model of the connected portal: only what the database holds for the member's own organization. */
 function liveModel(ctx, { session, membership: m, returning }, data = {}) {
@@ -150,6 +151,12 @@ export async function brandingUploadsPage(ctx, a, o = {}) {
   const vm = liveModel(ctx, a, {});
   const csrf = await csrfFor(ctx.cfg, a.session);
   return shell(ctx, a, { title: "Your brand materials", active: "home", body: brandingLive.brandingUploads(vm, { ...o, csrf }), vm, status: o.status || 200, script: o.error ? FOCUS_SCRIPT : null, ref: "branding-uploads" });
+}
+
+/** The Website section: `sites` is every website Framework published for this organization (the empty list is the "no website" state); `one` is a single website's own page. */
+export async function websitePage(ctx, a, { sites = [], one = null } = {}) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", body: one ? websiteLive.websiteDetail(vm, one) : websiteLive.websiteOverview(vm, sites), vm, ref: "website" });
 }
 
 /** The Client Services hub. `live`: which parts have data behind them (see services-live.js). */

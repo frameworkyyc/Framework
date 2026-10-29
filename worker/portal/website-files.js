@@ -1,10 +1,12 @@
 /**
- * A website's optional screenshot (Admin only in this phase): one private image in the files bucket, kept in step with the row in `websites` (repo/websites.js). Same rules as every
+ * A website's optional screenshot (Admin sets it; a client sees it only through clientScreenshotResponse): one private image in the files bucket, kept in step with the row in `websites` (repo/websites.js). Same rules as every
  * other file: the type is checked against the file's CONTENT, the object is written before the row points at it, a failed row update removes the object again, and nothing here
- * returns a storage key. Only png, jpg and webp are accepted, at most 5 MB. The client-facing display arrives with the dashboard phase.
+ * returns a storage key. Only png, jpg and webp are accepted, at most 5 MB.
  */
 import { ok, fail } from "./repo/common.js";
 import * as websites from "./repo/websites.js";
+import * as clientSites from "./repo/client-websites.js";
+import { can } from "./policy.js";
 import { recordActivity } from "./repo/activity.js";
 import { inspectUpload, makeKey, putObject, getObject, deleteObject, StorageError, fileResponse } from "./files/index.js";
 
@@ -44,6 +46,17 @@ export async function adminRemoveScreenshot(deps, { organizationId, websiteId, a
 /** The screenshot as an inline picture for the Admin page (never recorded as a download; sandboxed headers like every file). */
 export async function adminScreenshotResponse(deps, { organizationId, websiteId }) {
   const rec = await websites.getScreenshotRecord(deps.db, organizationId, websiteId);
+  if (!rec) return fail("not_found");
+  let object;
+  try { object = await getObject(deps.bucket, { key: rec.key, organizationId }); } catch (err) { return storageFail(err); }
+  if (!object) return fail("not_found");
+  return ok({ response: fileResponse({ object, name: rec.name, ext: rec.format, inlineImage: true, size: rec.size }) });
+}
+
+/** The screenshot for a CLIENT: only of a published, unarchived website of their own organization (anything else is "not found"), as an inline picture with the same sandboxed headers. */
+export async function clientScreenshotResponse(deps, { role, organizationId, websiteId }) {
+  if (!can(role, "website.view")) return fail("forbidden");
+  const rec = await clientSites.getClientScreenshotRecord(deps.db, organizationId, websiteId);
   if (!rec) return fail("not_found");
   let object;
   try { object = await getObject(deps.bucket, { key: rec.key, organizationId }); } catch (err) { return storageFail(err); }
