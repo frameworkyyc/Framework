@@ -67,7 +67,7 @@ test("client detail structure: header, next step, a single clickable Business Pr
   assert.match(detail, /dash\.header,\s*deletedBanner,\s*dash\.overview,/, "header then overview first");
   assert.ok(!/sectionMap\(|stepAccordion|Saved answers|adm-mapsec|id: "adm-profile"/.test(detail), "no section map or saved answers on the dashboard");
   assert.ok(!/brandingRow|invoicesRow|supportRow/.test(detail), "Branding, Invoices and Support are cards in the dashboard overview, not separate rows");
-  assert.match(dash, /brandingTile, invoicesTile, supportTile/, "all five areas share one tile grid");
+  assert.match(dash, /brandingTile, websiteTile, invoicesTile, supportTile/, "all six areas share one tile grid");
   assert.ok(detail.indexOf("dash.overview") < detail.indexOf("access,") && detail.indexOf("access,") < detail.lastIndexOf("info,"), "order: overview cards, team access, organization details last");
   assert.match(detail, /id: "org-details"[\s\S]*?"Portal address"[\s\S]*?"Website"[\s\S]*?"Created"/, "the low-priority details stay available inside a collapsed section");
   assert.ok(!/open: true/.test(detail), "nothing in the detail page is open by default");
