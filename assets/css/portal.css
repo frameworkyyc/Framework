@@ -889,3 +889,14 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-req { display: inline-block; margin-left: 12px; vertical-align: middle; font-family: var(--font-body); font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; line-height: 1.2; color: var(--slate); }
 .bk-req--required { color: var(--ink); }
 .bk-req__why { font-weight: 500; letter-spacing: .02em; text-transform: none; color: var(--slate); }
+
+/* Website section (client) */
+.ws__badges { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: var(--space-2) 0; }
+.ws__managed { font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); }
+.ws__name { margin-top: var(--space-3); }
+.ws__lead { margin: var(--space-2) 0 var(--space-3); }
+.ws__shot { display: block; max-width: 100%; height: auto; margin: var(--space-3) 0; border: 1px solid var(--hairline); }
+.ws__facts { max-width: 40em; }
+.ws__empty { max-width: 40em; margin-top: var(--space-4); }
+.ws__list { margin-top: var(--space-3); }
+.ws__back { margin-top: var(--space-4); }
