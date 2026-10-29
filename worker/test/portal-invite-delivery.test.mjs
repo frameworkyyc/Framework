@@ -48,7 +48,7 @@ const send = (m, db, o, inv, over = {}) => deliverInvitation(m.ctx(db, over.now)
 /* ------------------------------------------------------------------ the proposed migration */
 
 test("migration 0004: additive and compatible. It is the fourth portal migration, existing invitations become 'not_sent', and the constraints hold", () => {
-  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql"]);
+  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql"]);
   assert.ok(!existsSync(new URL("../../migrations/portal-proposed/0004_invitation_delivery.sql", import.meta.url)), "0004 was moved out of the proposal folder, not copied (the folder now holds later, still unapplied proposals)");
   const sqlText = read(MIGRATION).replace(/^--.*$/gm, "");
   assert.deepEqual(sqlText.match(/\b(ALTER|CREATE|DROP|INSERT|UPDATE|DELETE)\b/g), ["ALTER", "ALTER", "ALTER", "ALTER"], "four ALTER TABLE ... ADD COLUMN statements and nothing else");
@@ -81,7 +81,7 @@ test("migration 0004: additive and compatible. It is the fourth portal migration
 test("migration workflows: the Production check knows the migrations in order (0001 to 0008) and fails closed on anything else; the Staging config reads migrations/portal", () => {
   const check = read(".github/scripts/portal-d1-check.mjs");
   for (const f of ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql"]) assert.ok(check.includes(`"${f}"`), f);
-  for (const f of ["0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql"]) assert.ok(check.includes(`"${f}"`), f + " is known to the Production check (additive; applied only by the manual workflow, after approval)");
+  for (const f of ["0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql"]) assert.ok(check.includes(`"${f}"`), f + " is known to the Production check (additive; applied only by the manual workflow, after approval)");
   assert.match(check, /pending list must be a TAIL of the known, ordered list/);
   assert.match(read("wrangler.jsonc"), /"migrations_dir": "migrations\/portal"/);
   assert.match(read("migrations/portal/wrangler.migrate.staging.jsonc"), /"database_name": "framework-portal-staging"/);

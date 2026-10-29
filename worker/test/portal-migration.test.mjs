@@ -22,7 +22,7 @@ const insertInvitation = (db, org, email = "a@example.com", extra = {}) => {
 const rejects = (fn, re = /constraint failed/i, label = "") => assert.throws(fn, re, label);
 
 test("migration files: one numbered file, applied in order, named for wrangler", () => {
-  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql"]);
+  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql"]);
 });
 
 test("applies to an empty database and creates exactly the portal tables", () => {
