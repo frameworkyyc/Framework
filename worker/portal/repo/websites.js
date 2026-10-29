@@ -47,6 +47,10 @@ export function validateWebAddress(raw) {
 
 const FIELDS = ["name", "url", "origin", "status", "managed_by_framework", "launch_date", "domain_registrar", "domain_owner", "domain_renewal", "hosting_provider", "hosting_owner", "hosting_renewal", "management_notes", "published", "sort_order"];
 export const WEBSITE_FIELDS = Object.freeze([...FIELDS]);
+// Module-level, fixed column lists (never built from input): every writable column, in a fixed order, and what an omitted one is.
+const INSERT_COLUMNS = ["id", "organization_id", ...FIELDS, "created_at", "updated_at", "updated_by"].join(", ");
+const INSERT_PLACEHOLDERS = ["id", "organization_id", ...FIELDS, "created_at", "updated_at", "updated_by"].map(() => "?").join(", ");
+const OMITTED = { sort_order: 0 };
 
 /** Validate the submitted fields (all of them for a new website; just the given ones for an update). Returns { values } or { error }. */
 function check(input, { partial }) {
@@ -113,10 +117,10 @@ export async function createWebsite(db, organizationId, input, actor, { now = ne
   const c = check(input, { partial: false });
   if (c.error) return fail(c.error);
   const v = c.values, id = newId(), at = isoTime(now);
-  const cols = ["id", "organization_id", ...Object.keys(v), "created_at", "updated_at", "updated_by"], vals = [id, organizationId, ...Object.values(v), at, at, actor.trim()];
+  const vals = [id, organizationId, ...FIELDS.map((k) => (v[k] === undefined ? (OMITTED[k] ?? null) : v[k])), at, at, actor.trim()];
   try {
     const res = await db.batch([
-      db.prepare(`INSERT INTO websites (${cols.join(", ")}) SELECT ${cols.map(() => "?").join(", ")} WHERE (SELECT count(*) FROM websites WHERE organization_id = ? AND archived_at IS NULL) < ?`).bind(...vals, organizationId, MAX_WEBSITES),
+      db.prepare(`INSERT INTO websites (${INSERT_COLUMNS}) SELECT ${INSERT_PLACEHOLDERS} WHERE (SELECT count(*) FROM websites WHERE organization_id = ? AND archived_at IS NULL) < ?`).bind(...vals, organizationId, MAX_WEBSITES),
       audit(db, organizationId, actor, "website.created", id, at, { name: v.name, status: v.status }),
     ]);
     return res[0].meta.changes === 1 ? ok({ id }) : fail("too_many");
@@ -133,12 +137,12 @@ export async function updateWebsite(db, organizationId, websiteId, patch, actor,
   if (!patch || typeof patch !== "object" || Array.isArray(patch) || Object.keys(patch).some((k) => !FIELDS.includes(k))) return fail("invalid_input");
   const c = check(patch, { partial: true });
   if (c.error) return fail(c.error);
-  const keys = Object.keys(c.values);
+  const keys = Object.keys(c.values), sets = keys.map((k) => `${k} = ?`); // the keys are validated members of FIELDS; every value is bound
   if (!keys.length) return fail("invalid_input");
   const at = isoTime(now);
   try {
     const res = await db.batch([
-      db.prepare(`UPDATE websites SET ${keys.map((k) => `${k} = ?`).join(", ")}, updated_at = ?, updated_by = ? WHERE id = ? AND organization_id = ? AND archived_at IS NULL`).bind(...Object.values(c.values), at, actor.trim(), websiteId, organizationId),
+      db.prepare(`UPDATE websites SET ${sets.join(", ")}, updated_at = ?, updated_by = ? WHERE id = ? AND organization_id = ? AND archived_at IS NULL`).bind(...Object.values(c.values), at, actor.trim(), websiteId, organizationId),
       audit(db, organizationId, actor, "website.updated", websiteId, at, { fields: keys }),
     ]);
     return res[0].meta.changes === 1 ? ok() : fail("not_found");

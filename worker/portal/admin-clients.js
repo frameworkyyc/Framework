@@ -11,6 +11,7 @@
  */
 import { PROFILE_STEPS, profileProgress, stepStatus } from "./profile-schema.js";
 import { brandingSummary } from "./repo/brand.js";
+import { websiteSummary } from "./repo/websites.js";
 import { adminInvoiceSummary } from "./repo/invoices.js";
 import { adminSupportSummary } from "./repo/support.js";
 
@@ -96,6 +97,11 @@ async function brandingFor(rdb, id) {
   try { return await brandingSummary(rdb, id); } catch { return null; }
 }
 
+/** Website counts for the client page, or null on a database without migration 0011. */
+async function websitesFor(rdb, id) {
+  try { return await websiteSummary(rdb, id); } catch { return null; }
+}
+
 /** Invoice counts (drafts waiting, past due) for the client page, or null on a database without migration 0007. */
 async function invoicesFor(rdb, id, now) {
   try { return await adminInvoiceSummary(rdb, id, { now }); } catch { return null; }
@@ -117,7 +123,7 @@ async function one(rdb, id, now, writes) {
   const invitations = (await rdb.prepare("SELECT email, role, status, created_at, created_by, expires_at, accepted_at, revoked_at FROM invitations WHERE organization_id = ? ORDER BY created_at DESC LIMIT 100").bind(id).all()).results
     .map((i) => ({ ...i, past_expiry: i.status === "pending" && i.expires_at <= t })); // the stored status is reported as it is; "past_expiry" is only a fact about the date
   const ans = await answersFor(rdb, id);
-  return json({ organization: org, capabilities: { writes }, members, invitations, profile_available: ans.ok, profile: ans.ok ? profileFor(ans.rows, { withAnswers: true }) : null, branding: await brandingFor(rdb, id), invoices: await invoicesFor(rdb, id, now), support: await supportFor(rdb, id) });
+  return json({ organization: org, capabilities: { writes }, members, invitations, profile_available: ans.ok, profile: ans.ok ? profileFor(ans.rows, { withAnswers: true }) : null, branding: await brandingFor(rdb, id), websites: await websitesFor(rdb, id), invoices: await invoicesFor(rdb, id, now), support: await supportFor(rdb, id) });
 }
 
 /**
