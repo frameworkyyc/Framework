@@ -43,12 +43,12 @@ test("with PORTAL_WEBSITE off, Website stays 'Coming soon' and none of the new r
   assert.ok(!/href="\/portal\/o\/alpha\/website"/.test(await text(await s.ann.get("/portal/o/alpha"))), "Home does not link a section that is not live");
 });
 
-test("the flag is exactly \"1\", independent of the Branding and Services flags, and set on Staging only", () => {
+test("the flag is exactly \"1\", independent of the Branding and Services flags, and set in the config for Staging and Production", () => {
   const cfg = read("worker/portal/config.js");
   assert.match(cfg, /websiteEnabled[\s\S]*PORTAL_WEBSITE\) === "1"/);
   const w = JSON.parse(read("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1"));
-  assert.ok(!("PORTAL_WEBSITE" in w.vars), "Production (top-level vars) never has the flag");
-  assert.equal(w.previews.vars.PORTAL_WEBSITE, "1", "Staging has it");
+  assert.equal(w.vars.PORTAL_WEBSITE, "1", "Production has it (approved for the website release)");
+  assert.equal(w.previews.vars.PORTAL_WEBSITE, "1", "Staging has it too");
 });
 
 test("state 1, No Website: an empty state with a way to get in touch; nothing is stored for it", async () => {
