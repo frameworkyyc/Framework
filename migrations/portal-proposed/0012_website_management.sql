@@ -1,5 +1,5 @@
 -- Website management and Additional Services (Website Phase 3).
--- PROPOSED, NOT APPLIED anywhere. Staging first, after approval; Production follows the manual Production workflow after its own approval. See worker/portal/WEBSITES.md.
+-- APPROVED and applied to the Staging database ONLY (verified: schema identical to this file, existing data unchanged). Production follows the manual Production workflow after its own approval. See worker/portal/WEBSITES.md.
 -- Additive only: two new tables and a few seed rows. Nothing that exists is changed or removed (no ALTER, no UPDATE, no DELETE).
 --
 --   website_packages  The downloadable website files (one ZIP) Framework Admin uploads for a website. At most ONE current file per website (website_id is the key); replacing it replaces
