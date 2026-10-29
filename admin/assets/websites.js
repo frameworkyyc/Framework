@@ -104,6 +104,41 @@ export async function render(orgId, ctx) {
       canWrite() ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--primary adm-small", type: "submit" }, site ? "Save website" : "Add website")) : null);
   }
 
+  /** What the portal's live-preview check sees for this website, from the Worker (read-only; answers plain words, never page content). */
+  const previews = new Map();
+  const PREVIEW_WHY = {
+    blocked: "The website tells browsers not to show it inside another page, so clients see the screenshot (if there is one) or a Visit website card.",
+    status: "The website did not answer the portal’s check with a normal page. If the status below is not 200, the portal’s own check could not reach it.",
+    redirect: "The website redirects somewhere the portal’s check will not follow (not https, or not a public website name).",
+    not_html: "The address does not return a web page.", unreachable: "The portal’s check could not reach the website (it timed out or the connection failed).",
+    address_not_checkable: "Only public https addresses are checked; this one is not.", unavailable: "The check is not available on this deployment.",
+  };
+  function previewBlock(site) {
+    if (!site.url || site.status === "in_development") return null;
+    const r = previews.get(site.id);
+    const lines = [];
+    if (r && r.pending) lines.push(h("p", { class: "adm-muted", text: "Checking…" }));
+    else if (r && r.failed) lines.push(h("p", { class: "adm-muted", text: "The check could not be run. Reload the page and try again." }));
+    else if (r) {
+      lines.push(h("p", { class: "adm-brand__meta", text: r.embeddable ? "Live preview is available: this website allows the portal to show it, so clients see it live." : PREVIEW_WHY[r.reason] || "Live preview is not available for this website." }));
+      const facts = [];
+      if (r.hops && r.hops.length) facts.push("Checked: " + r.hops.map((x) => `${x.host} → ${x.status === null ? "no answer" : x.status}`).join(", then "));
+      if (r.error) facts.push("Error: " + r.error);
+      if (r.contentType) facts.push("Type: " + r.contentType);
+      facts.push("X-Frame-Options: " + (r.xFrameOptions || "none"));
+      facts.push("CSP frame-ancestors: " + (r.frameAncestors && r.frameAncestors.length ? r.frameAncestors.join(" | ") : "none"));
+      lines.push(h("ul", { class: "adm-muted" }, facts.map((t) => h("li", { text: t }))));
+    }
+    return h("div", { class: "adm-ws__preview" },
+      h("p", { class: "acc__group" }, "Live preview"),
+      h("p", { class: "adm-muted", text: "Clients see this website live when it allows being shown inside the portal. Otherwise they see the screenshot below, or a plain card with a Visit website button." }),
+      h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: async () => {
+        previews.set(site.id, { pending: true }); draw();
+        try { previews.set(site.id, await api(`${base}/${encodeURIComponent(site.id)}/preview-check`)); } catch { previews.set(site.id, { failed: true }); }
+        draw();
+      } }, r && !r.pending ? "Check again" : "Check live preview"), ...lines);
+  }
+
   /** The screenshot: a preview, and a picture to set, replace or remove. */
   function screenshotBlock(site) {
     const input = h("input", { id: "ws-shot-" + site.id.slice(0, 8), class: "input", type: "file", accept: ".png,.jpg,.jpeg,.webp" });
@@ -139,7 +174,7 @@ export async function render(orgId, ctx) {
     const key = "ws-" + site.id;
     return h("details", { class: "adm-acc adm-ws", id: key, open: opened.has(key) ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add(key); else opened.delete(key); } },
       h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: site.name }), h("span", { class: "adm-acc__meta" }, chips)),
-      h("div", { class: "adm-acc__body" }, h("p", null, summary), archived ? null : siteForm(site), archived ? null : screenshotBlock(site), actions));
+      h("div", { class: "adm-acc__body" }, h("p", null, summary), archived ? null : siteForm(site), archived ? null : previewBlock(site), archived ? null : screenshotBlock(site), actions));
   }
 
   function draw() {
