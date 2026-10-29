@@ -75,12 +75,12 @@ export async function readJson(request, allowed) {
 }
 
 /** multipart/form-data with exactly one `file` and an optional JSON `meta`. The declared size is checked BEFORE anything is read. */
-export async function readUpload(request, { withMeta }) {
+export async function readUpload(request, { withMeta, max = MAX_MULTIPART }) {
   const type = (request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
   if (type !== "multipart/form-data") return { response: err(415, "unsupported_media_type", "Send the file as a form upload.") };
   const declared = Number(request.headers.get("Content-Length"));
   if (!Number.isFinite(declared) || declared <= 0) return { response: err(411, "length_required", "The upload's size was not stated.") };
-  if (declared > MAX_MULTIPART) return { response: err(413, "file_too_large", "The file is too large.") };
+  if (declared > max) return { response: err(413, "file_too_large", "The file is too large.") };
   let form;
   try { form = await request.formData(); } catch { return { response: err(400, "invalid_upload", "The upload could not be read.") }; }
   const f = form.get("file");
