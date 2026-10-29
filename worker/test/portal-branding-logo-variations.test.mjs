@@ -138,7 +138,7 @@ test("Secondary needs no migration: it is stored as an unset logo_role with a 's
   assert.throws(() => s.w.db.raw.prepare("INSERT INTO brand_assets (id, organization_id, kind, title, logo_role, format, content_type, size_bytes, sha256, storage_key, original_name, created_by) VALUES (?, ?, 'logo', 't', 'secondary', 'png', 'image/png', 1, ?, ?, 'x.png', 'a')").run(crypto.randomUUID(), s.A.id, "a".repeat(64), "org/" + "a".repeat(40)), "the database CHECK still allows only the three older values, which is why no migration is needed");
   const bad = await s.upload(s.A, s.logo("tertiary"), "x.png", S.png());
   assert.deepEqual([bad.status, bad.json.error], [422, "invalid_logo_role"]);
-  assert.deepEqual(readdirSync(new URL("../../migrations/portal/", import.meta.url)).filter((f) => f.endsWith(".sql")).sort(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql"], "no new migration");
+  assert.deepEqual(readdirSync(new URL("../../migrations/portal/", import.meta.url)).filter((f) => f.endsWith(".sql")).sort(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql"], "no new migration");
 });
 
 test("several formats in one variation: every format downloads, the preview uses an image format, and a PDF-only variation shows a plain tile with its download", async () => {
@@ -695,13 +695,13 @@ test("Admin status messages have one 1px border and no ring around it when a scr
 
 /* ------------------------------------------------------------------ 04 Tagline (stored in brand_kits.sections_json, migration 0009) */
 
-import { readFileSync as readSql } from "node:fs";
-const applyProposed = (s) => s.w.db.raw.exec(readSql(new URL("../../migrations/portal-proposed/0009_brand_sections.sql", import.meta.url), "utf8"));
+/** A database as it is before migration 0009: the same schema with that one column dropped. */
+const withoutSections = (s) => s.w.db.raw.exec("ALTER TABLE brand_kits DROP COLUMN sections_json");
 const saveTag = (s, org, tagline) => s.call(`/clients/${org.id}/branding/kit`, { method: "PUT", json: { sections: { tagline } } });
 const TAG = { primary: "Clear thinking, beautifully made.", alternates: ["Built to be remembered", "Design with intent"], guidelines: "Use beside the logo, never above it.\n\nNever stretch or restyle it." };
 
 test("tagline storage is optional until migration 0009 is applied: the code works without the column, says so plainly, and keeps every other kit save working", async () => {
-  const s = await setup();
+  const s = await setup(); withoutSections(s);
   const view = await s.call(`/clients/${s.A.id}/branding`);
   assert.equal(view.json.capabilities.sections, false, "Admin is told storage isn't available yet");
   const refused = await saveTag(s, s.A, TAG);
@@ -713,7 +713,7 @@ test("tagline storage is optional until migration 0009 is applied: the code work
 });
 
 test("Admin saves, edits and removes a tagline; the client sees it only once the kit is published, with a Copy button beside each tagline; other kit content is untouched both ways", async () => {
-  const s = await setup(); applyProposed(s);
+  const s = await setup();
   await s.call(`/clients/${s.A.id}/branding/kit`, { method: "PUT", json: { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }], typography: [TF({ slot: "primary" })], brand_name: "Alpha" } });
   assert.equal((await s.call(`/clients/${s.A.id}/branding`)).json.capabilities.sections, true);
   const saved = await saveTag(s, s.A, TAG); assert.equal(saved.status, 200, JSON.stringify(saved.json));
@@ -747,7 +747,7 @@ test("Admin saves, edits and removes a tagline; the client sees it only once the
 });
 
 test("tagline validation: single-line text up to 120 characters, at most six alternates, guidelines up to 600, only the tagline key; the server is the authority", async () => {
-  const s = await setup(); applyProposed(s);
+  const s = await setup();
   const bad = [{ primary: "x".repeat(121) }, { primary: "two\nlines" }, { alternates: new Array(7).fill(0).map((_, i) => "alt " + i) }, { alternates: ["x".repeat(121)] }, { alternates: "not a list" }, { guidelines: "g".repeat(601) }, { primary: "ok", extra: 1 }, { primary: 42 }];
   for (const t of bad) { const r = await saveTag(s, s.A, t); assert.equal(r.status, 422, JSON.stringify(t).slice(0, 60)); assert.equal(r.json.error, "invalid_sections"); }
   for (const body of [{ sections: { colours: [] } }, { sections: [] }, { sections: "x" }, { sections: { tagline: [] } }]) assert.equal((await s.call(`/clients/${s.A.id}/branding/kit`, { method: "PUT", json: body })).status, 422, JSON.stringify(body));
@@ -757,7 +757,7 @@ test("tagline validation: single-line text up to 120 characters, at most six alt
 });
 
 test("tagline text is escaped everywhere it is shown, a client can't change it, and another organization never sees it", async () => {
-  const s = await setup(); applyProposed(s); await publishOnly(s, s.A); await publishOnly(s, s.B);
+  const s = await setup(); await publishOnly(s, s.A); await publishOnly(s, s.B);
   const evil = { primary: `<img src=x onerror="alert(1)"> & "quoted"`, alternates: [`</p><script>alert(2)</script>`, `'single' <b>bold</b>`], guidelines: `<script>alert(3)</script>\n<a href="javascript:alert(4)">x</a>` };
   assert.equal((await saveTag(s, s.A, evil)).status, 200);
   const html = await (await s.ann.get(base)).text(); const sec = sectionHtml(html, "tagline");
@@ -783,5 +783,5 @@ test("Admin tagline form: primary, add/remove alternates (up to six), usage guid
   assert.match(ui, /function taglineSection\(\)/); assert.match(ui, /"Primary tagline"/); assert.match(ui, /"Add alternate tagline"/); assert.match(ui, /Remove alternate tagline/); assert.match(ui, /"Usage guidelines \(optional\)"/);
   assert.match(ui, /sections: \{ tagline \}/); assert.match(ui, /"Save tagline"/); assert.match(ui, /"Remove tagline"/); assert.match(ui, /maxlength: "120"/); assert.match(ui, /maxlength: "600"/);
   assert.match(ui, /caps\(\)\.sections !== false/); assert.match(ui, /sections_unavailable/); assert.ok(!/waiting for approval/.test(ui), "the old placeholder notice is gone");
-  assert.match(read("migrations/portal-proposed/0009_brand_sections.sql"), /ALTER TABLE brand_kits ADD COLUMN sections_json TEXT CHECK \(sections_json IS NULL OR \(json_valid\(sections_json\) AND json_type\(sections_json\) = 'object' AND length\(sections_json\) <= 12000\)\);/);
+  assert.match(read("migrations/portal/0009_brand_sections.sql"), /ALTER TABLE brand_kits ADD COLUMN sections_json TEXT CHECK \(sections_json IS NULL OR \(json_valid\(sections_json\) AND json_type\(sections_json\) = 'object' AND length\(sections_json\) <= 12000\)\);/);
 });
