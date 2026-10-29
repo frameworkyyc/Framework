@@ -824,4 +824,4 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 /* Websites (a client's Admin page): the same accordion language as Branding; a screenshot preview that never overflows. */
 .adm-ws__list { display: grid; gap: 0; margin: 0 0 24px; }
 .adm-ws__shot { margin: 24px 0 0; }
-.adm-ws__img { display: block; max-width: 100%; height: auto; margin: 8px 0; border: 1px solid var(--hairline); }
+.adm-ws__img { display: block; width: auto; max-width: min(100%, 480px); height: auto; margin: 8px 0; border: 1px solid var(--hairline); }

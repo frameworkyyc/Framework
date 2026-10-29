@@ -110,7 +110,7 @@ export async function render(orgId, ctx) {
     const url = `/api/admin${base}/${encodeURIComponent(site.id)}/screenshot?v=${encodeURIComponent(site.updatedAt || "")}`;
     return h("div", { class: "adm-ws__shot" },
       h("p", { class: "acc__group" }, "Screenshot"),
-      site.screenshot ? h("img", { class: "adm-ws__img", src: url, alt: `Screenshot of ${site.name}`, loading: "lazy", width: "480" }) : h("p", { class: "adm-muted" }, "No screenshot yet. It is optional."),
+      site.screenshot ? h("img", { class: "adm-ws__img", src: url, alt: `Screenshot of ${site.name}`, loading: "lazy" }) : h("p", { class: "adm-muted" }, "No screenshot yet. It is optional."),
       site.screenshot ? h("p", { class: "adm-brand__meta", text: `${site.screenshot.name} · ${fmtSize(site.screenshot.size)}` }) : null,
       canWrite() && data.capabilities.storage ? [
         field(input.id, site.screenshot ? "Replace the screenshot" : "Add a screenshot", input, "PNG, JPG or WebP, up to 5 MB."),
@@ -122,8 +122,8 @@ export async function render(orgId, ctx) {
             const body = new FormData(); body.append("file", f, f.name);
             perform({ request: () => api(`${base}/${encodeURIComponent(site.id)}/screenshot`, { method: "POST", body }), success: "Screenshot saved." });
           } }, site.screenshot ? "Replace screenshot" : "Add screenshot"),
-          site.screenshot ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => perform({ confirm: { title: "Remove the screenshot?", body: "The picture is deleted from storage.", details: [["Website", site.name]], confirmLabel: "Remove screenshot" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/screenshot/remove`, { method: "POST", body: {} }), success: "Screenshot removed." }) }, "Remove screenshot") : null))
-        : null);
+          site.screenshot ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => perform({ confirm: { title: "Remove the screenshot?", body: "The picture is deleted from storage.", details: [["Website", site.name]], confirmLabel: "Remove screenshot" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/screenshot/remove`, { method: "POST", body: {} }), success: "Screenshot removed." }) }, "Remove screenshot") : null)
+      ] : null);
   }
 
   function siteCard(site) {

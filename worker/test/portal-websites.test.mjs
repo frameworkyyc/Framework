@@ -254,3 +254,13 @@ test("the Website section stays hidden from clients: no client route, no hub cha
   assert.ok(!/websites?\.js|PORTAL_WEBSITE/.test(router + cfg), "the client router and config know nothing of websites yet");
   assert.ok(!/PORTAL_WEBSITE/.test(read("wrangler.jsonc")), "no flag is set in any environment");
 });
+
+test("the new Admin pages are valid JavaScript modules (they are loaded by the browser, so a slip here would only show up there)", async () => {
+  const { spawnSync } = await import("node:child_process"); const { mkdtempSync, writeFileSync } = await import("node:fs"); const { tmpdir } = await import("node:os"); const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "adm-check-"));
+  for (const f of ["websites", "settings", "client-dashboard", "clients"]) {
+    const file = join(dir, f + ".mjs"); writeFileSync(file, read(`admin/assets/${f}.js`));
+    const r = spawnSync(process.execPath, ["--check", file], { encoding: "utf8" });
+    assert.equal(r.status, 0, `${f}.js: ${r.stderr}`);
+  }
+});
