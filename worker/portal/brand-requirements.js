@@ -20,12 +20,14 @@ export const DEFAULT_REQUIREMENT = Object.freeze({
 });
 
 /**
- * Explicit dependencies: service_requests key -> the sections that service cannot be done without. Only listed services require anything. Today the two quoted
- * services need the three sections that are already Required, so no Recommended section changes yet; a new dependency is one line here (see the report to Framework for proposals).
+ * Explicit dependencies: service_requests key -> the sections that service cannot be delivered without. Only genuine necessities are listed; a service that is not listed adds no requirement
+ * and nothing is inferred. A requirement is only a label: it never blocks, delays or hides a request (the request button is always there), and a section is never marked complete because of it.
+ * A business card and an email signature cannot be designed without the client's logo and brand colours; typefaces are the designer's call, so Typography is not listed. Both of those
+ * sections are Required by default, so no Recommended section changes yet; a new dependency is one line here, added only when a service truly cannot be done without that section.
  */
 export const SERVICE_REQUIRES = Object.freeze({
-  "business-card-design": Object.freeze(["logo", "typography", "colours"]),
-  "email-signature-design": Object.freeze(["logo", "typography", "colours"]),
+  "business-card-design": Object.freeze(["logo", "colours"]),
+  "email-signature-design": Object.freeze(["logo", "colours"]),
 });
 
 const OPEN = new Set(["new", "contacted"]);
