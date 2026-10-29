@@ -32,7 +32,7 @@ test("Production's portal resources are exactly: its own portal database, the Wo
   assert.equal(config.vars.ASSESSMENT_NOTIFY_TO, "hello@frameworkco.ca");
   assert.deepEqual(config.triggers, { crons: ["0-59/5 * * * *"] }, "the Stage 5 schedule: Production only");
   assert.equal(config.previews.triggers, undefined);
-  assert.deepEqual(Object.keys(config.vars).filter((k) => k.startsWith("PORTAL_")).sort(), ["PORTAL_ADMIN_WRITES", "PORTAL_ALLOW_PRODUCTION", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER", "PORTAL_BASE_URL", "PORTAL_BRANDING", "PORTAL_ENABLED", "PORTAL_INVITE_SENDING"]);
+  assert.deepEqual(Object.keys(config.vars).filter((k) => k.startsWith("PORTAL_")).sort(), ["PORTAL_ADMIN_WRITES", "PORTAL_ALLOW_PRODUCTION", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER", "PORTAL_BASE_URL", "PORTAL_BRANDING", "PORTAL_ENABLED", "PORTAL_INVITE_SENDING", "PORTAL_WEBSITE"]);
   const before = raw.slice(0, raw.indexOf('"previews"')).replace(/^\s*\/\/.*$/gm, "");
   assert.ok(!/PORTAL_PROBE|PORTAL_DEMO/.test(before), "no probe flag and no demo switch before the previews block");
   assert.equal(before.split('"bucket_name": "framework-portal-files"').length - 1, 1, "the Production files bucket is bound exactly once, outside previews");
