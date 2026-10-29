@@ -578,28 +578,6 @@ test("empty typography: a restrained empty state with the existing request butto
   assert.match(sectionHtml(await (await s.ann.get(base)).text(), "typography"), /class="tag">Requested</);
 });
 
-test("pricing presentation is designed but inactive: every provisional price is off, labels follow the three presentations, and a price only renders when explicitly activated", async () => {
-  const P = await import("../portal/branding-pricing.js");
-  assert.deepEqual(Object.fromEntries(Object.values(P.BRANDING_PRICING).map((x) => [x.name, x.priceCad])), { "Primary Logo Design": 500, "Secondary Logo": 150, "Simplified Logo": 150, "Sub-mark": 150, "Typography System": 250, "Brand Colour Palette": 200, "Tagline Development": 250, "Brand Imagery Direction": 300, "Layout System": 350, "Textures & Patterns": 150, Iconography: 250, "Design Style Guide": 350, "Framework Brand Kit": 2500 });
-  assert.ok(Object.values(P.BRANDING_PRICING).every((x) => x.active === false && x.type === "starting_at"), "nothing is live and nothing is assumed included");
-  assert.equal(P.activePricing("typography"), null);
-  assert.equal(P.priceLabel(P.BRANDING_PRICING.typography), "Starting at $250 CAD"); assert.equal(P.priceLabel(P.BRANDING_PRICING["brand-kit"]), "Starting at $2,500 CAD");
-  assert.equal(P.priceLabel({ type: "custom_quote" }), "Custom quote"); assert.equal(P.priceLabel({ type: "included" }), "Included"); assert.equal(P.priceLabel({ type: "starting_at", priceCad: 0 }), ""); assert.equal(P.priceLabel({ type: "bogus" }), "");
-  assert.equal(P.pricingBlock(P.BRANDING_PRICING.typography, "<x>"), "", "inactive renders nothing");
-  const on = { ...P.BRANDING_PRICING.typography, active: true };
-  const block = P.pricingBlock(on, '<p class="req">ACTION</p>');
-  assert.match(block, /Typography System/); assert.match(block, /Starting at \$250 CAD/); assert.match(block, /approved typeface roles, hierarchy and usage guidance/); assert.match(block, /A starting price, not a quote/); assert.match(block, /ACTION/);
-  const kit = P.pricingBlock({ ...P.BRANDING_PRICING["brand-kit"], active: true });
-  assert.match(kit, /Not included: original photography production, bespoke illustration, custom typefaces, extensive icon libraries/); assert.doesNotMatch(kit, /unlimited|revision|turnaround|days/i, "no scope or timing promised that isn't defined");
-  const { brandingOverview } = await import("../portal/branding-live.js");
-  const vm = { base: "/portal/o/alpha" };
-  const withPrice = brandingOverview(vm, { published: true, assets: [], colours: [], typography: [] }, { canRequest: true, csrf: "t", requests: {}, pricing: { typography: on } });
-  assert.match(sectionHtml(withPrice, "typography"), /bk-price[\s\S]*Starting at \$250 CAD[\s\S]*<summary class="btn btn--small">Request/, "the price sits with the existing request button");
-  assert.ok(!/bk-price/.test(sectionHtml(withPrice, "colours")), "no prices beside other section headings");
-  const withTypes = brandingOverview(vm, { published: true, assets: [], colours: [], typography: [TF({ slot: "primary" })] }, { canRequest: true, csrf: "t", requests: {}, pricing: { typography: on } });
-  assert.ok(!/bk-price/.test(withTypes), "completed typography shows no sales block");
-});
-
 test("Admin typography wiring: slots, styles, file choice and hierarchy-free save; the three roles come from one shared catalogue", () => {
   const ui = read("admin/assets/branding.js"), shared = read("admin/assets/brand-sections.js");
   assert.match(shared, /TYPE_SLOT_DEFS/); assert.match(ui, /TYPE_SLOT_DEFS\.filter\(\(d\) => !rows\.some\(\(r\) => r\.slot === d\.key\)\)\.map\(\(d\) => button\(`Add \$\{d\.title\}`/);

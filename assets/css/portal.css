@@ -796,10 +796,6 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .tf-l-caption { font-family: var(--font-body); font-size: 13px; line-height: 1.4; letter-spacing: .04em; text-transform: uppercase; }
 .fw-w100 { font-weight: 100; } .fw-w200 { font-weight: 200; } .fw-w300 { font-weight: 300; } .fw-w400 { font-weight: 400; } .fw-w500 { font-weight: 500; }
 .fw-w600 { font-weight: 600; } .fw-w700 { font-weight: 700; } .fw-w800 { font-weight: 800; } .fw-w900 { font-weight: 900; }
-.bk-price { margin: var(--space-3) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--hairline); max-width: 40em; }
-.bk-price__name { margin: 0 0 4px; font-family: var(--font-display); font-weight: 600; font-size: 20px; }
-.bk-price__label { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
-.bk-price p { margin: 0 0 8px; }
 
 /* Examples: what a section looks like when professionally developed, shown while the client has no approved content. Muted grey panels (never reduced opacity), a small
    "Example: Framework" label, no links, no copy buttons, no downloads. Approved content replaces them. Framework's own typefaces are the portal's Switzer and General Sans. */
@@ -860,3 +856,16 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-tag__alt { margin: 0; flex: 1 1 12em; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(20px, 2.6vw, 26px); line-height: 1.2; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .bk-tag__guide p { margin: 0 0 12px; max-width: 40em; }
 .bk-tag__guide p:last-child { margin-bottom: 0; }
+
+/* Design-service pricing: a quiet note beside the request button of a section the client has nothing in yet (never in a heading). Same type as the surrounding text, muted price. */
+.bk-design { margin: var(--space-3) 0 0; padding: var(--space-3) 0 0; border-top: 1px solid var(--hairline); max-width: 40em; }
+.bk-design > p { margin: 0 0 6px; }
+.bk-design__line { font-size: 16px; }
+.bk-design__price { color: var(--slate); font-weight: 500; white-space: nowrap; }
+.bk-design__list { margin: var(--space-2) 0; padding: 0; list-style: none; }
+.bk-design__item { padding: var(--space-2) 0; border-top: 1px solid var(--hairline); }
+.bk-design__item:first-child { border-top: 0; padding-top: 0; }
+.bk-design__item-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.bk-design__name { font-weight: 600; }
+.bk-design .brq { margin-top: var(--space-2); }
+.bk-design__item .brq { margin-top: 6px; }

@@ -801,3 +801,25 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 /* Branding: the nine numbered sections (same numbers and titles as the client's page), and thumbnails of section files. */
 .adm-bk-no { display: inline-block; min-width: 2.2em; margin-right: 6px; font-size: 13px; font-weight: 600; letter-spacing: .14em; color: var(--slate); font-variant-numeric: tabular-nums; }
 .adm-brand__thumb { display: block; width: 96px; height: 64px; margin: 0 0 10px; object-fit: contain; border: 1px solid var(--hairline); background: var(--paper); }
+
+/* Settings hub and Service Pricing: the same single-border, hairline-row language as Approved Emails. */
+.adm-settings__list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); max-width: 720px; }
+.adm-settings__item { border-bottom: 1px solid var(--hairline); }
+.adm-settings__link { display: grid; gap: 2px; padding: 16px 0; color: inherit; text-decoration: none; }
+.adm-settings__link:hover .adm-settings__title { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.adm-settings__title { font-weight: 600; font-size: 18px; }
+.adm-pricing .adm-msg { margin: 0 0 24px; max-width: 880px; }
+.adm-pricing__form { max-width: 880px; }
+.adm-pricing__group { margin: 0 0 32px; }
+.adm-pricing__h { margin: 0 0 8px; font-size: 20px; line-height: 1.2; }
+.adm-pricing__list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
+.adm-pricing__row { display: grid; grid-template-columns: minmax(0, 1fr) 11rem 9rem; gap: 8px 16px; align-items: start; padding: 14px 0; border-bottom: 1px solid var(--hairline); }
+.adm-pricing__name { display: grid; gap: 2px; min-width: 0; }
+.adm-pricing__title { font-weight: 600; }
+.adm-pricing__desc { font-size: 14px; color: var(--slate); }
+.adm-pricing__money { display: flex; align-items: center; gap: 6px; }
+.adm-pricing__sign { font-weight: 600; }
+.adm-pricing__amount { min-width: 0; width: 100%; }
+.adm-pricing__meta { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--slate); }
+@media (max-width: 720px) { .adm-pricing__row { grid-template-columns: 1fr 1fr; } .adm-pricing__name { grid-column: 1 / -1; } }
+@media (max-width: 400px) { .adm-pricing__row { grid-template-columns: 1fr; } }

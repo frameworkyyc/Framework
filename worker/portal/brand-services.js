@@ -3,6 +3,8 @@
  * page knows how to draw). A request stores only the service key, so renaming or retiring a service never touches saved requests. No prices, no checkout:
  * the action is always "Request a quote" and Framework follows up.
  */
+import { PRICING_SERVICES, requestKeyOf } from "./branding-pricing.js";
+
 export const BRANDING_SERVICES = Object.freeze([
   Object.freeze({ key: "business-card-design", title: "Business Card Design", blurb: "A professionally designed business card that matches your brand, ready for print.", icon: "card" }),
   Object.freeze({ key: "email-signature-design", title: "Professional Email Signature Design", blurb: "A clean, consistent email signature for you and your team, ready to install.", icon: "mail" }),
@@ -19,6 +21,8 @@ export const BRAND_REQUESTS = Object.freeze([
   Object.freeze({ key: "brand-guidelines", section: "Brand Guidelines & Documents", title: "Brand request: Guidelines & Documents" }),
   Object.freeze({ key: "brand-additional", section: "Additional Brand Assets", title: "Brand request: Additional Brand Assets" }),
   Object.freeze({ key: "brand-full-kit", section: "Full Brand Kit", title: "Brand request: Full Brand Kit" }),
+  // One request per priced design service (branding-pricing.js requestKeyOf), so Admin sees exactly which service was asked for. The complete kit keeps brand-full-kit above.
+  ...PRICING_SERVICES.filter((s) => s.key !== "brand-kit").map((s) => Object.freeze({ key: requestKeyOf(s.key), section: `${s.name} design`, title: `Design request: ${s.name}` })),
 ]);
 
 const ALL = [...BRANDING_SERVICES, ...BRAND_REQUESTS];
