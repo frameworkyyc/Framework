@@ -77,7 +77,7 @@ export class Browser {
   async send(path, { method = "GET", body, headers = {}, cookies = true } = {}) {
     const h = { ...headers };
     if (cookies && this.jar.size) h.Cookie = this.cookieHeader();
-    const res = await handlePortal(new Request(ORIGIN + path, { method, headers: h, body, redirect: "manual" }), this.env.env, { now: this.env.clock.now(), fetch: this.env.workos.fetch });
+    const res = await handlePortal(new Request(ORIGIN + path, { method, headers: h, body, redirect: "manual" }), this.env.env, { now: this.env.clock.now(), fetch: this.env.workos.fetch, previewFetch: this.env.previewFetch, previewCache: this.env.previewCache === undefined ? null : this.env.previewCache });
     if (res) for (const sc of res.headers.getSetCookie()) {
       const [pair, ...attrs] = sc.split(";").map((x) => x.trim());
       const i = pair.indexOf("=");
@@ -101,9 +101,9 @@ export class Browser {
   }
 }
 
-export async function makeWorld({ clock } = {}) {
+export async function makeWorld({ clock, skip = [] } = {}) {
   const c = clock || { t: T0, now() { return this.t; }, advance(s) { this.t = new Date(this.t.getTime() + s * 1000); } };
-  const db = openPortalDb();
+  const db = openPortalDb({ skip }); // `skip`: migration files to leave out, to build a database as it was before them
   const keys = await makeKeys();
   const workos = new FakeWorkos(keys, c);
   const env = {

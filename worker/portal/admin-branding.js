@@ -30,6 +30,7 @@ import * as brand from "./repo/brand.js";
 import { recordActivity } from "./repo/activity.js";
 import * as files from "./brand-files.js";
 import { BRANDING_SERVICES, brandingService } from "./brand-services.js";
+import { listServicesAdmin, requestKeyOfService } from "./repo/portal-services.js";
 import { limitsFor } from "./brand-files.js";
 import { backupFiles, restoreFiles, backupStatus } from "./file-backup.js";
 import { backupPurge, restorableKeys, purgeEnabled } from "./backup-purge.js";
@@ -75,12 +76,12 @@ export async function readJson(request, allowed) {
 }
 
 /** multipart/form-data with exactly one `file` and an optional JSON `meta`. The declared size is checked BEFORE anything is read. */
-export async function readUpload(request, { withMeta }) {
+export async function readUpload(request, { withMeta, max = MAX_MULTIPART }) {
   const type = (request.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
   if (type !== "multipart/form-data") return { response: err(415, "unsupported_media_type", "Send the file as a form upload.") };
   const declared = Number(request.headers.get("Content-Length"));
   if (!Number.isFinite(declared) || declared <= 0) return { response: err(411, "length_required", "The upload's size was not stated.") };
-  if (declared > MAX_MULTIPART) return { response: err(413, "file_too_large", "The file is too large.") };
+  if (declared > max) return { response: err(413, "file_too_large", "The file is too large.") };
   let form;
   try { form = await request.formData(); } catch { return { response: err(400, "invalid_upload", "The upload could not be read.") }; }
   const f = form.get("file");
@@ -102,7 +103,7 @@ const pick = (obj, keys) => Object.fromEntries(Object.entries(obj).filter(([k]) 
 
 const publicAsset = (a) => ({ id: a.id, kind: a.kind, title: a.title, variantKey: a.variantKey, logoRole: a.logoRole, orientation: a.orientation, tone: a.tone, transparent: a.transparent, usageNote: a.usageNote, downloadable: a.downloadable, licenseNote: a.licenseNote, format: a.format, size: a.size, sha256: a.sha256, originalName: a.originalName, published: a.published, sortOrder: a.sortOrder, createdAt: a.createdAt, createdBy: a.createdBy, updatedAt: a.updatedAt });
 const publicUpload = (u) => ({ id: u.id, category: u.category, name: u.originalName, format: u.format, size: u.size, sha256: u.sha256, held: u.status === "held", seen: Boolean(u.adminSeenAt), createdAt: u.createdAt, fontRightsAck: u.fontRightsAck, uploader: { email: u.uploaderEmail, name: u.uploaderName } });
-const publicRequest = (r) => ({ id: r.id, serviceKey: r.serviceKey, service: (brandingService(r.serviceKey) || { title: r.serviceKey }).title, status: r.status, note: r.note, createdAt: r.createdAt, handledBy: r.handledBy, handledAt: r.handledAt, adminNote: r.adminNote, priceShown: r.priceShown || null });
+const publicRequest = (r, names = new Map()) => ({ id: r.id, serviceKey: r.serviceKey, service: (brandingService(r.serviceKey) || { title: names.has(r.serviceKey) ? `Additional service: ${names.get(r.serviceKey)}` : r.serviceKey }).title, status: r.status, note: r.note, createdAt: r.createdAt, handledBy: r.handledBy, handledAt: r.handledAt, adminNote: r.adminNote, priceShown: r.priceShown || null });
 
 async function tablesPresent(db) {
   try { await db.prepare("SELECT 1 FROM brand_kits LIMIT 1").first(); return true; } catch { return false; }
@@ -110,6 +111,7 @@ async function tablesPresent(db) {
 
 async function view(env, org) {
   const db = env.PORTAL_DB;
+  const svcNames = new Map((await listServicesAdmin(db)).services.map((x) => [requestKeyOfService(x.key), x.name])); // Additional Services requests (key svc-...) are answered in this same list
   const [kit, assets, uploads, requests, usage] = await Promise.all([brand.getBrandKit(db, org.id), brand.listBrandAssetsAdmin(db, org.id), brand.listUploadsAdmin(db, org.id), brand.listServiceRequests(db, org.id), brand.uploadUsage(db, org.id)]);
   return {
     available: true,
@@ -120,7 +122,7 @@ async function view(env, org) {
     kit: kit ? { status: kit.status, colours: kit.colours, typography: kit.typography, sections: kit.sections, brandName: kit.brandName, updatedAt: kit.updatedAt, publishedAt: kit.publishedAt, publishedBy: kit.publishedBy } : null,
     assets: assets.map(publicAsset),
     uploads: uploads.map(publicUpload),
-    requests: requests.map(publicRequest),
+    requests: requests.map((r) => publicRequest(r, svcNames)),
     services: BRANDING_SERVICES.map((s) => ({ key: s.key, title: s.title })),
   };
 }

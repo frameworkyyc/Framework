@@ -24,6 +24,10 @@ const GRANTS = Object.freeze({
   "branding.upload": Object.freeze(["owner", "member"]),
   "branding.delete_upload": Object.freeze(["owner"]),
   "branding.request": Object.freeze(["owner"]),
+  // Website (only where PORTAL_WEBSITE is on): everyone in the organization may see the websites Framework has published for it. Framework Admin alone creates and edits them.
+  "website.view": Object.freeze(["owner", "member"]),
+  // Asking about an Additional Service (a request, never an order): owners only, like a Branding quote request. Change and support requests use support.view and support.submit.
+  "website.request": Object.freeze(["owner"]),
   // Client Services: everyone may open the hub, read the contact details, and send and follow support or change requests (a request never authorizes paid work).
   // Invoices carry financial information: owners only, and read-only (Framework Admin enters, publishes and archives them).
   "services.view": Object.freeze(["owner", "member"]),

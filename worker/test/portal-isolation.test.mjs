@@ -191,6 +191,7 @@ test("SQL scan: values are always bound; the only interpolations into SQL are th
     "VISIBLE", "ASSET_COLUMNS", "UPLOAD_COLUMNS", "UPLOAD_COLUMNS_U", "REQUEST_COLUMNS", // brand.js: module-level constants (column lists and the "kit published AND asset published AND not deleted" predicate; every value in them is bound)
     "COLS", "CLIENT_VISIBLE", "REQ", 'includeArchived ? "" : "AND archived_at IS NULL"', // invoices.js and support.js: module-level column lists and the "published, not archived, not void" predicate (every value in them is bound)
     "REQ_R", "where", // support.js: the module-level, fixed column list and the looked-up scope predicate of the Admin-only cross-tenant list (no value in them comes from a request)
+    "INSERT_COLUMNS", "INSERT_PLACEHOLDERS", // websites.js: module-level, fixed column lists (every writable column in a fixed order); the update uses the reviewed sets.join(", ") over validated column names, and every value is bound
     "REVISION", // business-profile.js: the module-level, organization-scoped "newest profile.updated entry of this step" subquery (a fixed constant; every value in it is bound)
   ]);
   const used = new Set();

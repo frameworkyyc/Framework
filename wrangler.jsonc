@@ -3,6 +3,10 @@
   "name": "framework",
   "main": "worker/index.js",
   "compatibility_date": "2026-09-01",
+  // A Worker's own fetch() to a hostname on ITS OWN zone (frameworkco.ca and its subdomains, which are Worker-served) is otherwise sent to the zone's origin server and never reaches the site, so the
+  // Website page's live-preview check (worker/portal/website-preview.js) could not see Framework's own websites. With this flag such requests go through the public front door like any visitor's.
+  // Nothing else in this Worker fetches its own zone (it uses the ASSETS binding and external APIs), so no other behaviour changes. Cloudflare allows compatibility flags at the top level only.
+  "compatibility_flags": ["global_fetch_strictly_public"],
   // Non-secret runtime settings for PRODUCTION (and any normal `wrangler deploy`). Wrangler treats this file as the source
   // of truth: a plain variable that exists only in the Cloudflare dashboard is deleted on the next deploy, so settings like
   // this one must live here (or be stored as secrets). The sender address is not a secret. Previews do not inherit this
@@ -32,7 +36,10 @@
     "PORTAL_INVITE_SENDING": "1",
     // Release 2 (client launch): the client-facing Branding section (view and download published brand assets, upload existing brand materials, request a quote).
     // Needs migrations 0005/0006 and the PORTAL_FILES binding (both in place). Exactly "1" or absent: absent returns Branding to a "Coming soon" page. Rollback: delete this line.
-    "PORTAL_BRANDING": "1"
+    "PORTAL_BRANDING": "1",
+    // Website release: the client-facing Website section (the client's websites, live preview, downloadable website files, change and support requests, Additional Services).
+    // Needs migrations 0011 and 0012 and the PORTAL_FILES binding. Exactly "1" or absent: absent returns Website to a "Coming soon" page. Rollback: delete this line (a one-line revert PR).
+    "PORTAL_WEBSITE": "1"
   },
   // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
   // redact_query_string keeps ?code= / ?invitation_token= out of platform logs; invocation_logs is OFF because the automatic per-request record
@@ -123,7 +130,9 @@
       // Needs migrations 0005/0006 and the PORTAL_FILES binding below. Exactly "1" or absent: absent keeps Branding as a "Coming soon" page.
       "PORTAL_BRANDING": "1",
       // Turns on the client-facing Client Services area (invoices, support & change requests, contact). STAGING ONLY, never at the top level. Needs migration 0007 for its data.
-      "PORTAL_SERVICES": "1"
+      "PORTAL_SERVICES": "1",
+      // Turns on the client-facing Website section (Phase 2: the client's websites, set by Framework Admin). STAGING ONLY, never at the top level. Needs migration 0011. Exactly "1" or absent.
+      "PORTAL_WEBSITE": "1"
     },
     "d1_databases": [
       {

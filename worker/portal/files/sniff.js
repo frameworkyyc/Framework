@@ -76,7 +76,7 @@ function svg(b) {
 
 function txt(b) { const t = utf8(b); return t === null || t.includes("\u0000") ? "content_mismatch" : null; }
 
-function archive(b) { const r = inspectZip(b); return r.ok ? null : r.code; }
+function archive(b, options) { const r = inspectZip(b, options); return r.ok ? null : r.code; }
 
 const OOXML_ROOT = { docx: "word/document.xml", xlsx: "xl/workbook.xml", pptx: "ppt/presentation.xml" };
 function ooxml(kind) {
@@ -121,6 +121,9 @@ export const PROFILES = Object.freeze({
   invoice: Object.freeze(["pdf"]),
   // Support request attachments (screenshots, documents, a ZIP): no fonts, vector or print files. ZIPs are inspected and download-only like everywhere else.
   support: Object.freeze(["png", "jpg", "webp", "pdf", "txt", "docx", "xlsx", "pptx", "zip"]),
+  // A website's screenshot (Admin only): a picture a browser shows, nothing else.
+  website_image: Object.freeze(["png", "jpg", "webp"]),
+  website_package: Object.freeze(["zip"]),
   brand_admin: Object.freeze(["png", "jpg", "webp", "svg", "pdf", "ai", "eps", "ttf", "otf", "woff", "woff2", "txt", "docx", "xlsx", "pptx", "zip"]),
 });
 
@@ -133,7 +136,7 @@ async function sha256Hex(bytes) {
  * @param {Uint8Array} bytes the whole file (already size-capped by the caller)
  * @returns {Promise<{ ok: true, name: string, ext: string, contentType: string, size: number, sha256: string } | { ok: false, error: string }>}
  */
-export async function inspectUpload({ bytes, originalName, profile, maxBytes }) {
+export async function inspectUpload({ bytes, originalName, profile, maxBytes, archiveOptions }) {
   if (!(bytes instanceof Uint8Array)) return { ok: false, error: "no_file" };
   if (bytes.length === 0) return { ok: false, error: "empty_file" };
   if (!Number.isInteger(maxBytes) || bytes.length > maxBytes) return { ok: false, error: "file_too_large" };
@@ -145,7 +148,7 @@ export async function inspectUpload({ bytes, originalName, profile, maxBytes }) 
   if (!allowed.includes(ext) || !Object.prototype.hasOwnProperty.call(FILE_TYPES, ext)) return { ok: false, error: "type_not_allowed" };
   const type = FILE_TYPES[ext];
   if (type.maxBytes && bytes.length > type.maxBytes) return { ok: false, error: "file_too_large" };
-  const problem = type.check(bytes);
+  const problem = type.check(bytes, archiveOptions);
   if (problem) return { ok: false, error: problem };
   return { ok: true, name: clean.name, ext, contentType: type.mime, size: bytes.length, sha256: await sha256Hex(bytes) };
 }

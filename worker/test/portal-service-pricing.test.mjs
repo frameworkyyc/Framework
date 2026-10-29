@@ -49,13 +49,13 @@ async function setup({ migrated = true } = {}) {
 }
 
 test("the catalogue: thirteen services in section order with Framework's starting prices; each has its own request key (the complete kit keeps its existing one)", () => {
-  assert.deepEqual(P.PRICING_SERVICES.map((s) => [s.key, s.name, s.defaultCad]), [
+  assert.deepEqual(P.PRICING_SERVICES.filter((s) => s.section !== "website" && s.section !== "addon").map((s) => [s.key, s.name, s.defaultCad]), [
     ["logo-primary", "Primary Logo", 500], ["logo-secondary", "Secondary Logo", 150], ["logo-simplified", "Simplified Logo", 150], ["logo-submark", "Sub-mark", 150], ["typography", "Typography", 250], ["colours", "Brand Colours", 200], ["tagline", "Tagline", 250],
     ["imagery", "Brand Imagery", 300], ["layout", "Layout System", 350], ["textures", "Textures", 150], ["iconography", "Iconography", 250], ["style", "Design Style", 350], ["brand-kit", "Complete Brand Kit", 2500]]);
-  assert.deepEqual(Object.fromEntries(P.PRICING_SERVICES.map((s) => [s.key, s.defaultCad])), PRICES);
+  assert.deepEqual(Object.fromEntries(P.PRICING_SERVICES.filter((s) => s.section !== "website" && s.section !== "addon").map((s) => [s.key, s.defaultCad])), PRICES);
   assert.deepEqual(P.PRICING_TYPES, ["starting_at", "custom_quote", "included"]);
   assert.equal(P.requestKeyOf("brand-kit"), "brand-full-kit"); assert.equal(P.requestKeyOf("logo-secondary"), "brand-svc-logo-secondary");
-  for (const s of P.PRICING_SERVICES) { assert.ok(BRAND_REQUESTS.some((r) => r.key === P.requestKeyOf(s.key)), s.key + " can be requested"); assert.equal(P.pricingKeyOfRequest(P.requestKeyOf(s.key)), s.key); }
+  for (const s of P.PRICING_SERVICES.filter((x) => x.section !== "website" && x.section !== "addon")) { assert.ok(BRAND_REQUESTS.some((r) => r.key === P.requestKeyOf(s.key)), s.key + " can be requested"); assert.equal(P.pricingKeyOfRequest(P.requestKeyOf(s.key)), s.key); }
   assert.equal(P.pricingKeyOfRequest("brand-colours"), null);
   assert.equal(P.priceLabel({ type: "starting_at", priceCad: 250 }), "Starting at $250 CAD"); assert.equal(P.priceLabel({ type: "starting_at", priceCad: 2500 }), "Starting at $2,500 CAD");
   assert.equal(P.priceLabel({ type: "custom_quote" }), "Custom quote"); assert.equal(P.priceLabel({ type: "included" }), "Included");
@@ -71,7 +71,7 @@ test("the catalogue: thirteen services in section order with Framework's startin
   assert.ok(!/<p class="bk-offer__desc|Framework can|Needed to use|Optional, but/.test(box), "no description, lead or messaging paragraphs");
   const bare = P.offerBox({ service: P.pricingService("tagline"), entry: null, action: "", uploadHref: "" });
   assert.ok(!/bk-offer__price|bk-offer__estimate|bk-offer__free/.test(bare), "no price, estimate line or upload block when there is nothing to show"); assert.match(bare, /Professional Tagline Development/);
-  assert.deepEqual(P.PRICING_SERVICES.map((x) => x.offerTitle), ["Primary Logo Design", "Secondary Logo Design", "Simplified Logo Design", "Sub-mark Design", "Professional Typography Design", "Professional Colour Palette Design", "Professional Tagline Development", "Professional Imagery Direction", "Professional Layout System Design", "Professional Texture & Pattern Design", "Professional Icon Design", "Professional Design Style Guide", "Complete Brand Kit"]);
+  assert.deepEqual(P.PRICING_SERVICES.filter((x) => x.section !== "website" && x.section !== "addon").map((x) => x.offerTitle), ["Primary Logo Design", "Secondary Logo Design", "Simplified Logo Design", "Sub-mark Design", "Professional Typography Design", "Professional Colour Palette Design", "Professional Tagline Development", "Professional Imagery Direction", "Professional Layout System Design", "Professional Texture & Pattern Design", "Professional Icon Design", "Professional Design Style Guide", "Complete Brand Kit"]);
 });
 
 test("migration 0010 is additive: it seeds the thirteen starting prices, enforces its rules, adds a nullable snapshot column, and leaves existing requests untouched", async () => {
@@ -102,8 +102,9 @@ test("Admin API: lists all thirteen services with their prices and types; a data
   const r = await s.admin("/service-pricing");
   assert.equal(r.status, 200); assert.equal(r.json.available, true); assert.equal(r.json.capabilities.writes, true);
   assert.deepEqual(r.json.types, [{ key: "starting_at", label: "Starting at" }, { key: "custom_quote", label: "Custom quote" }, { key: "included", label: "Included" }]);
-  assert.deepEqual(r.json.services.map((x) => [x.key, x.type, x.priceCad]), P.PRICING_SERVICES.map((x) => [x.key, "starting_at", x.defaultCad]));
-  assert.ok(r.json.services.every((x) => x.stored && x.name && x.description && x.section));
+  assert.deepEqual(r.json.services.slice(0, 13).map((x) => [x.key, x.type, x.priceCad]), P.PRICING_SERVICES.slice(0, 13).map((x) => [x.key, "starting_at", x.defaultCad]));
+  assert.ok(r.json.services.slice(0, 13).every((x) => x.stored && x.name && x.description && x.section));
+  assert.deepEqual(r.json.services.slice(13, 17).map((x) => [x.key, x.type, x.priceCad, x.stored]), [["website-design", "custom_quote", null, true], ["website-redesign", "custom_quote", null, true], ["website-seo", "custom_quote", null, true], ["website-maintenance", "custom_quote", null, true]], "the website services are custom quotes, stored by migration 0011")
   const bare = await setup({ migrated: false });
   const b = await bare.admin("/service-pricing");
   assert.equal(b.json.available, false); assert.deepEqual(b.json.services.map((x) => x.priceCad), P.PRICING_SERVICES.map((x) => x.defaultCad)); assert.ok(b.json.services.every((x) => !x.stored));
@@ -161,7 +162,7 @@ test("Admin API guards: writes need PORTAL_ADMIN_WRITES and the admin header; re
   const stranger = await handleAdmin(new Request(ORIGIN + "/api/admin/service-pricing", { headers: { "Cf-Access-Jwt-Assertion": sign({ iss: `https://${TEAM}`, aud: [AUD], email: "someone@else.test", exp: nowS() + 600, iat: nowS() }) } }), s.w.env, {});
   assert.equal(stranger.status, 403);
   assert.equal((await s.admin("/service-pricing", { method: "DELETE" })).status, 405);
-  assert.equal(rowsOf(s.w, "SELECT count(*) n FROM service_prices")[0].n, 13);
+  assert.equal(rowsOf(s.w, "SELECT count(*) n FROM service_prices")[0].n, 17);
 });
 
 test("client Branding with nothing added: every section offers its design service with a quiet price beside the request button, never in a heading, and always the free upload", async () => {

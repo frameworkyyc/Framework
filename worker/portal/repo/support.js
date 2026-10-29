@@ -56,24 +56,33 @@ function notify(db, { organizationId, audience, event, entityId, at }) {
 /* ------------------------------------------------------------------ client */
 
 /** A new request: the request row and its first message are written together, only while the organization has fewer than MAX_OPEN_REQUESTS open requests. */
-export async function createRequest(db, organizationId, userId, { category, title, description }, { now = new Date() } = {}) {
+export async function createRequest(db, organizationId, userId, { category, title, description, websiteId = null }, { now = new Date() } = {}) {
   requireOrgId(organizationId); requireUserId(userId);
   const cat = validateEnum(category, CATEGORIES), t = validateName(title, 120), body = validateText(description, MAX_BODY);
   if (!cat) return fail("invalid_category");
   if (!t) return fail("invalid_title");
   if (!body) return fail(body === undefined ? "invalid_description" : "description_required");
+  if (websiteId !== null) requireId(websiteId, "website_id");
   const id = newId(), mid = newId(), at = isoTime(now);
+  // A request about a website (migration 0011's support_requests.website_id) names a website of THIS organization that the client can see (published, not archived): checked in the same statement that writes it.
+  const linked = websiteId !== null;
   let res;
   try {
     res = await db.batch([
-      db
-        .prepare(
+      (linked
+        ? db.prepare(
+          `INSERT INTO support_requests (id, organization_id, category, scope, title, status, submitted_by, created_at, status_changed_at, last_message_at, last_message_by, client_read_at, website_id)
+           SELECT ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, 'client', ?, ?
+            WHERE EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')
+              AND (SELECT count(*) FROM support_requests r WHERE r.organization_id = ? AND r.status NOT IN ('completed', 'declined')) < ?
+              AND EXISTS (SELECT 1 FROM websites w WHERE w.id = ? AND w.organization_id = ? AND w.published = 1 AND w.archived_at IS NULL)`,
+        ).bind(id, organizationId, cat, scopeOf(cat), t, userId, at, at, at, at, websiteId, organizationId, userId, organizationId, MAX_OPEN_REQUESTS, websiteId, organizationId)
+        : db.prepare(
           `INSERT INTO support_requests (id, organization_id, category, scope, title, status, submitted_by, created_at, status_changed_at, last_message_at, last_message_by, client_read_at)
            SELECT ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, 'client', ?
             WHERE EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')
               AND (SELECT count(*) FROM support_requests r WHERE r.organization_id = ? AND r.status NOT IN ('completed', 'declined')) < ?`,
-        )
-        .bind(id, organizationId, cat, scopeOf(cat), t, userId, at, at, at, at, organizationId, userId, organizationId, MAX_OPEN_REQUESTS),
+        ).bind(id, organizationId, cat, scopeOf(cat), t, userId, at, at, at, at, organizationId, userId, organizationId, MAX_OPEN_REQUESTS)),
       db
         .prepare("INSERT INTO support_messages (id, organization_id, request_id, kind, author_type, author_user_id, visibility, body, created_at) SELECT ?, ?, ?, 'message', 'client', ?, 'client', ?, ? WHERE changes() > 0")
         .bind(mid, organizationId, id, userId, body, at),
@@ -86,9 +95,27 @@ export async function createRequest(db, organizationId, userId, { category, titl
   }
   if (res[0].meta.changes !== 1) {
     const open = await db.prepare("SELECT count(*) AS n FROM support_requests WHERE organization_id = ? AND status NOT IN ('completed', 'declined')").bind(organizationId).first();
-    return fail(open.n >= MAX_OPEN_REQUESTS ? "too_many_open" : "not_allowed");
+    return fail(open.n >= MAX_OPEN_REQUESTS ? "too_many_open" : linked ? "website_not_found" : "not_allowed");
   }
   return ok({ id, messageId: mid });
+}
+
+/** The requests that name a website (the Website section's Request a Change and Get Support), with the website's name, most recently active first. Needs migration 0011; [] without it. */
+export async function listWebsiteRequests(db, organizationId) {
+  requireOrgId(organizationId);
+  try {
+    return (await db.prepare("SELECT r.id, r.organization_id, r.category, r.scope, r.title, r.status, r.submitted_by, r.created_at, r.status_changed_at, r.last_message_at, r.last_message_by, r.client_read_at, r.admin_seen_at, r.website_id, w.name AS website_name FROM support_requests r JOIN websites w ON w.id = r.website_id AND w.organization_id = r.organization_id WHERE r.organization_id = ? ORDER BY r.last_message_at DESC, r.id").bind(organizationId).all()).results
+      .map((r) => ({ ...request(r), websiteId: r.website_id, websiteName: r.website_name }));
+  } catch (err) { if (/no such (table|column)/i.test(String(err && err.message))) return []; throw err; }
+}
+
+/** The website a request is about ({ id, name }), or null when it is about none (or migration 0011 is missing). */
+export async function getRequestWebsite(db, organizationId, requestId) {
+  requireOrgId(organizationId); requireId(requestId, "request_id");
+  try {
+    const r = await db.prepare("SELECT w.id, w.name FROM support_requests r JOIN websites w ON w.id = r.website_id AND w.organization_id = r.organization_id WHERE r.id = ? AND r.organization_id = ?").bind(requestId, organizationId).first();
+    return r ? { id: r.id, name: r.name } : null;
+  } catch (err) { if (/no such (table|column)/i.test(String(err && err.message))) return null; throw err; }
 }
 
 /** The organization's own requests, most recently active first. */
@@ -312,4 +339,13 @@ export async function listRequestsAllAdmin(db, { scope = "attention", limit = 20
 export async function adminSupportTotals(db) {
   const r = await db.prepare("SELECT count(*) AS total, COALESCE(sum(status NOT IN ('completed', 'declined')), 0) AS open, COALESCE(sum(status NOT IN ('completed', 'declined') AND (admin_seen_at IS NULL OR admin_seen_at < last_message_at)), 0) AS attention FROM support_requests WHERE organization_id IN (SELECT id FROM organizations WHERE status <> 'archived') /* cross-tenant: Admin totals; deleted clients are left out */").first();
   return { total: r.total, open: r.open, attention: r.attention };
+}
+
+/** Admin: the website each of this organization's requests is about, as a Map(request id -> website name). Empty without migration 0011. */
+export async function listRequestWebsiteNames(db, organizationId) {
+  requireOrgId(organizationId);
+  try {
+    const rows = (await db.prepare("SELECT r.id, w.name FROM support_requests r JOIN websites w ON w.id = r.website_id AND w.organization_id = r.organization_id WHERE r.organization_id = ?").bind(organizationId).all()).results;
+    return new Map(rows.map((r) => [r.id, r.name]));
+  } catch (err) { if (/no such (table|column)/i.test(String(err && err.message))) return new Map(); throw err; }
 }

@@ -20,7 +20,7 @@ export const PRICING_TYPE_LABEL = Object.freeze({ starting_at: "Starting at", cu
 export const MAX_PRICE_CAD = 1000000;
 
 /** `offerTitle` is the service's name in the client's offer; `upload` is the two halves of the free-upload line ("Already have your fonts?" + "Upload them for free"). */
-const svc = (key, section, name, defaultCad, description, offerTitle, upload) => Object.freeze({ key, section, name, defaultCad, description, offerTitle, upload: Object.freeze(upload) });
+const svc = (key, section, name, defaultCad, description, offerTitle, upload) => Object.freeze({ key, section, name, defaultCad, defaultType: defaultCad === null ? "custom_quote" : "starting_at", description, offerTitle, upload: Object.freeze(upload) });
 const LOGOS = ["Already have your logos?", "Upload them for free"];
 
 /** In display order. `section` is the Branding section key (admin/assets/brand-sections.js), or "all" for the complete kit. */
@@ -38,14 +38,29 @@ export const PRICING_SERVICES = Object.freeze([
   svc("iconography", "iconography", "Iconography", 250, "A consistent icon style with a starter set. Extensive icon libraries are not included.", "Professional Icon Design", ["Already have icons?", "Upload them for free"]),
   svc("style", "style", "Design Style", 350, "Your brand direction and visual principles, documented with examples.", "Professional Design Style Guide", ["Already have a design style guide?", "Upload it for free"]),
   svc("brand-kit", "all", "Complete Brand Kit", 2500, "A cohesive brand identity developed and documented across all nine sections.", "Complete Brand Kit", ["Already have a brand kit?", "Upload it for free"]),
+  // Website services (section "website"): priced by quote until Framework sets a starting price. They are not Branding requests; their client offer arrives with the Website section.
+  svc("website-design", "website", "Website Design", null, "A new website designed and built by Framework.", "Website Design", ["Already have a website?", "Add its details"]),
+  svc("website-redesign", "website", "Website Redesign", null, "A fresh design and rebuild of your existing website.", "Website Redesign", ["Already have a website?", "Add its details"]),
+  svc("website-seo", "website", "SEO", null, "Search engine optimization to help customers find your website.", "SEO", ["Already have a website?", "Add its details"]),
+  svc("website-maintenance", "website", "Website Maintenance", null, "Ongoing updates, security and support for your website.", "Website Maintenance", ["Already have a website?", "Add its details"]),
+  // Additional Services (section "addon", the Website page's optional services): no default price, shown to a client only once Admin has set one. Their name and short description live in
+  // the editable catalogue (portal_services, repo/portal-services.js); these entries only give Service Pricing a row for each. "Included" is not offered for them (see ADDON_TYPES).
+  svc("client-admin-portal", "addon", "Client Admin Portal", null, "A secure, branded workspace for managing customers, projects and records.", "Client Admin Portal", ["", ""]),
+  svc("invoice-sender", "addon", "Invoice Sender", null, "Create and send professional invoices.", "Invoice Sender", ["", ""]),
+  svc("digital-business-cards", "addon", "Digital Business Cards", null, "A shareable digital card that is always up to date.", "Digital Business Cards", ["", ""]),
+  svc("seo-visibility", "addon", "SEO & Visibility", null, "Help the right customers find your business in search.", "SEO & Visibility", ["", ""]),
 ]);
+
+/** An optional service is never described as "Included": that wording would suggest it is already part of what the client has. */
+export const ADDON_TYPES = Object.freeze(["starting_at", "custom_quote"]);
+export const typesFor = (service) => (service && service.section === "addon" ? ADDON_TYPES : PRICING_TYPES);
 
 export const PRICING_KEYS = Object.freeze(PRICING_SERVICES.map((s) => s.key));
 export const pricingService = (key) => PRICING_SERVICES.find((s) => s.key === key) || null;
 
 /** The service_requests key a pricing service is requested under: the complete kit keeps its existing key; every other service has its own, so Admin sees which one was asked for. */
-export const requestKeyOf = (key) => (key === "brand-kit" ? "brand-full-kit" : `brand-svc-${key}`);
-export const pricingKeyOfRequest = (requestKey) => PRICING_SERVICES.find((s) => requestKeyOf(s.key) === requestKey)?.key || null;
+export const requestKeyOf = (key) => (key === "brand-kit" ? "brand-full-kit" : `brand-svc-${key}`); // Branding services only; the website services get their own request keys with the Website section
+export const pricingKeyOfRequest = (requestKey) => PRICING_SERVICES.find((s) => s.section !== "addon" && requestKeyOf(s.key) === requestKey)?.key || null;
 
 const CAD = new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 });
 
