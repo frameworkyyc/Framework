@@ -823,3 +823,8 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-pricing__meta { grid-column: 1 / -1; margin: 0; font-size: 13px; color: var(--slate); }
 @media (max-width: 720px) { .adm-pricing__row { grid-template-columns: 1fr 1fr; } .adm-pricing__name { grid-column: 1 / -1; } }
 @media (max-width: 400px) { .adm-pricing__row { grid-template-columns: 1fr; } }
+
+/* Websites (a client's Admin page): the same accordion language as Branding; a screenshot preview that never overflows. */
+.adm-ws__list { display: grid; gap: 0; margin: 0 0 24px; }
+.adm-ws__shot { margin: 24px 0 0; }
+.adm-ws__img { display: block; width: auto; max-width: min(100%, 480px); height: auto; margin: 8px 0; border: 1px solid var(--hairline); }

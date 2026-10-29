@@ -56,7 +56,7 @@ async function pricingPage(ctx) {
     function row(s) {
       const x = state.get(s.key);
       const typeId = `sp-type-${s.key}`, priceId = `sp-price-${s.key}`, errId = `sp-err-${s.key}`;
-      const select = h("select", { id: typeId, class: "input", disabled: editable ? null : true, onchange: () => { x.type = select.value; price.disabled = !editable || x.type !== "starting_at"; if (x.type === "starting_at" && !x.price) { x.price = String(s.defaultCad); price.value = x.price; } clearError(); refresh(); } },
+      const select = h("select", { id: typeId, class: "input", disabled: editable ? null : true, onchange: () => { x.type = select.value; price.disabled = !editable || x.type !== "starting_at"; if (x.type === "starting_at" && !x.price && s.defaultCad) { x.price = String(s.defaultCad); price.value = x.price; } clearError(); refresh(); } },
         data.types.map((t) => h("option", { value: t.key, selected: t.key === x.type ? true : null }, t.label)));
       const price = h("input", { id: priceId, class: "input adm-pricing__amount", type: "text", inputmode: "numeric", autocomplete: "off", maxlength: "7", value: x.type === "starting_at" ? x.price : "", disabled: editable && x.type === "starting_at" ? null : true, "aria-describedby": errId, oninput: () => { x.price = price.value.trim(); clearError(); refresh(); } });
       const err = h("p", { class: "adm-field__error", id: errId, role: "alert", hidden: true });
@@ -66,14 +66,14 @@ async function pricingPage(ctx) {
         h("div", { class: "adm-pricing__name" }, h("span", { class: "adm-pricing__title", text: s.name }), h("span", { class: "adm-pricing__desc", text: s.description })),
         h("div", { class: "adm-field adm-pricing__type" }, h("label", { for: typeId }, h("span", { class: "visually-hidden", text: `${s.name}: ` }), "Pricing"), select),
         h("div", { class: "adm-field adm-pricing__price" }, h("label", { for: priceId }, h("span", { class: "visually-hidden", text: `${s.name}: ` }), "Price (CAD)"), h("div", { class: "adm-pricing__money" }, h("span", { class: "adm-pricing__sign", "aria-hidden": "true", text: "$" }), price), err),
-        h("p", { class: "adm-pricing__meta", text: s.stored && s.updatedAt ? `Default ${money(s.defaultCad)} · updated ${fmtDate(s.updatedAt)}${s.updatedBy && !/^migration/.test(s.updatedBy) ? ` by ${s.updatedBy}` : ""}` : `Default ${money(s.defaultCad)}` }));
+        h("p", { class: "adm-pricing__meta", text: s.stored && s.updatedAt ? `Default ${s.defaultType === "custom_quote" ? "Custom quote" : money(s.defaultCad)} · updated ${fmtDate(s.updatedAt)}${s.updatedBy && !/^migration/.test(s.updatedBy) ? ` by ${s.updatedBy}` : ""}` : `Default ${s.defaultType === "custom_quote" ? "Custom quote" : money(s.defaultCad)}` }));
     }
     row.fields = new Map();
 
     const group = (title, no, services) => h("section", { class: "adm-pricing__group", "aria-labelledby": `sp-h-${no}` },
-      h("h2", { class: "adm-pricing__h", id: `sp-h-${no}` }, no === "kit" ? null : h("span", { class: "adm-bk-no", text: no }), title),
+      h("h2", { class: "adm-pricing__h", id: `sp-h-${no}` }, no === "kit" || no === "website" ? null : h("span", { class: "adm-bk-no", text: no }), title),
       h("ul", { class: "adm-pricing__list" }, services.map(row)));
-    const groups = BRAND_SECTIONS.map((sec) => group(sec.title, sec.no, data.services.filter((s) => s.section === sec.key))).concat(group("Complete Brand Kit", "kit", data.services.filter((s) => s.section === "all")));
+    const groups = BRAND_SECTIONS.map((sec) => group(sec.title, sec.no, data.services.filter((s) => s.section === sec.key))).concat(group("Complete Brand Kit", "kit", data.services.filter((s) => s.section === "all")), group("Website", "website", data.services.filter((s) => s.section === "website")));
 
     const form = h("form", { class: "adm-form adm-pricing__form", novalidate: true, "aria-label": "Service prices", onsubmit: async (ev) => {
       ev.preventDefault();

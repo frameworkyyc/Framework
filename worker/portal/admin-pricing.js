@@ -42,7 +42,7 @@ export async function handleServicePricingApi(request, env, principal, path, dep
       available: list.available,
       services: PRICING_SERVICES.map((s) => {
         const row = stored.get(s.key);
-        return { key: s.key, section: s.section, name: s.name, description: s.description, defaultCad: s.defaultCad, type: row ? row.price_type : "starting_at", priceCad: row ? row.price_cad : s.defaultCad, stored: Boolean(row), updatedBy: row ? row.updated_by : null, updatedAt: row ? row.updated_at : null };
+        return { key: s.key, section: s.section, name: s.name, description: s.description, defaultCad: s.defaultCad, type: row ? row.price_type : s.defaultType, priceCad: row ? row.price_cad : s.defaultCad, defaultType: s.defaultType, stored: Boolean(row), updatedBy: row ? row.updated_by : null, updatedAt: row ? row.updated_at : null };
       }),
       types: PRICING_TYPES.map((t) => ({ key: t, label: PRICING_TYPE_LABEL[t] })),
       capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1" },

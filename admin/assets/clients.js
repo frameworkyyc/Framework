@@ -11,8 +11,9 @@ const statusWord = (s) => (s === "archived" ? "Deleted" : cap(s));
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 
 export async function render(ctx) {
-  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding|\/profile|\/invoices|\/support)?$/);
+  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding|\/website|\/profile|\/invoices|\/support)?$/);
   if (m && m[2] === "/branding") return (await import("./branding.js")).render(decodeURIComponent(m[1]), ctx);
+  if (m && m[2] === "/website") return (await import("./websites.js")).render(decodeURIComponent(m[1]), ctx);
   if (m && m[2] === "/support") return (await import("./support.js")).render(decodeURIComponent(m[1]), ctx);
   if (m && m[2] === "/invoices") return (await import("./invoices.js")).render(decodeURIComponent(m[1]), ctx);
   if (m && m[2] === "/profile") return renderProfile(decodeURIComponent(m[1]), ctx);
@@ -78,7 +79,7 @@ async function renderDetail(id, ctx) {
   const o = data.organization;
   const p = data.profile;
   const welcome = ctx.url.searchParams.get("welcome") === "1";
-  const dash = dashboard({ org: o, profile: data.profile_available ? p : null, members: data.members, invitations: data.invitations, branding: data.branding, invoices: data.invoices, support: data.support });
+  const dash = dashboard({ org: o, profile: data.profile_available ? p : null, members: data.members, invitations: data.invitations, branding: data.branding, websites: data.websites, invoices: data.invoices, support: data.support });
 
   const info = disclosure({
     id: "org-details", title: "Organization details", className: "adm-acc--quiet",
