@@ -17,6 +17,7 @@ import { viewFilters } from "./filters.js";
 import { listActiveMembershipsForUser, listMembers } from "./repo/memberships.js";
 import { setUserName } from "./repo/users.js";
 import { getStaffAccess, listOrganizationsForStaff } from "./repo/staff.js";
+import { listRequirementSettings } from "./repo/brand-requirement-settings.js";
 import { listProjects, getProject } from "./repo/projects.js";
 import { listActivity } from "./repo/activity.js";
 import { validateSlug, validateName } from "./repo/validate.js";
@@ -384,7 +385,7 @@ const BRANDING_ROUTES = [
       const newest = {}; // the newest request per section (listServiceRequests is newest first)
       for (const r of await listServiceRequests(ctx.db, org)) if (!newest[r.serviceKey]) newest[r.serviceKey] = r;
       const f = viewFilters(ctx.url);
-      return pages.brandingPage(ctx, a, brand, { canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, pricing: await loadPricing(ctx.db), notice: f.requested ? "sent" : f.requestDup ? "dup" : "" });
+      return pages.brandingPage(ctx, a, brand, { canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, requirementSettings: (await listRequirementSettings(ctx.db, org)).items, pricing: await loadPricing(ctx.db), notice: f.requested ? "sent" : f.requestDup ? "dup" : "" });
     },
   },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/request$/, action: "branding.view", postAction: "branding.request", bucket: "branding", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/branding`), post: (ctx, a) => requestBrandSection(ctx, a) },

@@ -941,3 +941,10 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .staff-search { display: flex; flex-wrap: wrap; gap: 12px; margin: var(--space-3) 0; max-width: 32em; }
 .staff-search input { flex: 1 1 14em; min-width: 0; width: auto !important; }
 @media (pointer: coarse), (max-width: 820px) { .staff-banner__btn, .staff-banner a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px; } .staff-banner .wrap { padding-top: 4px; padding-bottom: 4px; } }
+
+/* Branding requirements set by Framework for this client: a quiet note under the heading (never a button, never a price). */
+.bk-req--optional, .bk-req--not-applicable { color: var(--muted, #5c5c5c); }
+.bk-rnote { margin: 0 0 var(--space-3); max-width: 46em; font-size: 15px; line-height: 1.5; padding-left: 12px; border-left: 2px solid var(--ink); }
+.bk-rnote__act { margin: 0 0 var(--space-3); font-size: 14px; }
+.lv-card__status .bk-req { margin-left: 8px; }
+.lv-card__body > .bk-rnote { margin: 8px 0 0; font-size: 14px; }
