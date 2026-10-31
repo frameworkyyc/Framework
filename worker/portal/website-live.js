@@ -10,6 +10,7 @@ import { CATEGORY_LABEL, MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, MAX_BODY } from 
 import { fileSize } from "./branding-live.js";
 import { ESTIMATE_NOTE } from "./branding-pricing.js";
 import { stageOf, milestoneProgress } from "./website-stage.js";
+import { serviceCatalogue } from "./service-catalogue.js";
 import { SEO_STATUS_LABEL } from "./repo/website-seo.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
@@ -98,7 +99,7 @@ function seoTeaser(vm, s, seo) {
 function detailBody(vm, s, preview, extra = {}) {
   return `<div class="ws__badges">${statusChip(s)}${managedChip(s)}</div>
 <p class="lead ws__lead">${e(statement(s))}</p>
-${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${management(vm, s, extra.management)}${additionalServices(vm, extra.services)}`;
+${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${management(vm, s, extra.management)}${serviceCatalogue(vm, extra.services)}`;
 }
 
 /* ------------------------------------------------------------------ Website management and Additional Services */
@@ -124,24 +125,6 @@ function management(vm, s, m) {
 <ul class="ws-actions">${action("Download website files", downloadText, download)}${action("Request a change", "Ask for an update to your website, with details and files.", ask("change", "Request a change"))}${action("Get support", "Report a problem or ask for technical help.", ask("support", "Get support"))}</ul>${summary}${m.canRequest ? "" : `<p class="muted small">Only people with access to this account can send requests.</p>`}</section>`;
 }
 
-const FLASH = { requested: "Thanks. Your request was sent. Framework will get in touch before any work starts.", dup: "You have already asked for this service. Framework will be in touch." };
-
-/** The optional Additional Services: a plain grid of name, short description, a price only when Admin has set one, and a Request Service action. Nothing here says a service is already part of the client's plan. */
-function additionalServices(vm, svc) {
-  if (!svc || !svc.items || !svc.items.length) return "";
-  const banner = svc.flash && FLASH[svc.flash] ? `<p class="form-banner" role="status">${e(FLASH[svc.flash])}</p>` : "";
-  const items = svc.items.map((it) => {
-    const control = it.requested
-      ? `<span class="status status--active">Requested</span>`
-      : svc.canRequest
-        ? `<form method="post" action="${e(href(vm, "/website/services/request"))}"><input type="hidden" name="csrf" value="${e(svc.csrf)}"><input type="hidden" name="service" value="${e(it.key)}"><button class="btn" type="submit">Request Service<span class="visually-hidden"> ${e(it.name)}</span></button></form>`
-        : disabledButton("Request Service");
-    return `<li class="ws-svc"><h3 class="ws-svc__title">${e(it.name)}</h3><p class="ws-svc__desc">${e(it.description)}</p>${it.price ? `<p class="ws-svc__price">${e(it.price)}</p>` : ""}<div class="ws-svc__cta">${control}</div></li>`;
-  }).join("");
-  const est = svc.items.some((it) => it.priceType === "starting_at") ? `<p class="muted small">${e(ESTIMATE_NOTE)}</p>` : "";
-  return `<section class="ws-sec" id="additional-services" aria-labelledby="ws-svc-h"><h2 class="h2" id="ws-svc-h">Additional services</h2><p class="ws-sec__lead">Optional extras from Framework. Asking about one doesn’t start any work or cost anything: we’ll get in touch first.</p>${banner}<ul class="ws-grid">${items}</ul>${est}${svc.canRequest ? "" : `<p class="muted small">Only account owners can request a service.</p>`}</section>`;
-}
-
 /** The empty state: no website has been added for this organization. */
 function emptyState() {
   const subject = encodeURIComponent("Website enquiry");
@@ -159,9 +142,9 @@ const requestsLink = (vm, m) => (m && m.requests && m.requests.total ? `<p class
 /** /website: nothing yet (empty state), one website (shown in full), or several (a list; each opens its own page). */
 export function websiteOverview(vm, sites, preview = null, extra = {}) {
   const head = `<header class="page-head page-head--compact">${crumb(vm, [["Website"]])}<h1 class="h1 h1--section">Website</h1></header>`;
-  if (!sites.length) return `${head}${emptyState()}${additionalServices(vm, extra.services)}`;
+  if (!sites.length) return `${head}${emptyState()}${serviceCatalogue(vm, extra.services)}`;
   if (sites.length === 1) return `${head}<h2 class="h2 ws__name">${e(sites[0].name)}</h2>${detailBody(vm, sites[0], preview, extra)}`;
-  return `${head}<p class="lead">${e(`${sites.length} websites are listed for your business.`)}</p><ul class="hubs ws__list">${sites.map((s) => card(vm, s)).join("")}</ul>${requestsLink(vm, extra.management)}${additionalServices(vm, extra.services)}`;
+  return `${head}<p class="lead">${e(`${sites.length} websites are listed for your business.`)}</p><ul class="hubs ws__list">${sites.map((s) => card(vm, s)).join("")}</ul>${requestsLink(vm, extra.management)}${serviceCatalogue(vm, extra.services)}`;
 }
 
 /** /website/:id — one website in full (also reachable when it is the only one). */

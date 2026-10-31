@@ -850,3 +850,9 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-req__auto { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--muted, #5c5c5c); }
 @media (min-width: 820px) { .adm-req { grid-template-columns: minmax(0, 14rem) minmax(0, 1fr); } }
 @media (min-width: 1100px) { .adm-req__set { grid-template-columns: minmax(0, 12rem) minmax(0, 1fr) auto; } }
+
+/* Website milestones and SEO panel: stacked rows with hairline dividers, the shared action spacing. */
+.adm-ms__list, .adm-seo__list { list-style: none; margin: var(--adm-gap-block) 0 0; padding: 0; display: grid; gap: 0; }
+.adm-ms, .adm-seo__row { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--hairline); }
+.adm-ms .adm-field, .adm-seo__row .adm-field { margin: 0; }
+.adm-seo .adm-ws__block { margin-top: 0; }

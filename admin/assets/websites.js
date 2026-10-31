@@ -5,8 +5,12 @@
 
 import { h, api, confirmDialog, errorState, fmtDate } from "./ui.js";
 import { chip } from "./client-dashboard.js";
+import { seoPanel } from "./website-seo.js";
 
 const STATUS = { existing: "Existing website", in_development: "In development", live: "Live" };
+const PHASE = { "": "None", awaiting_feedback: "Awaiting client feedback (in development)", awaiting_approval: "Awaiting approval (in development)", maintenance: "Maintenance (live)" };
+const STAGE_LABEL = { existing: "Existing website", in_development: "In development", awaiting_feedback: "Awaiting client feedback", awaiting_approval: "Awaiting approval", live: "Live", maintenance: "Maintenance" };
+const MILE_STATUS = { todo: "To do", in_progress: "In progress", done: "Done" };
 const ORIGIN = { framework: "Built by Framework", client: "Built by the client or another company" };
 const PARTY = { framework: "Framework", client: "The client", unknown: "Not sure" };
 const MAX_SHOT = 5 * 1024 * 1024;
@@ -15,6 +19,8 @@ const MAX_PACKAGE = 25 * 1024 * 1024;
 const ERROR_TEXT = {
   invalid_name: "Give the website a name (up to 80 characters).",
   invalid_url: "Enter a web address like example.ca or https://example.ca (no spaces, no password in the address).",
+  invalid_phase: "That phase doesn’t fit where the website stands: Awaiting client feedback and Awaiting approval are for a website in development, Maintenance for a live one.", phase_unavailable: "Phases aren’t available on this site yet (a database change is waiting), so the phase was not saved.",
+  invalid_title: "Give the milestone a title (up to 120 characters, one line).", invalid_detail: "That detail is too long (500 characters at most).", invalid_direction: "Choose up or down.",
   invalid_origin: "Choose who built the website.", invalid_status: "Choose where the website stands.", invalid_date: "Use a real date.", invalid_party: "Choose who owns it.",
   invalid_text: "That text is too long or has odd characters.", invalid_input: "Check the details and try again.",
   invalid_combination: "An existing or live website needs a web address, and a website in development is built by Framework.",
@@ -78,6 +84,7 @@ export async function render(orgId, ctx) {
     const url = text(id + "-url", site && site.url, { maxlength: "300", inputmode: "url", spellcheck: "false", autocapitalize: "none", placeholder: "example.ca" });
     const origin = select(id + "-origin", ORIGIN, site ? site.origin : "framework");
     const status = select(id + "-status", STATUS, site ? site.status : "in_development");
+    const phase = select(id + "-phase", PHASE, (site && site.phase) || "");
     const managed = check(id + "-managed", "Framework manages this website", site && site.managedByFramework, "Separate from where it stands: whether Framework looks after its updates, hosting or maintenance.");
     const launch = date(id + "-launch", site && site.launchDate);
     const published = check(id + "-published", "Ready to show the client", site && site.published, "Clients can’t see websites yet: the Website section is switched off. This only prepares it.");
@@ -85,6 +92,7 @@ export async function render(orgId, ctx) {
     const hProv = text(id + "-hprov", site && site.hosting.provider, { maxlength: "120" }), hOwn = select(id + "-hown", PARTY, site ? site.hosting.owner : "unknown"), hRen = date(id + "-hren", site && site.hosting.renewal);
     const notes = h("textarea", { id: id + "-notes", class: "input adm-brand__textarea", rows: "3", maxlength: "1000" }, (site && site.managementNotes) || "");
     const body = () => ({
+      ...(data.phaseAvailable ? { phase: phase.value || null } : {}),
       name: name.value.trim(), url: orNull(url.value), origin: origin.value, status: status.value, managed_by_framework: managed.input.checked, launch_date: orNull(launch.value), published: published.input.checked,
       domain_registrar: orNull(dReg.value), domain_owner: dOwn.value, domain_renewal: orNull(dRen.value), hosting_provider: orNull(hProv.value), hosting_owner: hOwn.value, hosting_renewal: orNull(hRen.value), management_notes: orNull(notes.value),
     });
@@ -98,7 +106,8 @@ export async function render(orgId, ctx) {
     } },
       field(id + "-name", "Name", name, "For example “Main website” or “Online shop”."),
       field(id + "-url", "Web address", url, "Leave it empty only while the website is still being built."),
-      field(id + "-origin", "Who built it", origin), field(id + "-status", "Where it stands", status), managed.node,
+      field(id + "-origin", "Who built it", origin), field(id + "-status", "Where it stands", status),
+      data.phaseAvailable ? field(id + "-phase", "Stage (optional)", phase, "Refines where it stands for the client: Awaiting client feedback or Awaiting approval while in development, Maintenance once live. Changing where it stands clears a stage that no longer fits.") : null, managed.node,
       field(id + "-launch", "Launch date", launch, "Optional."), published.node,
       h("p", { class: "acc__group" }, "Domain"),
       field(id + "-dreg", "Registrar", dReg, "Where the domain name is registered."), field(id + "-down", "Who owns the domain", dOwn), field(id + "-dren", "Renews on", dRen),
@@ -141,6 +150,29 @@ export async function render(orgId, ctx) {
         try { previews.set(site.id, await api(`${base}/${encodeURIComponent(site.id)}/preview-check`)); } catch { previews.set(site.id, { failed: true }); }
         draw();
       } }, r && !r.pending ? "Check again" : "Check live preview"), ...lines);
+  }
+
+  /** The development milestones: the progress bar clients see is computed from these (complete milestones over all of them). Only a website in development has a bar. */
+  function milestonesBlock(site) {
+    const list = site.milestones || [];
+    const prog = site.progress && site.progress.show ? `${site.progress.percent}% complete (${site.progress.done} of ${site.progress.total} milestones done)` : site.status === "in_development" ? "No milestones yet, so the client sees no progress bar." : "Only a website in development shows a progress bar; a live website just says Live.";
+    const mBase = `${base}/${encodeURIComponent(site.id)}/milestones`;
+    const row = (m) => {
+      const k = "ms-" + m.id.slice(0, 8);
+      const title = text(k + "-t", m.title, { maxlength: "120" }), detail = text(k + "-d", m.detail, { maxlength: "500" }), st = select(k + "-s", MILE_STATUS, m.status), due = date(k + "-due", m.dueDate);
+      return h("li", { class: "adm-ms" }, field(k + "-t", "Milestone", title), field(k + "-d", "Detail (optional)", detail), field(k + "-s", "Status", st), field(k + "-due", "Due (optional)", due),
+        canWrite() ? h("div", { class: "adm-actions" },
+          h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => perform({ request: () => api(`${mBase}/${m.id}/update`, { method: "POST", body: { title: title.value.trim(), detail: orNull(detail.value), status: st.value, due_date: orNull(due.value) } }), success: "Milestone saved." }) }, "Save"),
+          h("button", { class: "btn btn--secondary adm-small", type: "button", "aria-label": `Move ${m.title} up`, onclick: () => perform({ request: () => api(`${mBase}/${m.id}/move`, { method: "POST", body: { direction: "up" } }), success: "Moved up." }) }, "Move up"),
+          h("button", { class: "btn btn--secondary adm-small", type: "button", "aria-label": `Move ${m.title} down`, onclick: () => perform({ request: () => api(`${mBase}/${m.id}/move`, { method: "POST", body: { direction: "down" } }), success: "Moved down." }) }, "Move down"),
+          h("button", { class: "btn btn--secondary adm-small adm-actions__danger", type: "button", onclick: () => perform({ confirm: { title: "Remove this milestone?", body: "It disappears from the client’s progress, and the progress bar is recalculated.", details: [["Website", site.name], ["Milestone", m.title]], confirmLabel: "Remove milestone" }, request: () => api(`${mBase}/${m.id}/delete`, { method: "POST", body: {} }), success: "Milestone removed." }) }, "Remove")) : null);
+    };
+    const k = "ms-new-" + site.id.slice(0, 8);
+    const nt = text(k + "-t", "", { maxlength: "120" }), nd = text(k + "-d", "", { maxlength: "500" }), ns = select(k + "-s", MILE_STATUS, "todo"), nu = date(k + "-due", "");
+    return h("div", { class: "adm-ws__block adm-ws__miles" }, h("p", { class: "acc__group" }, "Milestones and progress"), h("p", { class: "adm-brand__meta", text: prog }),
+      list.length ? h("ol", { class: "adm-ms__list" }, list.map(row)) : null,
+      canWrite() ? [field(k + "-t", "Add a milestone", nt, "For example “Design approved” or “Content loaded”."), field(k + "-d", "Detail (optional)", nd), field(k + "-s", "Status", ns), field(k + "-due", "Due (optional)", nu),
+        h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => { if (!nt.value.trim()) { say(ERROR_TEXT.invalid_title, "error"); nt.focus(); return; } perform({ request: () => api(mBase, { method: "POST", body: { title: nt.value.trim(), detail: orNull(nd.value), status: ns.value, due_date: orNull(nu.value) } }), success: "Milestone added." }); } }, "Add milestone"))] : null);
   }
 
   /** The downloadable website files: one ZIP per website. A new file starts unpublished; publishing is a separate step, and only a published file is offered to the client. */
@@ -192,7 +224,7 @@ export async function render(orgId, ctx) {
 
   function siteCard(site) {
     const archived = Boolean(site.archivedAt);
-    const chips = [chip(site.status === "live" ? "ok" : site.status === "in_development" ? "pending" : "plain", STATUS[site.status], site.status === "live" ? "complete" : site.status === "in_development" ? "info" : undefined),
+    const chips = [chip(site.status === "live" ? "ok" : site.status === "in_development" ? "pending" : "plain", STAGE_LABEL[site.stage] || STATUS[site.status], site.status === "live" ? "complete" : site.status === "in_development" ? "info" : undefined),
       site.managedByFramework ? chip("plain", "Managed by Framework") : chip("plain", "Not managed by Framework"), site.published && !archived ? chip("plain", "Ready to show the client") : null, archived ? chip("warn", "Archived", "warn") : null];
     const summary = [site.url ? h("a", { class: "adm-link", href: site.url, target: "_blank", rel: "noopener noreferrer" }, site.url.replace(/^https?:\/\//, "").replace(/\/$/, "")) : h("span", { class: "adm-muted", text: "No web address yet" }),
       site.launchDate ? h("span", { class: "adm-brand__meta", text: ` · Launch ${fmtDate(site.launchDate + "T00:00:00Z")}` }) : null];
@@ -203,7 +235,7 @@ export async function render(orgId, ctx) {
     const key = "ws-" + site.id;
     return h("details", { class: "adm-acc adm-ws", id: key, open: opened.has(key) ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add(key); else opened.delete(key); } },
       h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: site.name }), h("span", { class: "adm-acc__meta" }, chips)),
-      h("div", { class: "adm-acc__body" }, h("p", null, summary), archived ? null : siteForm(site), archived ? null : previewBlock(site), archived ? null : packageBlock(site), archived ? null : screenshotBlock(site), actions));
+      h("div", { class: "adm-acc__body" }, h("p", null, summary), archived ? null : siteForm(site), archived ? null : milestonesBlock(site), archived ? null : seoPanel({ base, site, canWrite, say }), archived ? null : previewBlock(site), archived ? null : packageBlock(site), archived ? null : screenshotBlock(site), actions));
   }
 
   function draw() {

@@ -218,7 +218,8 @@ test("Additional Services: a clean grid of the four services, no price unless Ad
   await s.site(s.A);
   let page = await html(await s.ann.get("/portal/o/alpha/website"));
   for (const n of ["Client Admin Portal", "Invoice Sender", "Digital Business Cards", "SEO &amp; Visibility"]) assert.match(page, new RegExp(n));
-  assert.equal((page.match(/Request Service<span class="visually-hidden">/g) || []).length, 4);
+  const buttons = (h) => (h.split('id="additional-services"')[1].match(/<button class="btn btn--primary" type="submit">/g) || []).length;
+  assert.equal(buttons(page), 4);
   assert.ok(!/ws-svc__price/.test(page) && !/Starting at|Custom quote|Included/.test(page.split('id="additional-services"')[1]), "no price is shown until one is configured");
   assert.ok(!/already included|part of your plan/i.test(page));
   const set = (prices) => s.call("/service-pricing", { method: "POST", json: { prices } });
@@ -235,7 +236,7 @@ test("Additional Services: a clean grid of the four services, no price unless Ad
   assert.deepEqual(JSON.parse(row.price_snapshot), { service: "seo-visibility", name: "SEO & Visibility", type: "starting_at", priceCad: 400, label: "Starting at $400 CAD" }, "the price the client was shown is recorded");
   page = await html(await s.ann.get("/portal/o/alpha/website?requested=1"));
   assert.match(page, /Your request was sent/); assert.match(page, /status--active">Requested/);
-  assert.equal((page.match(/Request Service<span class="visually-hidden">/g) || []).length, 3, "the requested service shows its state instead of a button");
+  assert.equal(buttons(page), 3, "the requested service shows its state instead of a button");
   const r2 = await s.svc(s.ann, { service: "seo-visibility" });
   assert.match(r2.headers.get("Location"), /requested=0/); assert.equal(rowsOf(s.w, "SELECT count(*) AS n FROM service_requests")[0].n, 1, "one open request per service");
   assert.match(await html(await s.ann.get("/portal/o/alpha/website?requested=0")), /already asked/);

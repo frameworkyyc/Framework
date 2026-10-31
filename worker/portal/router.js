@@ -21,6 +21,8 @@ import { listRequirementSettings } from "./repo/brand-requirement-settings.js";
 import { listClientMilestones } from "./repo/website-milestones.js";
 import { stageOf, milestoneProgress } from "./website-stage.js";
 import { getSeoForClient } from "./repo/website-seo.js";
+import { loadServiceCatalogue } from "./service-catalogue.js";
+import { mediaResponse } from "./service-media-files.js";
 import { listProjects, getProject } from "./repo/projects.js";
 import { listActivity } from "./repo/activity.js";
 import { validateSlug, validateName } from "./repo/validate.js";
@@ -443,16 +445,8 @@ async function websiteManagement(ctx, a, site) {
 
 /** The Additional Services grid: the shown services (Admin's catalogue), a price only where Admin set one (never "Included"), and whether the client already has an open request for each. */
 async function websiteServices(ctx, a) {
-  const org = a.membership.organizationId;
-  const items = await listClientServices(ctx.db);
-  if (!items.length) return null;
-  const prices = pricingFrom((await listPrices(ctx.db)).rows);
-  const open = new Set((await listServiceRequests(ctx.db, org, { openOnly: true })).map((r) => r.serviceKey));
   const f = viewFilters(ctx.url);
-  return {
-    canRequest: can(a.membership.role, "website.request"), flash: f.requested ? "requested" : f.requestDup ? "dup" : "",
-    items: items.map((it) => { const p = prices[it.key]; const shown = p && p.type !== "included" ? p : null; return { ...it, price: shown ? shown.label : "", priceType: shown ? shown.type : "", requested: open.has(requestKeyOfService(it.key)) }; }),
-  };
+  return loadServiceCatalogue(ctx, { organizationId: a.membership.organizationId, canRequest: can(a.membership.role, "website.request"), flash: f.requested ? "requested" : f.requestDup ? "dup" : "", mediaBase: `/portal/o/${a.membership.slug}/website/services/media`, formAction: `/portal/o/${a.membership.slug}/website/services/request` });
 }
 
 async function postServiceRequest(ctx, a) {
@@ -540,6 +534,12 @@ const WEBSITE_ROUTES = [
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/requests\/([^/]+)\/reply$/, action: "support.view", postAction: "support.submit", bucket: "support", maxBody: () => SUPPORT_BODY,
     run: async (ctx, a, id) => redirect(`/portal/o/${a.membership.slug}/website/requests/${id}`), post: (ctx, a, id) => postWebsiteReply(ctx, a, id) },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/requests\/([^/]+)$/, action: "support.view", run: (ctx, a, id) => showWebsiteThread(ctx, a, id) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/services\/media\/([^/]+)$/, action: "website.view", run: async (ctx, a, id) => {
+      if (!UUID.test(id)) return notFoundPage(ctx);
+      if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
+      const res = await mediaResponse(brandDeps(ctx), { id, clientOnly: true }); // only the picture of a service that is shown; the catalogue is global, so any signed-in member of an organization may see it
+      return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
+    } },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/services\/request$/, action: "website.view", postAction: "website.request", bucket: "support", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/website`), post: (ctx, a) => postServiceRequest(ctx, a) },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/requests\/new$/, action: "support.submit", run: async (ctx, a, id) => {
       if (!UUID.test(id)) return notFoundPage(ctx);
