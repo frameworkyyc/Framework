@@ -16,6 +16,10 @@ import { validateEnum, validateName, validateText, validateHttpsUrl } from "./va
 import { recordActivity } from "./activity.js";
 import { usableName } from "../../../admin/assets/brand-names.js";
 
+/** Who may write as the client: an active member, or (only when asStaff is passed, which only the portal guard does after verifying a bound master-access grant) a Framework staff member. Same binds in the same order. */
+const MEMBER_MAY_WRITE = "EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')";
+const STAFF_MAY_WRITE = "EXISTS (SELECT 1 FROM portal_staff s WHERE ? IS NOT NULL AND s.user_id = ? AND s.revoked_at IS NULL)";
+
 export const ASSET_KINDS = ["logo", "guideline", "document", "font", "package", "other"];
 export const LOGO_ROLES = ["primary", "simplified", "icon"]; // what the database CHECK allows (icon = the Sub-mark)
 /** What Framework Admin may choose. "secondary" has no column value of its own (that would need a migration): it is stored as logo_role NULL and the generated variant_key starts with "secondary-"; roleOf() reads it back. */
@@ -389,8 +393,9 @@ export async function uploadUsage(db, organizationId) {
  * Records a client upload. The limits are enforced INSIDE the insert (one statement: the row is written only if the file count and the byte total stay within
  * the limits, and only if the uploader is an active member of this organization), so two uploads at once cannot both slip past the quota.
  */
-export async function createClientUpload(db, organizationId, userId, { category, fontRightsAck }, file, limits, { now = new Date() } = {}) {
+export async function createClientUpload(db, organizationId, userId, { category, fontRightsAck }, file, limits, { now = new Date(), asStaff = false } = {}) {
   requireOrgId(organizationId); requireUserId(userId);
+  const WHO = asStaff ? STAFF_MAY_WRITE : MEMBER_MAY_WRITE; // see the note on these two constants in repo/support.js
   const cat = validateEnum(category, UPLOAD_CATEGORIES);
   if (!cat) return fail("invalid_category");
   const fontFile = ["ttf", "otf", "woff", "woff2"].includes(file.ext);
@@ -403,7 +408,7 @@ export async function createClientUpload(db, organizationId, userId, { category,
       .prepare(
         `INSERT INTO brand_uploads (id, organization_id, category, original_name, format, content_type, size_bytes, sha256, storage_key, uploaded_by, font_rights_ack, status, created_at)
          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', ?
-          WHERE EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')
+          WHERE ${WHO}
             AND (SELECT count(*) FROM brand_uploads u WHERE u.organization_id = ? AND u.deleted_at IS NULL) < ?
             AND (SELECT COALESCE(sum(u.size_bytes), 0) FROM brand_uploads u WHERE u.organization_id = ? AND u.deleted_at IS NULL) + ? <= ?`,
       )
@@ -499,8 +504,9 @@ const request = (r) => ({ id: r.id, serviceKey: r.service_key, status: r.status,
 const parseSnapshot = (text) => { try { const o = typeof text === "string" ? JSON.parse(text) : null; return o && typeof o === "object" && typeof o.label === "string" ? { service: String(o.service || ""), name: String(o.name || ""), type: String(o.type || ""), priceCad: Number.isInteger(o.priceCad) ? o.priceCad : null, label: o.label } : null; } catch { return null; } };
 
 /** One open request per organization and service (a database rule, so it holds under concurrency). `isKnownService` is the catalogue check supplied by the caller. */
-export async function createServiceRequest(db, organizationId, userId, { serviceKey, note, priceSnapshot = null }, isKnownService, { now = new Date() } = {}) {
+export async function createServiceRequest(db, organizationId, userId, { serviceKey, note, priceSnapshot = null }, isKnownService, { now = new Date(), asStaff = false } = {}) {
   requireOrgId(organizationId); requireUserId(userId);
+  const WHO = asStaff ? STAFF_MAY_WRITE : MEMBER_MAY_WRITE; // see the note on these two constants in repo/support.js
   if (typeof isKnownService !== "function" || typeof serviceKey !== "string" || !isKnownService(serviceKey)) return fail("unknown_service");
   const text = validateText(note, 1000);
   if (text === undefined) return fail("invalid_note");
@@ -510,10 +516,10 @@ export async function createServiceRequest(db, organizationId, userId, { service
       // With a price shown (only possible once migration 0010 is applied: no price is shown without it) the price wording is stored alongside the request.
       priceSnapshot
         ? db
-            .prepare("INSERT INTO service_requests (id, organization_id, service_key, status, note, requested_by, created_at, price_snapshot) SELECT ?, ?, ?, 'new', ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')")
+            .prepare(`INSERT INTO service_requests (id, organization_id, service_key, status, note, requested_by, created_at, price_snapshot) SELECT ?, ?, ?, 'new', ?, ?, ?, ? WHERE ${WHO}`)
             .bind(id, organizationId, serviceKey, text, userId, at, JSON.stringify(priceSnapshot), organizationId, userId)
         : db
-            .prepare("INSERT INTO service_requests (id, organization_id, service_key, status, note, requested_by, created_at) SELECT ?, ?, ?, 'new', ?, ?, ? WHERE EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')")
+            .prepare(`INSERT INTO service_requests (id, organization_id, service_key, status, note, requested_by, created_at) SELECT ?, ?, ?, 'new', ?, ?, ? WHERE ${WHO}`)
             .bind(id, organizationId, serviceKey, text, userId, at, organizationId, userId),
       auditAfterChange(db, { organizationId, actorType: "client", actorRef: userId, action: "service.requested", entityType: "service_request", entityId: id, visibility: "client", at }),
     ]);

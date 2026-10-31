@@ -185,7 +185,7 @@ test("migrations_dir safeguard: both PORTAL_DB bindings point at migrations/port
   for (const d of [...config.d1_databases, ...config.previews.d1_databases].filter((d) => d.binding === "DB")) assert.equal(d.migrations_dir, undefined, d.database_name + ": the feedback binding is unchanged (default ./migrations)");
   const dir = new URL("../../migrations/portal/", import.meta.url);
   assert.ok(existsSync(dir));
-  assert.deepEqual(readdirSync(dir).filter((f) => f.endsWith(".sql")), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql", "0010_service_pricing.sql", "0011_websites.sql", "0012_website_management.sql"], "exactly the four reviewed portal migrations are visible through that directory");
+  assert.deepEqual(readdirSync(dir).filter((f) => f.endsWith(".sql")), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql", "0010_service_pricing.sql", "0011_websites.sql", "0012_website_management.sql", "0013_staff_access.sql"], "exactly the four reviewed portal migrations are visible through that directory");
   const feedback = readdirSync(new URL("../../migrations/", import.meta.url)).filter((f) => f.endsWith(".sql"));
   assert.ok(feedback.length >= 6 && !feedback.some((f) => /portal/.test(f)), "the feedback migrations stay in ./migrations and are never visible to PORTAL_DB");
   const code = raw.replace(/^\s*\/\/.*$/gm, "");

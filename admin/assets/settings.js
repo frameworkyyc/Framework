@@ -74,6 +74,7 @@ async function pricingPage(ctx) {
 
     const group = (title, no, services) => h("section", { class: "adm-pricing__group", "aria-labelledby": `sp-h-${no}` },
       h("h2", { class: "adm-pricing__h", id: `sp-h-${no}` }, no === "kit" || no === "website" || no === "addon" ? null : h("span", { class: "adm-bk-no", text: no }), title),
+      no === "addon" ? h("p", { class: "adm-sub" }, "The optional services on each client’s Website page. Here you set what they cost; to rename, describe, show, hide or reorder them, use ", h("a", { class: "adm-link", href: "/admin/settings/additional-services", "data-link": "" }, "Additional Services"), ".") : null,
       h("ul", { class: "adm-pricing__list" }, services.map(row)));
     const groups = BRAND_SECTIONS.map((sec) => group(sec.title, sec.no, data.services.filter((s) => s.section === sec.key))).concat(group("Complete Brand Kit", "kit", data.services.filter((s) => s.section === "all")), group("Website", "website", data.services.filter((s) => s.section === "website")), group("Additional services", "addon", data.services.filter((s) => s.section === "addon")));
 
@@ -103,7 +104,7 @@ async function pricingPage(ctx) {
 
     root.replaceChildren(...[
       h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin · Settings"), h("h1", { class: "adm-title", tabindex: "-1" }, "Service Pricing"),
-        h("p", { class: "adm-sub" }, "The starting price of each Branding design service, in Canadian dollars. One price applies to every client. Clients see it quietly beside the request button, only for a section they have nothing in yet, and it is recorded with their request. These are estimates, not quotes: there is no checkout, payment or invoicing here."))),
+        h("p", { class: "adm-sub" }, "What it costs. The starting price of each Branding design service, in Canadian dollars. One price applies to every client. Clients see it quietly beside the request button, only for a section they have nothing in yet, and it is recorded with their request. These are estimates, not quotes: there is no checkout, payment or invoicing here."))),
       data.available ? null : h("p", { class: "adm-banner" }, "Service pricing isn’t available on this deployment yet (its database migration hasn’t been applied), so clients see no prices. The values below are the defaults and can’t be saved."),
       data.available && !data.capabilities.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at the prices, but not change them.") : null,
       say,
@@ -148,6 +149,16 @@ async function servicesPage(ctx) {
       const order = h("input", { id: id + "-order", class: "input", type: "number", min: "0", max: "9999", value: String(s.sortOrder), disabled: editable ? null : true });
       const shown = h("input", { id: id + "-on", type: "checkbox", checked: s.enabled ? true : null, disabled: editable ? null : true });
       const save = h("button", { class: "btn btn--primary adm-small", type: "submit", disabled: editable ? null : true }, "Save");
+      const idx = data.services.findIndex((x) => x.key === s.key);
+      const move = (dir, label) => h("button", { class: "btn btn--secondary adm-small", type: "button", disabled: editable && !(dir === "up" ? idx === 0 : idx === data.services.length - 1) ? null : true, "aria-label": `${label}: ${s.name}`, onclick: async () => {
+        if (busy) return;
+        busy = true;
+        let outcome;
+        try { await api("/additional-services", { method: "POST", body: { key: s.key, move: dir } }); outcome = { tone: "success", text: `${s.name} moved ${dir === "up" ? "up" : "down"}. Clients see the new order straight away.` }; } catch (err) { outcome = { tone: "error", text: serviceErrorText(err) }; }
+        try { draw(await api("/additional-services")); } catch { /* the old view stays; the message says what happened */ }
+        busy = false; speak(outcome.text, outcome.tone);
+      } }, dir === "up" ? "Move up" : "Move down");
+      const priceLine = h("p", { class: "adm-pricing__meta adm-services__price" }, s.price ? `Price clients see: ${s.price.label}. ` : "No price is set, so clients see no price. ", h("a", { class: "adm-link", href: "/admin/settings/service-pricing#sp-h-addon", "data-link": "" }, s.price ? "Change it in Service Pricing →" : "Set a price in Service Pricing →"));
       return h("form", { class: "adm-form adm-services__item", novalidate: true, "aria-label": s.name, onsubmit: async (ev) => {
         ev.preventDefault();
         if (busy) return;
@@ -161,12 +172,14 @@ async function servicesPage(ctx) {
       h("div", { class: "adm-field" }, h("label", { for: id + "-desc", text: "Short description" }), desc),
       h("div", { class: "adm-field" }, h("label", { class: "adm-choice", for: id + "-on" }, shown, " Shown to clients")),
       h("div", { class: "adm-field" }, h("label", { for: id + "-order", text: "Order (lowest first)" }), order),
-      h("div", { class: "adm-actions" }, save),
+      priceLine,
+      h("div", { class: "adm-actions" }, save, move("up", "Move up"), move("down", "Move down")),
       h("p", { class: "adm-pricing__meta", text: s.stored && s.updatedAt ? `Updated ${fmtDate(s.updatedAt)}${s.updatedBy && !/^migration/.test(s.updatedBy) ? ` by ${s.updatedBy}` : ""}` : "Built-in default" }));
     };
     root.replaceChildren(...[
       h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin · Settings"), h("h1", { class: "adm-title", tabindex: "-1" }, "Additional Services"),
-        h("p", { class: "adm-sub" }, "The optional services listed under “Additional Services” on every client’s Website page. Each has a Request Service button; a request goes to Framework like any other and never authorizes work. A price appears only if you set one in Service Pricing."))),
+        h("p", { class: "adm-sub" }, "What is offered: the optional services listed under “Additional Services” on every client’s Website page. Edit a service’s name and description, show or hide it, and put the services in order. Each has a Request Service button; a request goes to Framework like any other and never authorizes work."),
+        h("p", { class: "adm-sub" }, "What it costs is separate: set or change prices in ", h("a", { class: "adm-link", href: "/admin/settings/service-pricing#sp-h-addon", "data-link": "" }, "Service Pricing"), ". A price appears to clients only when you set one there."))),
       data.available ? null : h("p", { class: "adm-banner" }, "The catalogue can’t be edited on this deployment yet (its database migration hasn’t been applied). Clients see the built-in defaults shown below."),
       data.available && !data.capabilities.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at the services, but not change them.") : null,
       say,

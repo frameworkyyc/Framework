@@ -231,7 +231,7 @@ test("scan: organization-scoped data is only ever fetched with the membership's 
   assert.ok(calls.length >= 5, "found the data calls: " + calls.length);
   for (const c of calls) assert.match(c, /a\.membership\.organizationId/, c);
   assert.ok(!/organizationId\s*[:=]\s*(ctx\.url|m\[|slug|id\b)/.test(router));
-  assert.ok(!/searchParams|headers\.get/.test(router.replace(/url\.searchParams\.get\("start"\)/g, "")), "the router reads no request input beyond the path, method and the login 'start' flag");
+  assert.ok(!/searchParams|headers\.get/.test(router.replace(/url\.searchParams\.get\("start"\)/g, "").replace(/ctx\.url\.searchParams\.get\("q"\)/g, "")), "the router reads no request input beyond the path, method, the login 'start' flag and the staff directory search text");
 });
 test("scan: every organization route goes through requireOrgAccess with a reviewed policy action", () => {
   const router = src("../portal/router.js");

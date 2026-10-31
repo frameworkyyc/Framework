@@ -27,6 +27,23 @@ async function signOutForm(ctx, session) {
   return `<form method="post" action="/portal/logout" class="signout"><input type="hidden" name="csrf" value="${e(token)}"><button class="btn" type="submit">Sign out</button></form>`;
 }
 
+/** The subtle, persistent master-access strip: who is being viewed, the role being previewed, and the way back to the directory. Only ever rendered when the guard verified staff access. */
+async function staffBanner(ctx, a) {
+  const token = await csrfFor(ctx.cfg, a.session);
+  const next = e(ctx.url.pathname);
+  const form = (role, label) => `<form method="post" action="/portal/staff/view-as" class="staff-banner__form"><input type="hidden" name="csrf" value="${e(token)}"><input type="hidden" name="role" value="${role}"><input type="hidden" name="next" value="${next}"><button class="staff-banner__btn" type="submit"${a.staff.previewRole === role ? ' aria-pressed="true"' : ' aria-pressed="false"'}>${label}</button></form>`;
+  return `<div class="staff-banner" role="region" aria-label="Framework master access"><div class="wrap"><span class="staff-banner__who"><strong>Viewing: ${e(a.membership.name)}</strong> <span>Framework master access</span></span><span class="staff-banner__tools"><span class="staff-banner__label">Preview as</span>${form("owner", "Owner")}${form("member", "Member")}<a href="/portal">Switch client</a></span></div></div>`;
+}
+
+export async function staffDirectoryPage(ctx, session, orgs, q = "") {
+  const items = orgs.map((o) => `<li><a class="row" href="/portal/o/${e(o.slug)}"><span class="row__title">${e(o.name)}</span><span class="row__meta">Open portal</span></a></li>`).join("");
+  const none = `<p class="muted">${q ? "No client matches that search." : "There are no active clients yet."}</p>`;
+  return htmlPage({
+    title: "Client portals",
+    bodyHtml: `<p class="lead">Framework master access. Choose a client to open their portal exactly as their team sees it.</p><form method="get" action="/portal" class="staff-search field"><label class="visually-hidden" for="staff-q">Search clients</label><input id="staff-q" type="text" name="q" value="${e(q)}" maxlength="80" placeholder="Search clients"><button class="btn" type="submit">Search</button></form>${orgs.length ? `<ul class="rows">${items}</ul>` : none}<div class="auth__alt">${await signOutForm(ctx, session)}</div>`,
+  });
+}
+
 /** The sections that are built for signed-in clients: Branding joins them only where PORTAL_BRANDING is on, Website only where PORTAL_WEBSITE is on. */
 export const liveAreasFor = (ctx) => [...LIVE_AREAS, ...(brandingEnabled(ctx.env) ? ["branding"] : []), ...(websiteEnabled(ctx.env) ? ["website"] : [])];
 
@@ -54,7 +71,7 @@ async function shell(ctx, a, { title, active, body, status = 200, vm, script = n
   const { session, membership: m } = a;
   // Header navigation of the connected portal: Home and Account (and Team for owners). Every other page is reached from Home.
   const list = [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: active === "account" || active === "team" ? active : "home", list }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), script, styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}` });
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: active === "account" || active === "team" ? active : "home", list }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}` });
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null }) {

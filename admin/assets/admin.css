@@ -79,7 +79,11 @@ a.adm-nav__link:hover { color: var(--ink); }
 }
 .adm-title:focus { outline: none; }
 .adm-sub { margin: 14px 0 0; color: var(--slate); font-size: 15px; }
-.adm-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+:root { --adm-gap-actions: 12px; --adm-gap-block: 20px; } /* one rhythm for buttons, inputs and action groups: 12px between controls, 20px between blocks */
+.adm-actions { display: flex; flex-wrap: wrap; gap: var(--adm-gap-actions); align-items: center; }
+/* A destructive action (Remove, Archive) sits apart from the others: pushed to the far end of the row, and on its own line with extra air when the row wraps. */
+.adm-actions__danger { margin-inline-start: auto; }
+@media (max-width: 640px) { .adm-actions__danger { margin-inline-start: 0; margin-top: 8px; } }
 .adm-actions .btn { min-height: 44px; padding: 0 18px; font-size: 14px; }
 .btn[disabled], .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
 .adm-back { display: inline-block; margin-bottom: 28px; font-weight: 600; font-size: 14px; text-underline-offset: 5px; }
@@ -252,7 +256,7 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-details dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 @media (max-width: 520px) { .adm-details dl > div { grid-template-columns: 1fr; gap: 2px; } }
 .adm-banner--alert { border-color: var(--ink); color: var(--ink); }
-.adm-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.adm-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--adm-gap-actions); }
 .adm-icon-btn {
   display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0;
   border: 1px solid var(--hairline); border-radius: 0; background: var(--paper); color: var(--slate); cursor: pointer;
@@ -405,7 +409,7 @@ a.adm-nav__link:hover { color: var(--ink); }
   .adm-access .adm-table td .adm-client__sub { font-size: 14px; line-height: 1.5; }
   .adm-access .adm-table td[data-label="Invitation"], .adm-access .adm-table td[data-label="Delivery"], .adm-access .adm-table td[data-label="Access"] { padding-top: 12px; border-top: 1px solid var(--hairline); }
   .adm-access .adm-table td[data-label=""] { padding-top: 4px; }
-  .adm-access .adm-row-actions { flex-wrap: wrap; justify-content: flex-start; gap: 10px; }
+  .adm-access .adm-row-actions { flex-wrap: wrap; justify-content: flex-start; gap: var(--adm-gap-actions); }
   .adm-access .adm-row-actions .adm-small { min-height: 44px; padding: 0 18px; font-size: 14px; }
 }
 @media (min-width: 680px) and (max-width: 1279px) {
@@ -415,7 +419,7 @@ a.adm-nav__link:hover { color: var(--ink); }
 
 /* the invitation form and the confirmation dialog on a phone */
 @media (max-width: 520px) {
-  .adm-form .adm-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .adm-form .adm-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--adm-gap-actions); }
   .adm-form .adm-actions .btn { width: 100%; min-height: 48px; }
   .adm-choice { gap: 10px; }
   .adm-dialog { padding: 22px 20px; }
@@ -613,9 +617,9 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-swatch { flex: none; }
 .adm-swatch rect { stroke: var(--slate); stroke-width: 1; }
 .adm-brandpage .adm-actions { margin-top: 4px; }
-.adm-brandpage .adm-row-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start; }
+.adm-brandpage .adm-row-actions { display: flex; flex-wrap: wrap; gap: var(--adm-gap-actions); justify-content: flex-start; }
 .adm-brandpage .adm-row-actions .adm-small, .adm-brandpage .adm-actions .adm-small { min-height: 44px; padding: 0 18px; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
-@media (max-width: 520px) { .adm-brandpage .adm-row-actions .adm-small { flex: 1 1 calc(50% - 10px); } .adm-tile__big--sm { font-size: 22px; } }
+@media (max-width: 520px) { .adm-brandpage .adm-row-actions .adm-small { flex: 1 1 calc(50% - 12px); } .adm-tile__big--sm { font-size: 22px; } }
 .adm-brandpage .adm-acc--sub { margin: 0 0 26px; }
 .adm-brandpage .adm-acc--sub > .adm-acc__sum { min-height: 48px; }
 .adm-brandpage .adm-acc--sub .adm-acc__title { font-size: 15px; }
@@ -659,7 +663,7 @@ a.adm-tile--link:hover .adm-tile__go { color: var(--ink); transform: translateX(
 /* Support & Change Requests (Admin): requests are collapsed rows; the thread loads when one is opened. */
 .adm-req { margin: 12px 0; } .adm-reqbody { margin-top: 12px; }
 .adm-thread { display: grid; gap: 16px; }
-.adm-statusrow { display: grid; gap: 10px; max-width: 640px; } .adm-field__label { font-weight: 600; font-size: 15px; }
+.adm-statusrow { display: grid; gap: var(--adm-gap-actions); justify-items: start; max-width: 640px; } .adm-statusrow > .input { width: 100%; } .adm-field__label { font-weight: 600; font-size: 15px; }
 .adm-msglist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .adm-msgrow { padding: 12px 14px; border: 1px solid var(--hairline); background: var(--paper); min-width: 0; } .adm-msgrow p { margin: 0 0 4px; overflow-wrap: anywhere; }
 .adm-msgrow.is-staff { background: var(--mist); } .adm-msgrow.is-note { border-style: dashed; border-color: var(--field-edge); }
@@ -744,6 +748,9 @@ a.adm-tile--link { display: flex; flex-direction: column; gap: 0; }
 .adm-todo__item--info { border-left-color: var(--pend, #2F4B7C); }
 .adm-todo__text { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .adm-todo__item .adm-link { flex: none; white-space: nowrap; }
+.adm-todo__acts { display: flex; flex: none; flex-wrap: wrap; gap: 4px 18px; justify-content: flex-end; }
+.adm-todo__dismiss { background: none; border: 0; padding: 0; color: inherit; font-family: inherit; cursor: pointer; }
+.adm-todo__dismiss:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
 .adm-todo__clear { margin: 0; padding: 18px 0 18px 14px; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--hairline); border-left: 4px solid var(--ok, #1E6B3C); font-weight: 600; }
 .adm-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 0 0 40px; border-top: 1px solid var(--ink); border-left: 1px solid var(--hairline); }
 .adm-kpi { display: grid; align-content: start; gap: 10px; padding: 20px 22px 22px; color: var(--ink); text-decoration: none; border-right: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); min-width: 0; }
@@ -787,8 +794,8 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-lv__title { margin: 0; font-weight: 600; font-size: 20px; line-height: 1.15; letter-spacing: -0.01em; }
 .adm-lv__status, .adm-lv__meta { margin: 0; font-size: 14px; color: var(--slate); overflow-wrap: anywhere; }
 .adm-lv__desc { margin: 0; font-size: 15px; color: var(--slate); }
-.adm-lv__actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
-.adm-lv__manage { align-self: flex-start; margin: 0; padding: 0; min-height: 32px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.adm-lv__actions { display: flex; flex-wrap: wrap; gap: var(--adm-gap-actions); padding-top: 4px; }
+.adm-lv__manage { align-self: flex-start; margin: 4px 0 0; padding: 0; min-height: 32px; border: 0; background: none; color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
 .adm-lvwrap > .adm-acc { margin-top: 24px; }
 .adm-lvwrap > .adm-lv-grid + .adm-acc { margin-top: 32px; }
 .adm-lvdialog [hidden] { display: none !important; }
@@ -823,5 +830,10 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 
 /* Websites (a client's Admin page): the same accordion language as Branding; a screenshot preview that never overflows. */
 .adm-ws__list { display: grid; gap: 0; margin: 0 0 24px; }
-.adm-ws__shot { margin: 24px 0 0; }
+/* The blocks inside an expanded website (details form, live preview, website files, screenshot): a grid so a field, its hint, its picker and its buttons never touch, each block set off by a hairline. */
+.adm-ws__block { display: grid; gap: 12px; justify-items: start; margin: var(--adm-gap-block) 0 0; padding: var(--adm-gap-block) 0 0; border-top: 1px solid var(--hairline); min-width: 0; }
+.adm-ws__block > * { margin: 0; max-width: 100%; }
+.adm-ws__block .adm-field, .adm-ws__block .adm-actions { width: 100%; }
+.adm-ws__block .adm-actions { margin-top: 4px; }
+.adm-ws__foot { margin-top: 28px; padding-top: var(--adm-gap-block); border-top: 1px solid var(--hairline); }
 .adm-ws__img { display: block; width: auto; max-width: min(100%, 480px); height: auto; margin: 8px 0; border: 1px solid var(--hairline); }

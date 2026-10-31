@@ -46,7 +46,7 @@ export function validDate(raw) {
   return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3] ? raw : null;
 }
 
-/** The status a person should see: paid and void as stored, otherwise overdue once the due date has passed. `today` is YYYY-MM-DD in the portal's day (UTC date is used as the clock). */
+/** The status a person should see: paid and void as stored, otherwise overdue once the due date has passed. `today` is YYYY-MM-DD in the portal's day (America/Edmonton, see todayOf). */
 export function effectiveStatus(row, today) {
   if (row.paymentStatus === "paid" || row.paymentStatus === "void") return row.paymentStatus;
   return row.dueDate && validDate(today) && row.dueDate < today ? "overdue" : "unpaid";
@@ -58,7 +58,9 @@ export function retainUntil(issueDate) {
   return d ? `${Number(d.slice(0, 4)) + 6}-12-31` : null;
 }
 
-export const todayOf = (now = new Date()) => isoTime(now).slice(0, 10);
+/** The portal's day, in Framework's time zone (America/Edmonton), as YYYY-MM-DD: an invoice is overdue from the day AFTER its due date there, not from midnight UTC (which is the evening of the due date in Calgary). */
+const EDMONTON = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton", year: "numeric", month: "2-digit", day: "2-digit" });
+export const todayOf = (now = new Date()) => { const p = Object.fromEntries(EDMONTON.formatToParts(now).map((x) => [x.type, x.value])); return `${p.year}-${p.month}-${p.day}`; };
 
 /* ------------------------------------------------------------------ rows */
 

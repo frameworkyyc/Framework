@@ -137,6 +137,7 @@ async function route() {
   const heading = main.querySelector(".adm-title");
   (heading || main).focus({ preventScroll: true });
   window.scrollTo(0, 0);
+  if (location.hash.length > 1) { const target = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (target) target.scrollIntoView(); } // a link such as /admin/settings/service-pricing#sp-h-addon lands on its section
   refreshBadge();
 }
 

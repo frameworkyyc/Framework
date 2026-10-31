@@ -46,7 +46,7 @@ async function noteCleanupFailure(deps, organizationId, entityType, entityId) {
 /** deps: { db, bucket, env?, now? } */
 export const limitsFor = (deps) => limitsFromEnv(deps.env || {});
 
-export async function clientUploadFile(deps, { role, organizationId, userId, category, fontRightsAck, file }) {
+export async function clientUploadFile(deps, { role, organizationId, userId, asStaff = false, category, fontRightsAck, file }) {
   if (!can(role, "branding.upload")) return denied();
   const limits = limitsFor(deps);
   const usage = await brand.uploadUsage(deps.db, organizationId);
@@ -60,7 +60,7 @@ export async function clientUploadFile(deps, { role, organizationId, userId, cat
   } catch (err) { return storageFail(err); }
   let rec;
   try {
-    rec = await brand.createClientUpload(deps.db, organizationId, userId, { category, fontRightsAck }, describe(inspected, key), limits, { now: deps.now });
+    rec = await brand.createClientUpload(deps.db, organizationId, userId, { category, fontRightsAck }, describe(inspected, key), limits, { now: deps.now, asStaff });
   } catch (err) {
     await cleanup(deps, organizationId, key);
     throw err;
@@ -105,12 +105,12 @@ export async function clientDownloadAsset(deps, { role, organizationId, userId, 
   return stream(deps, { organizationId, row, actorType: "client", actorRef: userId, entityType: "brand_asset", inline, record: !font });
 }
 
-export async function clientRequestService(deps, { role, organizationId, userId, serviceKey, note }) {
+export async function clientRequestService(deps, { role, organizationId, userId, asStaff = false, serviceKey, note }) {
   if (!can(role, "branding.request")) return denied();
   // The price the client was shown is recorded with a priced design request: read here from the stored prices (never from the form), so it cannot be forged.
   const pricingKey = pricingKeyOfRequest(serviceKey);
   const entry = pricingKey ? (await loadPricing(deps.db))[pricingKey] : null;
-  return brand.createServiceRequest(deps.db, organizationId, userId, { serviceKey, note, priceSnapshot: priceSnapshot(entry) }, isKnownBrandingService, { now: deps.now });
+  return brand.createServiceRequest(deps.db, organizationId, userId, { serviceKey, note, priceSnapshot: priceSnapshot(entry) }, isKnownBrandingService, { now: deps.now, asStaff });
 }
 
 /* ------------------------------------------------------------------ Framework Admin side (callers are behind Cloudflare Access and ADMIN_EMAILS) */

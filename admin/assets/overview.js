@@ -1,7 +1,7 @@
 /* Framework Admin — Overview module: /admin. A working dashboard: what needs a person first, then clients, support requests, invoices, feedback and what just happened.
    Everything is live data from the Admin API; each part loads on its own, so one failing part never blanks the page. Server text is never inserted as HTML. */
 
-import { h, api, stateBlock, fmtDate } from "./ui.js";
+import { h, api, stateBlock, fmtDate, confirmDialog } from "./ui.js";
 import { responseTable } from "./feedback.js";
 
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
@@ -39,6 +39,14 @@ export function attentionItems({ dash, services, assess, feedback }) {
   const items = [];
   const add = (tone, text, href, label) => items.push({ tone, text, href, label });
   if (services && services.emails && services.emails.failed) add("bad", plural(services.emails.failed, "notification email") + " failed to send", "/admin/support", "Open Support Requests");
+  // Client notifications that could not be emailed because nobody on the approved list could receive them: one line per client (the newest three), naming the addresses
+  // that are not approved. It clears itself once they are approved, or by "Dismiss" for addresses that never will be.
+  const skipped = (services && services.emails && services.emails.unapproved) || [];
+  for (const o of skipped.slice(0, 3)) {
+    const who = o.recipients.length ? `Not approved: ${o.recipients.join(", ")}.` : "Nobody with access can receive email.";
+    items.push({ tone: "warn", text: `${o.orgName}: ${plural(o.notices, "client notification")} not emailed. ${who}`, href: "/admin/approved-emails", label: "Open Approved Emails", dismiss: { organizationId: o.organizationId, orgName: o.orgName } });
+  }
+  if (skipped.length > 3) items.push({ tone: "warn", text: `${skipped.length - 3} more ${skipped.length - 3 === 1 ? "client has" : "clients have"} notifications not emailed because an address isn’t approved`, href: "/admin/approved-emails", label: "Open Approved Emails" });
   if (assess && assess.unsent) add("bad", plural(assess.unsent, "assessment request") + " saved but not emailed", "/admin/assessments", "Open Assessments");
   const inv = dash && dash.invoices;
   if (inv && inv.overdue) add("bad", `${plural(inv.overdue, "invoice")} past due`, inv.overdueItems[0] ? `/admin/clients/${enc(inv.overdueItems[0].organizationId)}/invoices` : "/admin/clients", "Review");
@@ -53,10 +61,29 @@ export function attentionItems({ dash, services, assess, feedback }) {
   return items;
 }
 
+/** One "Needs attention" row: what, a link to where it is fixed and, for a warning that can be set aside, a Dismiss button (confirmed, audited by the server, announced). */
+function todoRow(it) {
+  const li = h("li", { class: "adm-todo__item adm-todo__item--" + it.tone },
+    h("span", { class: "adm-todo__text", text: it.text }));
+  const link = h("a", { class: "adm-link", href: it.href, "data-link": "" }, it.label + " →");
+  if (!it.dismiss) { li.append(link); return li; }
+  const status = h("span", { class: "visually-hidden", role: "status" });
+  const btn = h("button", { class: "adm-link adm-todo__dismiss", type: "button", onclick: async () => {
+    if (!(await confirmDialog({ title: "Dismiss this warning?", body: `Nothing is sent. The skipped notifications for ${it.dismiss.orgName} stay unsent and this warning is cleared. Approve the addresses instead if the client should receive emails.`, confirmLabel: "Dismiss" }))) return;
+    btn.disabled = true;
+    try {
+      await api("/services/notifications/dismiss", { method: "POST", body: { organization_id: it.dismiss.organizationId } });
+      status.textContent = `Warning for ${it.dismiss.orgName} dismissed.`;
+      li.replaceChildren(h("span", { class: "adm-todo__text adm-sub", text: `Dismissed: ${it.dismiss.orgName}.` }), status);
+    } catch { btn.disabled = false; status.textContent = "That didn’t work and nothing was changed."; li.append(h("span", { class: "adm-sub", text: "That didn’t work and nothing was changed." })); }
+  } }, "Dismiss");
+  li.append(h("span", { class: "adm-todo__acts" }, link, btn), status);
+  return li;
+}
+
 function attentionSection(items) {
   const body = items.length
-    ? h("ul", { class: "adm-todo" }, items.map((it) => h("li", { class: "adm-todo__item adm-todo__item--" + it.tone },
-      h("span", { class: "adm-todo__text", text: it.text }), h("a", { class: "adm-link", href: it.href, "data-link": "" }, it.label + " →"))))
+    ? h("ul", { class: "adm-todo" }, items.map((it) => todoRow(it)))
     : h("p", { class: "adm-todo__clear", role: "status" }, "All clear. Nothing needs your attention right now.");
   return section("adm-attn", "Needs attention", body);
 }

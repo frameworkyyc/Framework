@@ -6,7 +6,7 @@
  * portal host. When it IS enabled but misconfigured it fails closed with a generic 503 for portal paths.
  */
 import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled, servicesEnabled, websiteEnabled } from "./config.js";
-import { errorPage, newRef, redirect, checkSameSiteMutation, securityHeaders } from "./http.js";
+import { errorPage, newRef, redirect, checkSameSiteMutation, securityHeaders, serializeCookie, safeReturnPath, VIEW_ROLE_COOKIE } from "./http.js";
 import { handleLogin, handleCallback, handleLogout } from "./auth.js";
 import { requireSession, requireOrgAccess, dbCall, Unavailable, unavailablePage, notFoundPage } from "./guard.js";
 import { checkRateLimit } from "./ratelimit.js";
@@ -16,6 +16,7 @@ import { handleDemo, isDemoPath } from "./demo.js";
 import { viewFilters } from "./filters.js";
 import { listActiveMembershipsForUser, listMembers } from "./repo/memberships.js";
 import { setUserName } from "./repo/users.js";
+import { getStaffAccess, listOrganizationsForStaff } from "./repo/staff.js";
 import { listProjects, getProject } from "./repo/projects.js";
 import { listActivity } from "./repo/activity.js";
 import { validateSlug, validateName } from "./repo/validate.js";
@@ -77,9 +78,43 @@ async function home(ctx) {
     if (err instanceof Unavailable) return unavailablePage(ctx);
     throw err;
   }
+  // Master Client Access: a bound, unrevoked Framework grant sees every client (the directory); nobody else's page changes.
+  let directory = null;
+  try {
+    const grant = await dbCall(() => getStaffAccess(ctx.db, got.session.userId));
+    if (grant) directory = await dbCall(() => listOrganizationsForStaff(ctx.db, { q: (ctx.url.searchParams.get("q") || "").slice(0, 80) }));
+  } catch (err) {
+    if (err instanceof Unavailable) return unavailablePage(ctx);
+    throw err;
+  }
+  if (directory) return pages.staffDirectoryPage(ctx, got.session, directory, ctx.url.searchParams.get("q") || "");
   if (memberships.length === 0) return redirect("/portal/no-access");
   if (memberships.length === 1) return redirect(`/portal/o/${memberships[0].slug}`);
   return pages.pickerPage(ctx, got.session, memberships);
+}
+
+/** Choose which client role the Framework master-access banner previews (owner or member). It grants nothing: the cookie only picks what to show; access is re-derived from the database. */
+async function staffViewAs(ctx) {
+  if (ctx.request.method !== "POST") return errorPage(405, { ref: ctx.ref, headers: { Allow: "POST" } });
+  const same = checkSameSiteMutation(ctx.request, ctx.cfg.origin);
+  if (!same.ok) return errorPage(403, { ref: ctx.ref });
+  const got = await requireSession(ctx);
+  if (got instanceof Response) return got;
+  let grant;
+  try {
+    grant = await dbCall(() => getStaffAccess(ctx.db, got.session.userId));
+  } catch (err) {
+    if (err instanceof Unavailable) return unavailablePage(ctx);
+    throw err;
+  }
+  if (!grant) return notFoundPage(ctx);
+  const read = await readForm(ctx.request, MAX_FEEDBACK_FORM_BYTES);
+  if (read.error) return errorPage(read.error, { ref: ctx.ref });
+  if (!(await checkCsrf(ctx.cfg, got.session, read.fields.get("csrf") || ""))) return errorPage(403, { ref: ctx.ref });
+  const role = read.fields.get("role");
+  if (role !== "owner" && role !== "member") return errorPage(400, { ref: ctx.ref });
+  const next = safeReturnPath(read.fields.get("next") || "", "/portal");
+  return redirect(next, { cookies: [serializeCookie(VIEW_ROLE_COOKIE, role, { maxAge: 8 * 3600 })] });
 }
 
 async function noAccess(ctx) {
@@ -260,7 +295,7 @@ async function brandCard(ctx, a) {
 }
 
 const brandDeps = (ctx) => ({ db: ctx.db, bucket: ctx.env.PORTAL_FILES, env: ctx.env, now: ctx.now });
-const who = (a) => ({ role: a.membership.role, organizationId: a.membership.organizationId, userId: a.session.userId });
+const who = (a) => ({ role: a.membership.role, organizationId: a.membership.organizationId, userId: a.session.userId, asStaff: Boolean(a.staff) }); // asStaff: only the guard sets a.staff, after verifying a bound master-access grant
 /** Files leave through brand-files.js/fileResponse; the portal-wide headers it does not set itself are added here. */
 function withPortalHeaders(response) {
   response.headers.set("Strict-Transport-Security", "max-age=31536000");
@@ -407,7 +442,7 @@ async function postServiceRequest(ctx, a) {
   const priced = (pricingFrom((await listPrices(ctx.db)).rows))[key];
   const snapshot = priced && priced.type !== "included" ? priceSnapshot(priced) : null;
   const requestKey = requestKeyOfService(key);
-  const res = await createServiceRequest(ctx.db, a.membership.organizationId, a.session.userId, { serviceKey: requestKey, note: null, priceSnapshot: snapshot }, (k) => k === requestKey, { now: ctx.now });
+  const res = await createServiceRequest(ctx.db, a.membership.organizationId, a.session.userId, { serviceKey: requestKey, note: null, priceSnapshot: snapshot }, (k) => k === requestKey, { now: ctx.now, asStaff: Boolean(a.staff) });
   const base = `/portal/o/${a.membership.slug}/website`;
   if (!res.ok && res.error !== "already_requested") { logEvent({ evt: "website.service", outcome: "refused", reason: res.error, status: 400, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId }); return errorPage(400, { ref: ctx.ref }); }
   logEvent({ evt: "website.service", outcome: res.ok ? "saved" : "duplicate", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
@@ -730,6 +765,7 @@ const SIMPLE = {
   "/portal/auth/callback": handleCallback,
   "/portal/logout": handleLogout,
   "/portal/no-access": noAccess,
+  "/portal/staff/view-as": staffViewAs,
 };
 const LIMITED = { "/portal/login": "login", "/portal/auth/callback": "callback", "/portal/logout": "logout" };
 
