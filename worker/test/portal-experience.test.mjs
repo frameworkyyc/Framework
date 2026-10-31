@@ -297,7 +297,7 @@ test("Admin edits a service's sales content and picture; the client sees it, fea
 
 test("Additional Services content is validated; pictures must be real images with alternative text; Admin-only", async () => {
   const s = await setup();
-  for (const bad of [{ tagline: "x".repeat(161) }, { problem: "x".repeat(401) }, { benefits: ["a", "b", "c", "d", "e", "f"] }, { benefits: ["x".repeat(121)] }, { benefits: "one" }, { cta_label: "x".repeat(41) }, { featured: "yes" }, { demo_url: "http://insecure.example.com" }, { demo_url: "https://u:p@example.com" }, { demo_label: "x".repeat(61) }])
+  for (const bad of [{ tagline: "x".repeat(161) }, { problem: "x".repeat(401) }, { benefits: ["a", "b", "c", "d", "e", "f", "g", "h", "i"] }, { benefits: ["x".repeat(121)] }, { benefits: "one" }, { cta_label: "x".repeat(41) }, { featured: "yes" }, { demo_url: "http://insecure.example.com" }, { demo_url: "https://u:p@example.com" }, { demo_label: "x".repeat(61) }])
     assert.equal((await editSvc(s, { key: "invoice-sender", ...bad })).status, 422, JSON.stringify(bad));
   assert.equal((await addPic(s, "invoice-sender", "")).status, 422, "alternative text is required");
   assert.equal((await addPic(s, "invoice-sender", "ok", "", S.text("not an image"))).status, 422, "the content must match the type");

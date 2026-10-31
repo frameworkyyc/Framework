@@ -868,3 +868,12 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-ms, .adm-seo__row { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); align-items: start; }
 .adm-ms > .adm-actions, .adm-seo__row > .adm-actions, .adm-seo__row > .adm-field:has(textarea) { grid-column: 1 / -1; }
 .adm-ms > .adm-field:first-child { grid-column: 1 / -1; }
+
+/* Additional Services for one client: a row per service with its position, flags and controls. */
+.adm-clsvc__list { list-style: none; margin: var(--adm-gap-block) 0 0; padding: 0; display: grid; gap: 0; }
+.adm-clsvc__row { display: grid; gap: 12px; padding: 20px 0; border-top: 1px solid var(--hairline); }
+.adm-clsvc__what { display: flex; gap: 14px; align-items: baseline; }
+.adm-clsvc__pos { font-size: 13px; color: var(--slate); font-variant-numeric: tabular-nums; }
+.adm-clsvc__flags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
+.adm-clsvc__set { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) { .adm-clsvc__row { grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); } .adm-clsvc__set { grid-template-columns: repeat(2, minmax(0, 1fr)); } .adm-clsvc__set > .adm-actions { grid-column: 1 / -1; } }

@@ -49,6 +49,7 @@ export const PRICING_SERVICES = Object.freeze([
   svc("invoice-sender", "addon", "Invoice Sender", null, "Create and send professional invoices.", "Invoice Sender", ["", ""]),
   svc("digital-business-cards", "addon", "Digital Business Cards", null, "A shareable digital card that is always up to date.", "Digital Business Cards", ["", ""]),
   svc("seo-visibility", "addon", "SEO & Visibility", null, "Help the right customers find your business in search.", "SEO & Visibility", ["", ""]),
+  svc("nexus-fleet-tracker", "addon", "Nexus Fleet Tracker", null, "Manage vehicles, monitor maintenance and organize fleet operations from one dashboard.", "Nexus Fleet Tracker", ["", ""]),
 ]);
 
 /** An optional service is never described as "Included": that wording would suggest it is already part of what the client has. */

@@ -14,11 +14,12 @@ import { listClientWebsites } from "./repo/client-websites.js";
 import { seoStatusesForClient } from "./repo/website-seo.js";
 import { pricingFrom, ESTIMATE_NOTE } from "./branding-pricing.js";
 import { organiseServices } from "./service-relevance.js";
+import { listClientServiceSettings } from "./repo/client-service-settings.js";
 
 const FLASH = { requested: "Thanks. Your request was sent. Framework will get in touch before any work starts.", dup: "You have already asked for this service. Framework will be in touch." };
 
 /** The facts the relevance rules look at, for one organization. A fact that cannot be read counts as false: nothing is suggested or hidden on a guess. */
-async function contextFor(db, org) {
+export async function contextFor(db, org) {
   const ctx = { hasLiveWebsite: false, brandPublished: false, seoActive: false };
   try {
     const sites = await listClientWebsites(db, org);
@@ -39,10 +40,10 @@ export async function loadServiceCatalogue(ctx, o) {
   const db = ctx.db, org = o.organizationId;
   const all = await listClientServices(db);
   if (!all.length) return null;
-  const [prices, requests, states, media, context] = await Promise.all([listPrices(db), listServiceRequests(db, org, { openOnly: true }), listClientServiceStates(db, org), listServiceMedia(db), contextFor(db, org)]);
+  const [prices, requests, states, settings, media, context] = await Promise.all([listPrices(db), listServiceRequests(db, org, { openOnly: true }), listClientServiceStates(db, org), listClientServiceSettings(db, org), listServiceMedia(db), contextFor(db, org)]);
   const priced = pricingFrom(prices.rows);
   const open = new Set(requests.map((r) => r.serviceKey));
-  const items = organiseServices(all, context, states.items).map((s) => {
+  const items = organiseServices(all, context, states.items, settings.items).map((s) => {
     const p = priced[s.key], shown = p && p.type !== "included" ? p : null;
     return { ...s, price: shown ? shown.label : "", priceType: shown ? shown.type : "", requested: open.has(requestKeyOfService(s.key)), media: media.get(s.key) || [] };
   });
@@ -62,18 +63,18 @@ function card(cat, s, open) {
     : cat.canRequest
       ? `<form method="post" action="${e(cat.formAction)}"><input type="hidden" name="csrf" value="${e(cat.csrf)}"><input type="hidden" name="service" value="${e(s.key)}"><button class="btn btn--primary" type="submit">${e(s.ctaLabel || "Request Service")}<span class="visually-hidden"> (${e(s.name)})</span></button></form>`
       : `<span class="btn" aria-disabled="true">${e(s.ctaLabel || "Request Service")}</span>`;
-  const tags = [s.featured ? `<span class="svc-tag">Featured</span>` : "", s.suggested ? `<span class="svc-tag">Suggested for you</span><span class="svc-reason muted small">${e(s.suggested)}</span>` : ""].join("");
+  const tags = [s.recommended ? `<span class="svc-tag svc-tag--recommended">Recommended</span>` : "", s.featured ? `<span class="svc-tag">Featured</span>` : "", s.suggested && !s.recommended ? `<span class="svc-tag">Suggested for you</span><span class="svc-reason muted small">${e(s.suggested)}</span>` : "", s.category ? `<span class="svc-cat muted small">${e(s.category)}</span>` : ""].join("");
   const benefits = s.benefits && s.benefits.length ? `<h4 class="svc-h">What you get</h4><ul class="svc-benefits">${s.benefits.map((b) => `<li>${e(b)}</li>`).join("")}</ul>` : "";
   const demo = isHttps(s.demoUrl) ? `<p class="svc-demo"><a class="text-link" href="${e(s.demoUrl)}" target="_blank" rel="noopener noreferrer">${e(s.demoLabel || "See an example")}<span class="visually-hidden"> (opens in a new tab)</span></a></p>` : "";
   const priceLine = s.price ? `<p class="svc-price">${e(s.price)}</p>` : "";
-  return `<li><details class="svc-card${s.featured || s.suggested ? " svc-card--lead" : ""}"${open ? " open" : ""}><summary class="svc-card__sum"><span class="svc-card__tags">${tags}</span><span class="svc-card__title">${e(s.name)}</span>${(s.tagline || s.description) ? `<span class="svc-card__tagline">${e(s.tagline || s.description)}</span>` : ""}<span class="svc-card__more" aria-hidden="true"></span></summary><div class="svc-card__body">${gallery(cat, s)}<div class="svc-card__text">${s.problem ? `<h4 class="svc-h">The problem</h4><p>${e(s.problem)}</p>` : ""}${benefits}${s.why ? `<h4 class="svc-h">Why you might need it</h4><p>${e(s.why)}</p>` : ""}${demo}</div><div class="svc-card__cta">${priceLine}${control}</div></div></details></li>`;
+  return `<li><details class="svc-card${s.recommended || s.featured || s.suggested ? " svc-card--lead" : ""}"${open ? " open" : ""}><summary class="svc-card__sum"><span class="svc-card__tags">${tags}</span><span class="svc-card__title">${e(s.name)}</span>${(s.tagline || s.description) ? `<span class="svc-card__tagline">${e(s.tagline || s.description)}</span>` : ""}<span class="svc-card__more" aria-hidden="true"></span></summary><div class="svc-card__body">${gallery(cat, s)}<div class="svc-card__text">${s.tagline && s.description ? `<p class="svc-card__lead">${e(s.description)}</p>` : ""}${s.problem ? `<h4 class="svc-h">The problem</h4><p>${e(s.problem)}</p>` : ""}${benefits}${s.why ? `<h4 class="svc-h">Why you might need it</h4><p>${e(s.why)}</p>` : ""}${demo}</div><div class="svc-card__cta">${priceLine}${control}</div></div></details></li>`;
 }
 
 /** The section: a short lead, then one expandable card per service. The first highlighted (featured or suggested) card starts open; the rest are one tidy line each. */
 export function serviceCatalogue(vm, cat) {
   if (!cat || !cat.items || !cat.items.length) return "";
   const banner = cat.flash && FLASH[cat.flash] ? `<p class="form-banner" role="status">${e(FLASH[cat.flash])}</p>` : "";
-  const leadIdx = cat.items.findIndex((s) => s.featured || s.suggested);
+  const leadIdx = cat.items.findIndex((s) => s.recommended || s.featured || s.suggested);
   const est = cat.items.some((s) => s.priceType === "starting_at") ? `<p class="muted small">${e(ESTIMATE_NOTE)}</p>` : "";
   return `<section class="ws-sec svc" id="additional-services" aria-labelledby="ws-svc-h"><h2 class="h2" id="ws-svc-h">Additional services</h2><p class="ws-sec__lead">Optional extras from Framework. Open one to see what it is for. Asking about a service doesn’t start any work or cost anything: we’ll get in touch first.</p>${banner}<ul class="svc-list">${cat.items.map((s, i) => card(cat, s, i === leadIdx)).join("")}</ul>${est}${cat.canRequest ? "" : `<p class="muted small">Only account owners can request a service.</p>`}</section>`;
 }

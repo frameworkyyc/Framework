@@ -285,7 +285,7 @@ test("Additional Services is Admin-editable: name, description, shown or hidden 
   assert.equal(noWrite.status, 403, "cross-site writes are refused");
   const bare = await setup({ m12: false });
   const b = await bare.call("/additional-services");
-  assert.equal(b.json.available, false); assert.equal(b.json.services.length, 4);
+  assert.equal(b.json.available, false); assert.equal(b.json.services.length, 5, "the built-in defaults, including Nexus Fleet Tracker");
   assert.equal((await bare.call("/additional-services", { method: "POST", json: { key: "invoice-sender", name: "x" } })).status, 409);
 });
 

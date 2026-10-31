@@ -31,13 +31,20 @@ export function alreadyHas(key, context, states = {}) {
 }
 
 /**
- * @param {Array} services the shown services (portal-services.js listClientServices), in Admin's order
+ * @param {Array} services the shown services (portal-services.js listClientServices), in Admin's global order, each with its global `sortOrder`
  * @param {{hasLiveWebsite?: boolean, brandPublished?: boolean, seoActive?: boolean}} context
- * @param {{[key: string]: {state: string}}} states this client's client_service_state rows
- * @returns {Array} the services to show, each with `suggested` (a reason or null), highlighted ones first
+ * @param {{[key: string]: {state: string}}} states this client's client_service_state rows (Show/Hide and "already has it")
+ * @param {{[key: string]: {recommended: boolean, sortOrder: number|null}}} settings this client's client_service_settings rows (Recommended label and their own order)
+ * @returns {Array} the services to show, each with `recommended` (Admin chose it for this client) and `suggested` (an automatic reason or null)
+ *
+ * Left out, always: a service the client already has, one Admin hid for them, and one Framework is already doing for them. A Recommended label never brings one of those back.
+ * Order: when Admin has given THIS client their own order, that order is followed exactly (a service without a position of its own sits at its global position); nothing is promoted over it.
+ * Otherwise the global order applies, with Recommended services first, then Featured, then automatically suggested ones.
  */
-export function organiseServices(services, context, states = {}) {
-  const shown = services.filter((s) => !alreadyHas(s.key, context, states)).map((s, i) => ({ ...s, suggested: suggestionFor(s.key, context), _i: i }));
-  const rank = (s) => (s.featured ? 0 : s.suggested ? 1 : 2);
-  return shown.sort((a, b) => rank(a) - rank(b) || a._i - b._i).map(({ _i, ...s }) => s);
+export function organiseServices(services, context, states = {}, settings = {}) {
+  const own = (k) => (settings[k] && Number.isInteger(settings[k].sortOrder) ? settings[k].sortOrder : null);
+  const hasOwnOrder = services.some((s) => own(s.key) !== null);
+  const shown = services.filter((s) => !alreadyHas(s.key, context, states)).map((s, i) => ({ ...s, recommended: Boolean(settings[s.key] && settings[s.key].recommended), suggested: suggestionFor(s.key, context), _i: i, _k: own(s.key) ?? (Number.isInteger(s.sortOrder) ? s.sortOrder : i * 10) }));
+  const rank = (s) => (s.recommended ? 0 : s.featured ? 1 : s.suggested ? 2 : 3);
+  return shown.sort(hasOwnOrder ? (a, b) => a._k - b._k || a._i - b._i : (a, b) => rank(a) - rank(b) || a._i - b._i).map(({ _i, _k, ...s }) => s);
 }

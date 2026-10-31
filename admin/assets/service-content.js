@@ -4,8 +4,8 @@
 import { h, api, confirmDialog } from "./ui.js";
 
 const ERROR = {
-  invalid_tagline: "The headline is too long (160 characters at most).", invalid_problem: "“The problem” is too long (400 characters at most).", invalid_why: "“Why you might need it” is too long (400 characters at most).",
-  invalid_cta: "The button text is too long (40 characters at most).", invalid_benefits: "Use up to 5 benefits, each one line of up to 120 characters.", invalid_featured: "Choose featured or not.",
+  invalid_category: "The category is too long (60 characters at most).", invalid_tagline: "The headline is too long (160 characters at most).", invalid_problem: "“The problem” is too long (400 characters at most).", invalid_why: "“Why you might need it” is too long (400 characters at most).",
+  invalid_cta: "The button text is too long (40 characters at most).", invalid_benefits: "Use up to 8 items, each one line of up to 120 characters.", invalid_featured: "Choose featured or not.",
   invalid_demo_url: "Use a full https:// link with no spaces.", invalid_demo_label: "The link text is too long (60 characters at most).", invalid_alt: "Describe the picture in a few words (up to 160 characters, one line): it is read aloud for people who can’t see it.",
   invalid_caption: "The caption is too long (120 characters at most, one line).", too_many: "This service already has as many pictures as can be kept. Remove one first.",
   content_unavailable: "Sales content can’t be saved on this site yet (a database change is waiting). Nothing was changed.", unavailable: "Pictures can’t be saved on this site yet (a database change is waiting). Nothing was changed.",
@@ -25,7 +25,8 @@ export function contentEditor({ s, data, editable, speak, redraw, busyRef }) {
   const canContent = editable && data.contentAvailable;
   const tag = text(id + "-tag", s.custom && s.custom.tagline ? s.tagline : "", { maxlength: "160", disabled: canContent ? null : true, placeholder: s.description });
   const problem = area(id + "-prob", s.problem, 3, 400), why = area(id + "-why", s.why, 3, 400);
-  const benefits = area(id + "-ben", (s.benefits || []).join("\n"), 5, 700);
+  const benefits = area(id + "-ben", (s.benefits || []).join("\n"), 6, 1000);
+  const category = text(id + "-cat", s.custom && s.custom.category ? s.category : (s.category || ""), { maxlength: "60", disabled: canContent ? null : true, placeholder: "For example Fleet Management Software" });
   const cta = text(id + "-cta", s.ctaLabel, { maxlength: "40" });
   const demoUrl = text(id + "-du", s.demoUrl, { maxlength: "300", inputmode: "url", placeholder: "https://" }), demoLabel = text(id + "-dl", s.demoLabel, { maxlength: "60", placeholder: "See an example" });
   const featured = h("input", { id: id + "-feat", type: "checkbox", checked: s.featured ? true : null });
@@ -42,12 +43,13 @@ export function contentEditor({ s, data, editable, speak, redraw, busyRef }) {
   const form = h("form", { class: "adm-form adm-services__content", novalidate: true, "aria-label": `Sales content: ${s.name}`, onsubmit: (ev) => {
     ev.preventDefault();
     const lines = benefits.value.split("\n").map((x) => x.trim()).filter(Boolean);
-    run(() => api("/additional-services", { method: "POST", body: { key: s.key, tagline: tag.value, problem: problem.value, why: why.value, benefits: lines, cta_label: cta.value, featured: featured.checked, demo_url: demoUrl.value.trim(), demo_label: demoLabel.value } }), `Saved the sales content of ${s.name}. Clients see it straight away.`);
+    run(() => api("/additional-services", { method: "POST", body: { key: s.key, category: category.value, tagline: tag.value, problem: problem.value, why: why.value, benefits: lines, cta_label: cta.value, featured: featured.checked, demo_url: demoUrl.value.trim(), demo_label: demoLabel.value } }), `Saved the sales content of ${s.name}. Clients see it straight away.`);
   } },
     h("p", { class: "adm-sub" }, "Written for the client: benefit-led and specific, with no promises about results. Leave a box empty to use the standard wording."),
     !data.contentAvailable ? h("p", { class: "adm-banner" }, "Sales content can’t be saved on this site yet (a database change is waiting). Clients see the standard wording.") : null,
+    field(id + "-cat", "Category (optional)", category, "A short label shown above the name."),
     field(id + "-tag", "Headline (optional)", tag, "One line under the name. Empty: the short description above is used."),
-    field(id + "-prob", "The problem it solves", problem), field(id + "-ben", "What the client gets", benefits, "One benefit per line, up to 5."), field(id + "-why", "Why they might need it", why),
+    field(id + "-prob", "The problem it solves", problem), field(id + "-ben", "What the client gets (benefits or features)", benefits, "One per line, up to 8."), field(id + "-why", "Why they might need it", why),
     field(id + "-cta", "Button text", cta, "The request itself is unchanged: this only changes the words on the button."),
     field(id + "-du", "Link to a live demo or real example (optional)", demoUrl, "https only. Opens in a new tab."), field(id + "-dl", "Link text (optional)", demoLabel),
     h("div", { class: "adm-field" }, h("label", { class: "adm-choice", for: id + "-feat" }, featured, h("span", { text: "Featured" })), h("p", { class: "adm-field__hint", text: "Featured services are listed first and the first one starts open." })),

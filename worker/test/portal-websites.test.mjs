@@ -93,7 +93,7 @@ test("migration 0011 adds the four website services to the pricing editor as cus
   assert.deepEqual(PRICING_SERVICES.filter((x) => x.section === "website").map((x) => [x.key, x.name, x.defaultType]), [["website-design", "Website Design", "custom_quote"], ["website-redesign", "Website Redesign", "custom_quote"], ["website-seo", "SEO", "custom_quote"], ["website-maintenance", "Website Maintenance", "custom_quote"]]);
   assert.ok(!BRAND_REQUESTS.some((r) => /website/.test(r.key)), "they are not Branding requests");
   const r = await s.call("/service-pricing");
-  assert.equal(r.json.services.length, 21); assert.deepEqual(r.json.services.slice(13, 17).map((x) => [x.key, x.section, x.type, x.priceCad, x.stored]), [["website-design", "website", "custom_quote", null, true], ["website-redesign", "website", "custom_quote", null, true], ["website-seo", "website", "custom_quote", null, true], ["website-maintenance", "website", "custom_quote", null, true]]);
+  assert.equal(r.json.services.length, 22); assert.deepEqual(r.json.services.slice(13, 17).map((x) => [x.key, x.section, x.type, x.priceCad, x.stored]), [["website-design", "website", "custom_quote", null, true], ["website-redesign", "website", "custom_quote", null, true], ["website-seo", "website", "custom_quote", null, true], ["website-maintenance", "website", "custom_quote", null, true]]);
   const saved = await s.call("/service-pricing", { method: "POST", json: { prices: [{ key: "website-seo", type: "starting_at", priceCad: 400 }] } });
   assert.equal(saved.status, 200); assert.deepEqual(saved.json.services.find((x) => x.key === "website-seo").priceCad, 400);
 });
@@ -259,7 +259,10 @@ test("the Website section stays hidden from clients while PORTAL_WEBSITE is off:
 test("the new Admin pages are valid JavaScript modules (they are loaded by the browser, so a slip here would only show up there)", async () => {
   const { spawnSync } = await import("node:child_process"); const { mkdtempSync, writeFileSync } = await import("node:fs"); const { tmpdir } = await import("node:os"); const { join } = await import("node:path");
   const dir = mkdtempSync(join(tmpdir(), "adm-check-"));
-  for (const f of ["websites", "settings", "client-dashboard", "clients"]) {
+  const { readdirSync } = await import("node:fs");
+  const modules = readdirSync(new URL("../../admin/assets/", import.meta.url)).filter((f) => f.endsWith(".js")).map((f) => f.slice(0, -3)); // every Admin module, so a new one is covered automatically
+  assert.ok(["client-services", "website-seo", "service-content"].every((m) => modules.includes(m)));
+  for (const f of modules) {
     const file = join(dir, f + ".mjs"); writeFileSync(file, read(`admin/assets/${f}.js`));
     const r = spawnSync(process.execPath, ["--check", file], { encoding: "utf8" });
     assert.equal(r.status, 0, `${f}.js: ${r.stderr}`);
