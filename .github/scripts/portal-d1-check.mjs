@@ -33,6 +33,7 @@ export const STAGES = Object.freeze([
   { file: "0011_websites.sql", tables: ["website_milestones", "websites"], indexes: ["idx_support_requests_website", "idx_website_milestones_site", "idx_websites_org"] }, // two tables, one nullable column on support_requests, four service_prices rows
   { file: "0012_website_management.sql", tables: ["portal_services", "website_packages"], indexes: ["idx_website_packages_org"] }, // two tables, four seed rows
   { file: "0013_staff_access.sql", tables: ["portal_staff"], indexes: [] }, // one table (Master Client Access), one seed row (a pending grant for hello@frameworkco.ca)
+  { file: "0014_brand_requirements.sql", tables: ["brand_requirements"], indexes: [] }, // one table (per-client Branding requirement overrides), no seed rows
 ]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",
