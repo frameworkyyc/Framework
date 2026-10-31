@@ -34,6 +34,35 @@ export async function listClientServices(db) {
   return l.services.filter((s) => s.enabled).map(({ key, name, description }) => ({ key, name, description }));
 }
 
+/**
+ * Move one service up or down one place. Every service is renumbered 10, 20, 30... in its new order (so equal or gapped numbers never make a move do nothing), and only the rows whose
+ * number actually changed are written, each with an audit entry. Moving the first service up or the last one down changes nothing.
+ */
+export async function moveService(db, key, direction, actor, { now = new Date() } = {}) {
+  if (!validActor(actor)) return fail("invalid_actor");
+  if (typeof key !== "string" || !SERVICE_KEYS.includes(key)) return fail("invalid_service");
+  if (direction !== "up" && direction !== "down") return fail("invalid_direction");
+  const cur = await listServicesAdmin(db);
+  if (!cur.available) return fail("unavailable");
+  const order = cur.services.map((s) => s.key);
+  const i = order.indexOf(key), j = direction === "up" ? i - 1 : i + 1;
+  if (i < 0) return fail("invalid_service");
+  if (j < 0 || j >= order.length) return ok({ unchanged: true });
+  [order[i], order[j]] = [order[j], order[i]];
+  const at = isoTime(now), by = actor.trim(), statements = [];
+  order.forEach((k, idx) => {
+    const old = cur.services.find((s) => s.key === k), next = (idx + 1) * 10;
+    if (old.sortOrder === next) return;
+    statements.push(
+      db.prepare("UPDATE portal_services SET sort_order = ?, updated_by = ?, updated_at = ? WHERE service_key = ? /* cross-tenant: the service catalogue is global */").bind(next, by, at, k),
+      db.prepare("INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, detail, visibility, created_at) SELECT ?, NULL, 'admin', ?, 'portal_service.updated', 'portal_service', NULL, ?, 'internal', ? WHERE changes() > 0")
+        .bind(crypto.randomUUID(), by, JSON.stringify({ service: k, moved: direction }), at),
+    );
+  });
+  if (statements.length) await db.batch(statements);
+  return ok();
+}
+
 /** Change one service's text, visibility or order. All fields are validated first; nothing is written when any is invalid or nothing changed. */
 export async function updateService(db, key, patch, actor, { now = new Date() } = {}) {
   if (!validActor(actor)) return fail("invalid_actor");

@@ -133,7 +133,7 @@ export async function render(orgId, ctx) {
       facts.push("CSP frame-ancestors: " + (r.frameAncestors && r.frameAncestors.length ? r.frameAncestors.join(" | ") : "none"));
       lines.push(h("ul", { class: "adm-muted" }, facts.map((t) => h("li", { text: t }))));
     }
-    return h("div", { class: "adm-ws__preview" },
+    return h("div", { class: "adm-ws__block adm-ws__preview" },
       h("p", { class: "acc__group" }, "Live preview"),
       h("p", { class: "adm-muted", text: "Clients see this website live when it allows being shown inside the portal. Otherwise they see the screenshot below, or a plain card with a Visit website button." }),
       h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: async () => {
@@ -145,10 +145,10 @@ export async function render(orgId, ctx) {
 
   /** The downloadable website files: one ZIP per website. A new file starts unpublished; publishing is a separate step, and only a published file is offered to the client. */
   function packageBlock(site) {
-    if (!data.packagesAvailable) return h("div", { class: "adm-ws__pkg" }, h("p", { class: "acc__group" }, "Website files"), h("p", { class: "adm-muted", text: "Downloads for clients aren’t available on this site yet (a database change is waiting for approval)." }));
+    if (!data.packagesAvailable) return h("div", { class: "adm-ws__block adm-ws__pkg" }, h("p", { class: "acc__group" }, "Website files"), h("p", { class: "adm-muted", text: "Downloads for clients aren’t available on this site yet (a database change is waiting for approval)." }));
     const pkg = site.package;
     const input = h("input", { id: "ws-pkg-" + site.id.slice(0, 8), class: "input", type: "file", accept: ".zip,application/zip" });
-    return h("div", { class: "adm-ws__pkg" },
+    return h("div", { class: "adm-ws__block adm-ws__pkg" },
       h("p", { class: "acc__group" }, "Website files"),
       pkg ? h("p", { class: "adm-brand__meta", text: `${pkg.name} · ${fmtSize(pkg.size)} · ${pkg.published ? "Published: the client can download it" : "Not published: the client cannot see it"}` }) : h("p", { class: "adm-muted", text: "No file yet. The client sees a disabled Download button until you upload and publish a ZIP." }),
       canWrite() && data.capabilities.storage ? [
@@ -164,7 +164,7 @@ export async function render(orgId, ctx) {
           pkg ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => perform(pkg.published
             ? { confirm: { title: "Withdraw this download?", body: "The client will no longer be able to download it.", details: [["Website", site.name], ["File", pkg.name]], confirmLabel: "Withdraw" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/package/publish`, { method: "POST", body: { published: false } }), success: "Download withdrawn." }
             : { confirm: { title: "Publish this download?", body: "The client will be able to download this file from their Website page.", details: [["Website", site.name], ["File", pkg.name], ["Size", fmtSize(pkg.size)]], confirmLabel: "Publish" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/package/publish`, { method: "POST", body: { published: true } }), success: "Download published." }) }, pkg.published ? "Withdraw download" : "Publish download") : null,
-          pkg ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => perform({ confirm: { title: "Remove the website files?", body: "The file is deleted from storage and the client can no longer download it.", details: [["Website", site.name], ["File", pkg.name]], confirmLabel: "Remove file" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/package/remove`, { method: "POST", body: {} }), success: "File removed." }) }, "Remove file") : null),
+          pkg ? h("button", { class: "btn btn--secondary adm-small adm-actions__danger", type: "button", onclick: () => perform({ confirm: { title: "Remove the website files?", body: "The file is deleted from storage and the client can no longer download it.", details: [["Website", site.name], ["File", pkg.name]], confirmLabel: "Remove file" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/package/remove`, { method: "POST", body: {} }), success: "File removed." }) }, "Remove file") : null),
       ] : null);
   }
 
@@ -172,7 +172,7 @@ export async function render(orgId, ctx) {
   function screenshotBlock(site) {
     const input = h("input", { id: "ws-shot-" + site.id.slice(0, 8), class: "input", type: "file", accept: ".png,.jpg,.jpeg,.webp" });
     const url = `/api/admin${base}/${encodeURIComponent(site.id)}/screenshot?v=${encodeURIComponent(site.updatedAt || "")}`;
-    return h("div", { class: "adm-ws__shot" },
+    return h("div", { class: "adm-ws__block adm-ws__shot" },
       h("p", { class: "acc__group" }, "Screenshot"),
       site.screenshot ? h("img", { class: "adm-ws__img", src: url, alt: `Screenshot of ${site.name}`, loading: "lazy" }) : h("p", { class: "adm-muted" }, "No screenshot yet. It is optional: clients see a live preview of the website when it allows one, and this picture only when it does not."),
       site.screenshot ? h("p", { class: "adm-brand__meta", text: `${site.screenshot.name} · ${fmtSize(site.screenshot.size)}` }) : null,
@@ -186,7 +186,7 @@ export async function render(orgId, ctx) {
             const body = new FormData(); body.append("file", f, f.name);
             perform({ request: () => api(`${base}/${encodeURIComponent(site.id)}/screenshot`, { method: "POST", body }), success: "Screenshot saved." });
           } }, site.screenshot ? "Replace screenshot" : "Add screenshot"),
-          site.screenshot ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => perform({ confirm: { title: "Remove the screenshot?", body: "The picture is deleted from storage.", details: [["Website", site.name]], confirmLabel: "Remove screenshot" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/screenshot/remove`, { method: "POST", body: {} }), success: "Screenshot removed." }) }, "Remove screenshot") : null)
+          site.screenshot ? h("button", { class: "btn btn--secondary adm-small adm-actions__danger", type: "button", onclick: () => perform({ confirm: { title: "Remove the screenshot?", body: "The picture is deleted from storage.", details: [["Website", site.name]], confirmLabel: "Remove screenshot" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/screenshot/remove`, { method: "POST", body: {} }), success: "Screenshot removed." }) }, "Remove screenshot") : null)
       ] : null);
   }
 
@@ -196,10 +196,10 @@ export async function render(orgId, ctx) {
       site.managedByFramework ? chip("plain", "Managed by Framework") : chip("plain", "Not managed by Framework"), site.published && !archived ? chip("plain", "Ready to show the client") : null, archived ? chip("warn", "Archived", "warn") : null];
     const summary = [site.url ? h("a", { class: "adm-link", href: site.url, target: "_blank", rel: "noopener noreferrer" }, site.url.replace(/^https?:\/\//, "").replace(/\/$/, "")) : h("span", { class: "adm-muted", text: "No web address yet" }),
       site.launchDate ? h("span", { class: "adm-brand__meta", text: ` · Launch ${fmtDate(site.launchDate + "T00:00:00Z")}` }) : null];
-    const actions = canWrite() ? h("div", { class: "adm-actions" },
+    const actions = canWrite() ? h("div", { class: "adm-actions adm-ws__foot" },
       archived
         ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => perform({ request: () => api(`${base}/${encodeURIComponent(site.id)}/restore`, { method: "POST", body: {} }), success: `${site.name} restored.` }) }, "Restore")
-        : h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => perform({ confirm: { title: "Archive this website?", body: "It is hidden from the lists. Nothing is deleted, and you can restore it later.", details: [["Website", site.name]], confirmLabel: "Archive website" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/archive`, { method: "POST", body: {} }), success: `${site.name} archived.` }) }, "Archive")) : null;
+        : h("button", { class: "btn btn--secondary adm-small adm-actions__danger", type: "button", onclick: () => perform({ confirm: { title: "Archive this website?", body: "It is hidden from the lists. Nothing is deleted, and you can restore it later.", details: [["Website", site.name]], confirmLabel: "Archive website" }, request: () => api(`${base}/${encodeURIComponent(site.id)}/archive`, { method: "POST", body: {} }), success: `${site.name} archived.` }) }, "Archive")) : null;
     const key = "ws-" + site.id;
     return h("details", { class: "adm-acc adm-ws", id: key, open: opened.has(key) ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add(key); else opened.delete(key); } },
       h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: site.name }), h("span", { class: "adm-acc__meta" }, chips)),
@@ -214,7 +214,8 @@ export async function render(orgId, ctx) {
     root.replaceChildren(...[
       back,
       h("div", { class: "adm-idhead" }, h("div", { class: "adm-idhead__text" }, h("span", { class: "eyebrow" }, "Client"), h("h1", { class: "adm-title", tabindex: "-1" }, "Websites"),
-        h("p", { class: "adm-sub" }, `${data.organization.name}. Each website of this client, where it stands and who manages it. Clients can’t see any of this yet.`))),
+        h("p", { class: "adm-sub" }, `${data.organization.name}. Each website of this client, where it stands and who manages it. Clients see the published ones in the Website section of their portal.`),
+        h("p", { class: "adm-sub adm-ws__services" }, "The “Additional services” offered on this client’s Website page are the same for every client: ", h("a", { class: "adm-link", href: "/admin/settings/additional-services", "data-link": "" }, "manage Additional Services"), " (names, descriptions, order, shown or hidden) or ", h("a", { class: "adm-link", href: "/admin/settings/service-pricing#sp-h-addon", "data-link": "" }, "set their prices in Service Pricing"), "."))),
       !canWrite() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at the websites, but not change them.") : !data.capabilities.storage ? h("p", { class: "adm-banner" }, "File storage isn’t available on this site, so screenshots can’t be added.") : null,
       live,
       active.length ? h("div", { class: "adm-ws__list" }, active.map(siteCard)) : h("p", { class: "adm-muted" }, "No website yet. A client with no website simply has none listed here: add one when they have one, or when Framework starts building it."),

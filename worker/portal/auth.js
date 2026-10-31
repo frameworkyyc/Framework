@@ -15,6 +15,7 @@ import { buildAuthorizeUrl, exchangeCode, verifyAccessToken, forwardableParams }
 import { identityFromWorkosUser } from "./claims.js";
 import { rotateSession, endSession, workosLogoutUrl, checkCsrf } from "./sessions.js";
 import { upsertUserFromIdentity } from "./repo/users.js";
+import { bindStaffUser } from "./repo/staff.js";
 import { activatePendingInvitations } from "./repo/invitations.js";
 import { recordActivity } from "./repo/activity.js";
 import { loginPage } from "./pages.js";
@@ -124,6 +125,12 @@ export async function handleCallback(ctx) {
     if (user.status !== "active") {
       note(ctx, "auth.callback", "rejected", { reason: "user_disabled", user: user.id });
       return signInFailure(ctx, 403, "Account unavailable", "This account isn’t able to sign in. Please contact Framework.");
+    }
+    // Master Client Access: the first verified sign-in of an invited Framework address binds the grant to this account (never by email afterwards). A failure must not block sign-in.
+    try {
+      await bindStaffUser(ctx.db, user, { now: ctx.now });
+    } catch {
+      /* no grant table, or a transient error: the person simply has no master access */
     }
     const act = await dbCall(() => activatePendingInvitations(ctx.db, { user, emailVerified: true }, { now: ctx.now }));
     const started = await rotateSession(ctx.request, ctx.cfg, ctx.db, { userId: user.id, workosSessionId: token.claims.sid, authMethod: exchanged.authMethod, ip: ctx.request.headers.get("CF-Connecting-IP") }, { now: ctx.now });
