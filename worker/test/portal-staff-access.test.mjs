@@ -217,3 +217,24 @@ test("Admin API: grant, list and revoke need the writes flag and a same-origin a
   assert.deepEqual(body.staff.map((s) => s.email).sort(), [STAFF_EMAIL, "second@frameworkco.ca"]);
   assert.equal(sql(w, "SELECT COUNT(*) n FROM portal_staff")[0].n, 2);
 });
+
+test("audit: a direct link to an inner page records the visit, once per 30-minute window per client, and a different client is its own entry", async () => {
+  const { w, A, B, hello, staffId } = await setup();
+  const opened = (org) => sql(w, "SELECT detail FROM activity_log WHERE action = 'staff.portal.opened' AND organization_id = ? AND actor_ref = ?", org.id, `staff:${staffId}`);
+  assert.equal((await hello.get("/portal/o/alpha/documents")).status, 200); // straight to an inner page, never via the directory or the home page
+  assert.equal(opened(A).length, 1);
+  for (const p of ["", "/account", "/projects", "/documents"]) await hello.get(`/portal/o/alpha${p}`);
+  assert.equal(opened(A).length, 1, "further views in the same visit add nothing");
+  await hello.get("/portal/o/beta/projects");
+  assert.equal(opened(B).length, 1);
+  assert.equal(opened(A).length, 1);
+  w.clock.advance(31 * 60);
+  await hello.get("/portal/o/alpha/projects");
+  assert.equal(opened(A).length, 2, "a new visit after the window is a new entry");
+  assert.match(opened(A)[0].detail, /"route":/);
+  // writes are never collapsed
+  const csrf = csrfOf(await text(hello, "/portal/o/alpha/account"));
+  await post(hello, "/portal/o/alpha/account", { csrf, name: "A" });
+  await post(hello, "/portal/o/alpha/account", { csrf, name: "B" });
+  assert.equal(sql(w, "SELECT COUNT(*) n FROM activity_log WHERE action = 'staff.portal.write' AND organization_id = ?", A.id)[0].n, 2);
+});

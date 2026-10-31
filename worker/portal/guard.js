@@ -16,7 +16,7 @@
 import { authenticate } from "./sessions.js";
 import { redirect, errorPage, clearCookie, getCookie, SESSION_COOKIE, VIEW_ROLE_COOKIE } from "./http.js";
 import { getActiveMembership } from "./repo/memberships.js";
-import { getStaffAccess, getOrganizationForStaff, recordStaffActivity } from "./repo/staff.js";
+import { getStaffAccess, getOrganizationForStaff, recordStaffActivity, recordStaffVisit } from "./repo/staff.js";
 import { can } from "./policy.js";
 import { logEvent, routeName } from "./log.js";
 
@@ -83,10 +83,10 @@ export async function requireOrgAccess(ctx, slug, action) {
         const previewRole = viewRoleOf(ctx.request);
         membership = { ...org, role: previewRole };
         staff = { userId: got.session.userId, email: grant.email, previewRole };
-        const first = ctx.request.method === "GET" && ctx.url.pathname === `/portal/o/${org.slug}`;
-        if (first || (ctx.request.method !== "GET" && ctx.request.method !== "HEAD")) {
-          await dbCall(() => recordStaffActivity(ctx.db, { organizationId: org.organizationId, userId: got.session.userId, action: first ? "staff.portal.opened" : "staff.portal.write", detail: first ? { role: previewRole } : { route: routeName(ctx.url.pathname), method: ctx.request.method, role: previewRole } }, { now: ctx.now }));
-        }
+        const method = ctx.request.method;
+        // Every way in is audited: a write each time, and a page view once per visit window (a deep link or bookmark counts as much as the directory). A failed audit write fails the request closed.
+        if (method === "GET") await dbCall(() => recordStaffVisit(ctx.db, { organizationId: org.organizationId, userId: got.session.userId, detail: { role: previewRole, route: routeName(ctx.url.pathname) } }, { now: ctx.now }));
+        else if (method !== "HEAD") await dbCall(() => recordStaffActivity(ctx.db, { organizationId: org.organizationId, userId: got.session.userId, action: "staff.portal.write", detail: { route: routeName(ctx.url.pathname), method, role: previewRole } }, { now: ctx.now }));
       }
     }
   } catch (err) {
