@@ -141,9 +141,9 @@ export async function updateServiceContent(db, key, patch, actor, { now = new Da
   for (const [k, max, err] of [["tagline", 160, "invalid_tagline"], ["problem", 400, "invalid_problem"], ["why", 400, "invalid_why"], ["cta_label", 40, "invalid_cta"], ["demo_label", 60, "invalid_demo_label"]]) { const r = text(k, max, err); if (r !== true) return fail(r); }
   if ("benefits" in patch) {
     const b = patch.benefits;
-    if (b === null || (Array.isArray(b) && b.every((x) => typeof x === "string" && x.trim() === ""))) v.benefits = null;
+    if (b === null || (Array.isArray(b) && b.every((x) => typeof x === "string" && x.trim() === ""))) v.benefits_json = null;
     else if (!Array.isArray(b) || b.length > 5) return fail("invalid_benefits");
-    else { const items = []; for (const x of b) { const t = line(x, 120); if (t === null) return fail("invalid_benefits"); if (t) items.push(t); } v.benefits = items.length ? JSON.stringify(items) : null; }
+    else { const items = []; for (const x of b) { const t = line(x, 120); if (t === null) return fail("invalid_benefits"); if (t) items.push(t); } v.benefits_json = items.length ? JSON.stringify(items) : null; }
   }
   if ("featured" in patch) { if (typeof patch.featured !== "boolean") return fail("invalid_featured"); v.featured = patch.featured ? 1 : 0; }
   if ("demo_url" in patch) { const u = httpsLink(patch.demo_url); if (u === null) return fail("invalid_demo_url"); v.demo_url = u === undefined ? null : u; }
