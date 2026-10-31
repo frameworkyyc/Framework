@@ -12,24 +12,29 @@ const COLUMNS = "id, name, url, origin, status, managed_by_framework, launch_dat
 const VISIBLE = "organization_id = ? AND published = 1 AND archived_at IS NULL";
 
 const toClientWebsite = (r) => ({
-  id: r.id, name: r.name, url: r.url, origin: r.origin, status: r.status, managedByFramework: r.managed_by_framework === 1, launchDate: r.launch_date,
+  phase: r.phase ?? null, id: r.id, name: r.name, url: r.url, origin: r.origin, status: r.status, managedByFramework: r.managed_by_framework === 1, launchDate: r.launch_date,
   domain: { registrar: r.domain_registrar, owner: r.domain_owner, renewal: r.domain_renewal },
   hosting: { provider: r.hosting_provider, owner: r.hosting_owner, renewal: r.hosting_renewal },
   hasScreenshot: r.has_screenshot === 1,
 });
 
+/** Runs a query that also reads `phase` (migration 0015); on a database without that column it runs the same query without it, so the Website section works before the migration. */
+async function withPhase(run) {
+  try { return await run(`${COLUMNS}, phase`); } catch (err) { if (/no such column: phase/i.test(String(err && err.message))) return run(COLUMNS); throw err; }
+}
+
 /** The websites a client may see, in the order Framework set. [] when there are none (that is the "No Website" state) or the table does not exist yet. */
 export async function listClientWebsites(db, organizationId) {
   requireOrgId(organizationId);
   try {
-    return (await db.prepare(`SELECT ${COLUMNS} FROM websites WHERE ${VISIBLE} ORDER BY sort_order, created_at, id`).bind(organizationId).all()).results.map(toClientWebsite);
+    return (await withPhase((cols) => db.prepare(`SELECT ${cols} FROM websites WHERE ${VISIBLE} ORDER BY sort_order, created_at, id`).bind(organizationId).all())).results.map(toClientWebsite);
   } catch (err) { if (missingTable(err)) return []; throw err; }
 }
 
 export async function getClientWebsite(db, organizationId, websiteId) {
   requireOrgId(organizationId); requireId(websiteId, "website_id");
   try {
-    const r = await db.prepare(`SELECT ${COLUMNS} FROM websites WHERE id = ? AND ${VISIBLE}`).bind(websiteId, organizationId).first();
+    const r = await withPhase((cols) => db.prepare(`SELECT ${cols} FROM websites WHERE id = ? AND ${VISIBLE}`).bind(websiteId, organizationId).first());
     return r ? toClientWebsite(r) : null;
   } catch (err) { if (missingTable(err)) return null; throw err; }
 }

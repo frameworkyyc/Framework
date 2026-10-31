@@ -99,8 +99,8 @@ export async function pickerPage(ctx, session, memberships) {
 }
 
 /** The home of the connected portal: the six workspace blocks. Nothing from the demonstration is shown. */
-export async function homePage(ctx, a, moduleStatus = {}, nextAction = {}, brand = null, servicesAttention = []) {
-  const vm = { ...liveModel(ctx, a, {}), moduleStatus, nextAction, brand, servicesAttention };
+export async function homePage(ctx, a, moduleStatus = {}, nextAction = {}, brand = null, servicesAttention = [], website = null) {
+  const vm = { ...liveModel(ctx, a, {}), moduleStatus, nextAction, brand, servicesAttention, website };
   return shell(ctx, a, { title: "Home", active: "home", body: guided.home(vm), vm, ref: "home" });
 }
 export async function overviewPage(ctx, a, data) {
@@ -172,13 +172,18 @@ export async function brandingUploadsPage(ctx, a, o = {}) {
 }
 
 /** The Website section: `sites` is every website Framework published for this organization (the empty list is the "no website" state); `one` is a single website's own page. */
-export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null } = {}) {
+export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null, milestones = [], seo = null } = {}) {
   const vm = liveModel(ctx, a, {});
   const single = one || (sites.length === 1 ? sites[0] : null);
   // The live preview needs the page to be allowed to frame that one website: its verified origins go into THIS response's CSP only (frame-src); no other page and no global policy changes.
   const frameSrc = single ? frameSources(preview) : [];
-  const extra = { management, services: services ? { ...services, csrf: await csrfFor(ctx.cfg, a.session) } : null };
+  const extra = { management, milestones, seo, services: services ? { ...services, csrf: await csrfFor(ctx.cfg, a.session) } : null };
   return shell(ctx, a, { title: one ? one.name : "Website", active: "home", body: one ? websiteLive.websiteDetail(vm, one, preview, extra) : websiteLive.websiteOverview(vm, sites, preview, extra), vm, ref: "website", frameSrc });
+}
+/** SEO & Search Visibility: a subsection of one website (not a main navigation item). `seo` is only what Admin has published. */
+export async function websiteSeoPage(ctx, a, site, seo) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: `SEO & Search Visibility: ${site.name}`, active: "home", body: websiteLive.seoPage(vm, site, seo), vm, ref: "website" });
 }
 /** Change and support requests about a website: the existing support workflow (same statuses, thread and attachments), under the Website section. */
 export async function websiteRequestsPage(ctx, a, items) {

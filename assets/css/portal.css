@@ -948,3 +948,36 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-rnote__act { margin: 0 0 var(--space-3); font-size: 14px; }
 .lv-card__status .bk-req { margin-left: 8px; }
 .lv-card__body > .bk-rnote { margin: 8px 0 0; font-size: 14px; }
+
+/* Home: Business Profile as a full-width onboarding section above the service cards. */
+.onboard { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: 24px 0 28px; margin: 0 0 var(--space-4); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--hairline); align-items: start; }
+.onboard__title { margin: 4px 0 6px; font-family: var(--font-display); font-weight: 600; font-size: clamp(26px, 4vw, 34px); line-height: 1.1; letter-spacing: -0.02em; }
+.onboard__desc { margin: 0; max-width: 34em; color: var(--slate); font-size: 16px; }
+.onboard__status .tile__status { max-width: 28rem; }
+.onboard__cta { margin: 0; }
+@media (min-width: 900px) { .onboard { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: var(--space-5); align-items: center; padding: 32px 0; } }
+
+/* Website: progress of a website being built (from its real milestones), the milestone list, and the SEO subsection. */
+.ws-progress .progress-line { max-width: 34rem; margin: var(--space-2) 0 6px; }
+.ws-miles, .seo-items, .seo-reports { list-style: none; margin: var(--space-3) 0 0; padding: 0; max-width: 46rem; }
+.ws-mile, .seo-item { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 4px 14px; align-items: baseline; padding: 14px 0; border-top: 1px solid var(--hairline); }
+.ws-mile:last-child, .seo-item:last-child { border-bottom: 1px solid var(--hairline); }
+.ws-mile__mark, .seo-item__mark { width: 10px; height: 10px; border: 1.5px solid var(--ink); display: inline-block; align-self: center; }
+.ws-mile.is-done .ws-mile__mark, .seo-item.is-done .seo-item__mark { background: var(--ink); }
+.ws-mile.is-in_progress .ws-mile__mark, .seo-item.is-in_progress .seo-item__mark { background: linear-gradient(90deg, var(--ink) 50%, transparent 50%); }
+.ws-mile__body, .seo-item__body { display: grid; gap: 2px; min-width: 0; }
+.ws-mile__title, .seo-item__title { font-weight: 500; overflow-wrap: anywhere; }
+.ws-mile.is-done .ws-mile__title, .seo-item.is-done .seo-item__title { color: var(--slate); }
+.ws-mile__meta, .seo-item__meta { color: var(--slate); white-space: nowrap; }
+@media (max-width: 560px) { .ws-mile, .seo-item { grid-template-columns: 14px minmax(0, 1fr); } .ws-mile__meta, .seo-item__meta { grid-column: 2; white-space: normal; } }
+.seo-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 0; margin: var(--space-2) 0; max-width: 46rem; border-top: 1px solid var(--hairline); }
+.seo-stats > div { padding: 16px 16px 16px 0; border-bottom: 1px solid var(--hairline); }
+.seo-stats dt { font-size: 13px; color: var(--slate); }
+.seo-stats dd { margin: 4px 0 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(24px, 3.5vw, 30px); letter-spacing: -0.02em; }
+.seo-table { max-width: 46rem; overflow-x: auto; margin: var(--space-3) 0; }
+.seo-table table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.seo-table th, .seo-table td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--hairline); white-space: nowrap; font-weight: 400; }
+.seo-table thead th { font-size: 12px; color: var(--slate); font-weight: 500; }
+.seo-report { display: grid; gap: 4px; padding: 14px 0; border-top: 1px solid var(--hairline); }
+.seo-report:last-child { border-bottom: 1px solid var(--hairline); }
+.seo-report__title { font-weight: 500; }

@@ -9,6 +9,8 @@ import { CONTACT_EMAIL, SUPPORT_ERRORS, statusTag, when, notice } from "./servic
 import { CATEGORY_LABEL, MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, MAX_BODY } from "./repo/support.js";
 import { fileSize } from "./branding-live.js";
 import { ESTIMATE_NOTE } from "./branding-pricing.js";
+import { stageOf, milestoneProgress } from "./website-stage.js";
+import { SEO_STATUS_LABEL } from "./repo/website-seo.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const isWebUrl = (u) => typeof u === "string" && /^https?:\/\/[^\s"'<>]+$/.test(u);
@@ -21,12 +23,16 @@ export const STATUS_LABEL = Object.freeze({ existing: "Existing website", in_dev
 const STATUS_CLASS = { existing: "idle", in_development: "active", live: "live" };
 const PARTY = { framework: "Framework", client: "You", unknown: "Not recorded" };
 
-const statusChip = (s) => `<span class="status status--${STATUS_CLASS[s.status] || "idle"}">${e(STATUS_LABEL[s.status] || "Website")}</span>`;
+const statusChip = (s) => { const st = stageOf(s); return `<span class="status status--${e(st.tone)}">${e(st.label)}</span>`; };
 const managedChip = (s) => `<span class="ws__managed">${s.managedByFramework ? "Managed by Framework" : "Not managed by Framework"}</span>`;
 const link = (s, label) => (isWebUrl(s.url) ? `<a class="text-link" href="${e(s.url)}" target="_blank" rel="noopener noreferrer">${label || e(shortUrl(s.url))}<span class="visually-hidden"> (opens in a new tab)</span></a>` : "");
 
 /** What this website's state means for the client, in plain words. */
 function statement(s) {
+  const phase = stageOf(s).key;
+  if (phase === "awaiting_feedback") return "Framework is building this website and needs your feedback to keep moving. Reply on your latest request, or send us a note, and the work continues.";
+  if (phase === "awaiting_approval") return "Your website is ready for your review. Framework is waiting for your approval before the next step.";
+  if (phase === "maintenance") return s.managedByFramework ? "This website is live and in maintenance: Framework keeps it up to date and running smoothly." : "This website is live and in maintenance.";
   if (s.status === "in_development") return "Framework is building this website. You will see its progress here as the work moves forward.";
   if (s.status === "live") return s.managedByFramework ? "This website is live, and Framework looks after it for you." : "This website is live. Framework does not manage it; you or your own provider do. If you would like help with it, just ask.";
   return s.managedByFramework ? "This is your current website, and Framework looks after it for you." : "This is your current website. Framework does not manage it, and it is listed here so everything about your online presence is in one place.";
@@ -72,10 +78,27 @@ function visual(vm, s, preview) {
   return `<div class="ws-card"><p class="ws-card__host">${e(host(s))}</p><p class="muted">Open the website to see it in a new tab.</p><p class="ws__visit">${visit(s)}</p></div>`;
 }
 
+/* ------------------------------------------------------------------ progress, milestones and the SEO teaser */
+
+const MILE_MARK = { done: "Done", in_progress: "In progress", todo: "To do" };
+/** Progress of a website being built, from its real milestones: a thin bar, "n of m milestones complete", the next one, then the list. Nothing for a live website: its status says Live. */
+export function progressBlock(s, milestones) {
+  const p = milestoneProgress(s, milestones);
+  if (!p.show) return "";
+  const list = milestones.map((m) => `<li class="ws-mile is-${e(m.status)}"><span class="ws-mile__mark" aria-hidden="true"></span><span class="ws-mile__body"><span class="ws-mile__title">${e(m.title)}</span>${m.detail ? `<span class="ws-mile__detail muted small">${e(m.detail)}</span>` : ""}</span><span class="ws-mile__meta small"><span class="visually-hidden">Status: </span>${e(MILE_MARK[m.status] || "")}${m.dueDate && m.status !== "done" ? ` · due ${e(day(m.dueDate))}` : ""}</span></li>`).join("");
+  return `<section class="ws-sec ws-progress" aria-labelledby="ws-prog-h"><h2 class="h2" id="ws-prog-h">Progress</h2><div class="progress-line"><progress class="meter" max="100" value="${p.percent}" aria-hidden="true">${p.percent}%</progress><p class="tile__pct">${p.percent}% complete</p></div><p class="muted small">${e(`${p.done} of ${p.total} milestones complete${p.next ? `. Next: ${p.next}` : ""}`)}</p><ol class="ws-miles">${list}</ol></section>`;
+}
+
+/** The SEO & Search Visibility entry inside Website: the status, Framework's summary and one link. Shown only once Admin has published something for this website. */
+function seoTeaser(vm, s, seo) {
+  if (!seo) return "";
+  return `<section class="ws-sec" aria-labelledby="ws-seo-h"><h2 class="h2" id="ws-seo-h">SEO &amp; Search Visibility</h2><p class="ws__badges"><span class="status status--${seo.status === "not_started" ? "idle" : seo.status === "in_progress" ? "active" : "live"}">${e(SEO_STATUS_LABEL[seo.status] || "")}</span></p>${seo.summary ? `<p class="ws-sec__lead">${e(seo.summary)}</p>` : ""}<p><a class="btn" href="${e(href(vm, `/website/${s.id}/seo`))}">View SEO details<span class="visually-hidden"> for ${e(s.name)}</span></a></p></section>`;
+}
+
 function detailBody(vm, s, preview, extra = {}) {
   return `<div class="ws__badges">${statusChip(s)}${managedChip(s)}</div>
 <p class="lead ws__lead">${e(statement(s))}</p>
-${visual(vm, s, preview)}${facts(s)}${management(vm, s, extra.management)}${additionalServices(vm, extra.services)}`;
+${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${management(vm, s, extra.management)}${additionalServices(vm, extra.services)}`;
 }
 
 /* ------------------------------------------------------------------ Website management and Additional Services */
@@ -176,4 +199,39 @@ export function requestsList(vm, items) {
   const head = `<header class="page-head page-head--compact">${crumb(vm, [["Website", "/website"], ["Requests"]])}<h1 class="h1 h1--section">Website requests</h1><p class="lead">Changes and support requests about your website, and where each one stands.</p></header>`;
   const rows = items.map((r) => `<li><a class="req-row" href="${e(href(vm, `${WEBSITE_REQUEST_ROOT}/${r.id}`))}"><span class="req-row__main"><span class="req-row__title">${e(r.title)}${r.unreadForClient ? ' <span class="req-new">New reply</span>' : ""}</span><span class="muted small">${e(CATEGORY_LABEL[r.category] || "")} · ${e(r.websiteName)} · Updated ${e(when(r.lastMessageAt))}</span></span>${statusTag(r.status)}<span class="tile__arrow" aria-hidden="true">→</span></a></li>`).join("");
   return `${head}${items.length ? `<ul class="req-list">${rows}</ul>` : `<div class="empty"><strong>No requests yet</strong>Ask for a change or get support from your website’s page. We’ll reply here.</div>`}<p class="ws__back"><a class="text-link" href="${e(href(vm, "/website"))}"><span aria-hidden="true">←</span> Back to Website</a></p>`;
+}
+
+/* ------------------------------------------------------------------ SEO & Search Visibility (a subsection of one website) */
+
+const ITEM_MARK = { done: "Done", in_progress: "In progress", todo: "To do" };
+const PRIORITY_LABEL = { high: "High priority", medium: "Medium priority", low: "Low priority" };
+const num = (n) => (Number.isInteger(n) ? n.toLocaleString("en-CA") : "");
+const period = (m) => (m.periodStart === m.periodEnd ? day(m.periodStart) : `${day(m.periodStart)} to ${day(m.periodEnd)}`);
+
+/**
+ * /website/:id/seo. Everything here was written by Framework and published for this website; nothing is fetched from Google or anywhere else. The figures say so, and say they are entered by
+ * hand, so they are never mistaken for a live connection (a future Search Console import would fill the same figures; none exists).
+ */
+export function seoPage(vm, site, seo) {
+  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Website", "/website"], [site.name, `/website/${site.id}`], ["SEO & Search Visibility"]])}<h1 class="h1 h1--section">SEO &amp; Search Visibility</h1><p class="lead">How ${e(site.name)} shows up in search, what has been done, and what to do next.</p></header>`;
+  const tone = seo.status === "not_started" ? "idle" : seo.status === "in_progress" ? "active" : "live";
+  const status = `<section class="ws-sec" aria-labelledby="seo-status-h"><h2 class="h2" id="seo-status-h">Status</h2><p class="ws__badges"><span class="status status--${tone}">${e(SEO_STATUS_LABEL[seo.status] || "")}</span></p>${seo.summary ? `<p class="ws-sec__lead">${e(seo.summary)}</p>` : ""}</section>`;
+  const done = seo.checklist.filter((i) => i.status === "done").length;
+  const row = (i) => `<li class="seo-item is-${e(i.status)}"><span class="seo-item__mark" aria-hidden="true"></span><span class="seo-item__body"><span class="seo-item__title">${e(i.title)}</span>${i.detail ? `<span class="seo-item__detail muted small">${e(i.detail)}</span>` : ""}</span><span class="seo-item__meta small"><span class="visually-hidden">Status: </span>${e(ITEM_MARK[i.status] || "")}</span></li>`;
+  const checklist = `<section class="ws-sec" aria-labelledby="seo-check-h"><h2 class="h2" id="seo-check-h">Checklist</h2>${seo.checklist.length ? `<p class="muted small">${e(`${done} of ${seo.checklist.length} complete`)}</p><ul class="seo-items">${seo.checklist.map(row).join("")}</ul>` : `<p class="muted">Framework hasn’t added a checklist for this website yet.</p>`}</section>`;
+  const order = { high: 0, medium: 1, low: 2 };
+  const recs = seo.recommendations.slice().sort((a, b) => (a.status === "done") - (b.status === "done") || (order[a.priority] ?? 3) - (order[b.priority] ?? 3));
+  const rec = (i) => `<li class="seo-item is-${e(i.status)}"><span class="seo-item__mark" aria-hidden="true"></span><span class="seo-item__body"><span class="seo-item__title">${e(i.title)}</span>${i.detail ? `<span class="seo-item__detail muted small">${e(i.detail)}</span>` : ""}</span><span class="seo-item__meta small">${i.priority && i.status !== "done" ? `${e(PRIORITY_LABEL[i.priority])} · ` : ""}<span class="visually-hidden">Status: </span>${e(ITEM_MARK[i.status] || "")}</span></li>`;
+  const recommendations = `<section class="ws-sec" aria-labelledby="seo-rec-h"><h2 class="h2" id="seo-rec-h">Recommendations</h2>${recs.length ? `<ul class="seo-items">${recs.map(rec).join("")}</ul>` : `<p class="muted">No recommendations right now.</p>`}</section>`;
+  const latest = seo.metrics[0];
+  const stat = (label, value) => (value === "" ? "" : `<div><dt>${e(label)}</dt><dd>${e(value)}</dd></div>`);
+  const figures = latest
+    ? `<p class="muted small">${e(period(latest))}</p><dl class="seo-stats">${stat("Impressions", num(latest.impressions))}${stat("Clicks", num(latest.clicks))}${stat("Average position", latest.position == null ? "" : String(latest.position))}${stat("Pages in search", num(latest.indexedPages))}</dl>${latest.note ? `<p class="muted small">${e(latest.note)}</p>` : ""}`
+    : `<p class="muted">Search figures haven’t been added yet.</p>`;
+  const older = seo.metrics.slice(1, 7);
+  const table = older.length ? `<div class="seo-table" role="region" aria-label="Earlier periods" tabindex="0"><table><thead><tr><th scope="col">Period</th><th scope="col">Impressions</th><th scope="col">Clicks</th><th scope="col">Avg. position</th><th scope="col">Pages in search</th></tr></thead><tbody>${older.map((m) => `<tr><th scope="row">${e(period(m))}</th><td>${e(num(m.impressions))}</td><td>${e(num(m.clicks))}</td><td>${m.position == null ? "" : e(String(m.position))}</td><td>${e(num(m.indexedPages))}</td></tr>`).join("")}</tbody></table></div>` : "";
+  const visibility = `<section class="ws-sec" aria-labelledby="seo-vis-h"><h2 class="h2" id="seo-vis-h">Search visibility</h2>${figures}${table}<p class="muted small">These figures are collected and entered by Framework, and updated periodically. They are not a live feed.</p></section>`;
+  const rep = (r) => `<li class="seo-report"><span class="seo-report__title">${e(r.title)}</span>${r.period ? `<span class="muted small"> · ${e(r.period)}</span>` : ""}${r.summary ? `<span class="seo-report__text muted">${e(r.summary)}</span>` : ""}${r.link ? `<a class="text-link" href="${e(r.link)}" target="_blank" rel="noopener noreferrer">Open the full report<span class="visually-hidden"> (${e(r.title)}, opens in a new tab)</span></a>` : ""}</li>`;
+  const reports = `<section class="ws-sec" aria-labelledby="seo-rep-h"><h2 class="h2" id="seo-rep-h">Reports</h2>${seo.reports.length ? `<ul class="seo-reports">${seo.reports.map(rep).join("")}</ul>` : `<p class="muted">No reports yet. Framework will add them here.</p>`}</section>`;
+  return `${head}${status}${checklist}${recommendations}${visibility}${reports}<p class="ws__back"><a class="text-link" href="${e(href(vm, `/website/${site.id}`))}"><span aria-hidden="true">←</span> Back to ${e(site.name)}</a></p>`;
 }

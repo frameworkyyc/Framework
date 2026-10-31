@@ -189,6 +189,8 @@ test("SQL scan: values are always bound; the only interpolations into SQL are th
     "AUDIT", "ACTIVE_MEMBER", "ACTIVE_MEMBER_OF_OLD", "OTHER_ACTIVE_OWNER", "cond",
     "VISIBLE", "ASSET_COLUMNS", "UPLOAD_COLUMNS", "UPLOAD_COLUMNS_U", "REQUEST_COLUMNS", // brand.js: module-level constants (the column lists, and the "kit published AND asset published AND not deleted" predicate whose every value is bound)
     "VISIBLE", "ASSET_COLUMNS", "UPLOAD_COLUMNS", "UPLOAD_COLUMNS_U", "REQUEST_COLUMNS", // brand.js: module-level constants (column lists and the "kit published AND asset published AND not deleted" predicate; every value in them is bound)
+    "pub", // website-seo.js: the fixed fragment " AND published = 1" (client reads) or "" (Admin), chosen by code, never by input
+    "cols", // client-websites.js: the module-level column list (COLUMNS) with or without `phase`, chosen by code, never by input
     "WHO", // support.js and brand.js: one of two fixed module-level predicates (MEMBER_MAY_WRITE, STAFF_MAY_WRITE) chosen by the guard-verified `asStaff` flag, never by input
     "COLS", "CLIENT_VISIBLE", "REQ", 'includeArchived ? "" : "AND archived_at IS NULL"', // invoices.js and support.js: module-level column lists and the "published, not archived, not void" predicate (every value in them is bound)
     "REQ_R", "where", // support.js: the module-level, fixed column list and the looked-up scope predicate of the Admin-only cross-tenant list (no value in them comes from a request)
