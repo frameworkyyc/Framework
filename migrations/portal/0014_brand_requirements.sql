@@ -1,5 +1,5 @@
 -- Per-client Branding requirements (Admin -> Clients -> [Client] -> Branding -> Requirements).
--- PROPOSED, NOT APPLIED anywhere. Staging first, after approval; Production follows the manual Production workflow after its own approval.
+-- Applied to Staging. Production only by the manual Production workflow, after its own approval.
 -- Additive only: one new table, no seed rows. Nothing that exists is changed or removed (no ALTER, no UPDATE, no DELETE).
 --
 --   brand_requirements  An OVERRIDE of how important one Branding item is for ONE client: Required, Recommended, Optional or Not applicable, with an optional note the client sees.

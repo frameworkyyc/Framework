@@ -23,7 +23,7 @@ const sql = (w, q, ...p) => w.db.raw.prepare(q).all(...p).map((r) => ({ ...r }))
 
 async function setup({ migrated = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld(migrated ? { proposed: ["0014_brand_requirements.sql"] } : {});
+  const w = await makeWorld(migrated ? {} : { skip: ["0014_brand_requirements.sql"] });
   Object.assign(w.env, { PORTAL_BRANDING: "1", PORTAL_FILES: fakeR2(), PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   const A = await w.org("alpha", "Alpha Co");
   await w.invite(A, "ann@alpha.test", "owner");
@@ -51,7 +51,7 @@ const setReq = (t, key, level, note) => t.call(`/clients/${t.A.id}/branding/requ
 const card = (html, title) => { const i = html.indexOf(`<h3 class="lv-card__title">${title}</h3>`); const start = html.lastIndexOf("<li class=\"lv-card", i); return html.slice(start, html.indexOf("</li>", i)); };
 
 test("migration 0014: one additive table, no seed rows, nothing existing is changed", () => {
-  const sqlText = read("migrations/portal-proposed/0014_brand_requirements.sql").replace(/--.*$/gm, "");
+  const sqlText = read("migrations/portal/0014_brand_requirements.sql").replace(/--.*$/gm, "");
   assert.deepEqual([...sqlText.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]), ["brand_requirements"]);
   assert.ok(!/\b(ALTER|DROP|UPDATE|INSERT)\b|\bDELETE\s+FROM\b/i.test(sqlText), "no change to anything that exists, no seed");
   assert.match(sqlText, /PRIMARY KEY \(organization_id, item_key\)/);
@@ -192,4 +192,57 @@ test("Admin lists every item with its automatic level and the saved override", a
   assert.deepEqual([tag.auto, tag.level, tag.note], ["recommended", "optional", "Later."]);
   assert.equal(r.items.find((i) => i.key === "logo.primary").auto, null);
   assert.match(read("admin/assets/branding.js"), /requirementsSection\(\), logoSection\(\)/);
+});
+
+test("every setting works on every item: five settings across the nine sections and the four logo variations, each shown correctly to the client and reversible", async () => {
+  const t = await setup();
+  await t.publish();
+  const SECTIONS = ["logo", "typography", "colours", "tagline", "imagery", "layout", "textures", "iconography", "style"], VARIATIONS = [["primary", "Primary Logo"], ["secondary", "Secondary Logo"], ["simplified", "Simplified Logo"], ["submark", "Sub-mark"]];
+  const baseline = norm(await t.page());
+  const cls = { required: "required", recommended: "recommended", optional: "optional", not_applicable: "not-applicable" };
+  const label = { required: "Required", recommended: "Recommended", optional: "Optional", not_applicable: "Not applicable" };
+  let checks = 0;
+  for (const level of ["required", "recommended", "optional", "not_applicable"]) {
+    for (const key of SECTIONS) {
+      assert.equal((await setReq(t, key, level, `Note for ${key} as ${level}`)).status, 200, `${key} ${level}`);
+      const html = await t.page();
+      const sec = sectionHtml(html, key);
+      assert.match(sec, new RegExp(`bk-req bk-req--${cls[level]}"`), `${key} shows ${level}`); assert.ok(sec.includes(`Note for ${key} as ${level}`), `${key} shows its note`);
+      assert.doesNotMatch(sec, /Request Design/, `${key}: no paid design offer once Admin has set it`);
+      assert.match(html, new RegExp(`href="#${key}">[\\s\\S]*?${label[level].toLowerCase()}</span></a>`), `${key} navigation text says ${label[level].toLowerCase()}`);
+      assert.equal((await setReq(t, key, "automatic")).status, 200);
+      checks++;
+    }
+    for (const [v, title] of VARIATIONS) {
+      assert.equal((await setReq(t, `logo.${v}`, level, `Logo note ${v} ${level}`)).status, 200, `logo.${v} ${level}`);
+      const c = card(await t.page(), title);
+      assert.ok(c.includes(`Logo note ${v} ${level}`), `${v} card note`);
+      if (level === "not_applicable") assert.match(c, /Not applicable/); else assert.match(c, new RegExp(`bk-req--${cls[level]}"`));
+      assert.equal((await setReq(t, `logo.${v}`, "automatic")).status, 200);
+      checks++;
+    }
+  }
+  assert.equal(checks, 4 * 13);
+  assert.equal(norm(await t.page()), baseline, "after all of that, the page is byte-identical to the automatic one");
+  assert.equal(sql(t.w, "SELECT COUNT(*) n FROM brand_requirements")[0].n, 0);
+  assert.equal(sql(t.w, "SELECT COUNT(*) n FROM activity_log WHERE action = 'brand.requirement.set'")[0].n, 52);
+  assert.equal(sql(t.w, "SELECT COUNT(*) n FROM activity_log WHERE action = 'brand.requirement.cleared'")[0].n, 52);
+});
+
+test("Aurora: completion stays separate from priority as files arrive, and the client keeps the free upload path without any paid offer", async () => {
+  const t = await setup();
+  await t.publish();
+  const note = "Please upload the individual logo files for your primary and secondary logos (SVG or PNG).";
+  for (const k of ["logo.primary", "logo.secondary"]) assert.equal((await setReq(t, k, "required", note)).status, 200);
+  let html = await t.page();
+  assert.match(sectionHtml(html, "logo"), /Upload files/); assert.doesNotMatch(sectionHtml(html, "logo"), /Request Design|Already have your logos/);
+  assert.match(sectionHtml(html, "logo"), new RegExp(`href="/portal/o/alpha/branding/uploads"`));
+  const open = (h) => (card(h, "Primary Logo").match(/bk-req--required/) ? "required" : "") + "/" + (/Not added yet/.test(card(h, "Primary Logo")) ? "incomplete" : "complete");
+  assert.equal(open(html), "required/incomplete");
+  await t.logo("primary");
+  assert.equal(open(await t.page()), "required/complete", "the file arrives: complete, and still marked Required");
+  await t.logo("secondary"); await t.logo("simplified"); await t.logo("icon");
+  html = await t.page();
+  assert.match(sectionHtml(html, "logo"), /bk-done/, "the Logo section itself is complete"); assert.match(card(html, "Primary Logo"), /bk-req--required/, "while its cards still say Required");
+  assert.equal(sql(t.w, "SELECT COUNT(*) n FROM service_requests")[0].n, 0, "no paid request was ever created");
 });

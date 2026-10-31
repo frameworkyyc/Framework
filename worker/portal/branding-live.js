@@ -343,7 +343,9 @@ export function brandingOverview(vm, brand, o = {}) {
   const LOGO_PRICE = { primary: "logo-primary", secondary: "logo-secondary", simplified: "logo-simplified", submark: "logo-submark" };
   const missingLogos = LOGO_VARIATIONS.filter((d) => !byVariation.get(d.key).length && !vreq(d.key)).map((d) => ({ title: pricingService(LOGO_PRICE[d.key]).offerTitle, entry: pricing[LOGO_PRICE[d.key]], action: legacyOpen("brand-logos") ? "" : offerAction(LOGO_PRICE[d.key], null) }));
   const logoOffer = offerList({ rows: missingLogos, extra: legacyOpen("brand-logos"), uploadHref, upload: pricingService("logo-primary").upload });
-  const parts = [sec(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${logoFiles.length > 0 ? control("brand-logos", true) : ""}`, logoOffer)];
+  // When Admin has set any logo variation for this client, the section shows the free upload link instead of Framework's paid design offer for the others: it must never read as "buy a design to fill this".
+  const anyLogoSetting = LOGO_VARIATIONS.some((d) => vreq(d.key));
+  const parts = [sec(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${logoFiles.length > 0 ? control("brand-logos", true) : ""}`, anyLogoSetting ? uploadLine() : logoOffer)];
 
   // 02 Typography: three typeface slots (Primary, Secondary, Accent), the hierarchy preview, older typefaces and fonts that belong to no typeface; then 03 Brand Colours.
   const typeList = type.map(typefaceOf);
