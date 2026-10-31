@@ -119,3 +119,14 @@ export async function recordStaffActivity(db, { organizationId, userId, action, 
   await db.prepare("INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, detail, visibility, created_at) VALUES (?, ?, 'admin', ?, ?, 'staff_access', ?, 'internal', ?)")
     .bind(newId(), organizationId, `staff:${userId}`, action, detail ? JSON.stringify(detail) : null, isoTime(now)).run();
 }
+
+/** The minutes within which further page views of the same client by the same staff member are one visit (one "opened" entry), however they arrived (home, a deep link, a bookmark). */
+export const VISIT_WINDOW_MINUTES = 30;
+
+/** Records a visit ("staff.portal.opened") unless this staff member already has one for this client inside the visit window. One conditional INSERT, so concurrent page loads add at most one. */
+export async function recordStaffVisit(db, { organizationId, userId, detail = null }, { now = new Date() } = {}) {
+  const at = isoTime(now), since = isoTime(new Date(now.getTime() - VISIT_WINDOW_MINUTES * 60000)), ref = `staff:${userId}`;
+  const res = await db.prepare("INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, detail, visibility, created_at) SELECT ?, ?, 'admin', ?, 'staff.portal.opened', 'staff_access', ?, 'internal', ? WHERE NOT EXISTS (SELECT 1 FROM activity_log WHERE organization_id = ? AND actor_ref = ? AND action = 'staff.portal.opened' AND created_at > ?)")
+    .bind(newId(), organizationId, ref, detail ? JSON.stringify(detail) : null, at, organizationId, ref, since).run();
+  return res.meta.changes === 1;
+}

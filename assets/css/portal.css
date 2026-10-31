@@ -940,3 +940,4 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .staff-banner a { color: var(--paper); }
 .staff-search { display: flex; flex-wrap: wrap; gap: 12px; margin: var(--space-3) 0; max-width: 32em; }
 .staff-search input { flex: 1 1 14em; min-width: 0; width: auto !important; }
+@media (pointer: coarse), (max-width: 820px) { .staff-banner__btn, .staff-banner a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px; } .staff-banner .wrap { padding-top: 4px; padding-bottom: 4px; } }
