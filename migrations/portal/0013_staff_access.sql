@@ -1,5 +1,5 @@
 -- Master Client Access: which Framework staff may open ANY client's Client Portal (without being a member of it).
--- PROPOSED, NOT APPLIED anywhere. Staging first, after approval; Production follows the manual Production workflow after its own approval. See worker/portal/STAFF-ACCESS.md.
+-- Applied to Staging. Production only by the manual Production workflow, after its own approval. See worker/portal/STAFF-ACCESS.md.
 -- Additive only: one new table and one seed row. Nothing that exists is changed or removed (no ALTER, no UPDATE, no DELETE).
 --
 --   portal_staff   One row per Framework staff member who has been GRANTED master access. It is the ONLY thing that grants it: not an email in a request, a URL parameter, a cookie or any
