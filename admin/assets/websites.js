@@ -28,7 +28,7 @@ const ERROR_TEXT = {
   not_found: "That website no longer exists. The page has been refreshed.", conflict: "That changed while you were working. The page has been refreshed.",
   archive_encrypted: "That ZIP is password-protected, so it can’t be checked. Upload one without a password.", archive_unsupported: "That ZIP uses a format that can’t be checked. Save it again as a standard ZIP.",
   archive_unsafe_entry: "That ZIP contains a file type that isn’t allowed (such as a program or installer) or an unsafe path.", archive_entries: "That ZIP has no files, or far too many.", archive_too_large: "That ZIP expands to far more than it should.",
-  unavailable: "Website downloads aren’t available on this site yet, so nothing was changed.",
+  unavailable: "That isn’t available on this site yet (a database change is waiting), so nothing was changed.", invalid_state: "Choose how this service should be treated for this client.",
   type_not_allowed: "Use a PNG, JPG or WebP picture (a ZIP for the website files).", content_mismatch: "The file’s contents don’t match its type. Export the picture again.", invalid_name_file: "That file name can’t be used.",
   image_dimensions: "The picture is empty or far too large.", empty_file: "That file is empty.", file_too_large: "That picture is over 5 MB.", no_file: "Choose a picture first.",
   writes_disabled: "Changes are switched off on this site, so nothing was changed.", storage_unavailable: "File storage isn’t available on this site. Nothing was uploaded.",
@@ -53,6 +53,9 @@ export async function render(orgId, ctx) {
   const back = h("a", { class: "adm-back", href: "/admin/clients/" + encodeURIComponent(orgId), "data-link": "" }, "← " + (data.organization ? data.organization.name : "Client"));
   if (!data.available) return { title: "Websites", node: h("div", { class: "adm-page" }, back, h("div", { class: "adm-idhead" }, h("div", { class: "adm-idhead__text" }, h("span", { class: "eyebrow" }, "Client"), h("h1", { class: "adm-title", tabindex: "-1" }, "Websites"))), h("p", { class: "adm-banner" }, "Websites aren’t available on this site yet (its database migration hasn’t been applied).")) };
 
+  let svcState = null;
+  const svcBase = "/clients/" + encodeURIComponent(orgId) + "/additional-services";
+  try { svcState = await api(svcBase); } catch { svcState = null; }
   const root = h("div", { class: "adm-page adm-websites" });
   const live = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
   const opened = new Set();
@@ -238,6 +241,25 @@ export async function render(orgId, ctx) {
       h("div", { class: "adm-acc__body" }, h("p", null, summary), archived ? null : siteForm(site), archived ? null : milestonesBlock(site), archived ? null : seoPanel({ base, site, canWrite, say }), archived ? null : previewBlock(site), archived ? null : packageBlock(site), archived ? null : screenshotBlock(site), actions));
   }
 
+  const SVC_STATE = { automatic: "Automatic (offer it, unless they already have it)", owned: "Already has it (don’t promote it)", hidden: "Don’t show it to this client" };
+  /** What Admin knows about this client and each Additional Service: it is left out of their catalogue when they already have it or it should not be shown. Services are also left out automatically when Framework is already doing the work (for example a published SEO plan). */
+  function servicesStateBlock() {
+    if (!svcState || !svcState.available) return null;
+    const rows = svcState.services.map((sv) => {
+      const k = "ss-" + sv.key;
+      const sel = select(k, SVC_STATE, sv.state || "automatic"), note = text(k + "-n", sv.note, { maxlength: "300", placeholder: "Optional note for the team" });
+      return h("li", { class: "adm-ms" }, h("p", { class: "adm-req__label", text: sv.name }), field(k, "For this client", sel), field(k + "-n", "Note", note),
+        canWrite() ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: async () => {
+          if (busy) return; busy = true; let outcome;
+          try { svcState = await api(svcBase, { method: "POST", body: { key: sv.key, state: sel.value, note: sel.value === "automatic" ? "" : note.value } }); outcome = { tone: "success", text: `${sv.name}: saved for ${svcState.organization.name}.` }; } catch (err) { outcome = { tone: "error", text: errorText(err) }; }
+          busy = false; draw(); say(outcome.text, outcome.tone);
+        } }, "Save")) : null);
+    });
+    return h("details", { class: "adm-acc adm-acc--quiet", id: "ws-svcstate", open: opened.has("ws-svcstate") ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add("ws-svcstate"); else opened.delete("ws-svcstate"); } },
+      h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: "Additional services for this client" })),
+      h("div", { class: "adm-acc__body" }, h("p", { class: "adm-sub" }, "The catalogue on this client’s Website page is the same for everyone. Use this to leave a service out for this client because they already have it, or because it shouldn’t be shown to them. Edit the catalogue itself in ", h("a", { class: "adm-link", href: "/admin/settings/additional-services", "data-link": "" }, "Settings → Additional Services"), "."), h("ul", { class: "adm-ms__list" }, rows)));
+  }
+
   function draw() {
     const active = data.websites.filter((s) => !s.archivedAt), archived = data.websites.filter((s) => s.archivedAt);
     const adding = canWrite() && active.length < data.limits.maxWebsites
@@ -252,6 +274,7 @@ export async function render(orgId, ctx) {
       live,
       active.length ? h("div", { class: "adm-ws__list" }, active.map(siteCard)) : h("p", { class: "adm-muted" }, "No website yet. A client with no website simply has none listed here: add one when they have one, or when Framework starts building it."),
       adding,
+      servicesStateBlock(),
       archived.length ? h("details", { class: "adm-acc adm-acc--quiet", id: "ws-archived", open: opened.has("ws-archived") ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add("ws-archived"); else opened.delete("ws-archived"); } },
         h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: "Archived websites" }), h("span", { class: "adm-acc__meta" }, chip("plain", String(archived.length)))), h("div", { class: "adm-acc__body" }, archived.map(siteCard))) : null,
     ].filter(Boolean));

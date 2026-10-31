@@ -856,3 +856,10 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-ms, .adm-seo__row { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--hairline); }
 .adm-ms .adm-field, .adm-seo__row .adm-field { margin: 0; }
 .adm-seo .adm-ws__block { margin-top: 0; }
+
+/* Additional Services editor: the sales content and pictures sit under each service's basics. */
+.adm-services__card { display: grid; gap: 12px; padding-bottom: var(--adm-gap-block); }
+.adm-services__piclist { list-style: none; margin: var(--adm-gap-block) 0 0; padding: 0; display: grid; gap: 0; }
+.adm-services__pic { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--hairline); }
+.adm-services__pic .adm-ws__img { max-width: 20rem; }
+.adm-services__pics { margin-top: var(--adm-gap-block); }
