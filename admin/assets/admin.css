@@ -863,3 +863,8 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-services__pic { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--hairline); }
 .adm-services__pic .adm-ws__img { max-width: 20rem; }
 .adm-services__pics { margin-top: var(--adm-gap-block); }
+
+/* Milestone, SEO and figure rows: fields side by side where there is room, the actions on their own line. */
+.adm-ms, .adm-seo__row { grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); align-items: start; }
+.adm-ms > .adm-actions, .adm-seo__row > .adm-actions, .adm-seo__row > .adm-field:has(textarea) { grid-column: 1 / -1; }
+.adm-ms > .adm-field:first-child { grid-column: 1 / -1; }

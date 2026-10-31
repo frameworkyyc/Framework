@@ -28,6 +28,8 @@ export function seoPanel({ base, site, canWrite, say }) {
   const url = `${base}/${encodeURIComponent(site.id)}/seo`;
   const pre = "seo-" + site.id.slice(0, 8);
   let data = null, busy = false;
+  const opened = new Set(); // which sections are open survives a redraw after a save
+  const fold = (key, title, meta, ...children) => h("details", { class: "adm-acc adm-acc--quiet", id: pre + "-" + key, open: opened.has(key) ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add(key); else opened.delete(key); } }, h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: title }), meta ? h("span", { class: "adm-acc__meta", text: meta }) : null), h("div", { class: "adm-acc__body" }, ...children));
 
   async function act(request, success) {
     if (busy) return;
@@ -66,7 +68,7 @@ export function seoPanel({ base, site, canWrite, say }) {
     const id = pre + "-new-" + kind;
     const title = text(id + "-t", "", { maxlength: "120" }), detail = text(id + "-d", "", { maxlength: "500" });
     const pr = kind === "recommendation" ? select(id + "-p", PRIORITY, "") : null;
-    return h("div", { class: "adm-ws__block" }, h("p", { class: "acc__group" }, heading),
+    return fold(kind, heading, rows.length ? String(rows.length) : "None yet",
       rows.length ? h("ul", { class: "adm-seo__list" }, rows.map(itemRow)) : h("p", { class: "adm-muted", text: "None yet." }),
       canWrite() ? [field(id + "-t", "Add " + (kind === "checklist" ? "a checklist item" : "a recommendation"), title), field(id + "-d", "Detail (optional)", detail), pr ? field(id + "-p", "Priority", pr) : null,
         save("Add", () => { if (!title.value.trim()) { say(ERROR.invalid_title, "error"); title.focus(); return; } act(() => api(`${url}/items`, { method: "POST", body: { kind, title: title.value.trim(), detail: orNull(detail.value), ...(pr && pr.value ? { priority: pr.value } : {}) } }), "Added."); })] : null);
@@ -86,7 +88,7 @@ export function seoPanel({ base, site, canWrite, say }) {
   function reportsSection() {
     const id = pre + "-new-r";
     const title = text(id + "-t", "", { maxlength: "120" }), period = text(id + "-p", "", { maxlength: "40" }), summary = area(id + "-s", "", 1000), link = text(id + "-l", "", { maxlength: "300", inputmode: "url", placeholder: "https://" });
-    return h("div", { class: "adm-ws__block" }, h("p", { class: "acc__group" }, "Reports"),
+    return fold("reports", "Reports", data.reports.length ? String(data.reports.length) : "None yet",
       data.reports.length ? h("ul", { class: "adm-seo__list" }, data.reports.map(reportRow)) : h("p", { class: "adm-muted", text: "None yet." }),
       canWrite() ? [field(id + "-t", "Add a report", title), field(id + "-p", "Period", period), field(id + "-s", "Summary", summary), field(id + "-l", "Link (optional)", link),
         save("Add report", () => { if (!title.value.trim()) { say(ERROR.invalid_title, "error"); title.focus(); return; } act(() => api(`${url}/reports`, { method: "POST", body: { title: title.value.trim(), period: orNull(period.value), summary: orNull(summary.value), link: orNull(link.value) } }), "Report added. It is a draft until you show it to the client."); })] : null);
@@ -108,7 +110,7 @@ export function seoPanel({ base, site, canWrite, say }) {
   }
   function metricsSection() {
     const id = pre + "-new-m", f = metricFields(id, null);
-    return h("div", { class: "adm-ws__block" }, h("p", { class: "acc__group" }, "Search visibility figures"),
+    return fold("metrics", "Search visibility figures", data.metrics.length ? String(data.metrics.length) : "None yet",
       h("p", { class: "adm-muted", text: "Typed in by hand from your own reports. The client is told they are entered by Framework and are not a live feed." }),
       data.metrics.length ? h("ul", { class: "adm-seo__list" }, data.metrics.map(metricRow)) : h("p", { class: "adm-muted", text: "None yet." }),
       canWrite() ? [h("p", { class: "adm-field__hint", text: "Add figures for a period (fill in what you have):" }), ...metricInputs(id, f),

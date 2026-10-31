@@ -172,10 +172,12 @@ export async function render(orgId, ctx) {
     };
     const k = "ms-new-" + site.id.slice(0, 8);
     const nt = text(k + "-t", "", { maxlength: "120" }), nd = text(k + "-d", "", { maxlength: "500" }), ns = select(k + "-s", MILE_STATUS, "todo"), nu = date(k + "-due", "");
-    return h("div", { class: "adm-ws__block adm-ws__miles" }, h("p", { class: "acc__group" }, "Milestones and progress"), h("p", { class: "adm-brand__meta", text: prog }),
+    return h("details", { class: "adm-acc adm-acc--quiet adm-ws__miles", id: "ms-fold-" + site.id.slice(0, 8), open: opened.has("ms-fold-" + site.id) ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add("ms-fold-" + site.id); else opened.delete("ms-fold-" + site.id); } },
+      h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: "Milestones and progress" }), h("span", { class: "adm-acc__meta", text: site.progress && site.progress.show ? `${site.progress.percent}%` : list.length ? String(list.length) : "None yet" })),
+      h("div", { class: "adm-acc__body" }, h("p", { class: "adm-brand__meta", text: prog }),
       list.length ? h("ol", { class: "adm-ms__list" }, list.map(row)) : null,
       canWrite() ? [field(k + "-t", "Add a milestone", nt, "For example “Design approved” or “Content loaded”."), field(k + "-d", "Detail (optional)", nd), field(k + "-s", "Status", ns), field(k + "-due", "Due (optional)", nu),
-        h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => { if (!nt.value.trim()) { say(ERROR_TEXT.invalid_title, "error"); nt.focus(); return; } perform({ request: () => api(mBase, { method: "POST", body: { title: nt.value.trim(), detail: orNull(nd.value), status: ns.value, due_date: orNull(nu.value) } }), success: "Milestone added." }); } }, "Add milestone"))] : null);
+        h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => { if (!nt.value.trim()) { say(ERROR_TEXT.invalid_title, "error"); nt.focus(); return; } perform({ request: () => api(mBase, { method: "POST", body: { title: nt.value.trim(), detail: orNull(nd.value), status: ns.value, due_date: orNull(nu.value) } }), success: "Milestone added." }); } }, "Add milestone"))] : null));
   }
 
   /** The downloadable website files: one ZIP per website. A new file starts unpublished; publishing is a separate step, and only a published file is offered to the client. */
