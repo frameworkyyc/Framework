@@ -10,20 +10,26 @@
  *   POST /additional-services/media                  multipart: file (png, jpg or webp, 5 MB) + meta { service_key, alt, caption? }    add a picture
  *   POST /additional-services/media/:id/update | delete | move                                                       { alt?, caption? } | {} | { direction }
  *   GET  /additional-services/media/:id              the picture, inline
- *   GET  /clients/:org/additional-services           this client's state per service: { services: [{key, name, state: null|"owned"|"hidden", note}] }
- *   POST /clients/:org/additional-services           { key, state: "automatic"|"owned"|"hidden", note? }     owned = they already have it (not promoted); hidden = do not show it to them
+ *   GET  /clients/:org/additional-services           this client's services in THEIR order (their own order, else the global one): { services: [{key, name, enabled, state: null|"owned"|"hidden", note, recommended, autoHas}], ownOrder }
+ *   POST /clients/:org/additional-services           { key, state?: "automatic"|"owned"|"hidden", note? }     owned = they already have it (not promoted); hidden = do not show it to them
+ *                                                    { key, recommended: boolean }                            the Recommended label for this client
+ *                                                    { key, move: "up"|"down" }                               this client's own order (every service gets a position; the global order is untouched)
+ *                                                    { reset_order: true }                                    back to the global order
  */
 import { UUID } from "./repo/common.js";
 import { getOrganizationById } from "./repo/orgs.js";
 import { listServicesAdmin, updateService, updateServiceContent, moveService, SERVICE_CONTENT_KEYS, SERVICE_KEYS } from "./repo/portal-services.js";
 import { listServiceMedia, updateServiceMedia, moveServiceMedia, listClientServiceStates, setClientServiceState, SERVICE_STATES } from "./repo/service-catalogue-state.js";
+import { listClientServiceSettings, setRecommended, setClientOrder, resetClientOrder } from "./repo/client-service-settings.js";
+import { contextFor } from "./service-catalogue.js";
+import { alreadyHas } from "./service-relevance.js";
 import { adminAddMedia, adminDeleteMedia, mediaResponse, MEDIA_MAX_BYTES } from "./service-media-files.js";
 import { listPrices } from "./repo/prices.js";
 import { priceLabel } from "./branding-pricing.js";
 import { json, err, sameOriginWrite, readJson, readUpload } from "./admin-branding.js";
 
 const STATUS = {
-  invalid_service: 422, invalid_name: 422, invalid_description: 422, invalid_enabled: 422, invalid_sort_order: 422, invalid_direction: 422, invalid_input: 422,
+  invalid_service: 422, invalid_category: 422, invalid_recommended: 422, invalid_order: 422, invalid_name: 422, invalid_description: 422, invalid_enabled: 422, invalid_sort_order: 422, invalid_direction: 422, invalid_input: 422,
   invalid_tagline: 422, invalid_problem: 422, invalid_why: 422, invalid_cta: 422, invalid_benefits: 422, invalid_featured: 422, invalid_demo_url: 422, invalid_demo_label: 422,
   invalid_alt: 422, invalid_caption: 422, invalid_state: 422, invalid_note: 422, invalid_actor: 422, not_found: 404, too_many: 409, unavailable: 409, content_unavailable: 409,
   type_not_allowed: 415, content_mismatch: 422, active_content: 422, image_dimensions: 422, empty_file: 422, no_file: 400, file_too_large: 413, invalid_name_file: 422,
@@ -82,17 +88,37 @@ export async function handleServicesApi(request, env, principal, path, deps = {}
     if (route.kind === "client_state") {
       const org = await getOrganizationById(db, route.org);
       if (!org) return err(404, "not_found", "No such organization.");
+      const effective = async () => {
+        const list = await listServicesAdmin(db), st = await listClientServiceStates(db, org.id), cs = await listClientServiceSettings(db, org.id), context = await contextFor(db, org.id);
+        const own = (k) => (cs.items[k] && Number.isInteger(cs.items[k].sortOrder) ? cs.items[k].sortOrder : null);
+        const hasOwn = list.services.some((x) => own(x.key) !== null);
+        const ordered = list.services.map((x, i) => ({ x, i, k: own(x.key) ?? x.sortOrder })).sort((a, b) => a.k - b.k || a.i - b.i).map((o) => o.x);
+        return { list, st, cs, context, hasOwn, ordered };
+      };
       if (request.method === "POST") {
-        const read = await readJson(request, ["key", "state", "note"]);
+        const read = await readJson(request, ["key", "state", "note", "recommended", "move", "reset_order"]);
         if (read.response) return read.response;
-        const { key, state, note } = read.body;
-        if (state !== "automatic" && !SERVICE_STATES.includes(state)) return err(422, "invalid_state", "The change was not made.");
-        const r = await setClientServiceState(db, org.id, key, state === "automatic" ? null : state, state === "automatic" ? null : note, actor, { now });
-        if (!r.ok) return fromFailure(r);
+        const { key, state, note, recommended, move, reset_order } = read.body;
+        if (reset_order === true) { const r = await resetClientOrder(db, org.id, actor, { now }); if (!r.ok) return fromFailure(r); }
+        else if (move !== undefined) {
+          if (move !== "up" && move !== "down") return err(422, "invalid_direction", "The change was not made.");
+          const cur = await effective();
+          const order = cur.ordered.map((x) => x.key), i = order.indexOf(key), j = move === "up" ? i - 1 : i + 1;
+          if (i < 0) return err(422, "invalid_service", "The change was not made.");
+          if (j >= 0 && j < order.length) { [order[i], order[j]] = [order[j], order[i]]; const r = await setClientOrder(db, org.id, order, actor, { now }); if (!r.ok) return fromFailure(r); }
+        } else {
+          if (state === undefined && recommended === undefined) return err(422, "invalid_input", "The change was not made.");
+          if (state !== undefined) {
+            if (state !== "automatic" && !SERVICE_STATES.includes(state)) return err(422, "invalid_state", "The change was not made.");
+            const r = await setClientServiceState(db, org.id, key, state === "automatic" ? null : state, state === "automatic" ? null : note, actor, { now });
+            if (!r.ok) return fromFailure(r);
+          }
+          if (recommended !== undefined) { const r = await setRecommended(db, org.id, key, recommended, actor, { now }); if (!r.ok) return fromFailure(r); }
+        }
       }
-      const st = await listClientServiceStates(db, org.id);
-      const list = await listServicesAdmin(db);
-      return json({ available: st.available, organization: { id: org.id, name: org.name }, capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1" }, services: list.services.map((s) => ({ key: s.key, name: s.name, state: st.items[s.key] ? st.items[s.key].state : null, note: st.items[s.key] ? st.items[s.key].note || "" : "" })) });
+      const cur = await effective();
+      return json({ available: cur.st.available, settingsAvailable: cur.cs.available, organization: { id: org.id, name: org.name }, capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1" }, ownOrder: cur.hasOwn,
+        services: cur.ordered.map((x) => ({ key: x.key, name: x.name, enabled: x.enabled, category: x.category || null, state: cur.st.items[x.key] ? cur.st.items[x.key].state : null, note: cur.st.items[x.key] ? cur.st.items[x.key].note || "" : "", recommended: Boolean(cur.cs.items[x.key] && cur.cs.items[x.key].recommended), autoHas: alreadyHas(x.key, cur.context, {}) })) });
     }
     // pictures
     if (!env.PORTAL_FILES && route.kind !== "media_update" && route.kind !== "media_move") return err(503, "storage_unavailable", "File storage is not available on this deployment.");

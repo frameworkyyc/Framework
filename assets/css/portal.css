@@ -1027,3 +1027,6 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 }
 @media (max-width: 560px) { .svc-card__sum { padding: 18px 16px; } .svc-card__body { padding: 4px 16px 20px; } .svc-card__cta .btn { width: 100%; justify-content: center; text-align: center; } }
 @media print { .svc-card:not([open]) > .svc-card__body { display: grid; } }
+.svc-tag--recommended { border-bottom: 2px solid var(--ink); padding-bottom: 1px; }
+.svc-cat { margin: 0; }
+.svc-card__lead { font-size: 17px; color: var(--ink); }

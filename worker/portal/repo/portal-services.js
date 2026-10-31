@@ -27,6 +27,11 @@ export const SERVICE_DEFAULTS = Object.freeze([
     problem: "A good website still has to be found. If it is not set up for search, people looking for what you do may never see it.",
     benefits: ["A clear picture of how your site shows up in search today", "A practical plan for what to improve, in priority order", "Regular reporting on your search visibility", "Fixes for the technical basics search engines look for"],
     why: "Worth considering if you have a website and want more of your customers to find it by searching.", ctaLabel: "Ask about SEO & Visibility" },
+  // Exactly what was supplied for it: no problem or "why" text, no price, no integration. Admin adds the rest (description, benefits, pictures, demo link) in the editor.
+  { key: "nexus-fleet-tracker", name: "Nexus Fleet Tracker", description: "Manage vehicles, monitor maintenance and organize fleet operations from one dashboard.", sortOrder: 50,
+    tagline: "Take control of your fleet.", category: "Fleet Management Software",
+    benefits: ["Vehicle life expectancy", "Odometer tracking", "Oil change reminders", "Damage reporting", "Maintenance requests", "Service scheduling"],
+    problem: null, why: null, ctaLabel: "Ask about Nexus Fleet Tracker" },
 ].map((d) => Object.freeze({ ...d, benefits: Object.freeze(d.benefits) })));
 export const SERVICE_KEYS = Object.freeze(SERVICE_DEFAULTS.map((s) => s.key));
 /** The service_requests key an Additional Service is requested under. */
@@ -34,15 +39,15 @@ export const requestKeyOfService = (key) => `svc-${key}`;
 export const serviceKeyOfRequest = (requestKey) => (typeof requestKey === "string" && requestKey.startsWith("svc-") && SERVICE_KEYS.includes(requestKey.slice(4)) ? requestKey.slice(4) : null);
 
 const DEFAULT_OF = new Map(SERVICE_DEFAULTS.map((d) => [d.key, d]));
-const parseBenefits = (raw) => { try { const v = JSON.parse(raw); return Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).slice(0, 5) : null; } catch { return null; } };
+const parseBenefits = (raw) => { try { const v = JSON.parse(raw); return Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()).slice(0, MAX_BENEFITS) : null; } catch { return null; } };
 /** The sales content of a service: what Admin stored (migration 0016, columns present only once it is applied), else the standard wording. */
 const contentOf = (r, d) => ({
-  tagline: r.tagline || null, problem: r.problem || d.problem, why: r.why || d.why, ctaLabel: r.cta_label || d.ctaLabel,
+  tagline: r.tagline || d.tagline || null, category: r.category || d.category || null, problem: r.problem || d.problem, why: r.why || d.why, ctaLabel: r.cta_label || d.ctaLabel,
   benefits: (r.benefits_json && parseBenefits(r.benefits_json)) || [...d.benefits], featured: r.featured === 1, demoUrl: r.demo_url || null, demoLabel: r.demo_label || null,
-  custom: { tagline: Boolean(r.tagline), problem: Boolean(r.problem), why: Boolean(r.why), ctaLabel: Boolean(r.cta_label), benefits: Boolean(r.benefits_json) },
+  custom: { category: Boolean(r.category), tagline: Boolean(r.tagline), problem: Boolean(r.problem), why: Boolean(r.why), ctaLabel: Boolean(r.cta_label), benefits: Boolean(r.benefits_json) },
 });
 const row = (r) => ({ key: r.service_key, name: r.name, description: r.description, enabled: r.enabled === 1, sortOrder: r.sort_order, updatedBy: r.updated_by, updatedAt: r.updated_at, stored: true, ...contentOf(r, DEFAULT_OF.get(r.service_key) || { benefits: [] }) });
-const defaults = () => SERVICE_DEFAULTS.map((d) => ({ ...d, tagline: null, benefits: [...d.benefits], featured: false, demoUrl: null, demoLabel: null, custom: { tagline: false, problem: false, why: false, ctaLabel: false, benefits: false }, enabled: true, updatedBy: null, updatedAt: null, stored: false }));
+const defaults = () => SERVICE_DEFAULTS.map((d) => ({ ...d, tagline: d.tagline || null, category: d.category || null, benefits: [...d.benefits], featured: false, demoUrl: null, demoLabel: null, custom: { category: false, tagline: false, problem: false, why: false, ctaLabel: false, benefits: false }, enabled: true, updatedBy: null, updatedAt: null, stored: false }));
 
 /** Every catalogue entry (hidden ones too) for Admin, in order. `available` is false (and the defaults are returned) without the migration. */
 export async function listServicesAdmin(db) {
@@ -55,7 +60,7 @@ export async function listServicesAdmin(db) {
 /** What a client sees: only the shown services, in order. The built-in defaults when the table is missing; an empty list when Admin has hidden every service. */
 export async function listClientServices(db) {
   const l = await listServicesAdmin(db);
-  return l.services.filter((s) => s.enabled).map(({ key, name, description, tagline, problem, why, benefits, ctaLabel, featured, demoUrl, demoLabel }) => ({ key, name, description, tagline, problem, why, benefits, ctaLabel, featured, demoUrl, demoLabel }));
+  return l.services.filter((s) => s.enabled).map(({ key, name, description, sortOrder, category, tagline, problem, why, benefits, ctaLabel, featured, demoUrl, demoLabel }) => ({ key, name, description, sortOrder, category, tagline, problem, why, benefits, ctaLabel, featured, demoUrl, demoLabel }));
 }
 
 /**
@@ -111,7 +116,8 @@ export async function updateService(db, key, patch, actor, { now = new Date() } 
   return ok();
 }
 
-const CONTENT_KEYS = ["tagline", "problem", "why", "benefits", "cta_label", "featured", "demo_url", "demo_label"];
+export const MAX_BENEFITS = 8;
+const CONTENT_KEYS = ["category", "tagline", "problem", "why", "benefits", "cta_label", "featured", "demo_url", "demo_label"];
 export const SERVICE_CONTENT_KEYS = Object.freeze(CONTENT_KEYS);
 
 /** A one-line text, trimmed; "" or null mean "use the standard wording" (stored as NULL). null = invalid. */
@@ -138,11 +144,11 @@ export async function updateServiceContent(db, key, patch, actor, { now = new Da
   if (!old) return fail("invalid_service");
   const v = {};
   const text = (k, max, err) => { if (!(k in patch)) return true; const t = line(patch[k], max); if (t === null) return err; v[k] = t === undefined ? null : t; return true; };
-  for (const [k, max, err] of [["tagline", 160, "invalid_tagline"], ["problem", 400, "invalid_problem"], ["why", 400, "invalid_why"], ["cta_label", 40, "invalid_cta"], ["demo_label", 60, "invalid_demo_label"]]) { const r = text(k, max, err); if (r !== true) return fail(r); }
+  for (const [k, max, err] of [["category", 60, "invalid_category"], ["tagline", 160, "invalid_tagline"], ["problem", 400, "invalid_problem"], ["why", 400, "invalid_why"], ["cta_label", 40, "invalid_cta"], ["demo_label", 60, "invalid_demo_label"]]) { const r = text(k, max, err); if (r !== true) return fail(r); }
   if ("benefits" in patch) {
     const b = patch.benefits;
     if (b === null || (Array.isArray(b) && b.every((x) => typeof x === "string" && x.trim() === ""))) v.benefits_json = null;
-    else if (!Array.isArray(b) || b.length > 5) return fail("invalid_benefits");
+    else if (!Array.isArray(b) || b.length > MAX_BENEFITS) return fail("invalid_benefits");
     else { const items = []; for (const x of b) { const t = line(x, 120); if (t === null) return fail("invalid_benefits"); if (t) items.push(t); } v.benefits_json = items.length ? JSON.stringify(items) : null; }
   }
   if ("featured" in patch) { if (typeof patch.featured !== "boolean") return fail("invalid_featured"); v.featured = patch.featured ? 1 : 0; }
