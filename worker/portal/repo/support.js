@@ -11,6 +11,7 @@
  *  - Each change that someone must be told about queues a row in service_notifications in the same transaction (staff email for client activity; client email for a
  *    Framework reply or status change). Sending is separate (Phase 4); queuing never fails the request.
  */
+import { staffUserIds } from "./staff.js";
 import { newId, isoTime, requireOrgId, requireUserId, requireId, ok, fail, isConstraintViolation, validActor } from "./common.js";
 import { validateName, validateText, validateEnum } from "./validate.js";
 
@@ -27,6 +28,13 @@ export const scopeOf = (category) => (category === "website_change" || category 
 export const SUBMISSION_NOTICE = "Sending a request does not authorize any paid work. Framework will review it and, if it involves extra work, send you a quote to approve before anything starts.";
 export const CATEGORY_LABEL = Object.freeze({ website_change: "Website change", design_revision: "Logo or design revision", technical_issue: "Technical issue", general: "General support" });
 export const STATUS_LABEL = Object.freeze({ new: "New", in_review: "In review", quoted: "Quote sent", approved: "Approved", in_progress: "In progress", completed: "Completed", declined: "Declined" });
+
+/**
+ * Who may write as the client: an active member of the organization, or (only when the caller passes asStaff, which only the portal guard does, after verifying a bound master-access grant
+ * in portal_staff) a Framework staff member. Both fragments take the same two binds (organization id, user id), so a statement is identical apart from this one reviewed constant.
+ */
+const MEMBER_MAY_WRITE = "EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')";
+const STAFF_MAY_WRITE = "EXISTS (SELECT 1 FROM portal_staff s WHERE ? IS NOT NULL AND s.user_id = ? AND s.revoked_at IS NULL)";
 
 /* ------------------------------------------------------------------ rows */
 
@@ -56,8 +64,9 @@ function notify(db, { organizationId, audience, event, entityId, at }) {
 /* ------------------------------------------------------------------ client */
 
 /** A new request: the request row and its first message are written together, only while the organization has fewer than MAX_OPEN_REQUESTS open requests. */
-export async function createRequest(db, organizationId, userId, { category, title, description, websiteId = null }, { now = new Date() } = {}) {
+export async function createRequest(db, organizationId, userId, { category, title, description, websiteId = null }, { now = new Date(), asStaff = false } = {}) {
   requireOrgId(organizationId); requireUserId(userId);
+  const WHO = asStaff ? STAFF_MAY_WRITE : MEMBER_MAY_WRITE;
   const cat = validateEnum(category, CATEGORIES), t = validateName(title, 120), body = validateText(description, MAX_BODY);
   if (!cat) return fail("invalid_category");
   if (!t) return fail("invalid_title");
@@ -73,14 +82,14 @@ export async function createRequest(db, organizationId, userId, { category, titl
         ? db.prepare(
           `INSERT INTO support_requests (id, organization_id, category, scope, title, status, submitted_by, created_at, status_changed_at, last_message_at, last_message_by, client_read_at, website_id)
            SELECT ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, 'client', ?, ?
-            WHERE EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')
+            WHERE ${WHO}
               AND (SELECT count(*) FROM support_requests r WHERE r.organization_id = ? AND r.status NOT IN ('completed', 'declined')) < ?
               AND EXISTS (SELECT 1 FROM websites w WHERE w.id = ? AND w.organization_id = ? AND w.published = 1 AND w.archived_at IS NULL)`,
         ).bind(id, organizationId, cat, scopeOf(cat), t, userId, at, at, at, at, websiteId, organizationId, userId, organizationId, MAX_OPEN_REQUESTS, websiteId, organizationId)
         : db.prepare(
           `INSERT INTO support_requests (id, organization_id, category, scope, title, status, submitted_by, created_at, status_changed_at, last_message_at, last_message_by, client_read_at)
            SELECT ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, 'client', ?
-            WHERE EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')
+            WHERE ${WHO}
               AND (SELECT count(*) FROM support_requests r WHERE r.organization_id = ? AND r.status NOT IN ('completed', 'declined')) < ?`,
         ).bind(id, organizationId, cat, scopeOf(cat), t, userId, at, at, at, at, organizationId, userId, organizationId, MAX_OPEN_REQUESTS)),
       db
@@ -129,9 +138,11 @@ export async function getClientThread(db, organizationId, requestId) {
   requireOrgId(organizationId); requireId(requestId, "request_id");
   const r = await db.prepare(`SELECT ${REQ} FROM support_requests WHERE id = ? AND organization_id = ?`).bind(requestId, organizationId).first();
   if (!r) return null;
-  const msgs = (await db.prepare("SELECT m.id, m.kind, m.author_type, m.visibility, m.body, m.status_to, m.created_at, u.name AS author_name FROM support_messages m LEFT JOIN portal_users u ON u.id = m.author_user_id WHERE m.organization_id = ? AND m.request_id = ? AND m.visibility = 'client' ORDER BY m.created_at, m.rowid").bind(organizationId, requestId).all()).results;
+  const msgs = (await db.prepare("SELECT m.id, m.kind, m.author_type, m.author_user_id, m.visibility, m.body, m.status_to, m.created_at, u.name AS author_name FROM support_messages m LEFT JOIN portal_users u ON u.id = m.author_user_id WHERE m.organization_id = ? AND m.request_id = ? AND m.visibility = 'client' ORDER BY m.created_at, m.rowid").bind(organizationId, requestId).all()).results;
   const files = (await db.prepare("SELECT a.id, a.message_id, a.original_name, a.format, a.size_bytes, a.created_at FROM support_attachments a JOIN support_messages m ON m.id = a.message_id AND m.organization_id = a.organization_id WHERE a.organization_id = ? AND a.request_id = ? AND m.visibility = 'client' ORDER BY a.created_at, a.rowid").bind(organizationId, requestId).all()).results;
-  return { request: request(r), messages: msgs.map(message), attachments: files.map(attachment) };
+  // What Framework staff wrote through master access is Framework's own voice: never a client member's name.
+  const staff = msgs.some((m) => m.author_user_id) ? await staffUserIds(db) : new Set();
+  return { request: request(r), messages: msgs.map((m) => message(staff.has(m.author_user_id) ? { ...m, author_type: "staff" } : m)), attachments: files.map(attachment) };
 }
 
 /** Marks Framework's replies as seen. Only the unread flag changes. */
@@ -142,14 +153,15 @@ export async function markClientRead(db, organizationId, requestId, { now = new 
 }
 
 /** A client follow-up on an open request. Closed (completed or declined) requests take no more messages: a new request is opened instead. */
-export async function addClientMessage(db, organizationId, userId, requestId, bodyRaw, { now = new Date() } = {}) {
+export async function addClientMessage(db, organizationId, userId, requestId, bodyRaw, { now = new Date(), asStaff = false } = {}) {
   requireOrgId(organizationId); requireUserId(userId); requireId(requestId, "request_id");
+  const WHO = asStaff ? STAFF_MAY_WRITE : MEMBER_MAY_WRITE;
   const body = validateText(bodyRaw, MAX_BODY);
   if (!body) return fail(body === undefined ? "invalid_message" : "message_required");
   const mid = newId(), at = isoTime(now);
   const res = await db.batch([
     db
-      .prepare("UPDATE support_requests SET last_message_at = ?, last_message_by = 'client', client_read_at = ? WHERE id = ? AND organization_id = ? AND status NOT IN ('completed', 'declined') AND EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = ? AND m.user_id = ? AND m.status = 'active')")
+      .prepare(`UPDATE support_requests SET last_message_at = ?, last_message_by = 'client', client_read_at = ? WHERE id = ? AND organization_id = ? AND status NOT IN ('completed', 'declined') AND ${WHO}`)
       .bind(at, at, requestId, organizationId, organizationId, userId),
     db.prepare("INSERT INTO support_messages (id, organization_id, request_id, kind, author_type, author_user_id, visibility, body, created_at) SELECT ?, ?, ?, 'message', 'client', ?, 'client', ?, ? WHERE changes() > 0").bind(mid, organizationId, requestId, userId, body, at),
     audit(db, { organizationId, actorType: "client", actorRef: userId, action: "support.message.client", entityId: requestId, at, visibility: "client" }),
@@ -210,9 +222,10 @@ export async function getAdminThread(db, organizationId, requestId) {
   requireOrgId(organizationId); requireId(requestId, "request_id");
   const r = await db.prepare(`SELECT ${REQ} FROM support_requests WHERE id = ? AND organization_id = ?`).bind(requestId, organizationId).first();
   if (!r) return null;
-  const msgs = (await db.prepare("SELECT m.id, m.kind, m.author_type, m.visibility, m.body, m.status_to, m.created_at, COALESCE(u.name, u.email, m.author_label) AS author_name FROM support_messages m LEFT JOIN portal_users u ON u.id = m.author_user_id WHERE m.organization_id = ? AND m.request_id = ? ORDER BY m.created_at, m.rowid").bind(organizationId, requestId).all()).results;
+  const msgs = (await db.prepare("SELECT m.id, m.kind, m.author_type, m.author_user_id, m.visibility, m.body, m.status_to, m.created_at, COALESCE(u.name, u.email, m.author_label) AS author_name FROM support_messages m LEFT JOIN portal_users u ON u.id = m.author_user_id WHERE m.organization_id = ? AND m.request_id = ? ORDER BY m.created_at, m.rowid").bind(organizationId, requestId).all()).results;
+  const staff = msgs.some((m) => m.author_user_id) ? await staffUserIds(db) : new Set();
   const files = (await db.prepare("SELECT id, message_id, original_name, format, size_bytes, created_at FROM support_attachments WHERE organization_id = ? AND request_id = ? ORDER BY created_at, rowid").bind(organizationId, requestId).all()).results;
-  return { request: request(r), messages: msgs.map((m) => ({ ...message(m), authorName: m.author_name || "" })), attachments: files.map(attachment) };
+  return { request: request(r), messages: msgs.map((m) => ({ ...message(m), authorName: m.author_user_id && staff.has(m.author_user_id) ? `${m.author_name || "Framework"} (Framework master access)` : m.author_name || "" })), attachments: files.map(attachment) };
 }
 
 export async function markAdminSeen(db, organizationId, requestId, { now = new Date() } = {}) {

@@ -208,7 +208,7 @@ test("quotes and billable work: only change requests can be quoted or approved, 
   assert.equal((await adminJson2(call, A, chg, "status", { status: "paid" })).json.error, "invalid_status");
   assert.equal((await adminJson2(call, A, chg, "status", { status: "quoted", note: "Quote: 2 hours. Reply to approve." })).status, 200);
   let html = await page(mia, `/requests/${chg}`);
-  assert.match(html, /Quote sent/); assert.match(html, /Nothing goes ahead until you approve it/); assert.match(html, /Quote: 2 hours\. Reply to approve\./);
+  assert.match(html, /Quote sent/); assert.match(html, /To approve it, reply in this conversation\. No work starts until Framework confirms your approval\./); assert.match(html, /Quote: 2 hours\. Reply to approve\./);
   assert.match(await page(mia, ""), /1 quote to review/);
   assert.equal(sql(w.db, "SELECT status FROM support_requests WHERE id = ?", chg)[0].status, "quoted", "replying does not approve");
   const reply = (await import("./helpers/portal-e2e.mjs")).csrfOf; void reply;

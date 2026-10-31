@@ -15,13 +15,15 @@
  *   GET  /support?scope=attention|open|closed|all       requests of EVERY client (Framework Admin only), each with its organization and why it needs attention
  *   GET  /services/attention                            counts for the Admin dashboard and navigation badge: requests, invoices, unsent emails
  *   POST /services/notifications/process                sends pending notification emails now (the same code that runs after each change)
+ *   POST /services/notifications/dismiss                { organization_id }  clears the "client notices skipped: recipient not approved" warning for one client (nothing is sent)
  * Nothing deletes a message, an attachment or a request. A database without migration 0007 answers { available: false }.
  */
 import { getOrganizationById } from "./repo/orgs.js";
 import { UUID } from "./repo/common.js";
 import * as sup from "./repo/support.js";
 import * as files from "./support-files.js";
-import { dispatchNotifications, processNotifications, notificationTotals } from "./service-notifications.js";
+import { dispatchNotifications, processNotifications, notificationTotals, unapprovedSkips, dismissUnapprovedSkips } from "./service-notifications.js";
+import { recordActivity } from "./repo/activity.js";
 import { adminInvoiceTotals } from "./repo/invoices.js";
 import { emailConfig } from "../assessment.js";
 import { json, err, sameOriginWrite, readJson, readUpload } from "./admin-branding.js";
@@ -45,8 +47,8 @@ const SCOPES = ["attention", "open", "closed", "all"];
 const emailState = (env, totals) => ({ ...totals, configured: emailConfig(env).ok });
 
 /** The routes that are not about one client: the global list, the dashboard counts and "send pending emails now". */
-async function globalApi(request, env, kind, deps) {
-  const method = kind === "process" ? "POST" : "GET";
+async function globalApi(request, env, kind, deps, principal) {
+  const method = kind === "process" || kind === "dismiss" ? "POST" : "GET";
   if (request.method !== method) return json({ error: "method_not_allowed", message: "That method is not allowed here." }, 405, { Allow: method });
   if (method === "POST") {
     if (env.PORTAL_ADMIN_WRITES !== "1") return err(403, "writes_disabled", "Changes are not enabled on this deployment.");
@@ -67,7 +69,17 @@ async function globalApi(request, env, kind, deps) {
       return json({ available: true, scope: use, capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1" }, requests: requests.map((r) => ({ ...publicRequest(r), organization: { id: r.organizationId, name: r.orgName }, reason: r.reason })), totals: await sup.adminSupportTotals(db), emails: emailState(env, await notificationTotals(db)) });
     }
     if (kind === "attention") {
-      return json({ available: true, support: await sup.adminSupportTotals(db), invoices: await adminInvoiceTotals(db, { now }), emails: emailState(env, await notificationTotals(db)) });
+      return json({ available: true, support: await sup.adminSupportTotals(db), invoices: await adminInvoiceTotals(db, { now }), emails: { ...emailState(env, await notificationTotals(db)), unapproved: await unapprovedSkips(env, db) } });
+    }
+    if (kind === "dismiss") {
+      const read = await readJson(request, ["organization_id"]);
+      if (read.response) return read.response;
+      const id = read.body.organization_id;
+      if (typeof id !== "string" || !UUID.test(id)) return err(404, "not_found", "No such organization.");
+      if (!(await getOrganizationById(db, id))) return err(404, "not_found", "No such organization.");
+      const dismissed = await dismissUnapprovedSkips(db, id);
+      if (dismissed) await recordActivity(db, { organizationId: id, actorType: "admin", actorRef: (principal && principal.email) || "admin", action: "service.notice.dismissed", entityType: "service_notification", detail: { notices: dismissed }, visibility: "internal" }, { now });
+      return json({ ok: true, dismissed, emails: { ...emailState(env, await notificationTotals(db)), unapproved: await unapprovedSkips(env, db) } });
     }
     const result = await processNotifications(env, { db, now, fetch: deps.fetch, force: true });
     return json({ ok: true, result, emails: emailState(env, await notificationTotals(db)) });
@@ -81,8 +93,9 @@ async function globalApi(request, env, kind, deps) {
 export async function handleSupportApi(request, env, principal, path, deps = {}) {
   const seg = path.split("/").filter(Boolean);
   if (seg[0] === "support" && seg.length === 1) return globalApi(request, env, "list", deps);
-  if (seg[0] === "services" && seg.length === 2 && seg[1] === "attention") return globalApi(request, env, "attention", deps);
-  if (seg[0] === "services" && seg.length === 3 && seg[1] === "notifications" && seg[2] === "process") return globalApi(request, env, "process", deps);
+  if (seg[0] === "services" && seg.length === 2 && seg[1] === "attention") return globalApi(request, env, "attention", deps, principal);
+  if (seg[0] === "services" && seg.length === 3 && seg[1] === "notifications" && seg[2] === "process") return globalApi(request, env, "process", deps, principal);
+  if (seg[0] === "services" && seg.length === 3 && seg[1] === "notifications" && seg[2] === "dismiss") return globalApi(request, env, "dismiss", deps, principal);
   if (!(seg[0] === "clients" && seg[2] === "support" && seg.length >= 3)) return null;
   const rest = seg.slice(3);
   let route = null;

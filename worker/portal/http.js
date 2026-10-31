@@ -15,6 +15,7 @@ export { escapeHtml };
 
 export const SESSION_COOKIE = "__Host-fw_portal";
 export const STATE_COOKIE = "__Host-fw_auth";
+export const VIEW_ROLE_COOKIE = "__Host-fw_view_role"; // Master Client Access only: which client role a staff member previews (owner or member). Choosing it grants nothing; staff access is decided server-side.
 export const WORKOS_ORIGIN = "https://api.workos.com";
 
 // form-action includes WorkOS because the sign-out form POSTs here and is then redirected to WorkOS logout; browsers apply form-action to redirects.

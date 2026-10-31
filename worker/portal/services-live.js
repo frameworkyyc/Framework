@@ -67,7 +67,7 @@ export function invoicesPage(vm, items) {
   const body = items.length
     ? `<ul class="inv-list">${items.map((i) => invoiceRow(vm, i)).join("")}</ul>`
     : `<div class="empty"><strong>No invoices yet</strong>When Framework sends you an invoice, it will appear here.</div>`;
-  return `${head}${body}<p class="muted small">Questions about an invoice? Email <a class="text-link" href="mailto:${e(CONTACT_EMAIL)}">${e(CONTACT_EMAIL)}</a> and mention the invoice number. Only owners of your organization can see invoices.</p>`;
+  return `${head}<p class="req-notice">Payment instructions are included in your invoice PDF. Payments are recorded by Framework, and your invoice status will update once payment is confirmed.</p>${body}<p class="muted small">Questions about an invoice? Email <a class="text-link" href="mailto:${e(CONTACT_EMAIL)}">${e(CONTACT_EMAIL)}</a> and mention the invoice number. Only owners of your organization can see invoices.</p>`;
 }
 
 /* ------------------------------------------------------------------ support & change requests */
@@ -75,7 +75,7 @@ export function invoicesPage(vm, items) {
 const STATUS_HELP = Object.freeze({
   new: "Framework has received your request.",
   in_review: "Framework is reviewing your request.",
-  quoted: "Framework has sent you a quote. Nothing goes ahead until you approve it.",
+  quoted: "Framework has sent you a quote. To approve it, reply in this conversation. No work starts until Framework confirms your approval.",
   approved: "Framework has recorded that you approved the quote.",
   in_progress: "Framework is working on this.",
   completed: "This request is complete.",
