@@ -8,7 +8,7 @@ const sql = readFileSync(new URL("0001_portal_foundation.sql", MIGRATIONS_DIR), 
 const uuid = () => crypto.randomUUID();
 const T = "2026-10-20T12:00:00.000Z";
 const LATER = "2026-10-27T12:00:00.000Z";
-const TABLES = ["activity_log", "approved_emails", "brand_assets", "brand_kits", "brand_uploads", "business_profile_answers", "invitations", "invoices", "memberships", "organizations", "portal_feedback", "portal_services", "portal_sessions", "portal_users", "projects", "service_notifications", "service_prices", "service_requests", "support_attachments", "support_messages", "support_requests", "website_milestones", "website_packages", "websites"];
+const TABLES = ["activity_log", "approved_emails", "brand_assets", "brand_kits", "brand_uploads", "business_profile_answers", "invitations", "invoices", "memberships", "organizations", "portal_feedback", "portal_services", "portal_sessions", "portal_staff", "portal_users", "projects", "service_notifications", "service_prices", "service_requests", "support_attachments", "support_messages", "support_requests", "website_milestones", "website_packages", "websites"];
 
 const insertOrg = (db, id = uuid(), slug = "acme-" + id.slice(0, 6)) => (db.raw.prepare("INSERT INTO organizations (id, slug, name) VALUES (?, ?, 'Acme')").run(id, slug), id);
 const insertUser = (db, id = uuid(), email = `u${id.slice(0, 6)}@example.com`) => (db.raw.prepare("INSERT INTO portal_users (id, workos_user_id, email) VALUES (?, ?, ?)").run(id, "user_" + id.slice(0, 12), email), id);
@@ -22,7 +22,7 @@ const insertInvitation = (db, org, email = "a@example.com", extra = {}) => {
 const rejects = (fn, re = /constraint failed/i, label = "") => assert.throws(fn, re, label);
 
 test("migration files: one numbered file, applied in order, named for wrangler", () => {
-  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql", "0010_service_pricing.sql", "0011_websites.sql", "0012_website_management.sql"]);
+  assert.deepEqual(migrationFiles(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql", "0010_service_pricing.sql", "0011_websites.sql", "0012_website_management.sql", "0013_staff_access.sql"]);
 });
 
 test("applies to an empty database and creates exactly the portal tables", () => {
@@ -47,7 +47,7 @@ test("Cloudflare D1 compatibility: no transaction control, PRAGMA, triggers or A
 
 test("the migration touches only portal tables (never the feedback, assessment or revenue tables)", () => {
   const created = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).sort();
-  assert.deepEqual(created, TABLES.filter((t) => !["business_profile_answers", "portal_feedback", "approved_emails", "brand_assets", "brand_kits", "brand_uploads", "service_requests", "service_prices", "portal_services", "website_milestones", "website_packages", "websites", "invoices", "service_notifications", "support_attachments", "support_messages", "support_requests"].includes(t)), "0001 is unchanged; later tables live in 0002, 0003, 0005, 0007, 0008, 0010, 0011 and 0012");
+  assert.deepEqual(created, TABLES.filter((t) => !["business_profile_answers", "portal_feedback", "approved_emails", "brand_assets", "brand_kits", "brand_uploads", "service_requests", "service_prices", "portal_services", "website_milestones", "website_packages", "websites", "portal_staff", "invoices", "service_notifications", "support_attachments", "support_messages", "support_requests"].includes(t)), "0001 is unchanged; later tables live in 0002, 0003, 0005, 0007, 0008, 0010, 0011, 0012 and 0013");
   for (const other of ["feedback_responses", "client_revenue", "assessment_requests", "framework_environment"]) assert.ok(!sql.replace(/--.*$/gm, "").includes(other), other);
 });
 

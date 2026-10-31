@@ -13,7 +13,7 @@ const sql = (w, q, ...p) => w.db.raw.prepare(q).all(...p).map((r) => ({ ...r }))
 const text = async (b, path) => (await b.get(path)).text();
 
 async function setup() {
-  const w = await makeWorld({ proposed: ["0013_staff_access.sql"] });
+  const w = await makeWorld();
   Object.assign(w.env, { PORTAL_FILES: fakeR2(), PORTAL_SERVICES: "1" });
   const A = await w.org("alpha", "Alpha Co"), B = await w.org("beta", "Beta Co");
   await w.invite(A, "ann@alpha.test", "owner"); await w.invite(A, "mia@alpha.test", "member"); await w.invite(B, "bob@beta.test", "owner");
@@ -26,13 +26,13 @@ async function setup() {
 const post = (b, path, fields, extra) => b.post(path, fields, extra);
 
 test("migration 0013 seeds exactly one pending grant, for hello@frameworkco.ca, and nothing else", async () => {
-  const w = await makeWorld({ proposed: ["0013_staff_access.sql"] });
+  const w = await makeWorld();
   const rows = sql(w, "SELECT email, user_id, role, revoked_at FROM portal_staff");
   assert.deepEqual(rows, [{ email: STAFF_EMAIL, user_id: null, role: "master", revoked_at: null }]);
 });
 
 test("without the table (before the migration) nobody has master access and sign-in still works", async () => {
-  const w = await makeWorld();
+  const w = await makeWorld({ skip: ["0013_staff_access.sql"] });
   const b = w.browser();
   const r = await b.signIn(w.user(9, STAFF_EMAIL));
   assert.equal(r.status, 303);
@@ -203,7 +203,7 @@ test("an expired session or a signed-out browser gets the sign-in page, never a 
 });
 
 test("Admin API: grant, list and revoke need the writes flag and a same-origin admin request; a grant is by email only and rejects junk", async () => {
-  const w = await makeWorld({ proposed: ["0013_staff_access.sql"] });
+  const w = await makeWorld();
   const env = { PORTAL_DB: w.db, PORTAL_ADMIN_WRITES: "1" };
   const call = (body, { method = "POST", e = env, headers = {} } = {}) => handleStaffApi(new Request("https://staging.frameworkco.ca/api/admin/staff-access", { method, headers: { "Content-Type": "application/json", Origin: "https://staging.frameworkco.ca", "X-Framework-Admin": "1", ...headers }, body: method === "GET" ? undefined : JSON.stringify(body) }), e, { email: "owner@frameworkco.ca" }, "/staff-access", { now: w.clock.now() });
   assert.equal((await call(null, { method: "GET" })).status, 200);
