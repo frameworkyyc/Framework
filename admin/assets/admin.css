@@ -837,3 +837,16 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-ws__block .adm-actions { margin-top: 4px; }
 .adm-ws__foot { margin-top: 28px; padding-top: var(--adm-gap-block); border-top: 1px solid var(--hairline); }
 .adm-ws__img { display: block; width: auto; max-width: min(100%, 480px); height: auto; margin: 8px 0; border: 1px solid var(--hairline); }
+
+/* Branding requirements: one row per item, the choice and the client note side by side from tablet width, stacked on a phone. */
+.adm-reqs { list-style: none; margin: var(--adm-gap-block) 0 0; padding: 0; display: grid; gap: 0; }
+.adm-req { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 16px 0; border-top: 1px solid var(--hairline); }
+.adm-req--sub { padding-left: 20px; }
+.adm-req__what { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.adm-req__label { font-weight: 500; }
+.adm-req__set { display: grid; gap: var(--adm-gap-actions); grid-template-columns: minmax(0, 1fr); align-items: start; }
+.adm-req__set .input { width: 100%; }
+.adm-req__set textarea.input { min-height: 56px; resize: vertical; }
+.adm-req__auto { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--muted, #5c5c5c); }
+@media (min-width: 820px) { .adm-req { grid-template-columns: minmax(0, 14rem) minmax(0, 1fr); } }
+@media (min-width: 1100px) { .adm-req__set { grid-template-columns: minmax(0, 12rem) minmax(0, 1fr) auto; } }

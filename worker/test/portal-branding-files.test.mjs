@@ -41,7 +41,7 @@ async function deliver(w, org, o = {}, f = file("logo.png", S.png()), actor = "a
 test("migration 0005 (approved for Staging only): additive, idempotent, and creates exactly the four branding tables; Production is not mentioned as applied", () => {
   assert.ok(readdirSync(new URL("../../migrations/portal/", import.meta.url)).includes("0005_branding.sql"));
   const proposed = readdirSync(new URL("../../migrations/", import.meta.url)).includes("portal-proposed") ? readdirSync(new URL("../../migrations/portal-proposed/", import.meta.url)) : [];
-  assert.deepEqual(proposed, [], "nothing is waiting in the proposal folder: 0011 to 0013 joined migrations/portal (applied to Staging; Production only by the manual workflow)");
+  assert.deepEqual(proposed, ["0014_brand_requirements.sql"], "only 0014 (Branding requirements) waits in the proposal folder; 0011 to 0013 joined migrations/portal");
   const sql = readFileSync(new URL("../../migrations/portal/0005_branding.sql", import.meta.url), "utf8");
   assert.match(sql, /NOT applied to Production/);
   assert.ok(!/\b(ALTER|DROP)\b|(?<!ON )\b(DELETE|UPDATE)\b/i.test(sql.replace(/--.*$/gm, "")), "no change to anything that exists");

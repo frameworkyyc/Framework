@@ -11,7 +11,8 @@ import { BRAND_REQUESTS, BRANDING_SERVICES } from "./brand-services.js";
 import { LOGO_VARIATIONS } from "../../admin/assets/logo-variations.js";
 import { BRAND_SECTIONS, TYPE_SLOT_DEFS, sectionOf } from "../../admin/assets/brand-sections.js";
 import { typefaceOf, filesOf, specimenSlots, faceOf, WEIGHT_NAME } from "./brand-type.js";
-import { requirementsFor, completionOf, REQUIREMENT_LABEL } from "./brand-requirements.js";
+import { requirementsFor, completionOf, applyOverrides, REQUIREMENT_LABEL } from "./brand-requirements.js";
+import { LEVEL_LABEL } from "../../admin/assets/brand-requirement-items.js";
 import { offerBox, offerList, requestKeyOf, priceLabel, pricingService, ESTIMATE_NOTE } from "./branding-pricing.js";
 import { exampleTypeCard, exampleColours, exampleTagline, exampleImagery, exampleLayout, exampleTextures, exampleIcons, exampleStyle, EXAMPLE_LABEL } from "./brand-examples.js";
 
@@ -171,7 +172,7 @@ const previewable = (v) => IMAGE_FORMATS.map((f) => v.find((a) => a.format === f
 function downloads(vm, version) { return version.map((a) => downloadLink(vm, a, `Download ${e(upper(a.format))}`)).join(""); }
 
 /** A card whose variation has published files: the real preview, what it contains and a download button per format (all versions under "All versions" when there is more than one). */
-function variationCard(vm, def, files) {
+function variationCard(vm, def, files, vreq = null) {
   const versions = versionsOf(files);
   const first = versions[0];
   const shownVersion = versions.find((v) => previewable(v)) || first;
@@ -184,15 +185,15 @@ function variationCard(vm, def, files) {
   const more = versions.length > 1
     ? `<details class="lv-more"><summary>All versions (${versions.length})</summary><ul class="lv-more__list">${versions.map((v) => `<li><p class="small">${e(versionLabel(v) || v[0].title)}</p><div class="lv-card__actions">${downloads(vm, v)}</div></li>`).join("")}</ul></details>`
     : "";
-  return `<li class="lv-card lv-card--has">${stage}<div class="lv-card__body"><p class="lv-card__no" aria-hidden="true">${e(def.no)}</p><h3 class="lv-card__title">${e(def.title)}</h3><p class="lv-card__status"><span class="tag">Available</span></p><p class="lv-card__desc muted">${e(def.desc)}</p><p class="lv-card__meta muted small">${e([formats, versions.length === 1 ? versionLabel(first) : `${versions.length} versions`].filter(Boolean).join(" · "))}</p><div class="lv-card__actions">${downloads(vm, versions.length > 1 ? shownVersion : first)}</div>${more}</div></li>`;
+  return `<li class="lv-card lv-card--has">${stage}<div class="lv-card__body"><p class="lv-card__no" aria-hidden="true">${e(def.no)}</p><h3 class="lv-card__title">${e(def.title)}</h3><p class="lv-card__status"><span class="tag">Available</span>${requirementTag(vreq)}</p>${requirementNote(vreq)}<p class="lv-card__desc muted">${e(def.desc)}</p><p class="lv-card__meta muted small">${e([formats, versions.length === 1 ? versionLabel(first) : `${versions.length} versions`].filter(Boolean).join(" · "))}</p><div class="lv-card__actions">${downloads(vm, versions.length > 1 ? shownVersion : first)}</div>${more}</div></li>`;
 }
 
 /**
  * A card whose variation has no published file yet: Framework's own logo for that variation (a static public image, 16:9, never cropped or stretched), the subtle label
  * "Example: Framework", the status "Not added yet" and what the variation is for. No link and no download: an example is not a client asset and is not in private storage.
  */
-function exampleCard(def) {
-  return `<li class="lv-card lv-card--example"><div class="lv-card__stage lv-card__stage--example"><img src="${e(def.example)}" alt="${e(def.alt)}" width="1920" height="1080" loading="lazy" decoding="async"></div><div class="lv-card__body"><p class="lv-card__no" aria-hidden="true">${e(def.no)}</p><h3 class="lv-card__title">${e(def.title)}</h3><p class="lv-card__status"><span class="tag">Not added yet</span></p><p class="lv-card__desc muted">${e(def.desc)}</p><p class="lv-card__meta muted small">Example: Framework</p></div></li>`;
+function exampleCard(def, vreq = null) {
+  return `<li class="lv-card lv-card--example"><div class="lv-card__stage lv-card__stage--example"><img src="${e(def.example)}" alt="${e(def.alt)}" width="1920" height="1080" loading="lazy" decoding="async"></div><div class="lv-card__body"><p class="lv-card__no" aria-hidden="true">${e(def.no)}</p><h3 class="lv-card__title">${e(def.title)}</h3><p class="lv-card__status"><span class="tag">${vreq && vreq.level === "not_applicable" ? "Not applicable" : "Not added yet"}</span>${vreq && vreq.level !== "not_applicable" ? requirementTag(vreq) : ""}</p>${requirementNote(vreq)}<p class="lv-card__desc muted">${e(def.desc)}</p><p class="lv-card__meta muted small">Example: Framework</p></div></li>`;
 }
 
 const REQUEST_STATUS = Object.freeze({
@@ -254,8 +255,11 @@ const serviceName = (key) => { const q = BRANDING_SERVICES.find((x) => x.key ===
 function requirementTag(req) {
   if (!req) return "";
   const why = req.becauseOf && req.becauseOf.length ? `<span class="bk-req__why"> · for your ${e(req.becauseOf.map((k) => serviceName(k)).join(" and "))} request</span>` : "";
-  return ` <span class="bk-req bk-req--${e(req.level)}"><span class="visually-hidden">(</span>${e(REQUIREMENT_LABEL[req.level] || "")}${why}<span class="visually-hidden">)</span></span>`;
+  return ` <span class="bk-req bk-req--${e(String(req.level).replace(/_/g, "-"))}"><span class="visually-hidden">(</span>${e(LEVEL_LABEL[req.level] || REQUIREMENT_LABEL[req.level] || "")}${why}<span class="visually-hidden">)</span></span>`;
 }
+
+/** The note Framework wrote for a client about one item (Admin -> Branding -> Requirements), shown as plain text. It is never a request and never a price. */
+const requirementNote = (req) => (req && req.note ? `<p class="bk-rnote">${e(req.note)}</p>` : "");
 
 /** One of the nine numbered sections: a large two-digit number, the title, a short description, then the section's content or its empty state. All nine are always shown. */
 function bkSection(def, inner, prefix = "", badge = "") {
@@ -285,7 +289,9 @@ export function brandingOverview(vm, brand, o = {}) {
   const extraDocs = ["package", "other"].map((k) => [k, assets.filter((a) => a.kind === k && !sectionOf(a))]).filter(([, l]) => l.length);
   const reqDef = (key) => BRAND_REQUESTS.find((d) => d.key === key);
   // Required / Recommended per section for this client (defaults, plus sections a service they have open genuinely depends on: see brand-requirements.js).
-  const reqs = requirementsFor(Object.values(requests), o.requirementTable);
+  const settings = o.requirementSettings || {}; // Admin's per-client overrides (brand_requirements); none = the automatic behaviour above, unchanged
+  const reqs = applyOverrides(requirementsFor(Object.values(requests), o.requirementTable), settings);
+  const vreq = (key) => (settings[`logo.${key}`] ? { level: settings[`logo.${key}`].level, note: settings[`logo.${key}`].note || "", becauseOf: [] } : null);
   const control = (key, hasContent) => requestControl(vm, reqDef(key), { r: requests[key], canRequest, csrf, label: hasContent ? "Request additions or changes" : "Request" });
   // Each incomplete section opens with a status line (what is missing, and whether it is Required or Recommended) and, directly under it, Framework's design offer: what we can provide,
   // the price (Admin -> Settings -> Service Pricing; only when the service has one), a black Request Design button and the free way to upload what the client already has. The
@@ -299,13 +305,28 @@ export function brandingOverview(vm, brand, o = {}) {
   const typeCount = type.length, logoSlots = new Set(assets.filter((a) => a.kind === "logo").map(variationOf).filter(Boolean)).size;
   const comp = completionOf({ logoFilled: logoSlots, typefaces: typeCount, fontFiles: fonts.length, colours: colours.length, tagline: live && brand.tagline ? brand.tagline.primary : null,
     files: Object.fromEntries(["imagery", "layout", "textures", "iconography", "style"].map((k) => [k, assets.filter((a) => sectionOf(a) === k).length])) });
+  // A logo variation Admin marked Not applicable does not count towards the Logo section: it is complete when every other variation is in (completion stays separate from priority).
+  const naLogos = new Set(LOGO_VARIATIONS.filter((d) => settings[`logo.${d.key}`] && settings[`logo.${d.key}`].level === "not_applicable").map((d) => d.key));
+  if (naLogos.size) {
+    const have = new Set(assets.filter((a) => a.kind === "logo").map(variationOf).filter(Boolean));
+    const need = LOGO_VARIATIONS.filter((d) => !naLogos.has(d.key));
+    comp.logo = { done: need.length > 0 && need.every((d) => have.has(d.key)), count: need.filter((d) => have.has(d.key)).length, total: need.length };
+  }
   // Beside each section's heading: a small Required / Recommended label (with the Logo's 1/4 to 3/4 count) while it is incomplete, or a checkmark and "Complete". A complete section has no offer.
   const badgeOf = (d) => {
     const c = comp[d.key];
-    if (c.done) return ` <span class="bk-done">${CHECK}<span>Complete</span></span>`;
+    const set = reqs[d.key] && reqs[d.key].overridden;
+    if (set && reqs[d.key].level === "not_applicable") return requirementTag(reqs[d.key]);
+    if (c.done) return `${set ? requirementTag(reqs[d.key]) : ""} <span class="bk-done">${CHECK}<span>Complete</span></span>`;
     return requirementTag(reqs[d.key]) + (d.key === "logo" && c.count > 0 ? ` <span class="bk-req__count"><span class="visually-hidden">, </span>${c.count}/${c.total}<span class="visually-hidden"> logo variations provided</span></span>` : "");
   };
-  const sec = (d, inner, offerHtml = "") => bkSection(d, inner, comp[d.key].done ? "" : offerHtml, badgeOf(d));
+  // A section Admin has set for this client shows Admin's note and the free upload link instead of Framework's paid design offer: it must never read as "buy a service to fill this".
+  const uploadLine = () => (uploadHref ? `<p class="bk-rnote__act"><a class="text-link" href="${e(uploadHref)}">Upload files</a></p>` : "");
+  const sec = (d, inner, offerHtml = "") => {
+    const r = reqs[d.key];
+    if (r && r.overridden) return bkSection(d, inner, requirementNote(r) + (comp[d.key].done || r.level === "not_applicable" ? "" : uploadLine()), badgeOf(d));
+    return bkSection(d, inner, comp[d.key].done ? "" : offerHtml, badgeOf(d));
+  };
   const offer = (key) => offerBox({ service: pricingService(key), entry: pricing[key], action: offerAction(key, LEGACY[key]), uploadHref });
   const groups = (docs) => docs.map(([k, l]) => `${docs.length > 1 ? `<p class="acc__group">${e(DOC_LABEL[k])}</p>` : ""}<ul class="file-list">${l.map((a) => docRow(vm, a)).join("")}</ul>`).join("");
   const def = Object.fromEntries(BRAND_SECTIONS.map((d) => [d.key, d]));
@@ -316,11 +337,11 @@ export function brandingOverview(vm, brand, o = {}) {
   const unassigned = [];
   for (const a of logoFiles) { const k = variationOf(a); if (k) byVariation.get(k).push(a); else unassigned.push(a); }
   const filled = LOGO_VARIATIONS.filter((d) => byVariation.get(d.key).length).length;
-  const cards = LOGO_VARIATIONS.map((d) => (byVariation.get(d.key).length ? variationCard(vm, d, byVariation.get(d.key)) : exampleCard(d))).join("");
+  const cards = LOGO_VARIATIONS.map((d) => (byVariation.get(d.key).length ? variationCard(vm, d, byVariation.get(d.key), vreq(d.key)) : exampleCard(d, vreq(d.key)))).join("");
   const others = unassigned.length ? `<p class="acc__group">Other logo files</p><ul class="logo-grid">${logoGroups(unassigned).map((g) => logoCard(vm, g)).join("")}</ul>` : "";
   const examples = filled < 4 ? `<p class="muted small">Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation. They are not your logos and are not available to download.</p>` : "";
   const LOGO_PRICE = { primary: "logo-primary", secondary: "logo-secondary", simplified: "logo-simplified", submark: "logo-submark" };
-  const missingLogos = LOGO_VARIATIONS.filter((d) => !byVariation.get(d.key).length).map((d) => ({ title: pricingService(LOGO_PRICE[d.key]).offerTitle, entry: pricing[LOGO_PRICE[d.key]], action: legacyOpen("brand-logos") ? "" : offerAction(LOGO_PRICE[d.key], null) }));
+  const missingLogos = LOGO_VARIATIONS.filter((d) => !byVariation.get(d.key).length && !vreq(d.key)).map((d) => ({ title: pricingService(LOGO_PRICE[d.key]).offerTitle, entry: pricing[LOGO_PRICE[d.key]], action: legacyOpen("brand-logos") ? "" : offerAction(LOGO_PRICE[d.key], null) }));
   const logoOffer = offerList({ rows: missingLogos, extra: legacyOpen("brand-logos"), uploadHref, upload: pricingService("logo-primary").upload });
   const parts = [sec(def.logo, `<ul class="lv-grid">${cards}</ul>${examples}${others}${logoFiles.length > 0 ? control("brand-logos", true) : ""}`, logoOffer)];
 
@@ -360,7 +381,7 @@ export function brandingOverview(vm, brand, o = {}) {
     if (d.key === "logo" && c.count > 0) return `<span class="bk-nav__mark"><span aria-hidden="true">${c.count}/${c.total}</span><span class="visually-hidden">, ${c.count} of ${c.total} logo variations added</span></span>`;
     return "";
   };
-  const nav = `<nav class="bk-nav" aria-label="Brand kit sections"><ol>${BRAND_SECTIONS.map((d) => `<li><a href="#${e(d.id)}"><span class="bk-nav__no" aria-hidden="true">${e(d.no)}</span> ${e(d.title)}${markOf(d)}<span class="visually-hidden">, ${e(REQUIREMENT_LABEL[reqs[d.key].level].toLowerCase())}</span></a></li>`).join("")}</ol></nav>`;
+  const nav = `<nav class="bk-nav" aria-label="Brand kit sections"><ol>${BRAND_SECTIONS.map((d) => `<li><a href="#${e(d.id)}"><span class="bk-nav__no" aria-hidden="true">${e(d.no)}</span> ${e(d.title)}${markOf(d)}<span class="visually-hidden">, ${e((LEVEL_LABEL[reqs[d.key].level] || "").toLowerCase())}</span></a></li>`).join("")}</ol></nav>`;
   const more = `<section class="bk-more" aria-labelledby="h-more"><h2 class="h2" id="h-more">Documents and other files</h2><p class="muted">Guidelines, documents and other files from Framework that aren’t part of the nine sections above.</p>
 <div class="bk-more__group" id="guidelines"><h3 class="h3">Brand guidelines &amp; documents</h3>${guideDocs.length ? groups(guideDocs) : emptyState(MORE_COPY["brand-guidelines"])}${control("brand-guidelines", guideDocs.length > 0)}</div>
 <div class="bk-more__group" id="additional"><h3 class="h3">Additional brand assets</h3>${extraDocs.length ? groups(extraDocs) : emptyState(MORE_COPY["brand-additional"])}${control("brand-additional", extraDocs.length > 0)}</div></section>`;

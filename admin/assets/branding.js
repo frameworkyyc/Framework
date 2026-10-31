@@ -8,6 +8,7 @@ import { disclosure, chip, plural, goTo } from "./client-dashboard.js";
 import { buildBrandFileName, extensionOf } from "./brand-names.js";
 import { LOGO_VARIATIONS } from "./logo-variations.js";
 import { BRAND_SECTIONS, SECTION_FILE_KEYS, TYPE_SLOT_DEFS, sectionOf } from "./brand-sections.js";
+import { LEVEL_LABEL } from "./brand-requirement-items.js";
 
 const KIND_LABEL = { logo: "Logos", guideline: "Guidelines", document: "Documents", font: "Fonts", package: "Packages", other: "Other files" };
 const KIND_ONE = { logo: "Logo", guideline: "Guideline", document: "Document", font: "Font", package: "Package", other: "Other file" };
@@ -385,6 +386,26 @@ export async function render(orgId, ctx) {
   const sectionIntro = (def) => h("p", { class: "adm-sub", text: def.desc });
   const statusChip = (n, one) => (n ? chip("plain", plural(n, one)) : chip("plain", "Not added yet"));
 
+  /** Requirements: for THIS client, how important each Branding item is (and a note they see). Automatic = no override. Priority only: it never creates a request, never changes completion, never touches a file. */
+  function requirementsSection() {
+    const rq = data.requirements;
+    if (!rq || !rq.available) return section("br-reqs", "Requirements", "Not available yet", [h("p", { class: "adm-sub" }, "Requirement settings need a database update that hasn’t been applied here yet. The Branding page keeps its automatic behaviour until then.")]);
+    const set = rq.items.filter((i) => i.level).length;
+    const rows = rq.items.map((i) => {
+      const autoText = i.auto ? `Automatic: ${LEVEL_LABEL[i.auto]}` : "Automatic: follows the Logo section";
+      const lvl = select("rq-l-" + i.key, { automatic: "Automatic", ...Object.fromEntries(rq.levels.map((l) => [l, LEVEL_LABEL[l]])) }, i.level || "automatic");
+      const note = h("textarea", { id: "rq-n-" + i.key, class: "input", rows: 2, maxlength: 300, "aria-label": `Note for the client: ${i.label}`, placeholder: "Optional note the client will see, e.g. what to upload" }); note.value = i.note || "";
+      const save = button("Save", { disabled: canWrite() ? null : true, onclick: () => perform({ request: () => api(base + "/requirements", { method: "PUT", body: { key: i.key, level: lvl.value, note: lvl.value === "automatic" ? "" : note.value } }), success: `${i.label}: ${lvl.value === "automatic" ? "back to automatic" : LEVEL_LABEL[lvl.value].toLowerCase()}.` }) });
+      return h("li", { class: "adm-req" + (i.group === "logo" ? " adm-req--sub" : "") },
+        h("div", { class: "adm-req__what" }, h("label", { for: "rq-l-" + i.key, class: "adm-req__label", text: i.label }), i.level ? chip("plain", LEVEL_LABEL[i.level]) : null, h("p", { class: "adm-req__auto", text: i.level ? `Automatic would be: ${i.auto ? LEVEL_LABEL[i.auto] : "same as the Logo section"}` : autoText })),
+        h("div", { class: "adm-req__set" }, lvl, note, h("div", { class: "adm-actions" }, save)));
+    });
+    return section("br-reqs", "Requirements", set ? `${set} set for this client` : "Automatic", [
+      h("p", { class: "adm-sub" }, "Choose how important each item is for this client, and add a note explaining what is needed. The client sees the label and your note on their Branding page. This is separate from whether the item is complete (that follows the files and details actually added), and it never sends a request or asks the client to buy anything. Automatic keeps the standard behaviour."),
+      h("ul", { class: "adm-reqs" }, rows),
+    ]);
+  }
+
   /** 01 Logo: the four logo cards (upload, formats, files). */
   function logoSection() {
     const logos = data.assets.filter((a) => a.kind === "logo");
@@ -667,7 +688,7 @@ export async function render(orgId, ctx) {
       h("div", { class: "adm-idhead" }, h("div", { class: "adm-idhead__text" }, h("span", { class: "eyebrow" }, "Client"), h("h1", { class: "adm-title", tabindex: "-1" }, "Branding"), h("p", { class: "adm-sub" }, `${data.organization.name}. Clients only see items you publish, and only while the kit is published.`)), h("div", { class: "adm-actions" }, publish)),
       live, tiles,
       !canWrite() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at files, but not add, publish or delete them.") : !caps().storage ? h("p", { class: "adm-banner" }, "File storage isn’t available on this site, so files can’t be added or replaced. Colours and typography can still be set.") : null,
-      logoSection(), typographySection(), coloursSection(), taglineSection(), ...["imagery", "layout", "textures", "iconography", "style"].map((k) => fileSection(SECTION[k])),
+      requirementsSection(), logoSection(), typographySection(), coloursSection(), taglineSection(), ...["imagery", "layout", "textures", "iconography", "style"].map((k) => fileSection(SECTION[k])),
       otherFilesSection(), uploadsSection(), requestsSection(), storageSection(),
     ].filter(Boolean));
   }
