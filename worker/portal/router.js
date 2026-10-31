@@ -18,6 +18,11 @@ import { listActiveMembershipsForUser, listMembers } from "./repo/memberships.js
 import { setUserName } from "./repo/users.js";
 import { getStaffAccess, listOrganizationsForStaff } from "./repo/staff.js";
 import { listRequirementSettings } from "./repo/brand-requirement-settings.js";
+import { listClientMilestones } from "./repo/website-milestones.js";
+import { stageOf, milestoneProgress } from "./website-stage.js";
+import { getSeoForClient } from "./repo/website-seo.js";
+import { loadServiceCatalogue } from "./service-catalogue.js";
+import { mediaResponse } from "./service-media-files.js";
 import { listProjects, getProject } from "./repo/projects.js";
 import { listActivity } from "./repo/activity.js";
 import { validateSlug, validateName } from "./repo/validate.js";
@@ -283,6 +288,25 @@ async function saveFeedback(ctx, a) {
 /* ------------------------------------------------------------------ Branding (Phase 3; only where PORTAL_BRANDING is on) */
 
 /** The Branding card on Home: published or not, and how many files the client has shared. null when Branding is not live; "unavailable" when it cannot be read. */
+/**
+ * The Website card on Home: where the client's (first, in Framework's order) published website stands, and for one being built its progress from real milestones. null when the Website section is
+ * off or there is no website to show. An unreadable result is never shown as a status: the card then just shows no line.
+ */
+async function websiteCard(ctx, a) {
+  if (!websiteOn(ctx)) return null;
+  try {
+    const org = a.membership.organizationId;
+    const sites = await dbCall(() => listClientWebsites(ctx.db, org));
+    if (!sites.length) return null;
+    const first = sites[0];
+    const milestones = first.status === "in_development" ? await dbCall(() => listClientMilestones(ctx.db, org, first.id)) : [];
+    return { stage: stageOf(first), progress: milestoneProgress(first, milestones), count: sites.length, name: first.name };
+  } catch (err) {
+    if (err instanceof Unavailable || /no such (table|column)/i.test(String(err && err.message))) return null;
+    throw err;
+  }
+}
+
 async function brandCard(ctx, a) {
   if (!brandingOn(ctx)) return null;
   try {
@@ -421,16 +445,8 @@ async function websiteManagement(ctx, a, site) {
 
 /** The Additional Services grid: the shown services (Admin's catalogue), a price only where Admin set one (never "Included"), and whether the client already has an open request for each. */
 async function websiteServices(ctx, a) {
-  const org = a.membership.organizationId;
-  const items = await listClientServices(ctx.db);
-  if (!items.length) return null;
-  const prices = pricingFrom((await listPrices(ctx.db)).rows);
-  const open = new Set((await listServiceRequests(ctx.db, org, { openOnly: true })).map((r) => r.serviceKey));
   const f = viewFilters(ctx.url);
-  return {
-    canRequest: can(a.membership.role, "website.request"), flash: f.requested ? "requested" : f.requestDup ? "dup" : "",
-    items: items.map((it) => { const p = prices[it.key]; const shown = p && p.type !== "included" ? p : null; return { ...it, price: shown ? shown.label : "", priceType: shown ? shown.type : "", requested: open.has(requestKeyOfService(it.key)) }; }),
-  };
+  return loadServiceCatalogue(ctx, { organizationId: a.membership.organizationId, canRequest: can(a.membership.role, "website.request"), flash: f.requested ? "requested" : f.requestDup ? "dup" : "", mediaBase: `/portal/o/${a.membership.slug}/website/services/media`, formAction: `/portal/o/${a.membership.slug}/website/services/request` });
 }
 
 async function postServiceRequest(ctx, a) {
@@ -504,7 +520,7 @@ const WEBSITE_ROUTES = [
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website$/, action: "website.view", run: async (ctx, a) => {
       const sites = await listClientWebsites(ctx.db, a.membership.organizationId);
       const single = sites.length === 1 ? sites[0] : null;
-      return pages.websitePage(ctx, a, { sites, preview: single ? await previewOf(ctx, single, a) : null, management: single ? await websiteManagement(ctx, a, single) : (sites.length ? await websiteListManagement(ctx, a) : null), services: await websiteServices(ctx, a) });
+      return pages.websitePage(ctx, a, { sites, preview: single ? await previewOf(ctx, single, a) : null, management: single ? await websiteManagement(ctx, a, single) : (sites.length ? await websiteListManagement(ctx, a) : null), services: await websiteServices(ctx, a), ...(single ? await siteExtras(ctx, a, single) : {}) });
     } },
   // Requests about a website (Request a change, Get support): the existing support workflow and permissions (support.view / support.submit), independent of PORTAL_SERVICES.
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/requests$/, action: "support.view", run: async (ctx, a) => pages.websiteRequestsPage(ctx, a, await supportRepo.listWebsiteRequests(ctx.db, a.membership.organizationId)) },
@@ -518,6 +534,12 @@ const WEBSITE_ROUTES = [
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/requests\/([^/]+)\/reply$/, action: "support.view", postAction: "support.submit", bucket: "support", maxBody: () => SUPPORT_BODY,
     run: async (ctx, a, id) => redirect(`/portal/o/${a.membership.slug}/website/requests/${id}`), post: (ctx, a, id) => postWebsiteReply(ctx, a, id) },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/requests\/([^/]+)$/, action: "support.view", run: (ctx, a, id) => showWebsiteThread(ctx, a, id) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/services\/media\/([^/]+)$/, action: "website.view", run: async (ctx, a, id) => {
+      if (!UUID.test(id)) return notFoundPage(ctx);
+      if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
+      const res = await mediaResponse(brandDeps(ctx), { id, clientOnly: true }); // only the picture of a service that is shown; the catalogue is global, so any signed-in member of an organization may see it
+      return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
+    } },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/services\/request$/, action: "website.view", postAction: "website.request", bucket: "support", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/website`), post: (ctx, a) => postServiceRequest(ctx, a) },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/requests\/new$/, action: "support.submit", run: async (ctx, a, id) => {
       if (!UUID.test(id)) return notFoundPage(ctx);
@@ -540,13 +562,25 @@ const WEBSITE_ROUTES = [
       return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
     },
   },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/seo$/, action: "website.view", run: async (ctx, a, id) => {
+      if (!UUID.test(id)) return notFoundPage(ctx);
+      const site = await getClientWebsite(ctx.db, a.membership.organizationId, id);
+      const seo = site ? await getSeoForClient(ctx.db, a.membership.organizationId, id) : null; // nothing published (or another organization's website) is simply "not found"
+      return site && seo ? pages.websiteSeoPage(ctx, a, site, seo) : notFoundPage(ctx);
+    } },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)$/, action: "website.view", run: async (ctx, a, id) => {
       if (!UUID.test(id)) return notFoundPage(ctx);
       const one = await getClientWebsite(ctx.db, a.membership.organizationId, id); // another organization's, unpublished and archived websites are all "not found"
-      return one ? pages.websitePage(ctx, a, { one, preview: await previewOf(ctx, one, a), management: await websiteManagement(ctx, a, one), services: await websiteServices(ctx, a) }) : notFoundPage(ctx);
+      return one ? pages.websitePage(ctx, a, { one, preview: await previewOf(ctx, one, a), management: await websiteManagement(ctx, a, one), services: await websiteServices(ctx, a), ...(await siteExtras(ctx, a, one)) }) : notFoundPage(ctx);
     },
   },
 ];
+
+/** What one website's page adds to its basics: its real milestones (for the progress bar) and its published SEO information. Both are scoped to the member's own organization. */
+async function siteExtras(ctx, a, site) {
+  const org = a.membership.organizationId;
+  return { milestones: await listClientMilestones(ctx.db, org, site.id), seo: await getSeoForClient(ctx.db, org, site.id) };
+}
 
 /** On the list of several websites: only the link to the website requests (each website's own page has its management actions). */
 async function websiteListManagement(ctx, a) {
@@ -662,7 +696,7 @@ const ORG_ROUTES = [
       if (servicesOn(ctx)) await dispatchNotifications(ctx.env, ctx); // a client visit is also a chance to retry any email that did not go out (see service-notifications.js)
       const answers = await readAnswers(ctx, a);
       const shown = { ...withDisplayName(a, answers), returning: await returningVisitor(ctx, a) };
-      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }), await brandCard(ctx, a), await servicesAttention(ctx, a));
+      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }), await brandCard(ctx, a), await servicesAttention(ctx, a), await websiteCard(ctx, a));
     },
   },
   { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, { ...a, returning: await returningVisitor(ctx, a) }, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },

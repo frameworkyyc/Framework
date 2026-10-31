@@ -12,6 +12,7 @@
  */
 import { newId, isoTime, requireOrgId, requireId, ok, fail, isConstraintViolation, validActor } from "./common.js";
 import { validateEnum, validateName, validateText } from "./validate.js";
+import { validPairing, PHASES } from "../website-stage.js";
 
 export const ORIGINS = ["framework", "client"];
 export const STATUSES = ["existing", "in_development", "live"];
@@ -74,6 +75,7 @@ function check(input, { partial }) {
 }
 
 const toWebsite = (r) => ({
+  phase: r.phase ?? null,
   id: r.id, name: r.name, url: r.url, origin: r.origin, status: r.status, managedByFramework: r.managed_by_framework === 1, launchDate: r.launch_date,
   domain: { registrar: r.domain_registrar, owner: r.domain_owner, renewal: r.domain_renewal }, hosting: { provider: r.hosting_provider, owner: r.hosting_owner, renewal: r.hosting_renewal },
   managementNotes: r.management_notes, published: r.published === 1, sortOrder: r.sort_order,
@@ -208,4 +210,32 @@ export async function websiteSummary(db, organizationId) {
     const r = await db.prepare("SELECT count(*) AS total, COALESCE(sum(status = 'live'), 0) AS live, COALESCE(sum(status = 'in_development'), 0) AS building, COALESCE(sum(status = 'existing'), 0) AS existing, COALESCE(sum(managed_by_framework = 1), 0) AS managed FROM websites WHERE organization_id = ? AND archived_at IS NULL").bind(organizationId).first();
     return { total: r.total, live: r.live, inDevelopment: r.building, existing: r.existing, managed: r.managed };
   } catch { return null; }
+}
+
+/**
+ * Set (or clear, with null) the phase of a website (migration 0015): Awaiting client feedback / Awaiting approval for one in development, Maintenance for a live one. Only a pairing
+ * that makes sense is stored (website-stage.js). `onlyIfInvalid` is for a status change: keep the phase if it still fits the new status, otherwise clear it. Without the column this answers
+ * "phase_unavailable" and changes nothing.
+ */
+export async function setWebsitePhase(db, organizationId, websiteId, phase, actor, { now = new Date(), onlyIfInvalid = false } = {}) {
+  requireOrgId(organizationId); requireId(websiteId, "website_id");
+  if (!validActor(actor)) return fail("invalid_actor");
+  if (phase !== null && !PHASES.includes(phase)) return fail("invalid_phase");
+  try {
+    const cur = await db.prepare("SELECT status, phase FROM websites WHERE id = ? AND organization_id = ? AND archived_at IS NULL").bind(websiteId, organizationId).first();
+    if (!cur) return fail("not_found");
+    let next = phase;
+    if (onlyIfInvalid) next = validPairing(cur.status, cur.phase) ? cur.phase : null;
+    else if (!validPairing(cur.status, next)) return fail("invalid_phase");
+    if ((cur.phase ?? null) === (next ?? null)) return ok({ unchanged: true });
+    const at = isoTime(now);
+    await db.batch([
+      db.prepare("UPDATE websites SET phase = ?, updated_at = ?, updated_by = ? WHERE id = ? AND organization_id = ? AND archived_at IS NULL").bind(next, at, actor.trim(), websiteId, organizationId),
+      audit(db, organizationId, actor, "website.phase", websiteId, at, { phase: next }),
+    ]);
+    return ok({ phase: next });
+  } catch (err) {
+    if (/no such column/i.test(String(err && err.message))) return fail("phase_unavailable");
+    throw err;
+  }
 }
