@@ -1,5 +1,5 @@
 -- Additional Services, per client: a client's own order and Recommended flag; and the fifth service, Nexus Fleet Tracker, with a category.
--- APPLIED TO STAGING (verified: schema and seed row as below, existing data unchanged). Not applied to Production, and not yet moved to migrations/portal (waits for 0015, which comes first in the Production order). Production only by the manual Production workflow, after approval.
+-- Applied to Staging. Production only by the manual Production workflow, after its own approval.
 -- Needs 0012 (portal_services) and 0016 (the sales-content columns and client_service_state). Additive only: one nullable column, one new table, one seed row. Nothing that exists is
 -- changed or removed (no UPDATE, no DELETE, no table rebuild).
 --
