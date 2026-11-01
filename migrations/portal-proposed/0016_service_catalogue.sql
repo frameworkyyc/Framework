@@ -1,5 +1,5 @@
 -- The Additional Services catalogue as a sales experience: richer content per service, images, and what a client already has.
--- PROPOSED, NOT APPLIED anywhere. Staging first, after approval; Production follows the manual Production workflow after its own approval. Needs 0012 (portal_services).
+-- APPLIED TO STAGING (verified: schema as below, existing data unchanged). Not applied to Production, and not yet moved to migrations/portal: that waits until 0015 (which comes first in the Production order) is resolved. Production only by the manual Production workflow, after approval. Needs 0012 (portal_services).
 -- Additive only: new nullable columns on portal_services, two new tables. Nothing that exists is changed or removed (no UPDATE, no DELETE). The four service keys stay fixed.
 --
 --   portal_services new columns   tagline (the one-line promise), problem (the problem it solves), why (why a client might need it), benefits_json (a JSON list of up to 5 short benefits),
