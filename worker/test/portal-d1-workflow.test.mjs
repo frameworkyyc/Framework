@@ -89,7 +89,7 @@ test("order: config check, remote id check, pending list, table list, then apply
   assert.deepEqual([...order].sort((a, b) => a - b), order);
 });
 test("this is the only extra workflow, and the existing CI workflow is untouched in spirit (no Cloudflare, no secrets)", () => {
-  assert.deepEqual(readdirSync(new URL(".github/workflows/", root)).sort(), ["ci.yml", "portal-production-d1-migration.yml"]);
+  assert.deepEqual(readdirSync(new URL(".github/workflows/", root)).sort(), ["ci.yml", "portal-production-d1-migration.yml", "staging-data-sync.yml"]);
   const ci = readFileSync(new URL(".github/workflows/ci.yml", root), "utf8");
   assert.ok(!/secrets\.|CLOUDFLARE|wrangler|migrat/i.test(ci.replace(/^\s*#.*$/gm, "")));
 });
