@@ -340,6 +340,7 @@ test("the workflow: manual only, Staging ref, protected environment, verify-only
   assert.ok(!/upload-artifact/.test(y), "client data is never uploaded to GitHub");
   assert.match(y, /time-travel/); assert.match(y, /d1 export/);
   assert.ok(y.indexOf("time-travel") < y.indexOf("cli.mjs apply"), "the bookmark and backup come before the apply");
+  assert.ok(!/\$\{\{\s*runner\./.test(y.split("\njobs:")[0]), "the runner context is not available in workflow-level env (GitHub rejects the file)");
   assert.match(y, /staging-health/);
   const cfg = readFileSync(new URL("../../scripts/ops/staging-sync/wrangler.staging.jsonc", import.meta.url), "utf8");
   assert.ok(cfg.includes(TARGET.id) && !cfg.includes(SOURCE.id), "the export/bookmark config names only the Staging database");

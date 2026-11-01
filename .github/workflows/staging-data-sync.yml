@@ -49,7 +49,6 @@ env:
   WRANGLER_VERSION: "4.147.0"
   WRANGLER_SEND_METRICS: "false"
   WRANGLER_CONFIG: scripts/ops/staging-sync/wrangler.staging.jsonc
-  OUT: ${{ runner.temp }}/sync-out
 
 jobs:
   refresh:
@@ -75,6 +74,7 @@ jobs:
             if [ -n "$v" ] && ! printf '%s' "$v" | grep -Eq '^[a-z_]+:[A-Za-z0-9|_.-]+(,[a-z_]+:[A-Za-z0-9|_.-]+)*$'; then echo "FAIL: approval lists must look like table:key,table:key."; exit 1; fi
           done
           echo "mode: $MODE"
+          echo "OUT=$RUNNER_TEMP/sync-out" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
