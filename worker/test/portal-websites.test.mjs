@@ -27,7 +27,7 @@ const MIGRATION = read("migrations/portal/0011_websites.sql");
 
 async function setup({ migrated = true, storage = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld({ skip: migrated ? [] : ["0011_websites.sql", "0012_website_management.sql"] }); // every test world starts fully migrated; "unmigrated" is a database as it was before 0011
+  const w = await makeWorld({ skip: migrated ? [] : ["0011_websites.sql", "0012_website_management.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql"] }); // every test world starts fully migrated; "unmigrated" is a database as it was before 0011
   const bucket = fakeR2();
   Object.assign(w.env, { PORTAL_BRANDING: "1", PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   if (storage) w.env.PORTAL_FILES = bucket;

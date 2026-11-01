@@ -1,5 +1,5 @@
 -- Website progress and status, and the SEO & Search Visibility subsection of Website.
--- PROPOSED, NOT APPLIED anywhere. Staging first, after approval; Production follows the manual Production workflow after its own approval.
+-- Applied to Staging. Production only by the manual Production workflow, after its own approval.
 -- Additive only: one nullable column on websites and four new tables. Nothing that exists is changed or removed (no UPDATE, no DELETE, no table rebuild).
 --
 --   websites.phase        Refines the existing `status` WITHOUT changing it: for an in_development website NULL means "In development", 'awaiting_feedback' means Awaiting Client Feedback and

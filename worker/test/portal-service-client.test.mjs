@@ -24,7 +24,7 @@ const UUID0 = "00000000-0000-4000-8000-000000000000";
 
 async function setup({ migrated = true, branding = false, m17 = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld(migrated && !m17 ? { proposed: ["0015_website_status_seo.sql", "0016_service_catalogue.sql"] } : migrated ? { proposed: ["0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql"] } : {});
+  const w = await makeWorld(!migrated ? { skip: ["0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql"] } : !m17 ? { skip: ["0017_service_client_settings.sql"] } : {});
   const bucket = fakeR2();
   Object.assign(w.env, { PORTAL_FILES: bucket, PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   w.env.PORTAL_WEBSITE = "1"; if (branding) w.env.PORTAL_BRANDING = "1";
@@ -73,7 +73,7 @@ const GLOBAL = ["Client Admin Portal", "Invoice Sender", "Digital Business Cards
 /* ------------------------------------------------------------------ Nexus Fleet Tracker */
 
 test("migration 0017: one nullable column, one table and one seed row; the seed is exactly what was supplied and nothing more", () => {
-  const sqlText = read("migrations/portal-proposed/0017_service_client_settings.sql").replace(/--.*$/gm, "");
+  const sqlText = read("migrations/portal/0017_service_client_settings.sql").replace(/--.*$/gm, "");
   assert.deepEqual([...sqlText.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]), ["client_service_settings"]);
   assert.deepEqual([...sqlText.matchAll(/ALTER TABLE (\w+) ADD COLUMN (\w+)/g)].map((m) => [m[1], m[2]]), [["portal_services", "category"]]);
   assert.ok(!/\b(DROP|UPDATE)\b|\bDELETE\s+FROM\b/i.test(sqlText), "nothing that exists is changed or removed");

@@ -25,7 +25,7 @@ const UUID0 = "00000000-0000-4000-8000-000000000000";
 
 async function setup({ migrated = true, branding = false } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld(migrated ? { proposed: ["0015_website_status_seo.sql", "0016_service_catalogue.sql"] } : {});
+  const w = await makeWorld(migrated ? {} : { skip: ["0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql"] });
   const bucket = fakeR2();
   Object.assign(w.env, { PORTAL_FILES: bucket, PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   w.env.PORTAL_WEBSITE = "1"; if (branding) w.env.PORTAL_BRANDING = "1";
@@ -256,8 +256,8 @@ test("Additional Services: expandable benefit-led cards explain the problem, the
   const s = await setup();
   await s.site(s.A, { name: "Main", url: "https://alpha.example.ca", status: "live" });
   const sec = await svcSec(s.ann);
-  assert.equal((sec.match(/<details class="svc-card/g) || []).length, 4);
-  for (const x of ["The problem", "What you get", "Why you might need it"]) assert.equal((sec.match(new RegExp(x, "g")) || []).length, 4, x);
+  assert.equal((sec.match(/<details class="svc-card/g) || []).length, 5);
+  for (const [x, n] of [["The problem", 4], ["What you get", 5], ["Why you might need it", 4]]) assert.equal((sec.match(new RegExp(x, "g")) || []).length, n, x + " (Nexus has no problem or why text, so none is invented)");
   assert.match(sec, /Send them straight to your customers/); assert.doesNotMatch(sec, /guarantee|guaranteed|#1|number one|best in|instantly|10x|\d+% (more|increase)/i, "no exaggerated or unsupported claims");
   assert.equal((sec.match(/<details class="svc-card[^>]*open/g) || []).length, 1, "one card starts open (the suggested one); the rest are one tidy line");
   assert.match(sec, /Suggested for you<\/span><span class="svc-reason[^>]*>Your website is live/);
@@ -313,14 +313,14 @@ test("services the client already has are not promoted: marked by Admin, or Fram
   const s = await setup();
   const id = await s.site(s.A, { name: "Main", url: "https://alpha.example.ca", status: "live" });
   const names = async (b, slug) => [...(await svcSec(b, slug)).matchAll(/class="svc-card__title">([^<]+)</g)].map((m) => m[1].replace(/&amp;/g, "&"));
-  assert.equal((await names(s.ann, "alpha")).length, 4);
+  assert.equal((await names(s.ann, "alpha")).length, 5);
   const st = (org, key, state, note) => s.call(`/clients/${org.id}/additional-services`, { method: "POST", json: { key, state, note } });
   assert.equal((await st(s.A, "invoice-sender", "owned", "Uses our invoicing already")).status, 200);
-  assert.ok(!(await names(s.ann, "alpha")).includes("Invoice Sender")); assert.equal((await names(s.bob, "beta")).length, 4, "other clients are unaffected");
+  assert.ok(!(await names(s.ann, "alpha")).includes("Invoice Sender")); assert.equal((await names(s.bob, "beta")).length, 5, "other clients are unaffected");
   assert.equal((await st(s.A, "digital-business-cards", "hidden")).status, 200);
-  assert.deepEqual((await names(s.ann, "alpha")).sort(), ["Client Admin Portal", "SEO & Visibility"]);
+  assert.deepEqual((await names(s.ann, "alpha")).sort(), ["Client Admin Portal", "Nexus Fleet Tracker", "SEO & Visibility"]);
   const listed = (await s.call(`/clients/${s.A.id}/additional-services`)).json.services;
-  assert.deepEqual(listed.map((x) => [x.key, x.state]), [["client-admin-portal", null], ["invoice-sender", "owned"], ["digital-business-cards", "hidden"], ["seo-visibility", null]]);
+  assert.deepEqual(listed.map((x) => [x.key, x.state]), [["client-admin-portal", null], ["invoice-sender", "owned"], ["digital-business-cards", "hidden"], ["seo-visibility", null], ["nexus-fleet-tracker", null]]);
   assert.equal((await st(s.A, "invoice-sender", "automatic")).status, 200); assert.ok((await names(s.ann, "alpha")).includes("Invoice Sender"));
   assert.equal(rowsOf(s.w, "SELECT COUNT(*) n FROM client_service_state WHERE organization_id = ?", s.A.id)[0].n, 1, "automatic is no row");
   // Framework is already doing SEO for this client
@@ -351,7 +351,7 @@ test("the catalogue is a reusable component: one loader and one renderer, so ano
   const s = await setup();
   const { loadServiceCatalogue, serviceCatalogue } = await import("../portal/service-catalogue.js");
   const cat = await loadServiceCatalogue({ db: s.w.db }, { organizationId: s.A.id, canRequest: true, csrf: "tok", mediaBase: "/portal/o/alpha/elsewhere/media", formAction: "/portal/o/alpha/elsewhere/request" });
-  assert.equal(cat.items.length, 4);
+  assert.equal(cat.items.length, 5);
   const out = serviceCatalogue({ base: "/portal/o/alpha" }, cat);
   assert.match(out, /action="\/portal\/o\/alpha\/elsewhere\/request"/); assert.match(out, /name="csrf" value="tok"/);
   assert.equal(serviceCatalogue({}, null), "");
