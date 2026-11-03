@@ -41,14 +41,12 @@ function cardVisual(q, o, imageUrl) {
 }
 
 function card(q, o, picks, imageUrl) {
-  const like = picks && picks.like.includes(o.key), no = picks && picks.dislike.includes(o.key);
+  const like = picks && picks.like.includes(o.key);
   const id = `${idPart(q.key)}-${idPart(o.key)}`;
   const showLabel = q.visual !== "word";
   return `<div class="dc dc--${e(q.visual)}">
 <input class="dc__in dc__in--like" type="checkbox" id="l-${id}" name="l:${e(q.key)}:${e(o.key)}" value="1"${like ? " checked" : ""}>
-<input class="dc__in dc__in--no" type="checkbox" id="d-${id}" name="d:${e(q.key)}:${e(o.key)}" value="1"${no ? " checked" : ""}>
 <label class="dc__main" for="l-${id}"><span class="dc__vis">${cardVisual(q, o, imageUrl)}</span>${showLabel ? `<span class="dc__name">${e(o.label)}</span>` : ""}${o.note && q.visual !== "tagline" ? `<span class="dc__note">${e(o.note)}</span>` : ""}<span class="dc__tick" aria-hidden="true"></span></label>
-<label class="dc__no" for="d-${id}" title="Not for me"><span class="dc__no-text">Not for me: ${e(o.label)}</span></label>
 </div>`;
 }
 
@@ -59,7 +57,7 @@ function question(q, answer, imageUrl) {
   const id = idPart(q.key);
   const pill = (value, label) => `<label class="dq__pill"><input type="radio" name="m:${e(q.key)}" value="${value}"${mode === value ? " checked" : ""}><span>${e(label)}</span></label>`;
   return `<section class="dq" aria-labelledby="q-${id}">
-<header class="dq__head"><span class="eyebrow">${e(sec.number)} · ${e(sec.label)}</span><h2 class="dq__title" id="q-${id}">${e(q.prompt)}</h2>${q.help ? `<p class="dq__help">${e(q.help)}</p>` : ""}<p class="dq__hint">Tap a card to choose it. Tap the ✕ on a card that isn’t for you.</p></header>
+<header class="dq__head"><span class="eyebrow">${e(sec.number)} · ${e(sec.label)}</span><h2 class="dq__title" id="q-${id}">${e(q.prompt)}</h2>${q.help ? `<p class="dq__help">${e(q.help)}</p>` : ""}<p class="dq__hint">Tap a card to choose it. Tap it again to unchoose it.</p></header>
 <div class="dq__grid dq__grid--${e(q.visual)}">${q.options.map((o) => card(q, o, picks, imageUrl)).join("")}</div>
 <div class="dq__mode" role="radiogroup" aria-label="Or">${pill("picks", "Choose from these")}${pill("not_sure", MODE_LABEL.not_sure)}${pill("surprise", MODE_LABEL.surprise)}</div>
 <div class="dq__comment"><label for="c-${id}">Anything to add? <span class="muted">Optional</span></label><textarea id="c-${id}" name="c:${e(q.key)}" rows="2" maxlength="${MAX_COMMENT}" placeholder="Tell us more, in your own words">${e(answer ? answer.comment : "")}</textarea></div>

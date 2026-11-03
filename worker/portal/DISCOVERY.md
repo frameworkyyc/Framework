@@ -19,7 +19,7 @@ Six steps (about 10 to 15 minutes), saved as they go, back and forward at any ti
 | 5 Imagery, textures & icons | 05 Brand Imagery, 07 Textures, 08 Iconography |
 | 6 Layout & final review | 06 Layout System, a review of every choice, inspiration files, send |
 
-Large selectable cards (SVG sketches of logo forms, design directions, textures, icon styles and layouts; palette strips; type specimens; sample taglines), multiple choice, **Not for me** (✕ on a card), **I'm not sure**, **Surprise me** (keeps only the dislikes), an optional comment on every question, and up to ten inspiration files (PNG, JPG, WebP, PDF).
+Large selectable cards (SVG sketches of logo forms, design directions, textures, icon styles and layouts; palette strips; type specimens; sample taglines), multiple choice (a tick shows on a chosen card; tap it again to unchoose; no icon on unchosen cards), **I'm not sure**, **Surprise me**. The page no longer offers a "Not for me" control; the server still reads `d:` fields and the brief still shows dislikes saved earlier, an optional comment on every question, and up to ten inspiration files (PNG, JPG, WebP, PDF).
 
 ## Ways in
 
