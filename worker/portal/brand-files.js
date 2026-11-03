@@ -21,6 +21,7 @@ import { getOrganizationById } from "./repo/orgs.js";
 import { listInvoiceStorageKeys } from "./repo/invoices.js";
 import { listSupportStorageKeys } from "./repo/support.js";
 import { listWebsiteStorageKeys } from "./repo/websites.js";
+import { listLiveStorageKeys as listDiscoveryStorageKeys } from "./repo/discovery.js";
 import { listPackageStorageKeys } from "./repo/website-packages.js";
 import { buildBrandFileName } from "../../admin/assets/brand-names.js";
 import { SECTION_FILE_KEYS, sectionOf, sectionVariantKey } from "../../admin/assets/brand-sections.js";
@@ -254,7 +255,7 @@ export async function deleteOrganizationFiles(deps, { organizationId, actor }) {
     for await (const key of listOrganizationKeys(deps.bucket, organizationId)) keys.push(key); // everything under this organization's prefix, including orphans
     for (const key of keys) {
       const parsed = parseKey(key);
-      if (!parsed || parsed.area === "invoices" || parsed.area === "support" || parsed.area === "websites") continue; // invoices, support records and website records are kept for their retention periods: never swept up here (CLIENT-SERVICES.md)
+      if (!parsed || parsed.area === "invoices" || parsed.area === "support" || parsed.area === "websites" || parsed.area === "discovery") continue; // invoices, support records and website records are kept for their retention periods: never swept up here (CLIENT-SERVICES.md)
       try { await deleteObject(deps.bucket, { key, organizationId }); removed++; } catch { failed++; }
     }
   } catch (err) { return storageFail(err); }
@@ -264,7 +265,7 @@ export async function deleteOrganizationFiles(deps, { organizationId, actor }) {
 
 /** Read-only: stored objects of this organization that no live row refers to (left behind by an interrupted write). */
 export async function findOrphanObjects(deps, { organizationId }) {
-  const live = new Set([...(await brand.listLiveStorageKeys(deps.db, organizationId)), ...(await listInvoiceStorageKeys(deps.db, organizationId)), ...(await listSupportStorageKeys(deps.db, organizationId)), ...(await listWebsiteStorageKeys(deps.db, organizationId)), ...(await listPackageStorageKeys(deps.db, organizationId))]);
+  const live = new Set([...(await brand.listLiveStorageKeys(deps.db, organizationId)), ...(await listInvoiceStorageKeys(deps.db, organizationId)), ...(await listSupportStorageKeys(deps.db, organizationId)), ...(await listWebsiteStorageKeys(deps.db, organizationId)), ...(await listPackageStorageKeys(deps.db, organizationId)), ...(await listDiscoveryStorageKeys(deps.db, organizationId))]);
   const orphans = [];
   for await (const key of listOrganizationKeys(deps.bucket, organizationId)) if (!live.has(key)) orphans.push(key);
   return orphans;

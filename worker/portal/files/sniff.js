@@ -123,6 +123,8 @@ export const PROFILES = Object.freeze({
   support: Object.freeze(["png", "jpg", "webp", "pdf", "txt", "docx", "xlsx", "pptx", "zip"]),
   // A website's screenshot (Admin only): a picture a browser shows, nothing else.
   website_image: Object.freeze(["png", "jpg", "webp"]),
+  // Inspiration files a Discovery recipient adds: pictures and PDFs only (no vector, font, archive or office files).
+  discovery_inspiration: Object.freeze(["png", "jpg", "webp", "pdf"]),
   website_package: Object.freeze(["zip"]),
   brand_admin: Object.freeze(["png", "jpg", "webp", "svg", "pdf", "ai", "eps", "ttf", "otf", "woff", "woff2", "txt", "docx", "xlsx", "pptx", "zip"]),
 });

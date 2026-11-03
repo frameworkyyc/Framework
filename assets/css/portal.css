@@ -1030,3 +1030,8 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .svc-tag--recommended { border-bottom: 2px solid var(--ink); padding-bottom: 1px; }
 .svc-cat { margin: 0; }
 .svc-card__lead { font-size: 17px; color: var(--ink); }
+
+/* Branding: the Brand Discovery card (shown only while Framework has assigned an assessment). */
+.bk-discovery { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin: var(--space-3) 0; padding: var(--space-3); border: 1px solid var(--ink); }
+.bk-discovery .h3 { margin: 0 0 4px; }
+.bk-discovery p { margin: 0; max-width: 38em; }
