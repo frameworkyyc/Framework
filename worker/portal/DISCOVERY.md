@@ -57,3 +57,9 @@ Answers are stored in their own tables. Nothing here reads or writes `brand_kits
 ## Adding another type (for example Website Discovery)
 
 Add an entry to `KINDS` in `discovery/catalogue.js` (stages, questions, options with `tags`) and, if it needs new picture types, a generator in `discovery/visuals.js`; add its section labels and a brief rule set if the nine Branding sections do not fit. No migration, route or Admin change is needed for new content; allow the new kind in `KINDS` only when it is ready.
+
+## Keeping the content inclusive and compatible
+
+- **Any industry.** Questions, descriptions and sample taglines are written for contractors, retail, hospitality, beauty, creative and wellness businesses alike. Creative and holistic directions (holistic, mystical, ethereal, romantic, feminine, bohemian, ornamental) sit beside the modern, minimalist, industrial and corporate ones; nothing in the assessment assumes a trade. A test fails if trade-specific wording returns.
+- **Never rename or remove a key.** Saved answers store option keys. `worker/test/fixtures-discovery-legacy-keys.json` lists every question and option key as first released; a test fails if any disappears, and if new options are inserted before existing ones (Admin ordering is stored by position). Add new options at the end of a question.
+- **Fonts are the viewer's own.** Type specimens use fonts installed on the device (Apple, Windows and Android each ship real script and handwriting faces), so they can look slightly different between devices. An Admin can attach a real specimen picture to any option.

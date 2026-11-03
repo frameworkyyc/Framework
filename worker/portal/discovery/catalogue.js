@@ -18,11 +18,14 @@ export const TENSIONS = Object.freeze([
   ["modern", "traditional", "modern vs traditional"],
   ["organic", "technical", "organic vs technical"],
   ["luxury", "approachable", "luxury vs approachable"],
+  ["mystical", "technical", "mystical vs technical"],
+  ["ethereal", "bold", "ethereal vs bold"],
 ]);
 
 export const TAG_LABEL = Object.freeze({
   minimal: "Minimal", ornate: "Ornate", playful: "Playful", serious: "Serious", bold: "Bold", quiet: "Quiet", modern: "Modern", traditional: "Traditional",
   organic: "Organic", technical: "Technical", luxury: "Luxury", approachable: "Approachable", warm: "Warm", cool: "Cool",
+  holistic: "Holistic", mystical: "Mystical", ethereal: "Ethereal", romantic: "Romantic", feminine: "Feminine", bohemian: "Bohemian",
 });
 
 const o = (key, label, tags = [], extra = {}) => Object.freeze({ key, label, tags: Object.freeze(tags), ...extra });
@@ -44,7 +47,7 @@ export const SECTION_ORDER = Object.freeze(["logo", "typography", "colours", "ta
 
 const BRAND_STAGES = Object.freeze([
   Object.freeze({ n: 1, title: "Personality & style", blurb: "How should your brand feel? Pick the words and styles that sound like you.", sections: ["style"] }),
-  Object.freeze({ n: 2, title: "Logo", blurb: "Logos come in different forms. Choose the ones you would be proud to see on your van, sign or website.", sections: ["logo"] }),
+  Object.freeze({ n: 2, title: "Logo", blurb: "Logos come in many forms. Choose the ones you would be proud to see on your signage, packaging, products or website.", sections: ["logo"] }),
   Object.freeze({ n: 3, title: "Typography & tagline", blurb: "The shape of your letters and the way you speak both carry your personality.", sections: ["typography", "tagline"] }),
   Object.freeze({ n: 4, title: "Brand colours", blurb: "Colour sets the mood before anyone reads a word.", sections: ["colours"] }),
   Object.freeze({ n: 5, title: "Imagery, textures & icons", blurb: "The pictures, surfaces and little symbols that finish the look.", sections: ["imagery", "textures", "iconography"] }),
@@ -60,6 +63,8 @@ const BRAND_QUESTIONS = Object.freeze([
       o("bold", "Bold", ["bold"]), o("playful", "Playful", ["playful", "approachable"]), o("industrial", "Industrial", ["technical", "bold"]), o("organic", "Organic", ["organic", "approachable"]),
       o("friendly", "Friendly", ["approachable", "warm"]), o("authoritative", "Authoritative", ["serious"]), o("refined", "Refined", ["quiet", "luxury"]), o("rugged", "Rugged", ["bold", "technical"]),
       o("warm", "Warm", ["warm", "approachable"]), o("technical", "Technical", ["technical", "serious", "cool"]), o("elegant", "Elegant", ["luxury", "quiet"]), o("energetic", "Energetic", ["bold", "playful"]),
+      o("calm", "Calm", ["quiet", "approachable"]), o("holistic", "Holistic", ["holistic", "organic", "approachable"]), o("mystical", "Mystical", ["mystical", "ornate"]), o("ethereal", "Ethereal", ["ethereal", "quiet"]),
+      o("romantic", "Romantic", ["romantic", "warm"]), o("feminine", "Feminine", ["feminine", "approachable"]), o("bohemian", "Bohemian", ["bohemian", "organic", "warm"]), o("ornamental", "Ornamental", ["ornate", "luxury"]),
     ]),
   }),
   Object.freeze({
@@ -69,8 +74,12 @@ const BRAND_QUESTIONS = Object.freeze([
       o("modern", "Modern", ["modern"], { note: "Clean shapes, confident type" }), o("minimalist", "Minimalist", ["minimal", "quiet"], { note: "Space, restraint, very little decoration" }),
       o("luxury", "Luxury", ["luxury", "ornate"], { note: "Dark, rich, finely detailed" }), o("traditional", "Traditional", ["traditional", "serious"], { note: "Classic, centred, trustworthy" }),
       o("bold", "Bold", ["bold"], { note: "Big type, strong blocks" }), o("playful", "Playful", ["playful", "approachable"], { note: "Rounded, bright, friendly" }),
-      o("industrial", "Industrial", ["technical", "bold"], { note: "Grids, stripes, working-site feel" }), o("organic", "Organic", ["organic", "approachable"], { note: "Soft curves, natural shapes" }),
+      o("industrial", "Industrial", ["technical", "bold"], { note: "Grids, stripes, raw materials" }), o("organic", "Organic", ["organic", "approachable"], { note: "Soft curves, natural shapes" }),
       o("retro", "Retro", ["traditional", "playful"], { note: "Warm, nostalgic, sunburst energy" }), o("editorial", "Editorial", ["modern", "quiet"], { note: "Magazine columns, big headlines" }),
+      o("holistic", "Holistic", ["holistic", "organic", "approachable"], { note: "Gentle, grounded, balanced" }), o("mystical", "Mystical", ["mystical", "ornate"], { note: "Moon, stars, a sense of ritual" }),
+      o("ethereal", "Ethereal", ["ethereal", "quiet"], { note: "Soft, airy, luminous" }), o("romantic", "Romantic", ["romantic", "ornate", "warm"], { note: "Petals, curves, tenderness" }),
+      o("feminine", "Feminine", ["feminine", "approachable"], { note: "Graceful, soft, elegant" }), o("bohemian", "Bohemian", ["bohemian", "organic", "warm"], { note: "Free-spirited, layered, handmade" }),
+      o("ornamental", "Ornamental", ["ornate", "luxury"], { note: "Frames, flourishes, fine detail" }),
     ]),
   }),
   Object.freeze({
@@ -78,10 +87,13 @@ const BRAND_QUESTIONS = Object.freeze([
     prompt: "Which kinds of logo do you like?", help: "“Your Brand” stands in for your name. Look at the form, not the details.",
     options: Object.freeze([
       o("wordmark", "Wordmark", ["minimal", "modern"], { note: "Your name, set in type" }), o("lettermark", "Monogram", ["minimal", "modern"], { note: "Initials in a compact mark" }),
-      o("emblem", "Emblem / badge", ["traditional", "ornate"], { note: "Name inside a seal or badge" }), o("crest", "Heritage crest", ["traditional", "ornate", "luxury"], { note: "Shield, laurel, a sense of history" }),
+      o("emblem", "Emblem / badge", ["traditional", "ornate"], { note: "Name inside a seal or badge" }), o("crest", "Heritage crest", ["traditional", "ornate", "luxury"], { note: "Shield, ribbon, a sense of history" }),
       o("pictorial", "Illustrated mark", ["approachable", "organic"], { note: "A picture that stands for the business" }), o("abstract", "Abstract mark", ["modern", "technical"], { note: "Geometric shapes with no literal meaning" }),
       o("combination", "Symbol + wordmark", ["modern"], { note: "A symbol next to the name" }), o("mascot", "Mascot", ["playful", "approachable"], { note: "A character people remember" }),
       o("script", "Signature / script", ["luxury", "warm", "ornate"], { note: "Handwritten, personal" }),
+      o("celestial", "Celestial", ["mystical", "ornate"], { note: "Moon, stars and sky" }), o("botanical", "Botanical", ["organic", "romantic"], { note: "Leaves, flowers and sprigs" }),
+      o("ornamental", "Ornamental illustration", ["ornate", "luxury"], { note: "Decorative frames and flourishes" }), o("spiritual", "Spiritual motif", ["holistic", "quiet"], { note: "Lotus, sacred geometry, symbols with meaning" }),
+      o("expressive", "Expressive emblem", ["mystical", "ornate", "warm"], { note: "A richly illustrated seal or badge" }),
     ]),
   }),
   Object.freeze({
@@ -93,6 +105,9 @@ const BRAND_QUESTIONS = Object.freeze([
       o("slab", "Slab serif", ["bold", "traditional"], { note: "Sturdy, practical" }), o("script", "Script", ["luxury", "ornate", "warm"], { note: "Personal, flowing" }),
       o("display", "Display", ["bold", "playful"], { note: "Big personality, headlines only" }), o("mono", "Monospace", ["technical"], { note: "Technical, precise" }),
       o("condensed", "Condensed", ["bold", "technical"], { note: "Tall, tough, compact" }),
+      o("elegant-italic", "Elegant italic", ["romantic", "luxury", "ornate"], { note: "Graceful, flowing, refined" }), o("calligraphic", "Calligraphy", ["ornate", "luxury", "romantic"], { note: "Formal, handwritten, ceremonial" }),
+      o("handwritten", "Handwritten", ["warm", "approachable", "organic"], { note: "Casual, personal, artisan" }), o("deco", "Art deco", ["luxury", "ornate", "modern"], { note: "Glamorous, geometric, decorative" }),
+      o("old-style", "Refined old-style", ["traditional", "romantic"], { note: "Classic, literary, warm" }),
     ]),
   }),
   Object.freeze({
@@ -102,16 +117,20 @@ const BRAND_QUESTIONS = Object.freeze([
       o("friendly", "Friendly", ["approachable", "warm"]), o("professional", "Professional", ["serious"]), o("witty", "Witty", ["playful"]), o("inspiring", "Inspiring", ["warm"]),
       o("direct", "Direct", ["bold", "quiet"]), o("warm", "Warm", ["warm", "approachable"]), o("confident", "Confident", ["bold"]), o("understated", "Understated", ["quiet", "minimal"]),
       o("technical", "Technical", ["technical", "serious"]), o("premium", "Premium", ["luxury"]),
+      o("nurturing", "Nurturing", ["warm", "approachable"]), o("calm", "Calm", ["quiet", "approachable"]), o("poetic", "Poetic", ["romantic", "quiet"]), o("empowering", "Empowering", ["bold", "warm"]),
     ]),
   }),
   Object.freeze({
     key: "tagline.style", section: "tagline", multi: true, visual: "tagline",
     prompt: "Which kinds of tagline do you like?", help: "These are made-up examples to show the style. We write yours.",
     options: Object.freeze([
-      o("descriptive", "Says what you do", ["serious"], { sample: "Reliable roofing for Calgary homes." }), o("promise", "A promise", ["serious", "bold"], { sample: "Done right, the first time." }),
-      o("punchy", "Short and punchy", ["bold", "minimal"], { sample: "Built to last." }), o("playful", "A little playful", ["playful", "approachable"], { sample: "We’ve got you covered." }),
-      o("question", "A question", ["approachable"], { sample: "Ready for a better view?" }), o("heritage", "Heritage", ["traditional"], { sample: "Serving Alberta since 1987." }),
+      o("descriptive", "Says what you do", ["serious"], { sample: "Handcrafted goods for everyday living." }), o("promise", "A promise", ["serious", "bold"], { sample: "Done properly, every time." }),
+      o("punchy", "Short and punchy", ["bold", "minimal"], { sample: "Made to last." }), o("playful", "A little playful", ["playful", "approachable"], { sample: "Little things, big joy." }),
+      o("question", "A question", ["approachable"], { sample: "Ready for something new?" }), o("heritage", "Heritage", ["traditional"], { sample: "Crafted with care since 1987." }),
       o("aspirational", "Aspirational", ["luxury", "warm"], { sample: "Where great things take shape." }), o("none", "No tagline", ["minimal", "quiet"], { sample: "Let the name speak for itself." }),
+      o("healing", "Healing", ["holistic", "warm"], { sample: "Find your way back to calm." }), o("balance", "Balance", ["holistic", "quiet"], { sample: "Balance, restored." }),
+      o("connection", "Connection", ["warm", "approachable"], { sample: "Come as you are. Belong." }), o("transformation", "Transformation", ["mystical", "warm"], { sample: "Become who you are meant to be." }),
+      o("growth", "Personal growth", ["warm", "approachable"], { sample: "Grow at your own pace." }), o("inspiring", "Inspirational", ["warm", "romantic"], { sample: "Begin where you are." }),
     ]),
   }),
   Object.freeze({
@@ -128,6 +147,8 @@ const BRAND_QUESTIONS = Object.freeze([
       o("sunset", "Sunset", ["warm", "bold"], { colours: ["#3D1E2B", "#A63A50", "#E8744F", "#F2A65A", "#FBE3C4"] }),
       o("forest", "Forest", ["organic", "quiet"], { colours: ["#1E3D2F", "#3C6E57", "#7FA88C", "#D8E4D0", "#A4784E"] }),
       o("primary", "Bold primaries", ["bold", "playful"], { colours: ["#D00000", "#0047AB", "#FFC300", "#111111", "#F7F7F7"] }),
+      o("velvet-ritual", "Velvet & Ritual", ["luxury", "ornate", "warm"], { colours: ["#291329", "#5C253F", "#913E54", "#C49A65", "#E9D6C7"] }),
+      o("moonlit-amethyst", "Moonlit Amethyst", ["mystical", "quiet", "cool"], { colours: ["#211B3D", "#493267", "#765A9D", "#B8A4D2", "#F2E9DD"] }),
     ]),
   }),
   Object.freeze({
@@ -139,6 +160,8 @@ const BRAND_QUESTIONS = Object.freeze([
       o("detail", "Close-up detail", ["quiet", "luxury"], { note: "Craft and texture up close" }), o("flat", "Flat illustration", ["playful", "modern"], { note: "Simple shapes and colour" }),
       o("hand", "Hand-drawn", ["organic", "warm"], { note: "Sketchy, personal" }), o("abstract3d", "Abstract / 3D", ["modern", "technical"], { note: "Soft shapes and gradients" }),
       o("architectural", "Architectural", ["serious", "technical"], { note: "Lines, structure, perspective" }),
+      o("softfocus", "Soft & dreamy", ["ethereal", "romantic"], { note: "Glow, haze, gentle light" }), o("flatlay", "Styled flat lay", ["modern", "feminine"], { note: "Objects arranged from above" }),
+      o("botanical", "Botanical & natural", ["organic", "holistic"], { note: "Leaves, flowers, natural light" }),
     ]),
   }),
   Object.freeze({
@@ -148,6 +171,7 @@ const BRAND_QUESTIONS = Object.freeze([
       o("paper", "Paper grain", ["warm", "traditional"]), o("concrete", "Concrete", ["technical", "bold"]), o("linen", "Linen weave", ["warm", "quiet"]), o("marble", "Marble", ["luxury", "ornate"]),
       o("wood", "Wood grain", ["organic", "warm"]), o("lines", "Fine lines", ["modern", "minimal"]), o("halftone", "Halftone dots", ["playful", "bold"]), o("topographic", "Topographic", ["organic", "technical"]),
       o("terrazzo", "Terrazzo", ["playful", "modern"]), o("clean", "None, keep it clean", ["minimal", "quiet"]),
+      o("watercolour", "Watercolour wash", ["ethereal", "romantic"]), o("floral", "Floral pattern", ["romantic", "feminine"]), o("gilded", "Gilded foil", ["luxury", "ornate"]), o("starfield", "Starfield", ["mystical", "quiet"]),
     ]),
   }),
   Object.freeze({

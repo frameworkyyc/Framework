@@ -29,12 +29,12 @@ function stepper(eff, current, base, assessment) {
   }).join("")}</ol>`;
 }
 
-const FONT_CLASS = new Set(["serif-classic", "serif-modern", "sans-geometric", "sans-humanist", "slab", "script", "display", "mono", "condensed"]);
+const FONT_CLASS = new Set(["serif-classic", "serif-modern", "sans-geometric", "sans-humanist", "slab", "script", "display", "mono", "condensed", "elegant-italic", "calligraphic", "handwritten", "deco", "old-style"]);
 
 function cardVisual(q, o, imageUrl) {
   if (o.imageId) return `<img class="dv dv--photo" src="${e(imageUrl(o.imageId))}" alt="${e(o.label)}" loading="lazy" width="480" height="300">`;
   if (q.visual === "word") return `<span class="dc__word">${e(o.label)}</span>`;
-  if (q.visual === "font") return FONT_CLASS.has(o.key) ? `<span class="dc__font dc__font--${e(o.key)}" aria-hidden="true"><span class="dc__font-big">Your Brand</span><span class="dc__font-small">Quality you can see.</span><span class="dc__font-small">ABC abc 123</span></span>` : `<span class="dc__word">${e(o.label)}</span>`;
+  if (q.visual === "font") return FONT_CLASS.has(o.key) ? `<span class="dc__font dc__font--${e(o.key)}" aria-hidden="true"><span class="dc__font-big">Your Brand</span><span class="dc__font-small">Made with care, for you.</span><span class="dc__font-small">ABC abc 123</span></span>` : `<span class="dc__word">${e(o.label)}</span>`;
   if (q.visual === "tagline") return `<span class="dc__tagline">“${e(o.sample || o.label)}”</span>`;
   const svg = visualFor(q.visual, o, q.key);
   return svg || `<span class="dc__word">${e(o.label)}</span>`;

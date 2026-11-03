@@ -244,7 +244,7 @@ test("guest link: no account needed; welcome, six steps with real cards, saved a
   const s1 = await text(await anon.get(`${base}/1`));
   assert.match(s1, /Step 1 of 6/); assert.equal((s1.match(/class="dsc__step[ "]/g) || []).length, 6);
   for (const word of ["Modern", "Luxurious", "Playful", "Rugged"]) assert.match(s1, new RegExp(`>${word}<`));
-  assert.equal((s1.match(/class="dc dc--style"/g) || []).length, 10, "ten design-direction cards");
+  assert.equal((s1.match(/class="dc dc--style"/g) || []).length, 17, "seventeen design-direction cards (the original ten, then the seven added for creative, wellness and beauty brands)");
   assert.ok((s1.match(/<svg class="dv"/g) || []).length >= 10);
   assert.match(s1, /name="l:style\.personality:modern"/); assert.match(s1, /name="d:style\.personality:modern"/); assert.match(s1, /name="m:style\.personality" value="not_sure"/); assert.match(s1, /name="m:style\.personality" value="surprise"/);
   assert.match(s1, /Not for me/); assert.match(s1, /Save and finish later/);
@@ -602,4 +602,76 @@ test("Admin: before migration 0018 the screens say so plainly and nothing breaks
   assert.equal((await ann.get("/portal/o/alpha/branding/discovery")).status, 200, "the member page shows its empty state");
   assert.equal((await ann.get("/portal/o/alpha/branding")).status, 200, "Branding is unaffected");
   assert.equal((await ann.get(`/portal/discover/${"q".repeat(43)}`)).status, 404);
+});
+
+/* ====================================================================== inclusive content (any industry) */
+import { readFileSync } from "node:fs";
+const LEGACY = JSON.parse(readFileSync(new URL("./fixtures-discovery-legacy-keys.json", import.meta.url), "utf8")); // every question and option key as first released
+
+test("existing assessments stay compatible: every original question and option key still exists, answers using them still read and make a brief", () => {
+  const def = KINDS.brand;
+  for (const [qk, keys] of Object.entries(LEGACY)) {
+    const q = def.questions.find((x) => x.key === qk);
+    assert.ok(q, `question ${qk} still exists`);
+    for (const k of keys) assert.ok(q.options.some((o) => o.key === k), `${qk}/${k} still exists (saved answers refer to it)`);
+  }
+  const answers = {};
+  for (const q of eff.questions) answers[q.key] = { picks: { mode: "picks", like: LEGACY[q.key].slice(0, 3), dislike: LEGACY[q.key].slice(3, 4) }, comment: "kept" };
+  const brief = buildBrief(eff, answers);
+  assert.equal(brief.sections.length, 9);
+  for (const s of brief.sections) assert.ok(["answered", "partial"].includes(s.status), `${s.key} still reads as answered`);
+  for (const q of eff.questions) { const n = normalizePicks(q, { like: LEGACY[q.key], dislike: [] }); assert.deepEqual(n.like, LEGACY[q.key], `${q.key}: every original key is still accepted`); }
+  assert.equal(JSON.stringify(def.questions.map((q) => q.options.slice(0, LEGACY[q.key].length).map((o) => o.key))), JSON.stringify(def.questions.map((q) => LEGACY[q.key])), "new options were only added at the end, so any Admin ordering keeps its meaning");
+});
+
+test("the assessment suits any industry: new creative directions, logo forms, type styles, taglines, textures and the two new palettes", () => {
+  const q = (k) => KINDS.brand.questions.find((x) => x.key === k);
+  const keys = (k) => q(k).options.map((o) => o.key);
+  for (const k of ["holistic", "mystical", "ethereal", "romantic", "feminine", "bohemian", "ornamental"]) assert.ok(keys("style.direction").includes(k), `direction ${k}`);
+  for (const k of ["modern", "industrial", "minimalist", "traditional", "luxury", "bold"]) assert.ok(keys("style.direction").includes(k), `the original direction ${k} is kept`);
+  for (const k of ["celestial", "botanical", "ornamental", "spiritual", "expressive"]) assert.ok(keys("logo.type").includes(k), `logo ${k}`);
+  for (const k of ["elegant-italic", "calligraphic", "handwritten", "deco", "old-style"]) assert.ok(keys("typography.fonts").includes(k), `type ${k}`);
+  for (const k of ["healing", "balance", "connection", "transformation", "growth", "inspiring"]) assert.ok(keys("tagline.style").includes(k), `tagline ${k}`);
+  for (const k of ["watercolour", "floral", "gilded", "starfield"]) assert.ok(keys("textures.surface").includes(k), `texture ${k}`);
+  const pal = Object.fromEntries(q("colours.palettes").options.map((o) => [o.key, o]));
+  assert.deepEqual([pal["velvet-ritual"].label, pal["velvet-ritual"].colours], ["Velvet & Ritual", ["#291329", "#5C253F", "#913E54", "#C49A65", "#E9D6C7"]]);
+  assert.deepEqual([pal["moonlit-amethyst"].label, pal["moonlit-amethyst"].colours], ["Moonlit Amethyst", ["#211B3D", "#493267", "#765A9D", "#B8A4D2", "#F2E9DD"]]);
+  for (const k of ["velvet-ritual", "moonlit-amethyst"]) { const svg = visualFor("palette", pal[k], "colours.palettes"); assert.equal((svg.match(/<rect/g) || []).length, 5, `${k} is drawn like the other palettes: five swatches`); }
+  // no contractor-only wording anywhere in what a recipient reads
+  const words = JSON.stringify([KINDS.brand.intro, KINDS.brand.stages, KINDS.brand.questions.map((x) => [x.prompt, x.help, x.options.map((o) => [o.label, o.note, o.sample])])]);
+  assert.ok(!/roof|contractor|tradesp|job ?site|working-site|\bvan\b|Calgary|Alberta|plumb|renovat/i.test(words), "no trade-specific wording or examples");
+  // the wellness-leaning options are additions, not the whole assessment
+  const wellness = ["holistic", "mystical", "ethereal"].length + ["healing", "balance", "connection", "transformation", "growth"].length;
+  assert.ok(wellness < KINDS.brand.questions.flatMap((x) => x.options).length / 6, "creative and wellness options are a small share of all options");
+});
+
+test("drawings: the heritage crest keeps its text inside the ribbon and clear of the border; badge icons are centred and evenly sized", () => {
+  const crest = visualFor("logo", { key: "crest", label: "Heritage crest" }, "logo.type");
+  const ribbon = /<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)" fill="#0A0A0A"\/>/.exec(crest);
+  assert.ok(ribbon, "the date sits on a ribbon below the shield");
+  const [rx, ry, rw, rh] = ribbon.slice(1).map(Number);
+  const dateText = /<text x="(\d+)" y="(\d+)"[^>]*font-size="(\d+)"[^>]*letter-spacing="(\d+)"[^>]*>EST\. 1987</.exec(crest);
+  const [tx, ty, size, spacing] = dateText.slice(1).map(Number);
+  const width = 9 * (size * 0.62 + spacing); // generous estimate: nine characters
+  assert.ok(tx - width / 2 > rx && tx + width / 2 < rx + rw, `the date (${Math.round(width)}px wide) fits inside the ribbon (${rw}px)`);
+  assert.ok(ty > ry && ty < ry + rh, "and sits vertically within it");
+  // the shield's lowest point is above the ribbon text, so no text can touch the decorative border
+  assert.ok(Math.max(...[...crest.matchAll(/<text x="\d+" y="(\d+)"[^>]*>YB</g)].map((m) => Number(m[1]))) < 80, "the initials sit in the wide upper part of the shield");
+
+  const centres = [[12, 12], [12, 13], [12, 11.65], [12, 11.5]]; // measured centres of the four glyphs (see visuals.js)
+  for (const key of ["line", "solid", "duotone", "rounded", "sharp", "hand", "badge"]) {
+    const svg = visualFor("icons", { key, label: key }, "iconography.icons");
+    const groups = [...svg.matchAll(/<g transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)">/g)];
+    assert.equal(groups.length, 4, `${key}: four symbols`);
+    const sizes = new Set(groups.map((g) => g[3])); assert.equal(sizes.size, 1, `${key}: one consistent size`);
+    const cxs = groups.map((g, i) => Number(g[1]) + centres[i][0] * Number(g[3])), cys = groups.map((g, i) => Number(g[2]) + centres[i][1] * Number(g[3]));
+    cys.forEach((cy) => assert.ok(Math.abs(cy - 75) < 0.05, `${key}: every symbol is centred vertically on the tile`));
+    assert.ok(Math.abs((cxs[0] + cxs[3]) / 2 - 120) < 0.05, `${key}: the row is centred on the tile`);
+    const gaps = cxs.slice(1).map((x, i) => +(x - cxs[i]).toFixed(2)); assert.equal(new Set(gaps).size, 1, `${key}: even spacing`);
+    if (key === "badge") {
+      const circles = [...svg.matchAll(/<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)];
+      assert.equal(circles.length, 4);
+      circles.forEach((c, i) => { assert.ok(Math.abs(Number(c[1]) - cxs[i]) < 0.05 && Math.abs(Number(c[2]) - cys[i]) < 0.05, `badge ${i + 1}: the symbol is centred in its circle`); assert.ok(18 * Number(groups[i][3]) <= Number(c[3]) * 2 * 0.7, "the symbol fills no more than 70% of the circle"); });
+    }
+  }
 });
