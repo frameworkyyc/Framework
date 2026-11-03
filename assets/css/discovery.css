@@ -84,6 +84,12 @@
 .dc__font--script { font-family: "Snell Roundhand", "Segoe Script", "Brush Script MT", cursive; font-style: italic; font-weight: 400; }
 .dc__font--display { font-family: Impact, "Arial Black", "Haettenschweiler", sans-serif; font-weight: 400; letter-spacing: 0.01em; }
 .dc__font--mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-weight: 500; }
+.dc__font--elegant-italic { font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; font-style: italic; font-weight: 400; letter-spacing: 0.01em; }
+.dc__font--calligraphic { font-family: "Apple Chancery", "Snell Roundhand", "Lucida Calligraphy", "Segoe Script", "URW Chancery L", "Z003", cursive; font-style: italic; font-weight: 400; }
+.dc__font--handwritten { font-family: "Bradley Hand", "Noteworthy", "Segoe Print", "Ink Free", "Marker Felt", cursive; font-weight: 400; }
+.dc__font--deco { font-family: "Futura", "Century Gothic", "Avenir Next", "Trebuchet MS", sans-serif; font-weight: 500; text-transform: uppercase; letter-spacing: 0.16em; }
+.dc__font--deco .dc__font-big { font-size: 28px; }
+.dc__font--old-style { font-family: Garamond, "EB Garamond", "Cormorant Garamond", Baskerville, "Times New Roman", serif; font-weight: 400; }
 .dc__font--condensed { font-family: "Arial Narrow", "Helvetica Neue Condensed", "Roboto Condensed", Impact, sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; }
 
 /* "Not sure" / "Surprise me" and the comment */
