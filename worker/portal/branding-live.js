@@ -398,7 +398,14 @@ export function brandingOverview(vm, brand, o = {}) {
   // One subtle, general note about starting prices for the whole page, shown only when a price is visible somewhere on it.
   const priceShown = ["typography", "colours", "tagline", "imagery", "layout", "textures", "iconography", "style"].some((k) => !comp[k].done && priceLabel(pricing[k])) || missingLogos.some((r) => priceLabel(r.entry)) && !comp.logo.done || Boolean(kitPrice);
   const pricingNote = priceShown ? `<p class="bk-pricing-note">${e(ESTIMATE_NOTE)}</p>` : "";
-  return head.replace(/<\/header>$/, `${pricingNote}</header>`) + banner + nav + `<div class="bk">${parts.join("")}</div>` + more + meta + share + kit;
+  // Brand Discovery (only when Framework has assigned one and PORTAL_DISCOVERY is on): a quiet card at the top, separate from the approved brand below it.
+  const dc = o.discovery || [];
+  const dOpen = dc.filter((x) => x.status === "not_started" || x.status === "in_progress");
+  const dPick = dOpen[0] || dc[0];
+  const dHref = dc.length === 1 || (dPick && dOpen.length === 1) ? href(vm, `/branding/discovery/${dPick.id}`) : href(vm, "/branding/discovery");
+  const dWord = !dPick ? "" : dPick.status === "not_started" ? "Start" : dPick.status === "in_progress" ? "Continue" : "View";
+  const discoveryCard = dPick ? `<section class="bk-discovery" aria-labelledby="h-discovery"><div><span class="eyebrow">Not sure what you want?</span><h2 class="h3" id="h-discovery">Brand Discovery</h2><p class="muted">${dPick.status === "submitted" || dPick.status === "reviewed" ? "Thank you. Framework has your answers." : "A short, visual way to show Framework what you like. About 10 to 15 minutes, saved as you go."}</p></div><a class="btn ${dWord === "View" ? "" : "btn--primary"}" href="${e(dHref)}">${dWord}</a></section>` : "";
+  return head.replace(/<\/header>$/, `${pricingNote}</header>`) + banner + discoveryCard + nav + `<div class="bk">${parts.join("")}</div>` + more + meta + share + kit;
 }
 
 /* ------------------------------------------------------------------ the uploads area */
