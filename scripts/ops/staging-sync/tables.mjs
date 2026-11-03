@@ -33,6 +33,12 @@ export const EXCLUDED = {
   support_messages: "support history, excluded by decision",
   support_attachments: "support history, excluded by decision",
   portal_feedback: "client feedback, excluded",
+  // Discovery (migration 0018; not in Production yet): links are credentials, answers and files are client material, and Admin content edits belong to each environment.
+  discovery_assessments: "per-environment assessments; not part of this refresh",
+  discovery_links: "secret-link hashes (credentials)",
+  discovery_answers: "client answers; not part of this refresh",
+  discovery_content: "Admin edits to questions, per environment",
+  discovery_uploads: "client inspiration files; not part of this refresh",
 };
 
 /** Tables SQLite/D1 manage themselves. */

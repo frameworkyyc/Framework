@@ -1,5 +1,5 @@
 -- Migration 0018: Discovery assessments (Brand Discovery, and later Website and Marketing Discovery).
--- PROPOSED. Not applied anywhere. It needs the approval described in CLAUDE.md (show it, wait for approval, Staging first, Production only through the manual workflow).
+-- Applied to Staging. Production only by the manual Production workflow, after its own approval.
 --
 -- ADDITIVE ONLY: five new tables and their indexes. No existing table, column, row or index is touched, and nothing is deleted or rewritten.
 -- Why it is needed: nothing today can hold an assessment, a guest link, saved answers, Admin edits to the questions, or a recipient's inspiration files.

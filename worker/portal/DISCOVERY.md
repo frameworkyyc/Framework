@@ -4,7 +4,7 @@ A visual, step-by-step assessment that helps a client or prospect show what they
 
 ## Status
 
-Built and tested; **dormant until the migration is approved and applied**. It is behind `PORTAL_DISCOVERY` (exactly `"1"`), which is not set anywhere. Migration `0018_discovery.sql` is **proposed** (`migrations/portal-proposed/`), not applied to any database. Until it is, the Admin screens say "needs a database update" and the portal routes do nothing.
+Live on **Staging only**: migration `0018_discovery.sql` is applied to the Staging database and `PORTAL_DISCOVERY` is `"1"` in `previews.vars`. It is **not** applied to Production and the flag is not set there (`migrations/portal/0018_discovery.sql` is on the Production check list, so the manual Production workflow will apply it after its own approval).
 
 ## What a recipient sees
 
@@ -48,12 +48,11 @@ Answers are stored in their own tables. Nothing here reads or writes `brand_kits
 - Answers can be written only while Not started or In progress; the condition is part of the write statement, so a save cannot slip in after a submit.
 - The assessments' discovery uploads are kept with the assessment (like invoices and website records) and are not removed by `deleteOrganizationFiles`.
 
-## To turn it on (Staging first)
+## Before Production
 
-1. Approve and apply `0018_discovery.sql` to Staging (bookmark and snapshot first).
-2. Move it to `migrations/portal/` and add it to the Production check list in the same change.
-3. Set `PORTAL_DISCOVERY: "1"` in `previews.vars` (Staging only). Needs `PORTAL_BRANDING` and the `PORTAL_FILES` binding.
-4. Production later, only through the manual Production D1 workflow and a Production release approval.
+1. A Production release approval, then the manual Production D1 workflow (verify-only first, then apply) with a restore bookmark and before-snapshot. 0018 is additive: five new tables, three indexes, nothing existing touched.
+2. `PORTAL_DISCOVERY` stays off in Production until that release is approved (it needs `PORTAL_BRANDING` and the `PORTAL_FILES` binding, both on in Production).
+3. Assessments must belong to an existing client organization; there are no standalone prospect records yet.
 
 ## Adding another type (for example Website Discovery)
 

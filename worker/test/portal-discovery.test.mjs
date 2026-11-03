@@ -1,5 +1,5 @@
-// Discovery assessments (Brand Discovery): content, visuals, brief, repository rules. The migration is still PROPOSED (migrations/portal-proposed/0018_discovery.sql), so worlds
-// ask for it by name. Routes, Admin and the Branding integration are tested further down this file.
+// Discovery assessments (Brand Discovery): content, visuals, brief, repository rules, routes, Admin and the Branding integration. Migration 0018 is applied to Staging
+// (migrations/portal/0018_discovery.sql); the "before the migration" test leaves it out.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { openPortalDb, rows } from "./helpers/portal-db.mjs";
@@ -11,7 +11,7 @@ import * as repo from "../portal/repo/discovery.js";
 import { REQUIREMENT_ITEMS } from "../../admin/assets/brand-requirement-items.js";
 import { sha256b64url } from "../portal/crypto.js";
 
-const P = ["0018_discovery.sql"];
+const P = []; // 0018 is now a normal applied migration (it was proposed while this was built)
 const ORG_A = "11111111-1111-4111-8111-111111111111", ORG_B = "22222222-2222-4222-8222-222222222222";
 const T0 = new Date("2026-11-03T12:00:00.000Z");
 const days = (n) => new Date(T0.getTime() + n * 86400000);
@@ -589,7 +589,7 @@ test("Admin: customise the questions and options, add a reference picture, and t
 
 test("Admin: before migration 0018 the screens say so plainly and nothing breaks", async () => {
   resetKeyCacheForTests();
-  const w = await makePortal({ proposed: [] });
+  const w = await makePortal({ skip: ["0018_discovery.sql"] });
   Object.assign(w.env, { PORTAL_FILES: fakeR2(), PORTAL_DISCOVERY: "1", PORTAL_BRANDING: "1", PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   const org = await w.org("alpha", "Alpha Co");
   await w.invite(org, "ann@alpha.test", "owner"); const ann = w.browser(); await ann.signIn(w.user(1, "ann@alpha.test"));
