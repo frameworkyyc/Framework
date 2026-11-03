@@ -57,7 +57,7 @@ const BRAND_STAGES = Object.freeze([
 const BRAND_QUESTIONS = Object.freeze([
   Object.freeze({
     key: "style.personality", section: "style", multi: true, visual: "word",
-    prompt: "Which words feel like your business?", help: "Choose as many as you like. Mark any that are definitely not you.",
+    prompt: "Which words feel like your business?", help: "Choose as many as you like.",
     options: Object.freeze([
       o("modern", "Modern", ["modern"]), o("minimal", "Minimal", ["minimal", "quiet"]), o("luxurious", "Luxurious", ["luxury", "ornate"]), o("traditional", "Traditional", ["traditional"]),
       o("bold", "Bold", ["bold"]), o("playful", "Playful", ["playful", "approachable"]), o("industrial", "Industrial", ["technical", "bold"]), o("organic", "Organic", ["organic", "approachable"]),

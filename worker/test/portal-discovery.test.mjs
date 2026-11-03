@@ -246,8 +246,8 @@ test("guest link: no account needed; welcome, six steps with real cards, saved a
   for (const word of ["Modern", "Luxurious", "Playful", "Rugged"]) assert.match(s1, new RegExp(`>${word}<`));
   assert.equal((s1.match(/class="dc dc--style"/g) || []).length, 17, "seventeen design-direction cards (the original ten, then the seven added for creative, wellness and beauty brands)");
   assert.ok((s1.match(/<svg class="dv"/g) || []).length >= 10);
-  assert.match(s1, /name="l:style\.personality:modern"/); assert.match(s1, /name="d:style\.personality:modern"/); assert.match(s1, /name="m:style\.personality" value="not_sure"/); assert.match(s1, /name="m:style\.personality" value="surprise"/);
-  assert.match(s1, /Not for me/); assert.match(s1, /Save and finish later/);
+  assert.match(s1, /name="l:style\.personality:modern"/); assert.doesNotMatch(s1, /name="d:/); assert.doesNotMatch(s1, /dc__no"|Not for me|✕/); assert.match(s1, /name="m:style\.personality" value="not_sure"/); assert.match(s1, /name="m:style\.personality" value="surprise"/);
+  assert.match(s1, /Save and finish later/);
   assert.ok(!/name="csrf"/.test(s1), "a guest form has no session token");
 
   // step 1: likes + a dislike + a comment
@@ -258,7 +258,7 @@ test("guest link: no account needed; welcome, six steps with real cards, saved a
   const saved = await repo.getAnswers(w.db, id);
   assert.deepEqual(saved.get("style.personality"), { picks: { mode: "picks", like: ["modern", "minimal"], dislike: ["rugged"] }, comment: "Calm and clear" });
   const again = await text(await anon.get(`${base}/1`));
-  assert.match(again, /name="l:style\.personality:modern" value="1" checked/); assert.match(again, /name="d:style\.personality:rugged" value="1" checked/); assert.match(again, />Calm and clear</);
+  assert.match(again, /name="l:style\.personality:modern" value="1" checked/); assert.match(again, />Calm and clear</);
   assert.equal(loc(await guestPost(anon, token, 2, { "l:logo.type:wordmark": "1", go: "back" })), `${base}/1`, "Back saves and goes back");
   assert.equal(loc(await guestPost(anon, token, 2, { "l:logo.type:wordmark": "1", go: "save" })), `${base}?n=saved`);
   assert.match(await text(await anon.get(`${base}?n=saved`)), /Saved\. You can come back/);
