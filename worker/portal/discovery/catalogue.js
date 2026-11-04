@@ -69,7 +69,7 @@ const BRAND_QUESTIONS = Object.freeze([
   }),
   Object.freeze({
     key: "style.direction", section: "style", multi: true, visual: "style",
-    prompt: "Which design directions appeal to you?", help: "Each picture is a rough sketch of a look, not a finished design.",
+    prompt: "Which design directions appeal to you?", help: "Use these examples to explore the look and feel you want for your brand.",
     options: Object.freeze([
       o("modern", "Modern", ["modern"], { note: "Clean shapes, confident type" }), o("minimalist", "Minimalist", ["minimal", "quiet"], { note: "Space, restraint, very little decoration" }),
       o("luxury", "Luxury", ["luxury", "ornate"], { note: "Dark, rich, finely detailed" }), o("traditional", "Traditional", ["traditional", "serious"], { note: "Classic, centred, trustworthy" }),
@@ -77,9 +77,10 @@ const BRAND_QUESTIONS = Object.freeze([
       o("industrial", "Industrial", ["technical", "bold"], { note: "Grids, stripes, raw materials" }), o("organic", "Organic", ["organic", "approachable"], { note: "Soft curves, natural shapes" }),
       o("retro", "Retro", ["traditional", "playful"], { note: "Warm, nostalgic, sunburst energy" }), o("editorial", "Editorial", ["modern", "quiet"], { note: "Magazine columns, big headlines" }),
       o("holistic", "Holistic", ["holistic", "organic", "approachable"], { note: "Gentle, grounded, balanced" }), o("mystical", "Mystical", ["mystical", "ornate"], { note: "Moon, stars, a sense of ritual" }),
-      o("ethereal", "Ethereal", ["ethereal", "quiet"], { note: "Soft, airy, luminous" }), o("romantic", "Romantic", ["romantic", "ornate", "warm"], { note: "Petals, curves, tenderness" }),
+      o("ethereal", "Ethereal", ["ethereal", "quiet"], { note: "Soft, airy, luminous", retired: true }), o("romantic", "Romantic", ["romantic", "ornate", "warm"], { note: "Petals, curves, tenderness" }),
       o("feminine", "Feminine", ["feminine", "approachable"], { note: "Graceful, soft, elegant" }), o("bohemian", "Bohemian", ["bohemian", "organic", "warm"], { note: "Free-spirited, layered, handmade" }),
-      o("ornamental", "Ornamental", ["ornate", "luxury"], { note: "Frames, flourishes, fine detail" }),
+      o("ornamental", "Ornamental", ["ornate", "luxury"], { note: "Frames, flourishes, fine detail", retired: true }),
+      o("rustic", "Rustic", ["rugged", "warm", "traditional"], { note: "Weathered textures and handcrafted detail" }),
     ]),
   }),
   Object.freeze({

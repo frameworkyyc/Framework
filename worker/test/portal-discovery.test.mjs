@@ -41,6 +41,7 @@ test("the brand assessment covers all nine Branding sections, in six stages, usi
 test("every picture is drawn as safe inline SVG: no style attributes, scripts, event handlers or external references", () => {
   let n = 0;
   for (const q of KINDS.brand.questions) for (const o of q.options) {
+    if (q.key === "style.direction" && o.key === "rustic") continue; // Bundled image only.
     const s = visualFor(q.visual, o, q.key);
     if (["word", "font", "tagline"].includes(q.visual)) { assert.equal(s, "", `${q.key}/${o.key} is a text card`); continue; }
     assert.match(s, /^<svg class="dv" viewBox="0 0 240 150"/, `${q.key}/${o.key}`);
@@ -244,8 +245,11 @@ test("guest link: no account needed; welcome, six steps with real cards, saved a
   const s1 = await text(await anon.get(`${base}/1`));
   assert.match(s1, /Step 1 of 6/); assert.equal((s1.match(/class="dsc__step[ "]/g) || []).length, 6);
   for (const word of ["Modern", "Luxurious", "Playful", "Rugged"]) assert.match(s1, new RegExp(`>${word}<`));
-  assert.equal((s1.match(/class="dc dc--style"/g) || []).length, 17, "seventeen design-direction cards (the original ten, then the seven added for creative, wellness and beauty brands)");
-  assert.ok((s1.match(/<svg class="dv"/g) || []).length >= 10);
+  assert.equal((s1.match(/class="dc dc--style"/g) || []).length, 16);
+  const images = [...s1.matchAll(/src="\/assets\/img\/discovery-directions\/([a-z]+)\.jpg"/g)].map((m) => m[1]);
+  assert.deepEqual(images.sort(), ["bohemian", "bold", "editorial", "feminine", "holistic", "industrial", "luxury", "minimalist", "modern", "mystical", "organic", "playful", "retro", "romantic", "rustic", "traditional"]);
+  for (const key of images) assert.equal(readFileSync(new URL(`../../assets/img/discovery-directions/${key}.jpg`, import.meta.url)).readUInt16BE(), 0xffd8);
+  assert.doesNotMatch(s1, /name="l:style\.direction:(ethereal|ornamental)"/);
   assert.match(s1, /name="l:style\.personality:modern"/); assert.doesNotMatch(s1, /name="d:/); assert.doesNotMatch(s1, /dc__no"|Not for me|✕/); assert.match(s1, /name="m:style\.personality" value="not_sure"/); assert.match(s1, /name="m:style\.personality" value="surprise"/);
   assert.match(s1, /Save and finish later/);
   assert.ok(!/name="csrf"/.test(s1), "a guest form has no session token");

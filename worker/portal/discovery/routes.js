@@ -103,7 +103,8 @@ async function serve(c) {
 
   const go = fields.get("go") || "";
   const questions = stageQuestions(eff, stage);
-  const entries = readStageFields(fields, questions);
+  const previousAnswers = questions.some((q) => q.retiredOptions.length) ? await repo.getAnswers(db, assessment.id) : undefined;
+  const entries = readStageFields(fields, questions, previousAnswers);
   const nextStage = go === "back" ? Math.max(1, n - 1) : go === "next" || go === "submit" ? Math.min(eff.stages.length, n + 1) : n;
   const saved = await repo.saveAnswers(db, assessment, entries, { nextStage, by: c.by, now: ctx.now });
   if (!saved.ok) return redirect(base); // closed in the meantime: show the thank-you
