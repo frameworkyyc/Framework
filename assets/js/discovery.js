@@ -22,6 +22,55 @@
     });
   });
 
+  all(document, "[data-visual-pages]").forEach(function (question) {
+    var grid = question.querySelector(".dq__grid");
+    var cards = all(grid, ".dc");
+    var pageSize = 4;
+    var pageCount = Math.ceil(cards.length / pageSize);
+    if (pageCount < 2) return;
+
+    var page = 0;
+    var controls = document.createElement("div");
+    controls.className = "dq__paging";
+    var status = document.createElement("p");
+    status.tabIndex = -1;
+    status.setAttribute("role", "status");
+    grid.before(status);
+    var button = function (label, action) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.addEventListener("click", action);
+      controls.appendChild(b);
+      return b;
+    };
+    var show = function (index, focus) {
+      page = index;
+      cards.forEach(function (card, i) {
+        card.hidden = Math.floor(i / pageSize) !== page;
+      });
+      status.textContent = "Pick the ones you like · Set " + (page + 1) + " of " + pageCount;
+      back.disabled = page === 0;
+      next.disabled = page === pageCount - 1;
+      if (focus) status.focus();
+    };
+    var back = button("Previous 4", function () { show(page - 1, true); });
+    button("None of these", function () {
+      cards.slice(page * pageSize, (page + 1) * pageSize).forEach(function (card) {
+        card.querySelector(".dc__in--like").checked = false;
+      });
+      if (page < pageCount - 1) show(page + 1, true);
+      else {
+        status.textContent = "No choices selected in this set.";
+        status.focus();
+      }
+    });
+    var next = button("Next 4", function () { show(page + 1, true); });
+    grid.after(controls);
+    grid.classList.add("dq__grid--paged");
+    show(0, false);
+  });
+
   /* A second click on a submit button while the page is being saved would repeat the save: ignore it. */
   all(document, "form.dsc__form").forEach(function (form) {
     form.addEventListener("submit", function (ev) {

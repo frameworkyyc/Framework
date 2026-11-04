@@ -59,13 +59,15 @@ function card(q, o, picks, imageUrl) {
 </div>`;
 }
 
+const PAGED_VISUAL_QUESTIONS = new Set(["style.direction", "logo.type", "imagery.style", "textures.surface"]);
+
 function question(q, answer, imageUrl) {
   const picks = answer && answer.picks;
   const mode = picks ? picks.mode : "picks";
   const sec = SECTIONS[q.section];
   const id = idPart(q.key);
   const pill = (value, label) => `<label class="dq__pill"><input type="radio" name="m:${e(q.key)}" value="${value}"${mode === value ? " checked" : ""}><span>${e(label)}</span></label>`;
-  return `<section class="dq" aria-labelledby="q-${id}">
+  return `<section class="dq"${PAGED_VISUAL_QUESTIONS.has(q.key) ? " data-visual-pages" : ""} aria-labelledby="q-${id}">
 <header class="dq__head"><span class="eyebrow">${e(sec.number)} · ${e(sec.label)}</span><h2 class="dq__title" id="q-${id}">${e(q.prompt)}</h2>${q.help ? `<p class="dq__help">${e(q.help)}</p>` : ""}<p class="dq__hint">Tap a card to choose it. Tap it again to unchoose it.</p></header>
 <div class="dq__grid dq__grid--${e(q.visual)}">${q.options.map((o) => card(q, o, picks, imageUrl)).join("")}</div>
 <div class="dq__mode" role="radiogroup" aria-label="Or">${pill("picks", "Choose from these")}${pill("not_sure", MODE_LABEL.not_sure)}${pill("surprise", MODE_LABEL.surprise)}</div>
