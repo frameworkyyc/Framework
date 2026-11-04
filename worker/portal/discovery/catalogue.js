@@ -69,6 +69,14 @@ const BRAND_QUESTIONS = Object.freeze([
   }),
   Object.freeze({
     key: "style.direction", section: "style", multi: true, visual: "style",
+    displayOrder: Object.freeze([
+      "modern", "minimalist", "luxury", "traditional",
+      "bold", "playful", "industrial", "gothic",
+      "retro", "mystical", "editorial", "organic",
+      "holistic", "romantic", "feminine", "architectural",
+      "bohemian", "dark", "rustic", "futuristic",
+      "ethereal", "ornamental",
+    ]),
     prompt: "Which design directions appeal to you?", help: "Use these examples to explore the look and feel you want for your brand.",
     options: Object.freeze([
       o("modern", "Modern", ["modern"], { note: "Clean shapes, confident type" }), o("minimalist", "Minimalist", ["minimal", "quiet"], { note: "Space, restraint, very little decoration" }),
