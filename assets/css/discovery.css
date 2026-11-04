@@ -47,7 +47,6 @@
 .dc__main:hover { border-color: var(--ink); }
 .dc__vis { display: block; background: var(--mist); }
 .dc__vis .dv { display: block; width: 100%; height: auto; aspect-ratio: 8 / 5; object-fit: cover; }
-.dc__vis .dv--direction { object-fit: contain; }
 .dc__name { display: block; padding: 12px 14px 2px; font-weight: 600; font-size: 15px; }
 .dc__note { display: block; padding: 0 14px 12px; font-size: 13px; color: var(--slate); }
 .dc__name:last-child { padding-bottom: 12px; }
