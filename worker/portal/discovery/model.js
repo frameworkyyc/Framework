@@ -49,7 +49,7 @@ export function effectiveKind(kind, rows = []) {
         key: b.key, label: (r && r.label) || b.label, tags: b.tags, colours: b.colours || null,
         note: base.visual === "tagline" ? b.note || null : text || b.note || null,
         sample: base.visual === "tagline" ? text || b.sample || null : null,
-        enabled: r ? r.enabled !== 0 && r.enabled !== false : true, custom: false, imageId: (r && r.image_id) || null,
+        enabled: !b.retired && (!r || (r.enabled !== 0 && r.enabled !== false)), retired: b.retired === true, custom: false, imageId: (r && r.image_id) || null,
         sortOrder: r && Number.isInteger(r.sort_order) ? r.sort_order : (i + 1) * 10, index: i,
       };
     });
@@ -72,7 +72,7 @@ export function effectiveKind(kind, rows = []) {
 /** The questions to show on one stage, in order, skipping any the Admin has hidden. */
 export function stageQuestions(eff, stage) {
   const sections = new Set(stage.sections);
-  return eff.questions.filter((x) => sections.has(x.section) && x.enabled).sort(byOrder).map((x) => ({ ...x, options: x.options.filter((o) => o.enabled) })).filter((x) => x.options.length > 0);
+  return eff.questions.filter((x) => sections.has(x.section) && x.enabled).sort(byOrder).map((x) => ({ ...x, options: x.options.filter((o) => o.enabled), retiredOptions: x.options.filter((o) => o.retired) })).filter((x) => x.options.length > 0);
 }
 
 export const stageByNumber = (eff, n) => eff.stages.find((s) => s.n === n) || null;
@@ -92,7 +92,7 @@ export function normalizePicks(question, input = {}) {
 }
 
 /** Reads one stage's posted fields (l:<question>:<option>, d:<question>:<option>, m:<question>, c:<question>) into { [questionKey]: { picks, comment } }. */
-export function readStageFields(fields, questions) {
+export function readStageFields(fields, questions, previousAnswers = new Map()) {
   const out = {};
   for (const qn of questions) {
     const like = [], dislike = [];
@@ -100,8 +100,15 @@ export function readStageFields(fields, questions) {
       if (fields.get(`l:${qn.key}:${o.key}`) === "1") like.push(o.key);
       if (fields.get(`d:${qn.key}:${o.key}`) === "1") dislike.push(o.key);
     }
+    const retired = qn.retiredOptions || [];
+    const previous = previousAnswers.get(qn.key)?.picks;
+    // Retired choices are accepted only from saved answers, never from the form.
+    for (const o of retired) {
+      if (previous?.like.includes(o.key)) like.push(o.key);
+      if (previous?.dislike.includes(o.key)) dislike.push(o.key);
+    }
     const m = fields.get(`m:${qn.key}`);
-    out[qn.key] = { picks: normalizePicks(qn, { like, dislike, mode: MODES.includes(m) ? m : "picks" }), comment: cleanText(fields.get(`c:${qn.key}`), MAX_COMMENT) };
+    out[qn.key] = { picks: normalizePicks({ options: [...qn.options, ...retired] }, { like, dislike, mode: MODES.includes(m) ? m : "picks" }), comment: cleanText(fields.get(`c:${qn.key}`), MAX_COMMENT) };
   }
   return out;
 }
