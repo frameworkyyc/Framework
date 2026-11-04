@@ -166,9 +166,9 @@ const BRAND_QUESTIONS = Object.freeze([
   }),
   Object.freeze({
     key: "imagery.style", section: "imagery", multi: true, visual: "imagery",
-    prompt: "Which picture styles fit your brand?", help: "These are mood sketches. Framework can attach real photographs here.",
+    prompt: "Which picture styles fit your brand?", help: "Use these examples to explore the kinds of images that fit your brand.",
     options: Object.freeze([
-      o("lifestyle", "Candid people", ["warm", "approachable"], { note: "Real people, real moments" }), o("studio", "Clean studio", ["minimal", "modern"], { note: "Products on plain backgrounds" }),
+      o("lifestyle", "Candid people", ["warm", "approachable"], { note: "Real people, real moments" }), o("studio", "Clean studio", ["minimal", "modern"], { note: "Controlled lighting and simple backgrounds" }),
       o("documentary", "Black & white documentary", ["serious", "traditional"], { note: "Honest, grainy, timeless" }), o("aerial", "Aerial & landscape", ["organic", "bold"], { note: "Big views, the lay of the land" }),
       o("detail", "Close-up detail", ["quiet", "luxury"], { note: "Craft and texture up close" }), o("flat", "Flat illustration", ["playful", "modern"], { note: "Simple shapes and colour" }),
       o("hand", "Hand-drawn", ["organic", "warm"], { note: "Sketchy, personal" }), o("abstract3d", "Abstract / 3D", ["modern", "technical"], { note: "Soft shapes and gradients" }),
