@@ -247,9 +247,9 @@ test("guest link: no account needed; welcome, six steps with real cards, saved a
   for (const word of ["Modern", "Luxurious", "Playful", "Rugged"]) assert.match(s1, new RegExp(`>${word}<`));
   assert.equal((s1.match(/class="dc dc--style"/g) || []).length, 16);
   const images = [...s1.matchAll(/src="\/assets\/img\/discovery-directions\/([a-z]+)\.jpg"/g)].map((m) => m[1]);
-  assert.deepEqual(images.sort(), ["bohemian", "bold", "editorial", "holistic", "industrial", "luxury", "minimalist", "modern", "mystical", "organic", "playful", "retro", "romantic", "rustic", "traditional"]);
+  assert.deepEqual(images.sort(), ["bohemian", "bold", "editorial", "feminine", "holistic", "industrial", "luxury", "minimalist", "modern", "mystical", "organic", "playful", "retro", "romantic", "rustic", "traditional"]);
   for (const key of images) assert.equal(readFileSync(new URL(`../../assets/img/discovery-directions/${key}.jpg`, import.meta.url)).readUInt16BE(), 0xffd8);
-  assert.doesNotMatch(s1, /name="l:style\.direction:(ethereal|feminine)"/);
+  assert.doesNotMatch(s1, /name="l:style\.direction:(ethereal|ornamental)"/);
   assert.match(s1, /name="l:style\.personality:modern"/); assert.doesNotMatch(s1, /name="d:/); assert.doesNotMatch(s1, /dc__no"|Not for me|✕/); assert.match(s1, /name="m:style\.personality" value="not_sure"/); assert.match(s1, /name="m:style\.personality" value="surprise"/);
   assert.match(s1, /Save and finish later/);
   assert.ok(!/name="csrf"/.test(s1), "a guest form has no session token");

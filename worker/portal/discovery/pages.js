@@ -31,7 +31,7 @@ function stepper(eff, current, base, assessment) {
 
 const FONT_CLASS = new Set(["serif-classic", "serif-modern", "sans-geometric", "sans-humanist", "slab", "script", "display", "mono", "condensed", "elegant-italic", "calligraphic", "handwritten", "deco", "old-style"]);
 
-const DIRECTION_IMAGES = new Set(["modern", "minimalist", "luxury", "traditional", "bold", "playful", "industrial", "organic", "retro", "editorial", "holistic", "mystical", "romantic", "bohemian", "rustic"]);
+const DIRECTION_IMAGES = new Set(["modern", "minimalist", "luxury", "traditional", "bold", "playful", "industrial", "organic", "retro", "editorial", "holistic", "mystical", "romantic", "bohemian", "feminine", "rustic"]);
 
 function cardVisual(q, o, imageUrl) {
   if (o.imageId) return `<img class="dv dv--photo" src="${e(imageUrl(o.imageId))}" alt="${e(o.label)}" loading="lazy" width="480" height="300">`;
