@@ -81,6 +81,10 @@ const BRAND_QUESTIONS = Object.freeze([
       o("feminine", "Feminine", ["feminine", "approachable"], { note: "Graceful, soft, elegant" }), o("bohemian", "Bohemian", ["bohemian", "organic", "warm"], { note: "Free-spirited, layered, handmade" }),
       o("ornamental", "Ornamental", ["ornate", "luxury"], { note: "Frames, flourishes, fine detail", retired: true }),
       o("rustic", "Rustic", ["rugged", "warm", "traditional"], { note: "Weathered textures and handcrafted detail" }),
+      o("futuristic", "Futuristic", ["technical", "modern"], { note: "Angular forms and digital accents" }),
+      o("gothic", "Gothic", ["ornate", "mystical"], { note: "Pointed arches and dramatic ornament" }),
+      o("architectural", "Architectural", ["technical", "minimal"], { note: "Precise lines and structured geometry" }),
+      o("dark", "Dark", ["bold", "quiet"], { note: "Deep tones and sharp contrast" }),
     ]),
   }),
   Object.freeze({
