@@ -114,3 +114,30 @@
 .dlist { list-style: none; margin: var(--space-3) 0 0; padding: 0; }
 .dlist__item { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 0; border-top: 1px solid var(--hairline); }
 .dlist__item strong { display: block; margin-bottom: 4px; }
+
+/* Typography samples for “Which words feel like your business?” */
+.dc__word[data-personality] { line-height: 1.2; overflow-wrap: anywhere; }
+.dc__word[data-personality="modern"] { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.04em; }
+.dc__word[data-personality="minimal"] { font: 400 17px/1.2 var(--font-body); letter-spacing: .14em; text-transform: uppercase; }
+.dc__word[data-personality="luxurious"] { font: 400 24px/1.2 Didot, "Bodoni MT", Georgia, serif; letter-spacing: .035em; }
+.dc__word[data-personality="traditional"] { font: 700 19px/1.2 "Times New Roman", serif; }
+.dc__word[data-personality="bold"] { font: 900 26px/1.2 "Arial Black", Arial, sans-serif; text-transform: uppercase; }
+.dc__word[data-personality="playful"] { font: 700 21px/1.2 "Comic Sans MS", "Chalkboard SE", cursive; }
+.dc__word[data-personality="industrial"] { font: 700 19px/1.2 Impact, "Arial Narrow", sans-serif; letter-spacing: .07em; text-transform: uppercase; }
+.dc__word[data-personality="organic"] { font: italic 400 23px/1.2 Palatino, Georgia, serif; }
+.dc__word[data-personality="friendly"] { font: 700 21px/1.2 "Trebuchet MS", sans-serif; }
+.dc__word[data-personality="authoritative"] { font: 700 18px/1.2 Georgia, serif; }
+.dc__word[data-personality="refined"] { font: 400 23px/1.2 Garamond, Georgia, serif; letter-spacing: .07em; }
+.dc__word[data-personality="rugged"] { font: 700 20px/1.2 Rockwell, "Courier New", serif; text-transform: uppercase; }
+.dc__word[data-personality="warm"] { font: 700 23px/1.2 "Bookman Old Style", Georgia, serif; }
+.dc__word[data-personality="technical"] { font: 500 18px/1.2 ui-monospace, Consolas, monospace; }
+.dc__word[data-personality="elegant"] { font: italic 400 25px/1.2 Didot, "Bodoni MT", Georgia, serif; }
+.dc__word[data-personality="energetic"] { font: italic 800 21px/1.2 "Arial Black", Arial, sans-serif; letter-spacing: -.045em; }
+.dc__word[data-personality="calm"] { font: 400 20px/1.2 var(--font-body); letter-spacing: .12em; }
+.dc__word[data-personality="holistic"] { font: 400 22px/1.2 Palatino, Georgia, serif; }
+.dc__word[data-personality="mystical"] { font: 400 20px/1.2 Garamond, Georgia, serif; font-variant: small-caps; letter-spacing: .1em; }
+.dc__word[data-personality="ethereal"] { font: 400 22px/1.2 Didot, "Times New Roman", serif; letter-spacing: .12em; }
+.dc__word[data-personality="romantic"] { font: italic 400 24px/1.2 "Snell Roundhand", "Segoe Script", Georgia, serif; }
+.dc__word[data-personality="feminine"] { font: italic 400 22px/1.2 Baskerville, Georgia, serif; letter-spacing: .06em; }
+.dc__word[data-personality="bohemian"] { font: 400 21px/1.2 "Segoe Print", "Bradley Hand", Georgia, serif; }
+.dc__word[data-personality="ornamental"] { font: 700 19px/1.2 "Book Antiqua", Palatino, Georgia, serif; font-variant: small-caps; }
