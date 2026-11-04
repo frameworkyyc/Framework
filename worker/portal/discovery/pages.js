@@ -35,10 +35,13 @@ const DIRECTION_IMAGES = new Set(["modern", "minimalist", "luxury", "traditional
 
 const TEXTURE_IMAGES = new Set(["paper", "concrete", "linen", "marble", "wood", "lines", "halftone", "topographic", "terrazzo", "watercolour", "floral", "gilded", "mosaic", "steel", "rust", "blank"]);
 
+const IMAGERY_IMAGES = new Set(["abstract3d", "botanical", "lifestyle", "detail", "hand", "aerial", "architectural", "documentary", "flat", "studio", "flatlay", "softfocus"]);
+
 function cardVisual(q, o, imageUrl) {
   if (o.imageId) return `<img class="dv dv--photo" src="${e(imageUrl(o.imageId))}" alt="${e(o.label)}" loading="lazy" width="480" height="300">`;
   if (q.key === "style.direction" && DIRECTION_IMAGES.has(o.key)) return `<img class="dv dv--direction" src="/assets/img/discovery-directions/${o.key}.jpg" alt="" loading="lazy" width="480" height="300">`;
   if (q.key === "textures.surface" && TEXTURE_IMAGES.has(o.key)) return `<img class="dv dv--direction" src="/assets/img/discovery-textures/${o.key}.jpg" alt="" loading="lazy" width="640" height="400">`;
+  if (q.key === "imagery.style" && IMAGERY_IMAGES.has(o.key)) return `<img class="dv" src="/assets/img/discovery-imagery/${o.key}.jpg" alt="" loading="lazy" width="960" height="540">`;
   if (q.visual === "word") {
     const personality = q.key === "style.personality" ? ` data-personality="${e(o.key)}"` : "";
     return `<span class="dc__word"${personality}>${e(o.label)}</span>`;
