@@ -42,6 +42,7 @@ test("every picture is drawn as safe inline SVG: no style attributes, scripts, e
   let n = 0;
   for (const q of KINDS.brand.questions) for (const o of q.options) {
     if (q.key === "style.direction" && ["rustic", "futuristic", "gothic", "architectural", "dark"].includes(o.key)) continue; // Bundled image only.
+    if (q.key === "textures.surface" && ["mosaic", "steel", "rust", "blank"].includes(o.key)) continue; // Bundled image only.
     const s = visualFor(q.visual, o, q.key);
     if (["word", "font", "tagline"].includes(q.visual)) { assert.equal(s, "", `${q.key}/${o.key} is a text card`); continue; }
     assert.match(s, /^<svg class="dv" viewBox="0 0 240 150"/, `${q.key}/${o.key}`);
