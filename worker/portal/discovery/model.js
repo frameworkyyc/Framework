@@ -45,12 +45,13 @@ export function effectiveKind(kind, rows = []) {
     const options = base.options.map((b, i) => {
       const r = opt.get(`${base.key}\u0000${b.key}`);
       const text = r && r.description ? r.description : null;
+      const displayIndex = base.displayOrder?.indexOf(b.key) ?? -1;
       return {
         key: b.key, label: (r && r.label) || b.label, tags: b.tags, colours: b.colours || null,
         note: base.visual === "tagline" ? b.note || null : text || b.note || null,
         sample: base.visual === "tagline" ? text || b.sample || null : null,
         enabled: !b.retired && (!r || (r.enabled !== 0 && r.enabled !== false)), retired: b.retired === true, custom: false, imageId: (r && r.image_id) || null,
-        sortOrder: r && Number.isInteger(r.sort_order) ? r.sort_order : (i + 1) * 10, index: i,
+        sortOrder: r && Number.isInteger(r.sort_order) ? r.sort_order : ((displayIndex >= 0 ? displayIndex : i) + 1) * 10, index: i,
       };
     });
     for (const [j, r] of (custom.get(base.key) || []).entries()) {
