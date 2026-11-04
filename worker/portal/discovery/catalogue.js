@@ -183,8 +183,9 @@ const BRAND_QUESTIONS = Object.freeze([
     options: Object.freeze([
       o("paper", "Paper grain", ["warm", "traditional"]), o("concrete", "Concrete", ["technical", "bold"]), o("linen", "Linen weave", ["warm", "quiet"]), o("marble", "Marble", ["luxury", "ornate"]),
       o("wood", "Wood grain", ["organic", "warm"]), o("lines", "Fine lines", ["modern", "minimal"]), o("halftone", "Halftone dots", ["playful", "bold"]), o("topographic", "Topographic", ["organic", "technical"]),
-      o("terrazzo", "Terrazzo", ["playful", "modern"]), o("clean", "None, keep it clean", ["minimal", "quiet"]),
-      o("watercolour", "Watercolour wash", ["ethereal", "romantic"]), o("floral", "Floral pattern", ["romantic", "feminine"]), o("gilded", "Gilded foil", ["luxury", "ornate"]), o("starfield", "Starfield", ["mystical", "quiet"]),
+      o("terrazzo", "Terrazzo", ["playful", "modern"]), o("clean", "None, keep it clean", ["minimal", "quiet"], { retired: true }),
+      o("watercolour", "Watercolour wash", ["ethereal", "romantic"]), o("floral", "Floral pattern", ["romantic", "feminine"]), o("gilded", "Gilded foil", ["luxury", "ornate"]), o("starfield", "Starfield", ["mystical", "quiet"], { retired: true }),
+      o("mosaic", "Mosaic", ["ornate", "playful"]), o("steel", "Steel", ["technical", "modern"]), o("rust", "Rust", ["rugged", "warm"]), o("blank", "Blank", ["minimal", "quiet"]),
     ]),
   }),
   Object.freeze({
