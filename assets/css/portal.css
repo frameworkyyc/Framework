@@ -1035,3 +1035,17 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .bk-discovery { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; margin: var(--space-3) 0; padding: var(--space-3); border: 1px solid var(--ink); }
 .bk-discovery .h3 { margin: 0 0 4px; }
 .bk-discovery p { margin: 0; max-width: 38em; }
+/* Brand Discovery waiting for the client: the one dark block on the page, so it cannot be missed. */
+.bk-discovery--action { background: var(--ink); color: var(--paper); border-color: var(--ink); padding: var(--space-4); gap: var(--space-4); }
+.bk-discovery--action .h3 { font-size: clamp(24px, 3vw, 32px); line-height: 1.15; margin: 8px 0 8px; color: var(--paper); }
+.bk-discovery--action p { color: #E4E4E4; }
+.bk-discovery__text { flex: 1 1 22em; min-width: 0; }
+.bk-discovery__tag { display: inline-flex; align-items: center; gap: 8px; font: 600 12px/1 var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--paper); }
+.bk-discovery--action .dot--attention { box-shadow: 0 0 0 2px var(--paper); }
+.btn--on-dark { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+.btn--on-dark:hover { background: transparent; color: var(--paper); border-color: var(--paper); }
+.btn--on-dark:focus-visible, .bk-discovery--action a:focus-visible { outline: 2px solid var(--paper); outline-offset: 3px; }
+@media (max-width: 560px) { .bk-discovery--action { padding: var(--space-3); } .bk-discovery--action .btn { width: 100%; } }
+/* the small red dot beside "Branding" on the portal home when a Brand Discovery needs the client */
+.hub__flag { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 10px; }
+.hub__flag .dot { width: 10px; height: 10px; }
