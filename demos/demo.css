@@ -184,3 +184,79 @@ form.is-done .form-done{display:block}
 .site-foot .wrap{flex-wrap:wrap}
 .photo-credits{flex-basis:100%;font-size:12px;line-height:1.5;opacity:.75}
 .photo-credits a{text-decoration:underline}
+
+/* ---------- Scroll motion (demos/motion.js) ---------- */
+/* "Watch it come together": a pinned scene. Parts read --t (0 to 1) set by motion.js; with no script or reduced motion --t stays 1 and the scene shows finished. */
+.build{position:relative;background:var(--band-bg,var(--ink));color:var(--band-ink,var(--bg))}
+.build.is-live{height:480vh}
+.build__stick{position:static;padding:clamp(48px,7vw,96px) 0}
+.build.is-live .build__stick{position:sticky;top:76px;height:calc(100vh - 76px);height:calc(100svh - 76px);padding:0;display:flex;align-items:center;overflow:hidden}
+.build__grid{display:grid;grid-template-columns:minmax(260px,.36fr) 1fr;gap:clamp(24px,4vw,56px);align-items:center}
+.build .eyebrow{color:var(--accent-on-dark,var(--accent))}
+.build h2{font-size:clamp(30px,4vw,52px);margin:14px 0 14px}
+.build__lead{opacity:.75;font-size:17px;max-width:420px}
+.build__steps{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:0;border-left:2px solid rgba(255,255,255,.16)}
+.build__steps li{padding:10px 0 10px 20px;position:relative;opacity:.45;transition:opacity .3s ease}
+.build__steps li::before{content:"";position:absolute;left:-7px;top:18px;width:12px;height:12px;border-radius:50%;background:var(--band-bg,var(--ink));border:2px solid rgba(255,255,255,.4);transition:background .3s,border-color .3s,transform .3s}
+.build__steps b{display:block;font:600 16px/1.3 var(--body-font)}
+.build__steps span{display:block;font-size:14px;line-height:1.5;max-height:0;overflow:hidden;opacity:0;transition:max-height .35s ease,opacity .35s ease}
+.build__steps li.is-done{opacity:.8}
+.build__steps li.is-done::before{background:var(--accent);border-color:var(--accent)}
+.build__steps li.is-on{opacity:1}
+.build__steps li.is-on::before{background:var(--accent);border-color:var(--accent-on-dark,var(--accent));transform:scale(1.25)}
+.build__steps li.is-on span{max-height:5em;opacity:.78;margin-top:4px}
+.build:not(.is-live) .build__steps li{opacity:1}
+.build:not(.is-live) .build__steps span{max-height:none;opacity:.75;margin-top:4px}
+.build__stage{position:relative;border-radius:var(--radius);overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.35);background:#000;line-height:0}
+.build__stage svg{width:100%;height:auto;display:block}
+.build__bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.18)}
+.build__fill{display:block;height:100%;background:var(--accent);transform:scaleX(var(--p,1));transform-origin:0 50%}
+.build__hint{display:none;font-size:13px;opacity:.6;margin-top:18px;letter-spacing:.04em}
+.build.is-live .build__hint{display:block}
+.build svg *{vector-effect:none}
+.build svg [data-b]{--t:1}
+.b-rise{transform-box:fill-box;transform-origin:50% 100%;transform:scaleY(var(--t))}
+.b-down{transform-box:fill-box;transform-origin:50% 0;transform:scaleY(var(--t))}
+.b-wipe{transform-box:fill-box;transform-origin:0 50%;transform:scaleX(var(--t))}
+.b-pop{transform-box:fill-box;transform-origin:50% 100%;transform:scale(var(--t));opacity:min(1,calc(var(--t) * 4))}
+.b-fade{opacity:var(--t)}
+.b-out{opacity:calc(1 - var(--t))}
+.b-drop{transform:translateY(calc((1 - var(--t)) * -170px));opacity:min(1,calc(var(--t) * 5))}
+.b-up{transform:translateY(calc((1 - var(--t)) * 150px));opacity:min(1,calc(var(--t) * 5))}
+.b-inl{transform:translateX(calc((1 - var(--t)) * -300px));opacity:min(1,calc(var(--t) * 5))}
+.b-inr{transform:translateX(calc((1 - var(--t)) * 300px));opacity:min(1,calc(var(--t) * 5))}
+.b-draw{stroke-dasharray:1;stroke-dashoffset:calc(1 - var(--t))}
+.flame{transform-box:fill-box;transform-origin:50% 100%;animation:flame 1.1s ease-in-out infinite alternate}
+@keyframes flame{from{transform:scale(1,.86) skewX(-3deg)}to{transform:scale(.92,1.08) skewX(3deg)}}
+.glow{animation:glow 3s ease-in-out infinite alternate}
+@keyframes glow{from{opacity:.75}to{opacity:1}}
+
+/* Reveals, entrance and progress bar (only when motion.js runs and motion is allowed) */
+.scroll-prog{position:fixed;left:0;top:0;right:0;height:3px;z-index:60;background:var(--accent);transform:scaleX(0);transform-origin:0 50%;pointer-events:none}
+.motion .rv{opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.2,.7,.2,1) var(--d,0ms),transform .7s cubic-bezier(.2,.7,.2,1) var(--d,0ms)}
+.motion .rv.in{opacity:1;transform:none}
+.motion .hero .eyebrow,.motion .hero h1,.motion .hero__lead,.motion .hero .btn-row,.motion .hero .trust{animation:rise .8s cubic-bezier(.2,.7,.2,1) both}
+.motion .hero h1{animation-delay:.08s}.motion .hero__lead{animation-delay:.18s}.motion .hero .btn-row{animation-delay:.28s}.motion .hero .trust{animation-delay:.4s}
+.motion .hero .ph{animation:heroin 1.1s cubic-bezier(.2,.7,.2,1) .1s both}
+.motion .hero .ph img{will-change:transform;transform:scale(1.12)}
+@keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes heroin{from{opacity:0;clip-path:inset(0 0 14% 0)}to{opacity:1;clip-path:inset(0)}}
+.motion .btn--primary{position:relative;overflow:hidden}
+.motion .btn--primary::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.28) 50%,transparent 70%);transform:translateX(-120%);transition:transform .6s ease}
+.motion .btn--primary:hover::after{transform:translateX(120%)}
+
+@media (max-width:960px){
+  .build__grid{grid-template-columns:1fr;gap:20px}
+  .build.is-live{height:420vh}
+  .build.is-live .build__stick{align-items:flex-start;padding-top:20px}
+  .build h2{margin:10px 0 8px;font-size:clamp(26px,7vw,36px)}
+  .build__lead{display:none}
+  .build.is-live .build__steps{margin-top:14px}
+  .build.is-live .build__steps li:not(.is-on){display:none}
+  .build.is-live .build__steps{border-left:0}
+  .build.is-live .build__steps li{padding-left:0;opacity:1}
+  .build.is-live .build__steps li::before{display:none}
+  .build__stage{order:2}
+  .build.is-live .build__stage svg{width:190%;max-width:none;transform:translateX(calc(var(--p,0) * -47.4%));will-change:transform}
+  .build__hint{display:none!important}
+}
