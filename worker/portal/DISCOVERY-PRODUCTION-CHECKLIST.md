@@ -24,14 +24,14 @@ Status on 5 November 2026. Production is untouched. Nothing below is done on Pro
 
 ## 3. Image licensing (see `DISCOVERY-IMAGES.md`)
 - [x] Owner confirmed: photos and textures are from Unsplash (commercial use under its standard licence); the 12 logo examples are AI-generated. All existing images stay.
-- [ ] Quick rights review of the 7 flagged files (identifiable people or trademarks: lifestyle, flatlay, documentary, abstract3d, blank, and the direction images bold and dark). Each is keep-or-swap; none blocks the release if the owner accepts it for illustrative use.
+- [x] Owner decided to keep all existing images for launch. The 7 flagged files (identifiable people or trademarks: lifestyle, flatlay, documentary, abstract3d, blank, and the direction images bold and dark) are recorded in `DISCOVERY-IMAGES.md` for a **follow-up** rights review after launch.
 - [ ] Owner keeps the Unsplash page URL and photographer for each photo and texture, and the generation records and terms for the AI-generated images.
 - [ ] Owner states the source of the 20 design-direction images (most look AI-generated).
 
 ## 4. Privacy
 - [x] Guest welcome page shows a plain-language privacy notice; `privacy.html` has a "Brand Discovery" section and retention entry (PR #157, on Staging).
 - [x] The policy no longer claims an automated backup purge (that switch is off), and says an Admin deletion removes answers, links, files and backup copies together.
-- [ ] Effective date in `privacy.html` set to the real publication date (`PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`).
+- [x] Effective date in `privacy.html` set to November 5, 2026 (the planned publication date; change it if the release slips: `PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`).
 - [ ] Owner (or a lawyer) has read the new wording.
 - [ ] The deletion-request routine in `PRIVACY-OPERATIONS.md` section 7 is understood: a guest emails hello@frameworkco.ca; Admin finds the assessment and uses **Delete permanently** (tested: removes files and backup copies, fails closed, counts-only audit entry); the reply and the request log are recorded.
 
@@ -57,4 +57,4 @@ Know these before the apply run.
 3. Approve verify-only run, then read it.
 4. Approve the apply run.
 5. Approve merging the refreshed PR #156.
-6. Set the privacy effective date and decide the flagged-image reviews before step 5.
+6. Confirm the release still happens on November 5 (otherwise the effective date changes).

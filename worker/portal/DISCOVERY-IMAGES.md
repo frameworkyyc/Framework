@@ -11,6 +11,9 @@ The owner has confirmed that the **photos and textures (28 files) come from Unsp
 - **Design directions (20):** the owner has not stated a source. Most look AI-generated logo or poster mock-ups with fictional brand names. Please confirm.
 - No file is byte-identical to any other image in the repository.
 
+## Follow-up rights review (after launch; does not block it)
+The owner has decided to keep all existing images for the launch. The seven files below are recorded for a follow-up review: keep, or swap to the generated sketch.
+
 ## Quick rights review (people and trademarks)
 Unsplash's licence covers use of the photograph; it does not give trademark rights or a model release for identifiable people. These are the files where that matters. None is a blocker if the owner accepts the risk for illustrative use; each is a one-minute decision (keep, or swap to the generated sketch by removing the file and its key from the list at the top of `worker/portal/discovery/pages.js`).
 
