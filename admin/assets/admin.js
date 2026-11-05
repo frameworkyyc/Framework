@@ -3,6 +3,7 @@
 
 import { h, api, errorState } from "./ui.js";
 import { MODULES } from "./modules.js";
+import { navIcon } from "./kit.js";
 
 const MARK = `<svg viewBox="0 0 1092 1092" aria-hidden="true" focusable="false"><rect width="1092" height="1092" fill="#0A0A0A"/><path fill="#FFFFFF" d="M302 245H815V347H411V741L302 851Z"/><path fill="#FFFFFF" d="M435 517L512 440H815V545H534V842H435Z"/></svg>`;
 
@@ -23,8 +24,11 @@ function brand() {
   return a;
 }
 
+// How the sidebar is grouped (worker/admin/DESIGN-SYSTEM.md). A module not listed here still appears, after the groups.
+const NAV_GROUPS = [[null, ["overview"]], ["Inbox", ["feedback", "support"]], ["Assessments", ["assessments", "discovery"]], ["People", ["clients", "approved-emails"]], ["Setup", ["additional-services", "service-pricing", "settings"]]];
+
 function navItem(m) {
-  const a = h("a", { class: "adm-nav__link", href: m.path, "data-link": "", "data-module": m.id }, m.label);
+  const a = h("a", { class: "adm-nav__link", href: m.path, "data-link": "", "data-module": m.id }, navIcon(m.id), h("span", { text: m.label }));
   navLinks.push(a);
   return h("li", null, a);
 }
@@ -43,7 +47,8 @@ function buildShell() {
     h(
       "nav",
       { class: "adm-nav", "aria-label": "Admin" },
-      h("div", { class: "adm-nav__group" }, h("ul", null, live.map(navItem))),
+      NAV_GROUPS.map(([title, ids]) => { const items = live.filter((m) => ids.includes(m.id)); return items.length ? h("div", { class: "adm-nav__group" }, title ? h("p", { class: "adm-nav__title", text: title }) : null, h("ul", null, items.map(navItem))) : null; }),
+      h("div", { class: "adm-nav__group" }, h("ul", null, live.filter((m) => !NAV_GROUPS.some(([, ids]) => ids.includes(m.id))).map(navItem))),
     ),
     h("div", { class: "adm-side__foot" }, userLine, h("a", { href: "/", target: "_blank", rel: "noopener" }, "View website"), h("a", { href: "/cdn-cgi/access/logout" }, "Sign out")),
   );

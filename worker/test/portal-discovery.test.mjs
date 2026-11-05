@@ -1001,7 +1001,7 @@ test("the brief carries a picture description for every choice, without changing
 
 test("the Admin review page keeps links and controls out of the brief and never inserts server text as markup", async () => {
   const fs = await import("node:fs");
-  const kit = fs.readFileSync(new URL("../../admin/assets/review-kit.js", import.meta.url), "utf8");
+  const kit = fs.readFileSync(new URL("../../admin/assets/kit.js", import.meta.url), "utf8");
   const page = fs.readFileSync(new URL("../../admin/assets/discovery.js", import.meta.url), "utf8");
   for (const src of [kit, page]) { assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML/.test(src.replace(/\/\*[\s\S]*?\*\//g, "")), "no markup insertion"); assert.ok(!/setAttribute\(["']style|\.style\./.test(src), "no inline styles"); }
   const call = page.slice(page.indexOf("root.replaceChildren(...[...s.head, !writes()"));

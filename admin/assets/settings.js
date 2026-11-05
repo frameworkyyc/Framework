@@ -4,6 +4,7 @@
    A price is a starting estimate, not a quote: there is no checkout, payment or invoicing. Server text is never inserted as HTML. */
 
 import { contentEditor } from "./service-content.js";
+import { linkCard } from "./kit.js";
 import { h, api, fmtDate, stateBlock, errorState } from "./ui.js";
 import { BRAND_SECTIONS } from "./brand-sections.js";
 
@@ -28,13 +29,13 @@ export async function render(ctx) {
 }
 
 function hub() {
-  const item = (href, title, body) => h("li", { class: "adm-settings__item" }, h("a", { class: "adm-settings__link", href, "data-link": "" }, h("span", { class: "adm-settings__title", text: title }), h("span", { class: "adm-sub", text: body })));
+  const item = (href, title, body, icon) => h("li", { class: "adm-settings__item" }, linkCard({ href, title, body, icon, cls: "adm-settings__link" }));
   return { title: "Settings", node: h("div", { class: "adm-page adm-settings" },
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Settings"), h("p", { class: "adm-sub" }, "Settings that apply to every client."))),
     h("ul", { class: "adm-settings__list", "aria-label": "Settings" },
-      item("/admin/settings/service-pricing", "Service Pricing", "The starting price of each Branding design service, in Canadian dollars."),
-      item("/admin/settings/additional-services", "Additional Services", "The optional services listed on every client’s Website page: name, short description and order. Prices are set in Service Pricing."),
-      item("/admin/approved-emails", "Approved Emails", "The addresses that may be invited to a client portal or receive its emails."))) };
+      item("/admin/settings/service-pricing", "Service Pricing", "The starting price of each Branding design service, in Canadian dollars.", "service-pricing"),
+      item("/admin/settings/additional-services", "Additional Services", "The optional services listed on every client’s Website page: name, short description and order. Prices are set in Service Pricing.", "additional-services"),
+      item("/admin/approved-emails", "Approved Emails", "The addresses that may be invited to a client portal or receive its emails.", "approved-emails"))) };
 }
 
 async function pricingPage(ctx) {

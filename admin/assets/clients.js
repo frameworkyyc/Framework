@@ -38,7 +38,7 @@ function completion(p) {
 function clientRow(c) {
   const created = c.status === "active" ? "Created " + fmtDate(c.created_at) : `${statusWord(c.status)} · created ${fmtDate(c.created_at)}`;
   return h("a", { class: "adm-clientrow", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "" },
-    h("span", { class: "adm-clientrow__name", text: c.name }),
+    h("span", { class: "adm-clientrow__name", text: c.name, "data-mono": String(c.name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() }),
     h("span", { class: "adm-clientrow__date", text: created }),
     completion(c.profile));
 }
