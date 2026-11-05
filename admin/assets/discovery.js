@@ -10,6 +10,7 @@ const ERROR = {
   invalid_enabled: "Choose shown or hidden.", invalid_sort_order: "That order isn’t valid.", nothing_to_change: "Nothing to change.", not_found: "That no longer exists. The page has been refreshed.", not_submitted: "Only a submitted assessment can be reviewed or reopened.",
   closed: "It has already been sent, so it can’t be changed that way.", too_many: "That is the most that can be added.", type_not_allowed: "Use a PNG, JPG or WebP picture.", file_too_large: "That picture is too large (5 MB at most).", content_mismatch: "That file doesn’t look like its file type.",
   empty_file: "That file is empty.", no_file: "Choose a picture first.", unavailable: "That isn’t available on this site yet (a database update has not been applied here).", writes_disabled: "Changes are switched off on this site, so nothing was changed.",
+  invalid_date: "Choose a real date that is not in the future.", not_due: "That is no longer due, so nothing was deleted.", confirm_required: "Confirmation is needed.", storage_delete_failed: "A file could not be deleted, so nothing was changed. Try again.",
   session: "Your admin session has ended. Reload the page to sign in again.", denied: "This account isn’t allowed to do that.",
 };
 const errorText = (err) => ERROR[err && err.code] || "That didn’t work and nothing was changed. Try again, and reload the page if it keeps happening.";
@@ -34,7 +35,8 @@ export async function render(ctx) {
 
 async function listPage(ctx) {
   let data, clients;
-  try { [data, clients] = await Promise.all([api("/discovery"), api("/clients")]); } catch (err) { return { title: "Discovery", node: h("div", { class: "adm-page" }, errorState(err, ctx.retry)) }; }
+  let ret = null;
+  try { [data, clients, ret] = await Promise.all([api("/discovery"), api("/clients"), api("/discovery/retention").catch(() => null)]); } catch (err) { return { title: "Discovery", node: h("div", { class: "adm-page" }, errorState(err, ctx.retry)) }; }
   const root = h("div", { class: "adm-page adm-dsc" });
   const writes = Boolean(data.capabilities && data.capabilities.writes);
   const s = shell(root, { title: "Brand Discovery", sub: h("span", null, "Visual assessments that help a client or prospect show what they like. Recipients need no account: send them a secure link, or they can complete it in their Client Portal Branding area. Answers never change a brand kit. ", h("a", { class: "adm-link", href: "/admin/discovery/content", "data-link": "" }, "Edit the questions and pictures")) });
@@ -67,8 +69,42 @@ async function listPage(ctx) {
   root.replaceChildren(...[...s.head, !data.available ? h("p", { class: "adm-banner" }, "Discovery needs a database update that hasn’t been applied here yet. Nothing is lost: it will appear here once it is.") : null,
     !data.capabilities.enabled ? h("p", { class: "adm-banner" }, "Discovery is switched off for clients on this site (PORTAL_DISCOVERY). You can prepare assessments, but links and the Branding card stay inactive until it is on.") : null,
     !writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look, but not change.") : null,
-    data.available ? form : null, h("div", { class: "adm-dsc__bar" }, h("h2", { class: "adm-h2" }, "Assessments"), filter), list].filter(Boolean));
+    data.available ? form : null, h("div", { class: "adm-dsc__bar" }, h("h2", { class: "adm-h2" }, "Assessments"), filter), list, retentionPanel(ret, clients, writes, s)].filter(Boolean));
   return { title: "Discovery", node: root };
+}
+
+
+/* ------------------------------------------------------------------ retention (90 days after a client relationship ends) */
+
+function retentionPanel(ret, clients, writes, s) {
+  if (!ret) return null;
+  const body = h("div");
+  const org = h("select", { id: "ret-org", class: "input" }, h("option", { value: "" }, "Choose a client"), clients.clients.map((c) => h("option", { value: c.id, text: c.name })));
+  const date = h("input", { id: "ret-date", class: "input", type: "date", max: new Date().toISOString().slice(0, 10) });
+  async function save(orgId, ended) {
+    try { await api("/clients/" + encodeURIComponent(orgId) + "/relationship", { method: "POST", body: { ended_on: ended } }); s.say(ended ? "End date saved." : "End date cleared.", "ok"); await redraw(); } catch (err) { s.say(errorText(err), "error"); }
+  }
+  async function check() {
+    try { const r = await api("/discovery/retention/run", { method: "POST", body: { confirm: "RETENTION", dry_run: true } }); s.say(r.due ? `Dry run: ${r.due} assessment${r.due === 1 ? "" : "s"} would be deleted. Nothing was deleted.` : "Dry run: nothing is due. Nothing was deleted.", "ok"); } catch (err) { s.say(errorText(err), "error"); }
+  }
+  async function redraw() {
+    let d; try { d = await api("/discovery/retention"); } catch (err) { body.replaceChildren(errorState(err, redraw)); return; }
+    body.replaceChildren(...[
+      h("p", { class: "adm-sub", text: `Brand Discovery answers and files are kept while the client relationship continues and for ${d.days} days after the end date you record here. Automatic deletion is ${d.capabilities.retentionEnabled ? "ON" : "OFF"} on this site${d.capabilities.retentionEnabled ? "" : ": nothing is deleted automatically; you can still see what would be due and delete an assessment by hand"}.` }),
+      !d.available ? h("p", { class: "adm-banner", text: "Recording an end date needs a database update that hasn’t been applied here yet." }) : null,
+      d.available ? h("form", { class: "adm-dsc__fields", novalidate: true, onsubmit: (ev) => { ev.preventDefault(); if (!org.value || !date.value) { s.say("Choose a client and a date.", "error"); return; } save(org.value, date.value); } },
+        h("div", { class: "adm-field" }, h("label", { for: "ret-org", text: "Client" }), org), h("div", { class: "adm-field" }, h("label", { for: "ret-date", text: "Relationship ended on" }), date),
+        h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary", type: "submit", disabled: writes ? null : true }, "Record end date"))) : null,
+      d.relationships.length ? h("table", { class: "adm-table" }, h("thead", null, h("tr", null, ["Client", "Ended on", "Assessments", "Due for deletion", ""].map((t) => h("th", { scope: "col", text: t })))),
+        h("tbody", null, d.relationships.map((r) => {
+          const due = d.due.filter((x) => x.organizationId === r.organizationId).length;
+          return h("tr", null, h("td", { text: r.organizationName }), h("td", { text: r.endedOn }), h("td", { text: String(r.assessments) }), h("td", { text: due ? `${due} now` : r.assessments ? "Not yet" : "Nothing kept" }),
+            h("td", null, h("button", { class: "btn btn--secondary", type: "button", disabled: writes ? null : true, onclick: async () => { if (await confirmDialog({ title: "Clear the end date?", body: "The relationship is treated as continuing, so nothing will be due for deletion.", confirmLabel: "Clear" })) save(r.organizationId, null); } }, "Clear")));
+        }))) : h("p", { class: "adm-sub", text: "No client has an end date recorded, so nothing is due." }),
+      d.available ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary", type: "button", disabled: writes ? null : true, onclick: check }, "Check what would be deleted")) : null].filter(Boolean));
+  }
+  redraw();
+  return h("section", { class: "adm-dsc__retention", "aria-labelledby": "ret-h" }, h("h2", { class: "adm-h2", id: "ret-h" }, "Retention and deletion"), body);
 }
 
 /* ------------------------------------------------------------------ one assessment */
@@ -140,7 +176,8 @@ async function detailPage(orgId, id, ctx) {
       h("div", { class: "adm-actions" },
         st === "submitted" ? h("button", { class: "btn btn--primary", type: "button", onclick: () => act("/review", { note: note.value }, "Marked as reviewed.") }, "Mark as reviewed") : null,
         st === "submitted" || st === "reviewed" ? h("button", { class: "btn btn--secondary", type: "button", onclick: async () => { if (await confirmDialog({ title: "Reopen for the recipient?", body: "They will be able to change their answers and send them again.", confirmLabel: "Reopen" })) act("/reopen", {}, "Reopened."); } }, "Reopen") : null,
-        h("button", { class: "btn btn--secondary adm-actions__danger", type: "button", onclick: async () => { if (await confirmDialog({ title: "Archive this assessment?", body: "It is hidden from the client and its links stop working. The record is kept.", confirmLabel: "Archive" })) { try { await api(base + "/archive", { method: "POST", body: {} }); location.assign("/admin/discovery"); } catch (err) { s.say(errorText(err), "error"); } } } }, "Archive")));
+        h("button", { class: "btn btn--secondary adm-actions__danger", type: "button", onclick: async () => { if (await confirmDialog({ title: "Archive this assessment?", body: "It is hidden from the client and its links stop working. The record is kept.", confirmLabel: "Archive" })) { try { await api(base + "/archive", { method: "POST", body: {} }); location.assign("/admin/discovery"); } catch (err) { s.say(errorText(err), "error"); } } } }, "Archive"),
+        h("button", { class: "btn btn--secondary adm-actions__danger", type: "button", onclick: async () => { if (await confirmDialog({ title: "Delete this assessment permanently?", body: "Its answers, links and files are deleted for good, including the backup copies of the files. This is for a deletion request or the end of the retention period, and it cannot be undone.", confirmLabel: "Delete permanently" })) { try { await api(base + "/delete", { method: "POST", body: { confirm: "DELETE" } }); location.assign("/admin/discovery"); } catch (err) { s.say(errorText(err), "error"); } } } }, "Delete permanently")));
   }
   function draw() {
     root.replaceChildren(...[...s.head, !writes() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look, but not change.") : null,

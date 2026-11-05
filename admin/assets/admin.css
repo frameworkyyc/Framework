@@ -914,3 +914,8 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-dsc__optrow { display: grid; gap: 12px; grid-template-columns: minmax(140px, 1fr) minmax(180px, 1.6fr); }
 .adm-dsc__picdet summary { cursor: pointer; font-size: 13px; color: var(--slate); }
 @media (max-width: 640px) { .adm-dsc__optrow { grid-template-columns: 1fr; } }
+
+/* Discovery: retention panel */
+.adm-dsc__retention { margin-top: var(--space-6, 48px); }
+.adm-dsc__retention .adm-table, .adm-dsc__retention form { margin-top: var(--space-3, 16px); }
+.adm-dsc__retention .adm-actions { margin-top: var(--space-3, 16px); }

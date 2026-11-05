@@ -9,6 +9,8 @@
 import { processNotifications } from "./service-notifications.js";
 import { backupFiles } from "./file-backup.js";
 import { backupPurge, purgeEnabled } from "./backup-purge.js";
+import { runRetention } from "./discovery/retention.js";
+import { retentionEnabled } from "./config.js";
 import { logEvent } from "./log.js";
 
 export async function runScheduled(env, { now = new Date(), fetch: fetchImpl, log = logEvent } = {}) {
@@ -39,6 +41,11 @@ export async function runScheduled(env, { now = new Date(), fetch: fetchImpl, lo
         log({ evt: "cron.purge", outcome: "error" });
       }
     }
+  }
+  // 4. Discovery retention (answers and files 90 days after a recorded client relationship end). Runs ONLY where PORTAL_DISCOVERY_RETENTION is exactly "1"; otherwise nothing here
+  // happens at all. A few assessments per run; never throws. See discovery/retention.js.
+  if (retentionEnabled(env) && env.PORTAL_DB && env.PORTAL_FILES) {
+    try { const x = await runRetention(env, { now, dryRun: false, log }); if (x.due || !x.ok) out.retention = x; } catch { out.retention = { error: true }; }
   }
   return out;
 }
