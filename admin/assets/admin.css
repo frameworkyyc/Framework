@@ -919,3 +919,103 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-dsc__retention { margin-top: var(--space-6, 48px); }
 .adm-dsc__retention .adm-table, .adm-dsc__retention form { margin-top: var(--space-3, 16px); }
 .adm-dsc__retention .adm-actions { margin-top: var(--space-3, 16px); }
+
+/* ---- Review kit (admin/assets/review-kit.js): at-a-glance reading of a submitted assessment. Reusable by any assessment type. ---- */
+.rk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.rk-stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin: 24px 0 16px; }
+.rk-stat { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 1px solid var(--hairline); border-radius: 12px; background: #fff; }
+.rk-stat--ok { border-color: var(--ok); background: var(--ok-bg); }
+.rk-stat--warn { border-color: var(--warn); background: var(--warn-bg); }
+.rk-stat__label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--slate); }
+.rk-stat__value { font-size: 26px; line-height: 1.15; font-weight: 600; }
+.rk-stat__hint { font-size: 13px; color: var(--slate); }
+progress.rk-meter, progress.rk-bars__track { appearance: none; -webkit-appearance: none; display: block; width: 100%; border: 0; border-radius: 999px; overflow: hidden; background: var(--hairline); color: var(--ink); }
+progress.rk-meter { height: 6px; margin: 6px 0 2px; }
+progress.rk-bars__track { height: 8px; background: var(--mist); }
+progress.rk-meter::-webkit-progress-bar, progress.rk-bars__track::-webkit-progress-bar { background: transparent; }
+progress.rk-meter::-webkit-progress-value, progress.rk-bars__track::-webkit-progress-value { background: var(--ink); border-radius: 999px; }
+progress.rk-meter::-moz-progress-bar, progress.rk-bars__track::-moz-progress-bar { background: var(--ink); border-radius: 999px; }
+.rk-two { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); margin: 0 0 16px; }
+.rk-two--flush { margin: 0; gap: 24px; }
+.rk-card { margin: 0 0 16px; padding: 20px; border: 1px solid var(--hairline); border-radius: 12px; background: #fff; min-width: 0; }
+.rk-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; }
+.rk-card__title { margin: 0; font-size: 18px; font-weight: 600; }
+.rk-sub { margin: 14px 0 8px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--slate); }
+.rk-sub:first-child { margin-top: 0; }
+.rk-tags { display: flex; flex-wrap: wrap; }
+.rk-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.rk-bars li { display: grid; grid-template-columns: minmax(90px, 160px) 1fr 24px; gap: 10px; align-items: center; font-size: 14px; }
+.rk-bars__n { text-align: right; color: var(--slate); font-variant-numeric: tabular-nums; }
+.rk-quote { margin: 0 0 16px; padding: 14px 18px; border-left: 3px solid var(--ink); background: var(--mist); font-style: italic; }
+.rk-quote__label { display: block; margin: 0 0 4px; font-style: normal; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--slate); }
+.rk-attns { list-style: none; margin: 0; padding: 0; }
+.rk-attn { padding: 9px 0; border-top: 1px solid var(--hairline); font-size: 14px; }
+.rk-attn:first-child { border-top: 0; }
+.rk-attn summary, .rk-attn__row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; cursor: pointer; }
+.rk-attn__row { cursor: default; }
+.rk-attn__title { font-weight: 600; flex: 1 1 220px; }
+.rk-attn__where { color: var(--slate); font-size: 13px; }
+.rk-attn__detail { margin: 8px 0 0; color: var(--slate); }
+.rk-more { margin-top: 6px; } .rk-more > summary { cursor: pointer; font-size: 13px; color: var(--slate); padding: 6px 0; }
+.rk-selections { margin: 28px 0 16px; }
+.rk-folds-ctl { display: flex; gap: 8px; }
+.rk-folds { border: 1px solid var(--hairline); border-radius: 12px; background: #fff; overflow: hidden; }
+.rk-fold + .rk-fold { border-top: 1px solid var(--hairline); }
+.rk-fold__sum, .rk-manage__sum { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; padding: 14px 18px; cursor: pointer; }
+.rk-fold__no { min-width: 1.8em; color: var(--slate); font-variant-numeric: tabular-nums; }
+.rk-fold__title { font-weight: 600; }
+.rk-fold__meta { color: var(--slate); font-size: 13px; }
+.rk-fold__badges { margin-left: auto; }
+.rk-fold__body { padding: 4px 18px 18px; }
+.rk-item { padding: 14px 0; border-top: 1px solid var(--hairline); }
+.rk-item:first-child { border-top: 0; padding-top: 4px; }
+.rk-item__q { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+.rk-group { margin: 0 0 12px; }
+.rk-group__title { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.rk-group--like .rk-group__title { color: var(--ok); } .rk-group--dislike .rk-group__title { color: var(--bad); }
+.rk-choices { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.rk-choices:has(.rk-pill) { display: flex; flex-wrap: wrap; }
+.rk-tile { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rk-tile__pic { position: relative; display: block; aspect-ratio: 8 / 5; border-radius: 8px; overflow: hidden; background: var(--mist); outline: 2px solid var(--ok); outline-offset: -2px; }
+.rk-tile--dislike .rk-tile__pic { outline-color: var(--bad); }
+.rk-tile--dislike .rk-vis { opacity: .5; filter: grayscale(.7); }
+.rk-tile__label { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.rk-tile__note { font-size: 12px; color: var(--slate); line-height: 1.3; }
+.rk-choice__mark { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 12px; font-weight: 700; color: #fff; background: var(--ok); }
+.rk-tile--dislike .rk-choice__mark { background: var(--bad); }
+.rk-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 6px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ok); background: var(--ok-bg); }
+.rk-pill .rk-choice__mark { position: static; width: 18px; height: 18px; font-size: 10px; flex: none; }
+.rk-pill--dislike { color: var(--bad); background: var(--bad-bg); } .rk-pill--dislike .rk-choice__mark { background: var(--bad); }
+.rk-pill--dislike span:last-child { text-decoration: line-through; text-decoration-thickness: 1px; }
+.rk-vis { display: block; width: 100%; height: 100%; }
+.rk-vis--photo, .rk-vis--sketch { object-fit: cover; }
+.rk-vis--logo { object-fit: contain; }
+.rk-vis--font { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff; text-align: center; gap: 2px; }
+.rk-vis__aa { font-size: 34px; line-height: 1; } .rk-vis__sample { font-size: 13px; color: var(--slate); }
+.rk-note { margin: 6px 0 0; padding: 8px 12px; border-left: 2px solid var(--hairline); font-style: italic; color: var(--slate); font-size: 14px; }
+.rk-manage { margin: 28px 0 40px; border: 1px solid var(--hairline); border-radius: 12px; background: #fff; }
+.rk-manage__body { padding: 0 18px 4px; }
+.rk-manage__body .adm-dsc__panel:first-child { border-top: 0; }
+@media (max-width: 640px) {
+  .rk-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .rk-stat { padding: 12px 14px; } .rk-stat__value { font-size: 22px; }
+  .rk-card { padding: 16px; }
+  .rk-bars li { grid-template-columns: 1fr 80px 24px; }
+  .rk-choices { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .rk-fold__badges { margin-left: 0; flex-basis: 100%; }
+  .rk-fold__sum, .rk-manage__sum { padding: 12px 14px; } .rk-fold__body { padding: 4px 14px 14px; }
+}
+.rk-font--serif-classic { font-family: Georgia, "Times New Roman", Times, serif; }
+.rk-font--serif-modern { font-family: "Didot", "Bodoni 72", "Playfair Display", Georgia, serif; letter-spacing: .02em; }
+.rk-font--sans-geometric { font-family: "Switzer", "Avenir Next", "Century Gothic", Arial, sans-serif; font-weight: 600; }
+.rk-font--sans-humanist { font-family: "General Sans", "Trebuchet MS", "Segoe UI", sans-serif; font-weight: 500; }
+.rk-font--slab { font-family: Rockwell, "Roboto Slab", "Courier New", serif; font-weight: 700; }
+.rk-font--script { font-family: "Snell Roundhand", "Segoe Script", "Brush Script MT", cursive; font-style: italic; }
+.rk-font--display { font-family: Impact, "Arial Black", "Haettenschweiler", sans-serif; }
+.rk-font--mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-weight: 500; }
+.rk-font--elegant-italic { font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; font-style: italic; }
+.rk-font--calligraphic { font-family: "Apple Chancery", "Snell Roundhand", "Lucida Calligraphy", "Segoe Script", "URW Chancery L", "Z003", cursive; font-style: italic; }
+.rk-font--handwritten { font-family: "Bradley Hand", "Noteworthy", "Segoe Print", "Ink Free", "Marker Felt", cursive; }
+.rk-font--deco { font-family: "Futura", "Century Gothic", "Avenir Next", "Trebuchet MS", sans-serif; font-weight: 500; text-transform: uppercase; letter-spacing: .12em; }
+.rk-font--old-style { font-family: Garamond, "EB Garamond", "Cormorant Garamond", Baskerville, "Times New Roman", serif; }
+.rk-font--condensed { font-family: "Arial Narrow", "Helvetica Neue Condensed", "Roboto Condensed", Impact, sans-serif; font-weight: 700; text-transform: uppercase; }

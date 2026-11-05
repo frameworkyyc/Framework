@@ -973,3 +973,39 @@ test("compatibility: the four new picture styles are appended, every original ke
   const was = legacy["imagery.style"]; for (const k of was) assert.ok(keys.includes(k), "still present: " + k);
   assert.equal(new Set(keys).size, keys.length, "no duplicate keys");
 });
+
+test("the brief carries a picture description for every choice, without changing any answer or the scoring", () => {
+  const answers = new Map([
+    ["logo.type", { picks: { mode: "picks", like: ["wordmark"], dislike: ["mascot"] } }],
+    ["colours.palettes", { picks: { mode: "picks", like: ["earthy"], dislike: [] } }],
+    ["typography.fonts", { picks: { mode: "picks", like: ["serif-modern"], dislike: [] } }],
+    ["layout.system", { picks: { mode: "picks", like: ["airy"], dislike: [] } }],
+    ["style.personality", { picks: { mode: "picks", like: ["warm"], dislike: [] } }],
+  ]);
+  const brief = buildBrief(eff, answers);
+  const item = (k) => brief.sections.flatMap((s) => s.items).find((i) => i.key === k);
+  assert.deepEqual(item("logo.type").likes[0].thumb, { type: "photo", src: "/assets/img/discovery-logos/wordmark.png" });
+  assert.equal(item("logo.type").dislikes[0].thumb.src, "/assets/img/discovery-logos/mascot.png");
+  assert.equal(item("colours.palettes").likes[0].thumb.type, "colours");
+  assert.ok(item("colours.palettes").likes[0].thumb.colours.every((c) => /^#[0-9A-F]{6}$/i.test(c)));
+  assert.deepEqual(item("typography.fonts").likes[0].thumb, { type: "font", font: "serif-modern" });
+  assert.equal(item("layout.system").likes[0].thumb.type, "sketch");
+  assert.match(item("layout.system").likes[0].thumb.svg, /^<svg /);
+  assert.equal(item("style.personality").likes[0].thumb.type, "word");
+  // the same likes, dislikes, themes and tensions as before the pictures were added
+  assert.deepEqual(item("logo.type").likes.map((l) => l.key), ["wordmark"]);
+  assert.deepEqual(brief.summary.personality, ["Warm"]);
+  const attached = effectiveKind("brand", [{ item_key: "logo.type", option_key: "wordmark", image_id: "img-1", enabled: 1 }]);
+  assert.equal(buildBrief(attached, answers).sections.flatMap((s) => s.items).find((i) => i.key === "logo.type").likes[0].thumb.src, "/api/admin/discovery/media/img-1");
+});
+
+test("the Admin review page keeps links and controls out of the brief and never inserts server text as markup", async () => {
+  const fs = await import("node:fs");
+  const kit = fs.readFileSync(new URL("../../admin/assets/review-kit.js", import.meta.url), "utf8");
+  const page = fs.readFileSync(new URL("../../admin/assets/discovery.js", import.meta.url), "utf8");
+  for (const src of [kit, page]) { assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML/.test(src.replace(/\/\*[\s\S]*?\*\//g, "")), "no markup insertion"); assert.ok(!/setAttribute\(["']style|\.style\./.test(src), "no inline styles"); }
+  const call = page.slice(page.indexOf("root.replaceChildren(...[...s.head, !writes()"));
+  const order = ["overview()", "attention()", "selections()", "filesPanel()", "mg"].map((k) => call.indexOf(k));
+  assert.ok(order.every((n, i) => n > 0 && (i === 0 || n > order[i - 1])), "brief first, management last: " + order);
+  assert.ok(!call.slice(0, call.indexOf("selections()")).includes("linksPanel"), "secure links are not above the brief");
+});

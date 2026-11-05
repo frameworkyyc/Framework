@@ -7,6 +7,7 @@
  */
 import { SECTIONS, SECTION_ORDER, TENSIONS, TAG_LABEL, MODE_LABEL } from "./catalogue.js";
 import { answerState } from "./model.js";
+import { thumbFor } from "./thumbs.js";
 
 const asMap = (a) => (a instanceof Map ? a : new Map(Object.entries(a || {})));
 
@@ -24,12 +25,12 @@ export function buildBrief(eff, answersIn, { uploads = 0, overallComment = "" } 
     const items = qs.map((q) => {
       const row = answers.get(q.key) || null;
       const state = answerState(row);
-      const pick = (keys) => (keys || []).map((k) => ({ key: k, label: labelOf.get(`${q.key}:${k}`) || k, note: (q.options.find((o) => o.key === k) || {}).note || null }));
+      const pick = (keys) => (keys || []).map((k) => { const opt = q.options.find((o) => o.key === k); return { key: k, label: labelOf.get(`${q.key}:${k}`) || k, note: (opt || {}).note || null, thumb: opt ? thumbFor(q, opt) : { type: "word" } }; });
       const likes = row && row.picks ? pick(row.picks.like) : [];
       const dislikes = row && row.picks ? pick(row.picks.dislike) : [];
       for (const l of likes) liked.push({ q: q.key, key: l.key, label: l.label, tags: tagsOf.get(`${q.key}:${l.key}`) || [], section: key });
       for (const d of dislikes) disliked.push({ q: q.key, key: d.key, label: d.label, tags: tagsOf.get(`${q.key}:${d.key}`) || [], section: key });
-      return { key: q.key, prompt: q.prompt, state, likes, dislikes, comment: (row && row.comment) || "" };
+      return { key: q.key, prompt: q.prompt, visual: q.visual, state, likes, dislikes, comment: (row && row.comment) || "" };
     });
     const states = items.map((i) => i.state);
     const status = !items.length ? "not_included"
