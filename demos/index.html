@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo websites — Framework</title>
+<meta name="description" content="See the kind of website Framework builds for contractors and trades: fence and deck, landscaping, renovation and general contractor demos.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@600,700&f[]=general-sans@400,500,600&display=swap">
+<style>
+  *,*::before,*::after{box-sizing:border-box;border-radius:0}
+  body{margin:0;background:#FFFFFF;color:#0A0A0A;font:400 17px/1.6 "General Sans",Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .wrap{width:min(1180px,100% - 48px);margin-inline:auto}
+  header{border-bottom:1px solid #E0E0E0}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;height:76px}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none;font-weight:600;letter-spacing:.18em;text-transform:uppercase;font-size:14px}
+  .brand svg{width:32px;height:32px}
+  .btn{display:inline-flex;align-items:center;padding:14px 22px;font-weight:600;font-size:15px;text-decoration:none;border:1px solid #0A0A0A}
+  .btn--primary{background:#0A0A0A;color:#FFFFFF}
+  .intro{padding:clamp(64px,10vw,128px) 0 clamp(48px,6vw,72px);display:grid;grid-template-columns:1.3fr 1fr;gap:48px;align-items:end;border-bottom:1px solid #E0E0E0}
+  .eyebrow{font-weight:600;font-size:13px;letter-spacing:1.8px;text-transform:uppercase;color:#A3A3A3;margin:0 0 20px}
+  h1{font:700 clamp(48px,7.6vw,96px)/.98 Switzer,sans-serif;letter-spacing:-.022em;margin:0}
+  .intro p{color:#5C5C5C;margin:0;font-size:19px}
+  .intro strong{color:#0A0A0A;font-weight:600}
+  .grid{display:grid;grid-template-columns:1fr 1fr;border-left:1px solid #E0E0E0}
+  .tile{display:grid;grid-template-rows:auto 1fr;text-decoration:none;border-right:1px solid #E0E0E0;border-bottom:1px solid #E0E0E0;padding:32px;gap:28px;transition:background .2s ease}
+  .tile:hover{background:#F5F5F5}
+  .tile__preview{position:relative;aspect-ratio:16/10;overflow:hidden;background:var(--a);isolation:isolate}
+  .tile__preview::before{content:"";position:absolute;inset:0;z-index:-1;opacity:.25;background:var(--pattern)}
+  .tile__preview::after{content:"";position:absolute;inset:0;z-index:-2;background:radial-gradient(120% 90% at 85% 10%,var(--b),transparent 60%),linear-gradient(160deg,var(--a),var(--c))}
+  .mock{position:absolute;inset:12% 10% auto 10%;display:grid;gap:10px;color:#fff}
+  .mock__bar{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;opacity:.9}
+  .mock__bar i{width:18px;height:18px;background:var(--accent)}
+  .mock__h{font:var(--font);font-size:clamp(20px,2.6vw,30px);line-height:1.05;max-width:80%}
+  .mock__btn{width:96px;height:26px;background:var(--accent);margin-top:6px}
+  .tile__meta{display:grid;grid-template-columns:auto 1fr auto;gap:20px;align-items:baseline}
+  .tile__n{font:600 15px Switzer,sans-serif;color:#A3A3A3}
+  .tile h2{font:600 clamp(26px,3vw,34px)/1.1 Switzer,sans-serif;letter-spacing:-.01em;margin:0}
+  .tile p{margin:6px 0 0;color:#5C5C5C;font-size:15px}
+  .tile__go{font-weight:600;font-size:15px;white-space:nowrap}
+  .cta{background:#0A0A0A;color:#FFFFFF;padding:clamp(64px,9vw,112px) 0}
+  .cta .wrap{display:flex;justify-content:space-between;gap:32px;align-items:end;flex-wrap:wrap}
+  .cta h2{font:700 clamp(36px,5vw,60px)/1 Switzer,sans-serif;letter-spacing:-.02em;margin:0;max-width:720px}
+  .cta .btn{border-color:#FFFFFF;background:#FFFFFF;color:#0A0A0A}
+  footer{padding:32px 0;color:#A3A3A3;font-size:14px}
+  @media (max-width:820px){.intro,.grid{grid-template-columns:1fr}.tile{padding:24px}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <a class="brand" href="../index.html" aria-label="Framework home"><svg viewBox="0 0 1092 1092" aria-hidden="true"><rect width="1092" height="1092" fill="#0A0A0A"/><path fill="#FFFFFF" d="M302 245H815V347H411V741L302 851Z"/><path fill="#FFFFFF" d="M435 517L512 440H815V545H534V842H435Z"/></svg>Framework</a>
+  <a class="btn btn--primary" href="../contact.html">Start a project</a>
+</div></header>
+<main>
+  <section class="wrap intro">
+    <div><p class="eyebrow">— Demo websites</p><h1>See what we'd build for your business.</h1></div>
+    <p><span id="for-line"></span>Four sample websites built for the trades. Fast on every phone, built to turn visitors into quote requests, and ready to carry your name, photos and reviews.</p>
+  </section>
+  <section class="wrap grid" aria-label="Demo websites">
+    <a class="tile" href="fence-deck.html" style="--a:#4A3324;--b:#C98A55;--c:#1F2A22;--accent:#B5552B;--font:600 1em 'Clash Display',sans-serif;--pattern:repeating-linear-gradient(90deg,rgba(255,255,255,.55) 0 2px,transparent 2px 22px)">
+      <div class="tile__preview" aria-hidden="true"><div class="mock"><span class="mock__bar"><i></i>Ridgeline Fence &amp; Deck</span><span class="mock__h">Fences and decks built to outlast Calgary winters.</span><span class="mock__btn"></span></div></div>
+      <div class="tile__meta"><span class="tile__n">01</span><div><h2>Fence &amp; Decks</h2><p>Fencing, decks, gates and repairs</p></div><span class="tile__go">View →</span></div>
+    </a>
+    <a class="tile" href="landscaping.html" style="--a:#244A2E;--b:#9CC27A;--c:#132016;--accent:#CDE6B8;--font:500 1em Gambetta,Georgia,serif;--pattern:repeating-radial-gradient(circle at 30% 80%,rgba(255,255,255,.5) 0 1px,transparent 1px 18px)">
+      <div class="tile__preview" aria-hidden="true"><div class="mock"><span class="mock__bar"><i></i>Foothills Grove Landscaping</span><span class="mock__h">Outdoor spaces you'll actually live in.</span><span class="mock__btn"></span></div></div>
+      <div class="tile__meta"><span class="tile__n">02</span><div><h2>Landscaping</h2><p>Design, hardscape, sod and maintenance</p></div><span class="tile__go">View →</span></div>
+    </a>
+    <a class="tile" href="renovations.html" style="--a:#5A4632;--b:#D9BF98;--c:#2B241E;--accent:#D9BF98;--font:400 1em Zodiak,Georgia,serif;--pattern:linear-gradient(rgba(255,255,255,.45) 1px,transparent 1px) 0 0/30px 30px,linear-gradient(90deg,rgba(255,255,255,.45) 1px,transparent 1px) 0 0/30px 30px">
+      <div class="tile__preview" aria-hidden="true"><div class="mock"><span class="mock__bar"><i></i>Hearth &amp; Hall Renovations</span><span class="mock__h">Renovations, done properly.</span><span class="mock__btn"></span></div></div>
+      <div class="tile__meta"><span class="tile__n">03</span><div><h2>Renovations</h2><p>Kitchens, bathrooms and basements</p></div><span class="tile__go">View →</span></div>
+    </a>
+    <a class="tile" href="general-contractor.html" style="--a:#2A2F36;--b:#F2B705;--c:#0E1013;--accent:#F2B705;--font:800 1em 'Cabinet Grotesk',sans-serif;--pattern:repeating-linear-gradient(45deg,rgba(255,255,255,.4) 0 1px,transparent 1px 16px)">
+      <div class="tile__preview" aria-hidden="true"><div class="mock"><span class="mock__bar"><i></i>Keystone Build Co.</span><span class="mock__h">Built right. From foundation to final walkthrough.</span><span class="mock__btn"></span></div></div>
+      <div class="tile__meta"><span class="tile__n">04</span><div><h2>General Contractor</h2><p>Custom homes, additions and fit-outs</p></div><span class="tile__go">View →</span></div>
+    </a>
+  </section>
+  <section class="cta"><div class="wrap">
+    <h2>Like what you see? We'll build yours, with your name, your photos and your reviews.</h2>
+    <a class="btn" href="../contact.html">Start a project</a>
+  </div></section>
+</main>
+<footer><div class="wrap">© Framework · Calgary, Alberta · <a href="../index.html">frameworkco.ca</a></div></footer>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@600&f[]=gambetta@500&f[]=zodiak@400&f[]=cabinet-grotesk@800&display=swap">
+<script>
+  // Personalised link: /demos/?for=Total+Fencing+Solutions carries the name into each demo.
+  (function () {
+    var name = (new URLSearchParams(location.search).get("for") || "").replace(/[\u0000-\u001F<>]/g, "").trim().slice(0, 60);
+    if (!name) return;
+    document.getElementById("for-line").textContent = "Made for " + name + ". ";
+    document.querySelectorAll(".tile").forEach(function (a) { a.setAttribute("href", a.getAttribute("href") + "?for=" + encodeURIComponent(name)); });
+  })();
+</script>
+</body>
+</html>
