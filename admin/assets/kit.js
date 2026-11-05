@@ -81,3 +81,26 @@ export function attentionList(rows, { limit = 4, empty = "Nothing here." } = {})
   const first = rows.slice(0, limit), rest = rows.slice(limit);
   return h("div", null, h("ul", { class: "rk-attns" }, first.map(one)), rest.length ? h("details", { class: "rk-more" }, h("summary", { text: `Show ${rest.length} more` }), h("ul", { class: "rk-attns" }, rest.map(one))) : null);
 }
+
+/** A calm "nothing here" block: an icon, a short title, one line of help and, optionally, the one action that fixes it. */
+export function emptyState({ title, body, action }) {
+  return h("div", { class: "rk-empty" }, navIcon("check"), h("p", { class: "rk-empty__title", text: title }), body ? h("p", { class: "rk-empty__body", text: body }) : null, action || null);
+}
+
+/** A whole card that is a link: an icon, a title and one line. Used for hubs (Settings) where each entry opens a page. */
+export const linkCard = ({ href, title, body, icon, cls = "" }) => h("a", { class: "rk-linkcard" + (cls ? " " + cls : ""), href, "data-link": "" }, icon ? h("span", { class: "rk-linkcard__ico" }, navIcon(icon)) : null, h("span", { class: "rk-linkcard__text" }, h("strong", { text: title }), body ? h("span", { text: body }) : null), navIcon("chevron"));
+
+const ICONS = {
+  overview: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z", feedback: "M4 5h16v11H9l-5 4z", support: "M12 3a9 9 0 100 18 9 9 0 000-18zM12 8a4 4 0 100 8 4 4 0 000-8z",
+  assessments: "M8 4h8v3H8zM6 5H5v16h14V5h-1M9 12h6M9 16h4", discovery: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z",
+  clients: "M9 11a3 3 0 100-6 3 3 0 000 6zM3 20v-1a5 5 0 0110 0v1M17 11a3 3 0 000-6M21 20v-1a5 5 0 00-4-4.9", "approved-emails": "M3 6h18v12H3zM3 7l9 6 9-6",
+  "additional-services": "M4 4h16v16H4zM12 8v8M8 12h8", "service-pricing": "M3 12V3h9l9 9-9 9zM8 8h.01", settings: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M14 4v4M8 10v4M16 16v4",
+  check: "M12 3a9 9 0 100 18 9 9 0 000-18zM8 12.4l2.7 2.7L16 9.8", chevron: "M9 6l6 6-6 6",
+};
+/** A 20px line icon by name (the module ids, plus check and chevron). Decorative: it is hidden from screen readers. */
+export function navIcon(name) {
+  const NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24"); svg.setAttribute("class", "rk-ico"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false");
+  const path = document.createElementNS(NS, "path"); path.setAttribute("d", ICONS[name] || ICONS.check); svg.append(path);
+  return svg;
+}

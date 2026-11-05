@@ -2,7 +2,7 @@
    /admin/discovery/<client>/<assessment> (links, what the recipient answered, files, and the creative brief). Server text is never inserted as HTML. A secret link is
    shown once, when it is made, and never again (only its hash is stored). */
 import { h, api, fmtDateTime, errorState, confirmDialog } from "./ui.js";
-import { badge, statCard, card, fold, foldControls, barList, choiceGroups, attentionList } from "./review-kit.js";
+import { badge, statCard, card, fold, foldControls, barList, choiceGroups, attentionList } from "./kit.js";
 
 const STATUS = { not_started: ["Not started", "pending"], in_progress: ["In progress", "warn"], submitted: ["Submitted", "ok"], reviewed: ["Reviewed", "ok"] };
 const statusChip = (s) => h("span", { class: "adm-chip adm-chip--" + (STATUS[s] || ["", "pending"])[1], text: (STATUS[s] || [s])[0] });

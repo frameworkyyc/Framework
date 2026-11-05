@@ -13,7 +13,8 @@ These apply to every session in this repository. Where a development principle b
 - Branch from `origin/Staging`, open a PR into `Staging`, merge only when "Node tests" and "Workers Builds: framework" pass, then run `NODE_USE_ENV_PROXY=1 node scripts/ops/staging-health.mjs` (expect no FAIL and the deployed commit equal to the Staging head).
 - Run `node --test worker/test/*.test.mjs` before every push. Pinned tests are guards: change one deliberately, not to get green.
 - A Production release is a branch from `origin/main` carrying only approved Staging work, then a sync of `main` back into Staging.
-- Project map: `README.md`, `worker/portal/README.md` and its topic notes, `migrations/portal/README.md`.
+- Admin UI: every Admin screen follows `worker/admin/DESIGN-SYSTEM.md`. Use the shared kit (`admin/assets/kit.js`), the tokens in `admin/assets/admin.css` and the page patterns there before writing new markup or styles; no inline styles or HTML insertion. Update that document when a pattern is added.
+- Project map: `README.md`, `worker/admin/DESIGN-SYSTEM.md`, `worker/portal/README.md` and its topic notes, `migrations/portal/README.md`.
 
 ## Development principles
 Adapted from [multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills/blob/main/CLAUDE.md). They bias toward caution over speed; for trivial tasks use judgment.
