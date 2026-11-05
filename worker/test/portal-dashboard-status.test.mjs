@@ -116,10 +116,9 @@ const soonNames = (frag) => (/<p class="soon-line">[\s\S]*?<\/p>/.exec(frag) || 
 
 test("signed-in Home: only the live module carries status, the five unavailable ones are a bare text list (even if a status is supplied for them); the demo is unchanged", () => {
   const html = home(vmFor({ profile: MODULE_STATUS.profile({}), branding: MODULE_STATUS.profile(answers(ALL)), website: { state: "ready", percent: 40, actionRequired: true } }));
-  const focus = (html.match(/<a class="hub"[\s\S]*?<\/a>/g) || []);
-  assert.equal(focus.length, 1);
-  assert.match(focus[0], /Business Profile/);
-  assert.equal((html.match(/class="tile__status"/g) || []).length, 1, "one status block: the live module's");
+  assert.equal((html.match(/<a class="hub"/g) || []).length, 0, "Business Profile is the onboarding section, not a service card");
+  assert.match(/<section class="onboard"[\s\S]*?<\/section>/.exec(html)[0], /Business Profile/);
+  assert.equal((html.match(/class="tile__status"/g) || []).length, 1, "one status block: the onboarding section's");
   const soon = html.slice(html.indexOf('<p class="soon-line"'));
   assert.deepEqual(soonNames(soon), ["Branding", "Website", "Marketing", "Content & Photography", "Files & Deliverables"]);
   assert.ok(!/<progress|% complete|required answers? left|dot|tile__status|<a /.test(soon), "unavailable modules show no progress and no required action");
@@ -129,7 +128,7 @@ test("signed-in Home: only the live module carries status, the five unavailable 
   assert.equal(tiles(demo).length, 6);
   // a live module with no calculator keeps a plain focus block: nothing is invented
   const plain = home({ base: "/portal/o/x", user: { name: "Ann" }, liveAreas: ["profile", "website"], moduleStatus: { profile: MODULE_STATUS.profile({}) } });
-  assert.equal((plain.match(/<a class="hub"/g) || []).length, 2);
+  assert.equal((plain.match(/<a class="hub"/g) || []).length, 1, "Website is the one card; Business Profile is the onboarding section");
   assert.equal((plain.match(/class="tile__status"/g) || []).length, 1, "Website is live but has no status");
 });
 
@@ -195,7 +194,8 @@ test("unreadable data never shows 0%: a failing or missing profile table gives '
   assert.ok(!/SECRET|D1_ERROR/.test(html), "no internals");
   assert.match(html, /<h1 class="h1 h1--home">Welcome/);
   assert.equal(soonNames(html.slice(html.indexOf('<p class="soon-line"'))).length, 5);
-  assert.equal((html.match(/<a class="hub"/g) || []).length, 1);
+  assert.equal((html.match(/<a class="hub"/g) || []).length, 0, "Business Profile is the onboarding section, not a card");
+  assert.match(html, /<section class="onboard"/);
   w.env.PORTAL_DB = real;
   // the profile table does not exist (database without that migration)
   w.db.raw.exec("DROP TABLE business_profile_answers");
@@ -213,13 +213,13 @@ test("the page carries no script or inline style, the link's accessible text inc
   await save(A, "ann@a.test", ALL.filter((f) => f.step === "business"));
   const html = await homeHtml(br.ann, "alpha");
   assert.ok(!/<script|style="/.test(html.replace(/<style[\s\S]*?<\/style>/g, "")));
-  const link = /<a class="hub"[\s\S]*?<\/a>/.exec(html)[0];
+  const link = /<section class="onboard"[\s\S]*?<\/section>/.exec(html)[0];
   const name = link.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   assert.match(name, /Business Profile/);
   assert.match(name, /14% complete/);
   assert.match(name, /\d+ required answers? left/);
   assert.match(link, /aria-hidden="true"><\/span>\d+ required answers? left/, "the dot is decorative; the words remain");
-  assert.equal((html.match(/<a class="hub"/g) || []).length + soonNames(html.slice(html.indexOf('<p class="soon-line"'))).length, 6, "all six areas are still accounted for");
+  assert.equal((html.match(/<section class="onboard"/g) || []).length + (html.match(/<a class="hub"/g) || []).length + soonNames(html.slice(html.indexOf('<p class="soon-line"'))).length, 6, "all six areas are still accounted for");
   assert.equal(AREAS.length, 6);
 });
 

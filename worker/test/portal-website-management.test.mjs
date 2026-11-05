@@ -26,7 +26,7 @@ const UUID0 = "00000000-0000-4000-8000-000000000000";
 
 async function setup({ m12 = true, flag = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld({ skip: m12 ? [] : ["0012_website_management.sql"] });
+  const w = await makeWorld({ skip: m12 ? [] : ["0012_website_management.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql"] });
   const bucket = fakeR2();
   Object.assign(w.env, { PORTAL_FILES: bucket, PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   if (flag) w.env.PORTAL_WEBSITE = "1";
@@ -217,8 +217,9 @@ test("Additional Services: a clean grid of the four services, no price unless Ad
   const s = await setup();
   await s.site(s.A);
   let page = await html(await s.ann.get("/portal/o/alpha/website"));
-  for (const n of ["Client Admin Portal", "Invoice Sender", "Digital Business Cards", "SEO &amp; Visibility"]) assert.match(page, new RegExp(n));
-  assert.equal((page.match(/Request Service<span class="visually-hidden">/g) || []).length, 4);
+  for (const n of ["Client Admin Portal", "Invoice Sender", "Digital Business Cards", "SEO &amp; Visibility", "Nexus Fleet Tracker"]) assert.match(page, new RegExp(n));
+  const buttons = (h) => (h.split('id="additional-services"')[1].match(/<button class="btn btn--primary" type="submit">/g) || []).length;
+  assert.equal(buttons(page), 5);
   assert.ok(!/ws-svc__price/.test(page) && !/Starting at|Custom quote|Included/.test(page.split('id="additional-services"')[1]), "no price is shown until one is configured");
   assert.ok(!/already included|part of your plan/i.test(page));
   const set = (prices) => s.call("/service-pricing", { method: "POST", json: { prices } });
@@ -235,7 +236,7 @@ test("Additional Services: a clean grid of the four services, no price unless Ad
   assert.deepEqual(JSON.parse(row.price_snapshot), { service: "seo-visibility", name: "SEO & Visibility", type: "starting_at", priceCad: 400, label: "Starting at $400 CAD" }, "the price the client was shown is recorded");
   page = await html(await s.ann.get("/portal/o/alpha/website?requested=1"));
   assert.match(page, /Your request was sent/); assert.match(page, /status--active">Requested/);
-  assert.equal((page.match(/Request Service<span class="visually-hidden">/g) || []).length, 3, "the requested service shows its state instead of a button");
+  assert.equal(buttons(page), 4, "the requested service shows its state instead of a button");
   const r2 = await s.svc(s.ann, { service: "seo-visibility" });
   assert.match(r2.headers.get("Location"), /requested=0/); assert.equal(rowsOf(s.w, "SELECT count(*) AS n FROM service_requests")[0].n, 1, "one open request per service");
   assert.match(await html(await s.ann.get("/portal/o/alpha/website?requested=0")), /already asked/);
@@ -265,7 +266,7 @@ test("Additional Services is Admin-editable: name, description, shown or hidden 
   const s = await setup();
   await s.site(s.A);
   const list = await s.call("/additional-services");
-  assert.equal(list.json.available, true); assert.deepEqual(list.json.services.map((x) => x.key), ["client-admin-portal", "invoice-sender", "digital-business-cards", "seo-visibility"]);
+  assert.equal(list.json.available, true); assert.deepEqual(list.json.services.map((x) => x.key), ["client-admin-portal", "invoice-sender", "digital-business-cards", "seo-visibility", "nexus-fleet-tracker"]);
   const edit = (body) => s.call("/additional-services", { method: "POST", json: body });
   assert.equal((await edit({ key: "invoice-sender", name: "Invoice Sender Pro", description: "Send invoices fast.", sort_order: 5 })).status, 200);
   assert.equal((await edit({ key: "digital-business-cards", enabled: false })).status, 200);
@@ -277,14 +278,14 @@ test("Additional Services is Admin-editable: name, description, shown or hidden 
   assert.equal((await edit({ key: "invoice-sender", name: "Invoice Sender Pro" })).status, 200);
   assert.equal(rowsOf(s.w, "SELECT count(*) AS n FROM activity_log WHERE action = 'portal_service.updated'")[0].n, 2, "an unchanged save writes nothing");
   for (const bad of [{ key: "nope", name: "x" }, { key: "invoice-sender", name: "" }, { key: "invoice-sender", name: "x".repeat(61) }, { key: "invoice-sender", description: "" }, { key: "invoice-sender", enabled: "yes" }, { key: "invoice-sender", sort_order: -1 }, { key: "invoice-sender", sort_order: 1.5 }]) assert.equal((await edit(bad)).status, 422, JSON.stringify(bad));
-  for (const k of ["client-admin-portal", "invoice-sender", "seo-visibility"]) await edit({ key: k, enabled: false });
+  for (const k of ["client-admin-portal", "invoice-sender", "seo-visibility", "nexus-fleet-tracker"]) await edit({ key: k, enabled: false });
   page = await html(await s.ann.get("/portal/o/alpha/website"));
   assert.ok(!/Additional services/.test(page), "with every service hidden the section disappears");
   const noWrite = await handleAdmin(new Request(ADMIN_ORIGIN + "/api/admin/additional-services", { method: "POST", headers: { Origin: "https://evil.example", "X-Framework-Admin": "1", "Content-Type": "application/json", "Cf-Access-Jwt-Assertion": sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, iat: nowS(), exp: nowS() + 600 }) }, body: JSON.stringify({ key: "invoice-sender", enabled: true }) }), s.w.env, {});
   assert.equal(noWrite.status, 403, "cross-site writes are refused");
   const bare = await setup({ m12: false });
   const b = await bare.call("/additional-services");
-  assert.equal(b.json.available, false); assert.equal(b.json.services.length, 4);
+  assert.equal(b.json.available, false); assert.equal(b.json.services.length, 5, "the built-in defaults, including Nexus Fleet Tracker");
   assert.equal((await bare.call("/additional-services", { method: "POST", json: { key: "invoice-sender", name: "x" } })).status, 409);
 });
 
@@ -317,7 +318,7 @@ test("the new sections add no scripts or inline styles, keep the strict CSP, and
 test("migration 0012 is additive: two new tables and four seed rows, nothing existing is changed or removed", async () => {
   const sql = M12.replace(/--.*$/gm, "");
   assert.ok(!/\bDROP\b|(?<!ON )\b(DELETE|UPDATE)\b|\bALTER\b|\bRENAME\b/i.test(sql), "no destructive or altering statement");
-  const w = await makeWorld({ skip: ["0012_website_management.sql"] });
+  const w = await makeWorld({ skip: ["0012_website_management.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql"] });
   const before = rowsOf(w, "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").map((r) => r.name);
   const prices = rowsOf(w, "SELECT * FROM service_prices ORDER BY service_key");
   w.db.raw.exec(M12); w.db.raw.exec(M12); // and idempotent

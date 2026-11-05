@@ -154,7 +154,7 @@ The website records only a yes/no `marketing_opt_in` and the request time. Befor
 * "We do not currently use website analytics": true only while no analytics code or Cloudflare Web Analytics is enabled. Check the Cloudflare dashboard (Analytics → Web Analytics) is off.
 * "The Pixel is off unless you allow it": true while `consent.js` + `assessment.js` are unchanged and `META_PIXEL_ID` gating stays.
 * "We do not set cookies ourselves": true while no code sets cookies.
-* The effective date at the top of `privacy.html` must be the actual Production publication date. It is set to October 17, 2026; if deployment slips, change it and run `PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`.
+* The effective date at the top of `privacy.html` must be the actual Production publication date. It is set to November 5, 2026 (the Brand Discovery release); if deployment slips, change it and run `PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`.
 * The homepage "$2.5M+" figure is a combined, client-reported total; it never names or attributes an individual client's figure.
 
 ## 6. Client portal (private beta): data inventory and request handling
@@ -180,3 +180,30 @@ Public wording: `privacy.html` ("The client portal" and the portal items elsewhe
 3. Removal of access: `migrations/portal-ops/emergency-offboard.sql` (revokes membership and sessions). Never delete the WorkOS user afterwards (a re-created user is refused as `email_conflict`).
 4. Erasure: only after the retention need has passed; reviewed manual deletion of the organization's answers, feedback and the person's portal user row (foreign keys protect history, so order matters); then the WorkOS user in the WorkOS dashboard; note that backups and provider logs expire on their own schedules. Record the request, the dates and what was removed.
 5. Inactive beta accounts: review every 12 months (calendar reminder); delete information no longer needed, subject to legal and operational requirements.
+
+## 7. Brand Discovery (guest links and assessments)
+
+Public wording: `privacy.html` ("Brand Discovery" and the retention list). The guest notice is `PRIVACY_NOTICE` in `worker/portal/discovery/pages.js`; a test keeps the two in step.
+
+| data | where | notes |
+| --- | --- | --- |
+| recipient name (as typed by Admin), title, status | D1 `discovery_assessments` | no email address is collected from guests |
+| answers and comments | D1 `discovery_answers`, `discovery_assessments.overall_comment` | free text can contain personal information |
+| guest links | D1 `discovery_links` | only the SHA-256 of the token; expiry (14 days default, max 90) and revocation |
+| inspiration files | private R2 `PORTAL_FILES`, area `discovery` (`org/<id>/discovery/<uuid>`), row in `discovery_uploads` | PNG, JPG, WebP, PDF; objects stored as application/octet-stream |
+| backup copies | private R2 `PORTAL_FILES_BACKUP` | copied by the Production cron; removed by the backup purge (needs `PORTAL_BACKUP_PURGE` = "1") 90 days after the file was deleted |
+| audit | D1 `activity_log` | ids, formats and sizes only, never names or answers |
+
+**Retention rule (proposed, owner-approved wording in the policy):** answers, comments and files are kept while the client relationship continues and for 90 days after it ends, unless the law requires longer; a file removed earlier leaves main storage at once and its backup copy goes within 90 days. **Today this is a manual review**, like the other records (see section 3): nothing deletes Discovery data automatically when a relationship ends. Known limits:
+
+* `deleteOrganizationFiles` deliberately skips the `discovery` area, and nothing deletes `discovery_*` rows. At offboarding (relationship end + 90 days) delete them by hand: tombstone the uploads, delete the objects under `org/<id>/discovery/`, then delete the rows in the order uploads, answers, links, assessments (foreign keys are RESTRICT), and note it in the request log.
+* The backup purge only removes a backup copy whose database row is a tombstone. Discovery uploads are now looked up too, so a removed file's copy goes 90 days after removal; objects under `discovery/` that no row points to are left for a human, as for other files.
+* An archived assessment is hidden but kept. Archiving is not deletion.
+* **Admin > Brand Discovery > an assessment > Delete permanently** (a guest's deletion request) removes the assessment, its answers, links, upload records, files and the backup copies of the files in one step, and leaves a counts-only audit entry. If a file cannot be deleted it changes nothing and can be repeated. It needs no migration.
+* **Automatic retention** (code present, OFF): needs migration 0019 (`client_relationships`, proposed, not applied) and the switch `PORTAL_DISCOVERY_RETENTION` = "1". It acts only on organizations where Admin has recorded a relationship end date at least 90 days old (Admin > Brand Discovery > Retention and deletion); nothing is inferred from archiving or status. Use the dry run ("Check what would be deleted") first; at most 3 assessments per cron run; clearing the date cancels it. Before turning it on, change the policy sentence "We review and delete records manually" to say the Brand Discovery deletion is automatic.
+
+**Requests from a guest** (access, correction, deletion): the guest emails hello@frameworkco.ca and names the organization the link came from. Confirm identity by replying to the address they wrote from and, where possible, with the organization's contact. Find the assessment in Admin > Brand Discovery (by organization and recipient name). Delete as above (one assessment at a time), revoke any live link first, then record it in the request log. Guests cannot delete answers themselves; they can remove their own files while the form is open.
+
+**Backup purge:** `PORTAL_BACKUP_PURGE` is not set in `wrangler.jsonc` (main or Staging), so the scheduled purge is OFF and the policy no longer claims it. The promise (a backup copy goes within 90 days of deletion) is kept by running Admin > Branding > Storage > backup purge at least monthly (dry run first, then type PURGE) until the switch is turned on by a reviewed change. A guest's file removed from the form, and an assessment deleted by Admin, are handled differently: an Admin deletion removes the backup copies at once; a guest-removed file waits for the purge.
+
+**Effective date:** set to November 5, 2026 for the Brand Discovery release; if the release slips to another day, change it and run `PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`.

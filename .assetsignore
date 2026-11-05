@@ -2,6 +2,7 @@ wrangler.jsonc
 .assetsignore
 .gitignore
 README.md
+CLAUDE.md
 CNAME
 .git/
 .github/

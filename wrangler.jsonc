@@ -39,7 +39,9 @@
     "PORTAL_BRANDING": "1",
     // Website release: the client-facing Website section (the client's websites, live preview, downloadable website files, change and support requests, Additional Services).
     // Needs migrations 0011 and 0012 and the PORTAL_FILES binding. Exactly "1" or absent: absent returns Website to a "Coming soon" page. Rollback: delete this line (a one-line revert PR).
-    "PORTAL_WEBSITE": "1"
+    "PORTAL_WEBSITE": "1",
+    // Brand Discovery release: assessments, secure guest links and the Branding card. Needs migration 0018 (applied to Production by the manual Production D1 workflow BEFORE this deploys), PORTAL_BRANDING and the PORTAL_FILES binding. Exactly "1" or absent: absent hides it. Rollback: delete this line.
+    "PORTAL_DISCOVERY": "1"
   },
   // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
   // redact_query_string keeps ?code= / ?invitation_token= out of platform logs; invocation_logs is OFF because the automatic per-request record
@@ -132,7 +134,9 @@
       // Turns on the client-facing Client Services area (invoices, support & change requests, contact). STAGING ONLY, never at the top level. Needs migration 0007 for its data.
       "PORTAL_SERVICES": "1",
       // Turns on the client-facing Website section (Phase 2: the client's websites, set by Framework Admin). STAGING ONLY, never at the top level. Needs migration 0011. Exactly "1" or absent.
-      "PORTAL_WEBSITE": "1"
+      "PORTAL_WEBSITE": "1",
+      // Turns on Brand Discovery (assessments, secure guest links, the Branding card). STAGING ONLY, never at the top level. Needs migration 0018 (applied to Staging) and PORTAL_BRANDING. Exactly "1" or absent.
+      "PORTAL_DISCOVERY": "1"
     },
     "d1_databases": [
       {

@@ -33,6 +33,11 @@ export const STAGES = Object.freeze([
   { file: "0011_websites.sql", tables: ["website_milestones", "websites"], indexes: ["idx_support_requests_website", "idx_website_milestones_site", "idx_websites_org"] }, // two tables, one nullable column on support_requests, four service_prices rows
   { file: "0012_website_management.sql", tables: ["portal_services", "website_packages"], indexes: ["idx_website_packages_org"] }, // two tables, four seed rows
   { file: "0013_staff_access.sql", tables: ["portal_staff"], indexes: [] }, // one table (Master Client Access), one seed row (a pending grant for hello@frameworkco.ca)
+  { file: "0014_brand_requirements.sql", tables: ["brand_requirements"], indexes: [] }, // one table (per-client Branding requirement overrides), no seed rows
+  { file: "0015_website_status_seo.sql", tables: ["website_seo", "website_seo_items", "website_seo_metrics", "website_seo_reports"], indexes: ["idx_website_seo_items_site", "idx_website_seo_metrics_site", "idx_website_seo_reports_site"] }, // four tables, one nullable column (websites.phase)
+  { file: "0016_service_catalogue.sql", tables: ["client_service_state", "portal_service_media"], indexes: ["idx_portal_service_media_service"] }, // two tables, eight nullable columns (portal_services)
+  { file: "0017_service_client_settings.sql", tables: ["client_service_settings"], indexes: [] }, // one table, one nullable column (portal_services.category), one seed row (Nexus Fleet Tracker, no price)
+  { file: "0018_discovery.sql", tables: ["discovery_answers", "discovery_assessments", "discovery_content", "discovery_links", "discovery_uploads"], indexes: ["idx_discovery_assessments_org", "idx_discovery_links_assessment", "idx_discovery_uploads_assessment"] }, // five additive tables (Brand Discovery assessments, links, answers, Admin content edits, inspiration files); nothing existing is touched
 ]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",

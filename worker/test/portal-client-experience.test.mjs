@@ -44,12 +44,13 @@ const goals = PROFILE_STEPS.find((s) => s.id === "goals");
 
 /* ------------------------------------------------------------------ 1. dashboard messaging */
 
-test("dashboard, brand-new client: organization name and a short greeting, then one card for the Business Profile with its progress; no instructions or time estimate", async () => {
+test("dashboard, brand-new client: organization name and a short greeting, then the full-width Business Profile onboarding section with its progress; no instructions or time estimate", async () => {
   const s = await setup();
   const html = await s.get(s.ann, "/portal/o/alpha");
   assert.match(html, /<span class="eyebrow">Alpha Co<\/span><h1 class="h1 h1--home">/);
-  assert.match(html, /<a class="hub" href="\/portal\/o\/alpha\/profile">/, "the whole card is one link");
-  assert.equal([...html.matchAll(/class="btn btn--primary"/g)].length, 0, "no separate call-to-action button");
+  assert.match(html, /<section class="onboard"[\s\S]*?<a class="btn btn--primary" href="\/portal\/o\/alpha\/profile\/[a-z]+">Start your profile/, "the onboarding section has one call to action, to the first step");
+  assert.equal([...html.matchAll(/class="btn btn--primary"/g)].length, 1, "and it is the only primary button on Home");
+  assert.equal([...html.matchAll(/<a class="hub"/g)].length, 0, "Business Profile is not one of the service cards");
   assert.ok(!/home-note|20–30|Start your Business Profile|Your progress is saved|will review your answers/.test(html), "the welcome text and instructions are gone");
   assert.match(html, /0% complete/);
   assert.match(html, /12 required answers left/, "the existing progress indicator is unchanged");
@@ -82,7 +83,7 @@ test("dashboard: the organization name is escaped, and a member sees the same Ho
   const html = await s.get(s.mia, "/portal/o/alpha");
   assert.ok(!html.includes("<img src=x"), "no markup from the name");
   assert.match(html, /<span class="eyebrow">&lt;img src=x onerror=alert\(1\)&gt; &amp; Co<\/span>/);
-  assert.match(html, /class="hub" href="\/portal\/o\/alpha\/profile"/);
+  assert.match(html, /<section class="onboard"[\s\S]*?href="\/portal\/o\/alpha\/profile/);
 });
 
 /* ------------------------------------------------------------------ 2. the four optional questions */

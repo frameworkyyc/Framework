@@ -3,6 +3,7 @@
    Included. The client's Branding page shows the price quietly beside the request button for a section the client has nothing in yet, and records it with the request.
    A price is a starting estimate, not a quote: there is no checkout, payment or invoicing. Server text is never inserted as HTML. */
 
+import { contentEditor } from "./service-content.js";
 import { h, api, fmtDate, stateBlock, errorState } from "./ui.js";
 import { BRAND_SECTIONS } from "./brand-sections.js";
 
@@ -129,6 +130,7 @@ const SERVICE_ERRORS = {
 const serviceErrorText = (e) => SERVICE_ERRORS[e && e.code] || (e && e.data && SERVICE_ERRORS[e.data.error]) || "That didn’t work and nothing was changed. Please try again.";
 
 async function servicesPage(ctx) {
+  const busyRef = { busy: false };
   const root = h("div", { class: "adm-page adm-services" });
   const say = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
   const speak = (text, tone = "info") => { say.textContent = text; say.className = "adm-msg is-" + tone; say.setAttribute("role", tone === "error" ? "alert" : "status"); say.hidden = !text; if (text) say.focus({ preventScroll: true }); };
@@ -159,7 +161,7 @@ async function servicesPage(ctx) {
         busy = false; speak(outcome.text, outcome.tone);
       } }, dir === "up" ? "Move up" : "Move down");
       const priceLine = h("p", { class: "adm-pricing__meta adm-services__price" }, s.price ? `Price clients see: ${s.price.label}. ` : "No price is set, so clients see no price. ", h("a", { class: "adm-link", href: "/admin/settings/service-pricing#sp-h-addon", "data-link": "" }, s.price ? "Change it in Service Pricing →" : "Set a price in Service Pricing →"));
-      return h("form", { class: "adm-form adm-services__item", novalidate: true, "aria-label": s.name, onsubmit: async (ev) => {
+      const basics = h("form", { class: "adm-form adm-services__item", novalidate: true, "aria-label": s.name, onsubmit: async (ev) => {
         ev.preventDefault();
         if (busy) return;
         busy = true; save.disabled = true;
@@ -175,6 +177,7 @@ async function servicesPage(ctx) {
       priceLine,
       h("div", { class: "adm-actions" }, save, move("up", "Move up"), move("down", "Move down")),
       h("p", { class: "adm-pricing__meta", text: s.stored && s.updatedAt ? `Updated ${fmtDate(s.updatedAt)}${s.updatedBy && !/^migration/.test(s.updatedBy) ? ` by ${s.updatedBy}` : ""}` : "Built-in default" }));
+      return h("div", { class: "adm-services__card" }, basics, contentEditor({ s, data, editable, speak, redraw: async () => { try { draw(await api("/additional-services")); } catch { /* the old view stays */ } }, busyRef }));
     };
     root.replaceChildren(...[
       h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin · Settings"), h("h1", { class: "adm-title", tabindex: "-1" }, "Additional Services"),

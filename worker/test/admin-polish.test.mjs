@@ -30,7 +30,7 @@ test("the editor reorders services one place at a time and shows each price read
   const call = (json, method = "POST") => handleServicesApi(new Request("https://staging.frameworkco.ca/api/admin/additional-services", { method, headers: { "Content-Type": "application/json", Origin: "https://staging.frameworkco.ca", "X-Framework-Admin": "1" }, body: method === "GET" ? undefined : JSON.stringify(json) }), env, { email: "owner@frameworkco.ca" }, "/additional-services", { now: w.clock.now() });
   const keys = async () => (await (await call(null, "GET")).json()).services.map((s) => s.key);
   const before = await keys();
-  assert.equal(before.length, 4);
+  assert.equal(before.length, 5);
   assert.equal((await call({ key: before[1], move: "up" })).status, 200);
   assert.deepEqual((await keys()).slice(0, 2), [before[1], before[0]]);
   assert.equal((await call({ key: before[0], move: "sideways" })).status, 422);

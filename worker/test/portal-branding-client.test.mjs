@@ -362,15 +362,17 @@ test("fileSize prints plain sizes", () => {
 
 /* ------------------------------------------------------------------ Home cards */
 
-test("Home: Business Profile and Branding are two matching whole-card links, each with title, description, status and an arrow; no welcome copy", async () => {
+test("Home: Business Profile is the full-width onboarding section above the cards; Branding is the first whole-card link, with title, description, status and an arrow; no welcome copy", async () => {
   const { ann, mia, alpha, publishKit } = await setup();
   let html = await (await ann.get("/portal/o/alpha")).text();
   const cards = [...html.matchAll(/<a class="hub" href="([^"]+)">([\s\S]*?)<\/a>/g)];
-  assert.deepEqual(cards.map((c) => c[1]), ["/portal/o/alpha/profile", "/portal/o/alpha/branding"]);
+  assert.deepEqual(cards.map((c) => c[1]), ["/portal/o/alpha/branding"]);
+  assert.ok(html.indexOf('class="onboard"') > -1 && html.indexOf('class="onboard"') < html.indexOf('class="hubs"'), "the onboarding section sits above the cards");
+  assert.match(/<section class="onboard"[\s\S]*?<\/section>/.exec(html)[0], /Business Profile[\s\S]*href="\/portal\/o\/alpha\/profile/);
   for (const [, , inner] of cards) {
     assert.match(inner, /class="hub__title"/); assert.match(inner, /class="hub__desc"/); assert.match(inner, /class="hub__status"/); assert.match(inner, /class="hub__arrow tile__arrow" aria-hidden="true">→</);
   }
-  assert.match(cards[1][2], /Not published yet/); assert.match(cards[1][2], /Upload your existing brand materials/);
+  assert.match(cards[0][2], /Not published yet/); assert.match(cards[0][2], /Upload your existing brand materials/);
   assert.ok(!/class="lead"|home-note|Start your Business Profile/.test(html));
   assert.ok(!/<p class="soon-line">[\s\S]*Branding[\s\S]*<\/p>/.test(html), "Branding is no longer 'coming soon'");
   await publishKit(alpha);
@@ -379,10 +381,11 @@ test("Home: Business Profile and Branding are two matching whole-card links, eac
   assert.match(await (await ann.get("/portal/o/alpha")).text(), /1 file shared with Framework/);
 });
 
-test("Home with Branding off: only the Business Profile card, and Branding is listed as coming soon", async () => {
+test("Home with Branding off: no service card (Business Profile is the onboarding section), and Branding is listed as coming soon", async () => {
   const { ann } = await setup({ flag: false });
   const html = await (await ann.get("/portal/o/alpha")).text();
-  assert.equal([...html.matchAll(/<a class="hub"/g)].length, 1);
+  assert.equal([...html.matchAll(/<a class="hub"/g)].length, 0);
+  assert.match(html, /<section class="onboard"/);
   assert.match(/<p class="soon-line">[\s\S]*?<\/p>/.exec(html)[0], /Branding/);
 });
 

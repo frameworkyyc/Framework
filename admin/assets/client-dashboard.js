@@ -176,6 +176,7 @@ export function dashboard({ org, profile, members, invitations, branding = null,
     href: `/admin/clients/${encodeURIComponent(org.id)}/website`, label: "Website", big: String(websites.total), unit: websites.total === 1 ? "website" : "websites",
     note: websites.total ? "Where each one stands, and who manages it." : "None added yet.",
     chips: [websites.live ? chip("ok", `${websites.live} live`, "complete") : null, websites.inDevelopment ? chip("pending", `${websites.inDevelopment} in development`, "info") : null, websites.existing ? chip("plain", `${websites.existing} existing`) : null, websites.managed ? chip("plain", `${websites.managed} managed by Framework`) : null] });
+  const servicesTile = linkTile({ href: `/admin/clients/${encodeURIComponent(org.id)}/additional-services`, label: "Additional Services", big: "Order and recommend", unit: "", note: "Reorder, recommend, show or hide services for this client.", chips: [] });
   const invoicesTile = invoices && linkTile({
     href: invoicesHref, label: "Invoices", big: String(invoices.total), unit: invoices.total === 1 ? "invoice" : "invoices",
     note: invoices.total ? "Archived invoices are kept, not shown here." : "None entered yet.",
@@ -188,7 +189,7 @@ export function dashboard({ org, profile, members, invitations, branding = null,
   paint(teamFacts(members, invitations));
   return {
     header,
-    overview: h("div", { class: "adm-dash" }, next, h("div", { class: "adm-tiles" }, prof, team, brandingTile, websiteTile, invoicesTile, supportTile)),
+    overview: h("div", { class: "adm-dash" }, next, h("div", { class: "adm-tiles" }, prof, team, brandingTile, websiteTile, servicesTile, invoicesTile, supportTile)),
     update: (m, i) => paint(teamFacts(m, i)),
   };
 }

@@ -17,9 +17,9 @@ import { RESERVED_PREFIX } from "./file-backup.js";
 export const PURGE_GRACE_DAYS = 90;
 export const PURGE_LIMIT = 10;
 const DAY = 86400000;
-const CHUNK = 20; // 4 tables x 20 keys = 80 bound values, under D1's 100 limit
+const CHUNK = 16; // 5 tables x 16 keys = 80 bound values, under D1's 100 limit
 const PAGE = 1000;
-const LOOKUP = "SELECT storage_key, deleted_at FROM brand_assets WHERE storage_key IN (%) UNION ALL SELECT storage_key, deleted_at FROM brand_uploads WHERE storage_key IN (%) UNION ALL SELECT storage_key, NULL FROM invoices WHERE storage_key IN (%) UNION ALL SELECT storage_key, NULL FROM support_attachments WHERE storage_key IN (%)";
+const LOOKUP = "SELECT storage_key, deleted_at FROM brand_assets WHERE storage_key IN (%) UNION ALL SELECT storage_key, deleted_at FROM brand_uploads WHERE storage_key IN (%) UNION ALL SELECT storage_key, NULL FROM invoices WHERE storage_key IN (%) UNION ALL SELECT storage_key, NULL FROM support_attachments WHERE storage_key IN (%) UNION ALL SELECT storage_key, deleted_at FROM discovery_uploads WHERE storage_key IN (%)";
 
 export const purgeEnabled = (env) => Boolean(env) && env.PORTAL_BACKUP_PURGE === "1";
 
@@ -40,7 +40,7 @@ async function rowsFor(db, keys) {
   for (let i = 0; i < keys.length; i += CHUNK) {
     const part = keys.slice(i, i + CHUNK);
     const marks = part.map(() => "?").join(",");
-    const res = await db.prepare(LOOKUP.replaceAll("%", marks)).bind(...part, ...part, ...part, ...part).all();
+    const res = await db.prepare(LOOKUP.replaceAll("%", marks)).bind(...part, ...part, ...part, ...part, ...part).all();
     for (const r of res.results) { if (!found.has(r.storage_key)) found.set(r.storage_key, []); found.get(r.storage_key).push(r.deleted_at ?? null); }
   }
   return found;

@@ -10,7 +10,7 @@ const code = raw.replace(/^\s*#.*$/gm, "").replace(/\s+#\s.*$/gm, ""); // commen
 const lines = code.split("\n");
 
 test("CI plus the one reviewed manual Production D1 migration workflow exist; Node 22 is pinned in the workflows, NOT by a .node-version file", () => {
-  assert.deepEqual(readdirSync(new URL(".github/workflows/", root)).sort(), ["ci.yml", "portal-production-d1-migration.yml"], "a new workflow must be reviewed on purpose (update this test with it)");
+  assert.deepEqual(readdirSync(new URL(".github/workflows/", root)).sort(), ["ci.yml", "portal-production-d1-migration.yml", "staging-data-sync.yml"], "a new workflow must be reviewed on purpose (update this test with it)");
   // Cloudflare Workers Builds reads .node-version and .nvmrc (and NODE_VERSION). Adding either would silently change the Node version of the
   // Staging AND Production builds, which was decided against: they keep Cloudflare's own default.
   for (const f of [".node-version", ".nvmrc", ".tool-versions"]) assert.ok(!existsSync(new URL(f, root)), `${f} must not exist: it would change the Node version of Cloudflare builds`);

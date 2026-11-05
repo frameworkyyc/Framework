@@ -79,6 +79,11 @@ export function websiteEnabled(env) {
   return !!env && text(env.PORTAL_WEBSITE) === "1";
 }
 
+/** Discovery assessments (Brand Discovery): the guest links and the Branding card are live only where PORTAL_DISCOVERY is exactly "1". Off everywhere until it is approved; independent of the other switches. */
+export function discoveryEnabled(env) {
+  return !!env && text(env.PORTAL_DISCOVERY) === "1";
+}
+
 /** The Client Services area (hub, contact, and later invoices and support requests) is live only where PORTAL_SERVICES is exactly "1" (Staging). */
 export function servicesEnabled(env) {
   return !!env && text(env.PORTAL_SERVICES) === "1";
@@ -96,4 +101,9 @@ export function readPortalConfig(env) {
     issuer: text(env.PORTAL_AUTH_ISSUER),
     pepper: text(env.PORTAL_SESSION_PEPPER),
   });
+}
+
+/** Automatic deletion of Discovery data 90 days after a client relationship ended (worker/portal/discovery/retention.js): runs for real only where PORTAL_DISCOVERY_RETENTION is exactly "1". OFF by default; everywhere else it can only report what it would do (a dry run). */
+export function retentionEnabled(env) {
+  return !!env && text(env.PORTAL_DISCOVERY_RETENTION) === "1";
 }
