@@ -164,6 +164,11 @@ export async function brandingPage(ctx, a, brand, o = {}) {
   const csrf = await csrfFor(ctx.cfg, a.session);
   return shell(ctx, a, { title: "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, { ...o, csrf }), vm, script: brand.published ? BRANDING_SCRIPT : null, styles: Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [], ref: "branding" });
 }
+/** Brand Discovery (signed-in): the list of assessments and the step pages. `body` is built by discovery/routes.js and discovery/pages.js (every value escaped there). */
+export async function discoveryPage(ctx, a, { title = "Brand Discovery", body, status = 200 }) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title, active: "home", body, vm, status, script: "/assets/js/discovery.js", styles: ["/assets/css/discovery.css"], ref: "branding-discovery" });
+}
 /** The separate area for the client's own brand materials. `o`: see branding-live.js brandingUploads; `status` is the HTTP status (4xx for a refused upload). */
 export async function brandingUploadsPage(ctx, a, o = {}) {
   const vm = liveModel(ctx, a, {});

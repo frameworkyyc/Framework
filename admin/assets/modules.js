@@ -9,6 +9,7 @@ export const MODULES = [
   { id: "feedback", label: "Feedback", path: "/admin/feedback", enabled: true, load: () => import("./feedback.js") },
   { id: "support", label: "Support Requests", path: "/admin/support", enabled: true, load: () => import("./support-global.js") },
   { id: "assessments", label: "Assessments", path: "/admin/assessments", enabled: true, load: () => import("./assessments.js") },
+  { id: "discovery", label: "Brand Discovery", path: "/admin/discovery", enabled: true, load: () => import("./discovery.js") },
 
   { id: "clients", label: "Clients", path: "/admin/clients", enabled: true, load: () => import("./clients.js") },
   { id: "approved-emails", label: "Approved Emails", path: "/admin/approved-emails", enabled: true, load: () => import("./approved-emails.js") },

@@ -32,7 +32,7 @@ test("Production's portal resources are exactly: its own portal database, the Wo
   assert.equal(config.vars.ASSESSMENT_NOTIFY_TO, "hello@frameworkco.ca");
   assert.deepEqual(config.triggers, { crons: ["0-59/5 * * * *"] }, "the Stage 5 schedule: Production only");
   assert.equal(config.previews.triggers, undefined);
-  assert.deepEqual(Object.keys(config.vars).filter((k) => k.startsWith("PORTAL_")).sort(), ["PORTAL_ADMIN_WRITES", "PORTAL_ALLOW_PRODUCTION", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER", "PORTAL_BASE_URL", "PORTAL_BRANDING", "PORTAL_ENABLED", "PORTAL_INVITE_SENDING", "PORTAL_WEBSITE"]);
+  assert.deepEqual(Object.keys(config.vars).filter((k) => k.startsWith("PORTAL_")).sort(), ["PORTAL_ADMIN_WRITES", "PORTAL_ALLOW_PRODUCTION", "PORTAL_AUTH_CLIENT_ID", "PORTAL_AUTH_ISSUER", "PORTAL_BASE_URL", "PORTAL_BRANDING", "PORTAL_DISCOVERY", "PORTAL_ENABLED", "PORTAL_INVITE_SENDING", "PORTAL_WEBSITE"]);
   const before = raw.slice(0, raw.indexOf('"previews"')).replace(/^\s*\/\/.*$/gm, "");
   assert.ok(!/PORTAL_PROBE|PORTAL_DEMO/.test(before), "no probe flag and no demo switch before the previews block");
   assert.equal(before.split('"bucket_name": "framework-portal-files"').length - 1, 1, "the Production files bucket is bound exactly once, outside previews");
@@ -64,7 +64,7 @@ test("the Production ID appears exactly once in the file (never inside the previ
 
 test("Production (top-level vars) and Staging (previews.vars) each carry the sender, the same public Turnstile site key and their OWN WorkOS settings; both enable the portal (Production since launch), only Staging also has the demo", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
-  assert.deepEqual(config.vars, { ...shared, ASSESSMENT_NOTIFY_TO: "hello@frameworkco.ca", PORTAL_AUTH_CLIENT_ID: "client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_BASE_URL: "https://frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1", PORTAL_WEBSITE: "1" });
+  assert.deepEqual(config.vars, { ...shared, ASSESSMENT_NOTIFY_TO: "hello@frameworkco.ca", PORTAL_AUTH_CLIENT_ID: "client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_BASE_URL: "https://frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1", PORTAL_WEBSITE: "1", PORTAL_DISCOVERY: "1" });
   assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1", PORTAL_DEMO: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1", PORTAL_SERVICES: "1", PORTAL_WEBSITE: "1" });
 });
 
@@ -143,7 +143,7 @@ test("the sender is a valid From value that the Worker accepts as-is (no correct
 });
 
 test("only whitelisted NON-secret names may ever appear under vars", () => {
-  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED", "PORTAL_ALLOW_PRODUCTION", "PORTAL_BRANDING", "PORTAL_SERVICES", "PORTAL_WEBSITE", "PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_DEMO"]);
+  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED", "PORTAL_ALLOW_PRODUCTION", "PORTAL_BRANDING", "PORTAL_SERVICES", "PORTAL_WEBSITE", "PORTAL_DISCOVERY", "PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_DEMO"]);
   for (const name of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) {
     assert.equal(config.vars[name], "1", name + " is on in Production since launch (invitations are still limited to the allowlist secret)");
     assert.equal(config.previews.vars[name], "1", name + " is on for Staging (invitations are still limited to the allowlist secret)");

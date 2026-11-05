@@ -88,6 +88,8 @@ export async function render(orgId, ctx) {
   let data;
   try { data = await api("/clients/" + encodeURIComponent(orgId) + "/branding"); } catch (err) { return { title: "Branding", node: h("div", { class: "adm-page" }, errorState(err, ctx.retry)) }; }
   const base = "/clients/" + encodeURIComponent(orgId) + "/branding";
+  let discovery = null; // Brand Discovery assessments assigned to this client (best effort: the section simply stays out when they are unavailable)
+  try { discovery = await api("/clients/" + encodeURIComponent(orgId) + "/discovery"); } catch { discovery = null; }
   const root = h("div", { class: "adm-page adm-brandpage" });
   const live = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
   const opened = new Set();
@@ -385,6 +387,17 @@ export async function render(orgId, ctx) {
   const sectionIntro = (def) => h("p", { class: "adm-sub", text: def.desc });
   const statusChip = (n, one) => (n ? chip("plain", plural(n, one)) : chip("plain", "Not added yet"));
 
+  /** Brand Discovery: the visual assessments assigned to this client and their creative briefs. Preferences only: nothing here changes the brand kit, assets or requirements below. */
+  function discoverySection() {
+    if (!discovery || !discovery.available) return null;
+    const list = discovery.assessments || [];
+    const WORD = { not_started: "Not started", in_progress: "In progress", submitted: "Submitted", reviewed: "Reviewed" };
+    return section("br-discovery", "Brand Discovery", list.length ? `${list.length} assigned` : "None assigned", [
+      h("p", { class: "adm-sub", text: "Visual preference assessments for this client. The creative brief is a summary of what they like and is kept separate from the approved brand: it never changes the kit, any file or any requirement." }),
+      list.length ? h("ul", { class: "adm-dsc__links" }, list.map((a) => h("li", null, h("span", null, h("strong", { text: a.title }), ` · ${WORD[a.status] || a.status} · ${a.answered} answered`), h("a", { class: "btn btn--secondary adm-small", href: `/admin/discovery/${encodeURIComponent(orgId)}/${encodeURIComponent(a.id)}`, "data-link": "" }, a.status === "submitted" || a.status === "reviewed" ? "Open creative brief" : "Open")))) : h("p", { class: "adm-muted", text: "Nothing assigned yet." }),
+      h("p", null, h("a", { class: "adm-link", href: `/admin/discovery?org=${encodeURIComponent(orgId)}`, "data-link": "" }, "Assign a Brand Discovery"))]);
+  }
+
   /** 01 Logo: the four logo cards (upload, formats, files). */
   function logoSection() {
     const logos = data.assets.filter((a) => a.kind === "logo");
@@ -667,7 +680,7 @@ export async function render(orgId, ctx) {
       h("div", { class: "adm-idhead" }, h("div", { class: "adm-idhead__text" }, h("span", { class: "eyebrow" }, "Client"), h("h1", { class: "adm-title", tabindex: "-1" }, "Branding"), h("p", { class: "adm-sub" }, `${data.organization.name}. Clients only see items you publish, and only while the kit is published.`)), h("div", { class: "adm-actions" }, publish)),
       live, tiles,
       !canWrite() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at files, but not add, publish or delete them.") : !caps().storage ? h("p", { class: "adm-banner" }, "File storage isn’t available on this site, so files can’t be added or replaced. Colours and typography can still be set.") : null,
-      logoSection(), typographySection(), coloursSection(), taglineSection(), ...["imagery", "layout", "textures", "iconography", "style"].map((k) => fileSection(SECTION[k])),
+      discoverySection(), logoSection(), typographySection(), coloursSection(), taglineSection(), ...["imagery", "layout", "textures", "iconography", "style"].map((k) => fileSection(SECTION[k])),
       otherFilesSection(), uploadsSection(), requestsSection(), storageSection(),
     ].filter(Boolean));
   }
