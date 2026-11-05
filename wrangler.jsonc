@@ -132,7 +132,9 @@
       // Turns on the client-facing Client Services area (invoices, support & change requests, contact). STAGING ONLY, never at the top level. Needs migration 0007 for its data.
       "PORTAL_SERVICES": "1",
       // Turns on the client-facing Website section (Phase 2: the client's websites, set by Framework Admin). STAGING ONLY, never at the top level. Needs migration 0011. Exactly "1" or absent.
-      "PORTAL_WEBSITE": "1"
+      "PORTAL_WEBSITE": "1",
+      // Turns on Brand Discovery (assessments, secure guest links, the Branding card). STAGING ONLY, never at the top level. Needs migration 0018 (applied to Staging) and PORTAL_BRANDING. Exactly "1" or absent.
+      "PORTAL_DISCOVERY": "1"
     },
     "d1_databases": [
       {

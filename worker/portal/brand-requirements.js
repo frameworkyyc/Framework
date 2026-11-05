@@ -66,3 +66,18 @@ export function completionOf(c) {
   for (const k of ["imagery", "layout", "textures", "iconography", "style"]) out[k] = { done: has(files[k]) };
   return out;
 }
+
+/**
+ * Admin's per-client overrides (brand_requirements) laid over the automatic requirements. An item with an override takes Admin's level and note; every other item is untouched, so a client with no
+ * overrides gets exactly the automatic result. Pure: it changes no completion (see completionOf) and creates nothing.
+ * @param {{[section: string]: {level: string, becauseOf: string[]}}} reqs the output of requirementsFor
+ * @param {{[key: string]: {level: string, note: string|null}}} [settings] listRequirementSettings().items
+ */
+export function applyOverrides(reqs, settings = {}) {
+  const out = {};
+  for (const [k, r] of Object.entries(reqs)) {
+    const o = settings && Object.hasOwn(settings, k) ? settings[k] : null;
+    out[k] = o ? { level: o.level, becauseOf: [], note: o.note || "", overridden: true } : r;
+  }
+  return out;
+}

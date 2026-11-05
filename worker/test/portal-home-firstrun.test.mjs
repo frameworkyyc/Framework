@@ -131,12 +131,12 @@ test("wording is consistent across portal pages: the legacy progress page greets
 
 /* ------------------------------------------------------------------ the next action */
 
-test("Home, NEW client: a short greeting under the organization name, one Business Profile card with its progress, and the overview still offers the first step", async () => {
+test("Home, NEW client: a short greeting under the organization name, the Business Profile onboarding section with its progress, and the overview still offers the first step", async () => {
   const { br } = await setup();
   const html = await home(br.ann);
   assert.match(html, /<span class="eyebrow">Alpha Co<\/span><h1 class="h1 h1--home">/, "the organization's name sits above the greeting");
-  assert.match(html, /<a class="hub" href="\/portal\/o\/alpha\/profile">/);
-  assert.ok(!/btn btn--primary|home-note|class="lead"|20–30|Your progress is saved/.test(html), "no extra button, instructions or lead text");
+  assert.match(html, /<section class="onboard"[\s\S]*?<a class="btn btn--primary" href="\/portal\/o\/alpha\/profile\/business">Start your profile/);
+  assert.ok(!/home-note|class="lead"|20–30|Your progress is saved/.test(html), "no instructions or lead text");
   assert.match(html, /0% complete/); assert.match(html, /required answers left/);
   const overview = await (await br.ann.get("/portal/o/alpha/profile")).text();
   assert.match(overview, /href="\/portal\/o\/alpha\/profile\/business">Start: Your business/);
@@ -146,7 +146,7 @@ test("Home, PARTIAL and COMPLETE: only the card's progress changes; the overview
   const { alpha, br, save } = await setup();
   await save(alpha, "ann@alpha.test", ALL.filter((f) => f.step === "business"));
   let html = await home(br.ann);
-  assert.match(html, /\d+% complete/); assert.ok(!/Pick up where you left off|Continue your/.test(html));
+  assert.match(html, /\d+% complete/); assert.ok(!/Pick up where you left off/.test(html)); assert.match(html, /<section class="onboard"[\s\S]*?href="\/portal\/o\/alpha\/profile\/location">Continue your profile/);
   const overview = await (await br.ann.get("/portal/o/alpha/profile")).text();
   assert.match(overview, /href="\/portal\/o\/alpha\/profile\/location">Continue: /);
   await save(alpha, "ann@alpha.test", REQUIRED);
@@ -162,7 +162,7 @@ test("Home, unreadable data makes no claim: 'Progress unavailable', no percentag
   w.db.raw.exec("DROP TABLE business_profile_answers");
   const html = await home(br.ann);
   assert.match(html, /Progress unavailable right now/);
-  assert.match(html, /class="hub" href="\/portal\/o\/alpha\/profile"/);
+  assert.match(html, /<section class="onboard"[\s\S]*?href="\/portal\/o\/alpha\/profile">Open Business Profile/);
   assert.ok(!/required answers? left|% complete/.test(html));
 });
 
@@ -213,16 +213,17 @@ test("the red indicator appears only beside real required work and always with w
   assert.ok(!/Action required/.test(await home(br.ann)), "the vague old wording is gone");
 });
 
-test("unavailable modules are one quiet line: no link, no focus stop, no card, no badge, no progress; the live module is one whole-card link with a decorative arrow", async () => {
+test("unavailable modules are one quiet line: no link, no focus stop, no card, no badge, no progress; the Business Profile onboarding section is the one link, with one call to action", async () => {
   const { br } = await setup();
   const html = await home(br.ann);
   const line = /<p class="soon-line">[\s\S]*?<\/p>/.exec(html)[0];
   assert.ok(!/<a |href|tabindex|role=|tile|<progress|dot/.test(line));
-  assert.equal([...html.matchAll(/<a class="hub"/g)].length, 1, "one module link");
-  const card = /<a class="hub"[\s\S]*?<\/a>/.exec(html)[0];
-  assert.match(card, /class="hub__title">Business Profile</); assert.match(card, /class="hub__desc">/); assert.match(card, /hub__arrow tile__arrow" aria-hidden="true">→</);
+  assert.equal([...html.matchAll(/<a class="hub"/g)].length, 0, "no service card while nothing else is built");
+  const sec = /<section class="onboard"[\s\S]*?<\/section>/.exec(html)[0];
+  assert.match(sec, /class="onboard__title" id="onboard-h">Business Profile</); assert.match(sec, /class="onboard__desc"/);
+  assert.equal([...sec.matchAll(/<a [^>]*href=/g)].length, 1, "one call to action in the section");
   const body = html.slice(html.indexOf('<main'), html.indexOf("</main>"));
-  assert.equal([...body.matchAll(/<a [^>]*href=/g)].length, 1, "the Business Profile card is the only link in the page body");
+  assert.equal([...body.matchAll(/<a [^>]*href=/g)].length, 1, "the onboarding call to action is the only link in the page body");
 });
 
 /* ------------------------------------------------------------------ owner / member, isolation, security */

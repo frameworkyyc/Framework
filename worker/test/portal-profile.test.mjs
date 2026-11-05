@@ -144,14 +144,16 @@ test("repository: organization ids must be real UUIDs and every query is scoped 
 
 /* ------------------------------------------------------------------ routes: home, overview, steps */
 
-test("signed-in Home: Business Profile is the one link and the clear focus; the five unavailable sections are a quiet, non-interactive 'Coming soon' list", async () => {
+test("signed-in Home: Business Profile is the full-width onboarding section and the one link; the five unavailable sections are a quiet, non-interactive 'Coming soon' list", async () => {
   const { ann } = await setup();
   const res = await ann.get("/portal/o/alpha");
   assert.equal(res.status, 200);
   const html = await res.text();
   const focus = html.slice(html.indexOf('<ul class="hubs">'), html.indexOf("</ul>", html.indexOf('<ul class="hubs">')));
-  assert.deepEqual([...focus.matchAll(/<span class="hub__title">([^<]+)</g)].map((m) => m[1]), ["Business Profile"], "only the available module is a card");
-  assert.deepEqual([...focus.matchAll(/<a class="hub" href="([^"]+)"/g)].map((m) => m[1]), ["/portal/o/alpha/profile"]);
+  assert.deepEqual([...focus.matchAll(/<span class="hub__title">([^<]+)</g)].map((m) => m[1]), [], "no service card is built yet");
+  const onboard = /<section class="onboard"[\s\S]*?<\/section>/.exec(html)[0];
+  assert.match(onboard, /Business Profile/);
+  assert.deepEqual([...onboard.matchAll(/<a class="btn btn--primary" href="([^"]+)"/g)].map((m) => m[1].replace(/\/profile\/[a-z]+$/, "/profile")), ["/portal/o/alpha/profile"]);
   const soon = /<p class="soon-line">[\s\S]*?<\/p>/.exec(html)[0];
   assert.deepEqual(soon.replace(/<[^>]+>/g, "").replace(/^Coming soon\s+/, "").replace(/&amp;/g, "&").split(" · "), ["Branding", "Website", "Marketing", "Content & Photography", "Files & Deliverables"], "same five, same order");
   assert.equal([...soon.matchAll(/Coming soon/g)].length, 1, "one quiet label, not a badge on every item");
@@ -169,8 +171,8 @@ test("availability is one list: activating a section turns its block into a link
   assert.deepEqual(d.comingSoonKeys(["profile", "website"]), ["branding", "marketing", "content", "files"]);
   const vm = (liveAreas) => ({ base: "/portal/o/x", org: { name: "X Co" }, user: { name: "Ann" }, ...(liveAreas ? { liveAreas } : {}) });
   const links = (h) => [...h.matchAll(/class="(?:tile(?: tile--status)?|hub)" href="([^"]+)"/g)].map((m) => m[1].split("/").pop());
-  assert.deepEqual(links(g.home(vm(["profile"]))), ["profile"]);
-  assert.deepEqual(links(g.home(vm(["profile", "website"]))), ["profile", "website"], "one more section released: nothing else changes");
+  assert.deepEqual(links(g.home(vm(["profile"]))), [], "Business Profile is the onboarding section, not a card");
+  assert.deepEqual(links(g.home(vm(["profile", "website"]))), ["website"], "one more section released: it becomes a card, nothing else changes");
   assert.equal(/<p class="soon-line">[\s\S]*?<\/p>/.exec(g.home(vm(["profile", "website"])))[0].split(" · ").length, 4);
   assert.deepEqual(links(g.home(vm(null))), ["profile", "branding", "website", "marketing", "content", "files"], "the demo is unaffected");
   assert.ok(!/Coming soon/.test(g.home(vm(null))));

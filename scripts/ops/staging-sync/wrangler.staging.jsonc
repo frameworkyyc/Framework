@@ -1,0 +1,8 @@
+// Used only by the "Staging data refresh" workflow for `wrangler d1 export` and `wrangler d1 time-travel info`. It names the Staging portal database and nothing else.
+{
+  "name": "staging-sync-tools",
+  "compatibility_date": "2026-09-01",
+  "d1_databases": [
+    { "binding": "PORTAL_DB", "database_name": "framework-portal-staging", "database_id": "1edda8a2-5249-4f40-9dbc-d29aa44e21f8" }
+  ]
+}

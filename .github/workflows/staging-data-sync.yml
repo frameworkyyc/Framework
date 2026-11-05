@@ -1,0 +1,146 @@
+# Manually triggered refresh of the STAGING portal from a read-only copy of PRODUCTION client data. NOT part of CI: it never runs automatically.
+#   * workflow_dispatch only; runs only with ref Staging; the GitHub environment "staging-data-sync" needs a human reviewer for EVERY run (this file cannot create or
+#     verify that protection; see scripts/ops/staging-sync/RUNBOOK.md).
+#   * mode "dry-run" (default) reads both databases, prints the plan and changes nothing. mode "apply" additionally needs the plan hash of a reviewed dry run, then:
+#     Staging health check -> Staging Time Travel bookmark -> full Staging export to the PRIVATE Staging backup bucket -> apply (files, then one atomic D1 batch) ->
+#     verify -> store the refresh record -> Staging health check again.
+#   * Production is only ever READ (PRODUCTION_READ_TOKEN: D1 read + R2 read). Everything that writes uses STAGING_WRITE_TOKEN and the pinned Staging ids in
+#     scripts/ops/staging-sync/config.mjs. Nothing is ever synchronised back to Production.
+#   * Reports hold counts and record keys only. Client data is never printed and never uploaded as an artifact; the backup goes to the private Staging bucket.
+# Environment secrets (names only): PRODUCTION_READ_TOKEN, STAGING_WRITE_TOKEN.
+name: Staging data refresh from Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_target:
+        description: "Type the Staging database name exactly: framework-portal-staging"
+        required: true
+        type: string
+      mode:
+        description: "dry-run reports the plan and changes nothing; apply writes to Staging (needs plan_sha from a reviewed dry run)"
+        required: true
+        type: choice
+        default: dry-run
+        options:
+          - dry-run
+          - apply
+      plan_sha:
+        description: "apply only: the Plan hash printed by the dry run you reviewed"
+        required: false
+        type: string
+      overwrite:
+        description: "apply only: comma-separated table:key of CONFLICTS you approve overwriting with Production's version (default none)"
+        required: false
+        type: string
+      approve_deletions:
+        description: "apply only: comma-separated table:key of deletion candidates you approve deleting from Staging (default none)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-data-sync
+  cancel-in-progress: false
+
+env:
+  WRANGLER_VERSION: "4.147.0"
+  WRANGLER_SEND_METRICS: "false"
+  WRANGLER_CONFIG: scripts/ops/staging-sync/wrangler.staging.jsonc
+
+jobs:
+  refresh:
+    name: Dry run / apply the Staging data refresh
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging-data-sync
+    steps:
+      - name: Check the inputs and the branch
+        env:
+          CONFIRM_TARGET: ${{ inputs.confirm_target }}
+          MODE: ${{ inputs.mode }}
+          REF: ${{ github.ref }}
+          PLAN_SHA: ${{ inputs.plan_sha }}
+          OVERWRITE: ${{ inputs.overwrite }}
+          DELETIONS: ${{ inputs.approve_deletions }}
+        run: |
+          if [ "$CONFIRM_TARGET" != "framework-portal-staging" ]; then echo "FAIL: the typed database name does not match."; exit 1; fi
+          if [ "$MODE" != "dry-run" ] && [ "$MODE" != "apply" ]; then echo "FAIL: unknown mode."; exit 1; fi
+          if [ "$REF" != "refs/heads/Staging" ]; then echo "FAIL: run this only with ref Staging."; exit 1; fi
+          if [ "$MODE" = "apply" ] && ! printf '%s' "$PLAN_SHA" | grep -Eq '^[0-9a-f]{64}$'; then echo "FAIL: apply needs the 64-character plan hash from a reviewed dry run."; exit 1; fi
+          for v in "$OVERWRITE" "$DELETIONS"; do
+            if [ -n "$v" ] && ! printf '%s' "$v" | grep -Eq '^[a-z_]+:[A-Za-z0-9|_.-]+(,[a-z_]+:[A-Za-z0-9|_.-]+)*$'; then echo "FAIL: approval lists must look like table:key,table:key."; exit 1; fi
+          done
+          echo "mode: $MODE"
+          echo "OUT=$RUNNER_TEMP/sync-out" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Install Wrangler (no secrets in this step, no install scripts)
+        run: npm install --prefix "$RUNNER_TEMP/wrangler" --ignore-scripts --no-audit --no-fund --no-save "wrangler@$WRANGLER_VERSION"
+      - name: Fetch the previous refresh record (Staging backup bucket)
+        env:
+          STAGING_WRITE_TOKEN: ${{ secrets.STAGING_WRITE_TOKEN }}
+        run: |
+          mkdir -p "$OUT"
+          node scripts/ops/staging-sync/cli.mjs fetch-manifest --file "$OUT/manifest.json"
+      - name: Staging health check (email and integration isolation must be intact)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_WRITE_TOKEN }}
+        run: node scripts/ops/staging-health.mjs
+      - name: Preflight and dry run (reads only)
+        if: ${{ inputs.mode == 'dry-run' }}
+        env:
+          PRODUCTION_READ_TOKEN: ${{ secrets.PRODUCTION_READ_TOKEN }}
+          STAGING_WRITE_TOKEN: ${{ secrets.STAGING_WRITE_TOKEN }}
+        run: |
+          MANIFEST=""; [ -f "$OUT/manifest.json" ] && MANIFEST="--manifest $OUT/manifest.json"
+          node scripts/ops/staging-sync/cli.mjs dry-run $MANIFEST --check-files --out "$OUT"
+          cat "$OUT/report.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Record the Staging restore bookmark (apply only)
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_WRITE_TOKEN }}
+        run: |
+          "$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler" d1 time-travel info PORTAL_DB -c "$WRANGLER_CONFIG" --json > "$OUT/bookmark.json"
+          node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const b=j.bookmark||j.result?.bookmark;if(!b){console.error("no bookmark");process.exit(1)}require("fs").appendFileSync(process.env.GITHUB_ENV,"BOOKMARK="+b+"\n");console.log("restore bookmark recorded (value in the job summary)");require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY,"Staging restore bookmark before this refresh: `"+b+"`\n")' "$OUT/bookmark.json"
+      - name: Back up Staging to the private Staging backup bucket (apply only)
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_WRITE_TOKEN }}
+          STAGING_WRITE_TOKEN: ${{ secrets.STAGING_WRITE_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          KEY="staging-sync/backups/pre-refresh-${RUN_ID}.sql"
+          echo "BACKUP_KEY=$KEY" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler" d1 export PORTAL_DB --remote -c "$WRANGLER_CONFIG" --output "$OUT/pre-refresh.sql"
+          node scripts/ops/staging-sync/cli.mjs store-backup --file "$OUT/pre-refresh.sql" --backup-key "$KEY"
+          rm -f "$OUT/pre-refresh.sql"
+          echo "Staging backup stored at \`$KEY\` in the private Staging backup bucket." >> "$GITHUB_STEP_SUMMARY"
+      - name: Apply the reviewed plan (apply only)
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          PRODUCTION_READ_TOKEN: ${{ secrets.PRODUCTION_READ_TOKEN }}
+          STAGING_WRITE_TOKEN: ${{ secrets.STAGING_WRITE_TOKEN }}
+          PLAN_SHA: ${{ inputs.plan_sha }}
+          OVERWRITE: ${{ inputs.overwrite }}
+          DELETIONS: ${{ inputs.approve_deletions }}
+        run: |
+          MANIFEST=""; [ -f "$OUT/manifest.json" ] && MANIFEST="--manifest $OUT/manifest.json"
+          node scripts/ops/staging-sync/cli.mjs apply $MANIFEST --plan-sha "$PLAN_SHA" --bookmark "$BOOKMARK" --backup-key "$BACKUP_KEY" --overwrite "$OVERWRITE" --approve-deletions "$DELETIONS" --manifest-out "$OUT/manifest.next.json" --out "$OUT" | tee "$OUT/apply.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Store the new refresh record (apply only)
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          STAGING_WRITE_TOKEN: ${{ secrets.STAGING_WRITE_TOKEN }}
+        run: node scripts/ops/staging-sync/cli.mjs store-manifest --file "$OUT/manifest.next.json"
+      - name: Staging health check after the refresh (apply only)
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.STAGING_WRITE_TOKEN }}
+        run: node scripts/ops/staging-health.mjs

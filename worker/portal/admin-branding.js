@@ -6,6 +6,7 @@
  *   GET  /clients/:org/branding                          everything for one organization (kit, assets, client uploads, requests, usage); never storage keys
  *   PUT  /clients/:org/branding/kit                      { colours?, typography? }  saves (never publishes)
  *   POST /clients/:org/branding/kit/publish | unpublish  publication of the whole kit
+ *   PUT  /clients/:org/branding/requirements             { key, level: "automatic"|"required"|"recommended"|"optional"|"not_applicable", note? }  one item's requirement for this client (Automatic = no override)
  *   POST /clients/:org/branding/assets                   multipart: file + meta (JSON)   a new deliverable (a draft until published)
  *   POST /clients/:org/branding/assets/:id/update        { ...metadata, published? }
  *   POST /clients/:org/branding/assets/:id/replace       multipart: file                swap the file, keep the metadata
@@ -28,6 +29,9 @@ import { getOrganizationById } from "./repo/orgs.js";
 import { UUID } from "./repo/common.js";
 import * as brand from "./repo/brand.js";
 import { recordActivity } from "./repo/activity.js";
+import { listRequirementSettings, setRequirementSetting } from "./repo/brand-requirement-settings.js";
+import { REQUIREMENT_ITEMS, REQUIREMENT_LEVELS } from "../../admin/assets/brand-requirement-items.js";
+import { DEFAULT_REQUIREMENT } from "./brand-requirements.js";
 import * as files from "./brand-files.js";
 import { BRANDING_SERVICES, brandingService } from "./brand-services.js";
 import { listServicesAdmin, requestKeyOfService } from "./repo/portal-services.js";
@@ -46,7 +50,7 @@ export const err = (status, error, message) => json({ error, message }, status);
 /** Data-layer and file-service failure codes, as HTTP statuses. Anything unlisted is a bare 500: no internals reach the browser. */
 const STATUS = {
   not_found: 404, forbidden: 403,
-  invalid_colours: 422, invalid_typography: 422, invalid_brand_name: 422, invalid_kind: 422, invalid_title: 422, invalid_variant: 422, invalid_logo_role: 422, invalid_orientation: 422, invalid_tone: 422, invalid_section: 422, invalid_usage_note: 422,
+  invalid_item: 422, invalid_level: 422, requirements_unavailable: 409, invalid_colours: 422, invalid_typography: 422, invalid_brand_name: 422, invalid_kind: 422, invalid_title: 422, invalid_variant: 422, invalid_logo_role: 422, invalid_orientation: 422, invalid_tone: 422, invalid_section: 422, invalid_usage_note: 422,
   invalid_license_note: 422, invalid_sort_order: 422, invalid_input: 422, invalid_status: 422, invalid_note: 422, invalid_kit: 422, invalid_sections: 422, sections_unavailable: 409, font_license_required: 422,
   invalid_name: 422, type_not_allowed: 415, content_mismatch: 422, active_content: 422, image_dimensions: 422, pdf_encrypted: 422, empty_file: 422, no_file: 400, file_too_large: 413,
   archive_unsafe_entry: 422, archive_encrypted: 422, archive_unsupported: 422, archive_entries: 422, archive_too_large: 422,
@@ -124,6 +128,17 @@ async function view(env, org) {
     uploads: uploads.map(publicUpload),
     requests: requests.map((r) => publicRequest(r, svcNames)),
     services: BRANDING_SERVICES.map((s) => ({ key: s.key, title: s.title })),
+    requirements: await requirementsView(db, org.id),
+  };
+}
+
+/** Every item Admin can set, with its automatic level (sections only; a logo variation follows its section) and any override for this client. Needs migration 0014: without it, available is false. */
+async function requirementsView(db, organizationId) {
+  const set = await listRequirementSettings(db, organizationId);
+  return {
+    available: set.available,
+    levels: REQUIREMENT_LEVELS,
+    items: REQUIREMENT_ITEMS.map((i) => ({ key: i.key, label: i.label, group: i.group, auto: DEFAULT_REQUIREMENT[i.key] || null, level: set.items[i.key] ? set.items[i.key].level : null, note: set.items[i.key] ? set.items[i.key].note || "" : "", updatedBy: set.items[i.key] ? set.items[i.key].updatedBy : null, updatedAt: set.items[i.key] ? set.items[i.key].updatedAt : null })),
   };
 }
 
@@ -237,6 +252,7 @@ export async function handleBrandingApi(request, env, principal, path, deps = {}
     const id = (i) => rest[i];
     if (rest.length === 0) route = { kind: "view", method: "GET" };
     else if (rest.length === 1 && rest[0] === "kit") route = { kind: "kit_save", method: "PUT" };
+    else if (rest.length === 1 && rest[0] === "requirements") route = { kind: "requirement_set", method: "PUT" };
     else if (rest.length === 2 && rest[0] === "kit" && (rest[1] === "publish" || rest[1] === "unpublish")) route = { kind: "kit_" + rest[1], method: "POST" };
     else if (rest.length === 1 && rest[0] === "assets") route = { kind: "asset_create", method: "POST" };
     else if (rest.length === 3 && rest[0] === "assets" && ["update", "replace", "delete"].includes(rest[2])) route = { kind: "asset_" + rest[2], method: "POST", target: id(1) };
@@ -272,6 +288,14 @@ export async function handleBrandingApi(request, env, principal, path, deps = {}
 
     if (route.kind === "view") return json(await view(env, org));
 
+    if (route.kind === "requirement_set") {
+      const read = await readJson(request, ["key", "level", "note"]);
+      if (read.response) return read.response;
+      const lv = read.body.level;
+      if (lv !== "automatic" && !REQUIREMENT_LEVELS.includes(lv)) return err(422, "invalid_level", "The change was not made.");
+      const r = await setRequirementSetting(db, org.id, read.body.key, lv === "automatic" ? null : lv, lv === "automatic" ? "" : read.body.note, actor, { now });
+      return r.ok ? json({ ok: true, changed: r.changed, requirements: await requirementsView(db, org.id) }) : fromFailure(r);
+    }
     if (route.kind === "kit_save") {
       const read = await readJson(request, ["colours", "typography", "brand_name", "sections"]);
       if (read.response) return read.response;

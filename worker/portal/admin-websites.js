@@ -8,6 +8,9 @@
  *   POST /clients/:org/websites                       { name, url?, origin, status, managed_by_framework?, launch_date?, domain_*?, hosting_*?, management_notes?, published? }
  *   POST /clients/:org/websites/:id/update            { ...any of those fields }
  *   POST /clients/:org/websites/:id/archive | restore hide or bring back a website (nothing is deleted)
+ *   (create and update also take `phase`: "awaiting_feedback" | "awaiting_approval" (in development) | "maintenance" (live) | null; needs migration 0015)
+ *   POST /clients/:org/websites/:id/milestones                       { title, detail?, status?, due_date? }   add a milestone (the progress bar of a website in development is computed from these)
+ *   POST /clients/:org/websites/:id/milestones/:mid/update | delete | move   { ...fields } | {} | { direction: "up"|"down" }
  *   POST /clients/:org/websites/:id/screenshot        multipart: file (png, jpg or webp, up to 5 MB)   set or replace the screenshot
  *   POST /clients/:org/websites/:id/screenshot/remove removes the screenshot (the stored image is deleted at once)
  *   GET  /clients/:org/websites/:id/preview-check     what the portal's live-preview check sees for this website, from the Worker (verdict, redirect chain, framing headers; never cached)
@@ -19,6 +22,8 @@ import { UUID } from "./repo/common.js";
 import * as sites from "./repo/websites.js";
 import * as wfiles from "./website-files.js";
 import * as packages from "./repo/website-packages.js";
+import * as miles from "./repo/website-milestones.js";
+import { milestoneProgress, stageOf, PHASES } from "./website-stage.js";
 import { diagnoseEmbeddable } from "./website-preview.js";
 import { json, err, sameOriginWrite, readJson, readUpload } from "./admin-branding.js";
 
@@ -26,12 +31,16 @@ const MAX_UPLOAD = wfiles.SCREENSHOT_MAX_BYTES + 256 * 1024;
 const MAX_PACKAGE_UPLOAD = wfiles.PACKAGE_MAX_BYTES + 256 * 1024;
 const STATUS = {
   not_found: 404, conflict: 409, too_many: 409,
-  invalid_input: 422, invalid_name: 422, invalid_url: 422, invalid_origin: 422, invalid_status: 422, invalid_managed_by_framework: 422, invalid_published: 422, invalid_date: 422, invalid_party: 422, invalid_text: 422, invalid_sort_order: 422, invalid_combination: 422,
+  invalid_phase: 422, phase_unavailable: 409, unavailable: 409, invalid_title: 422, invalid_detail: 422, invalid_direction: 422, invalid_input: 422, invalid_name: 422, invalid_url: 422, invalid_origin: 422, invalid_status: 422, invalid_managed_by_framework: 422, invalid_published: 422, invalid_date: 422, invalid_party: 422, invalid_text: 422, invalid_sort_order: 422, invalid_combination: 422,
   archive_encrypted: 422, archive_unsupported: 422, archive_unsafe_entry: 422, archive_entries: 422, archive_too_large: 422, invalid_published: 422,
   type_not_allowed: 415, invalid_name_file: 422, content_mismatch: 422, active_content: 422, image_dimensions: 422, empty_file: 422, no_file: 400, file_too_large: 413,
   storage_unavailable: 503, storage_write_failed: 502, storage_read_failed: 502, storage_delete_failed: 502,
 };
 const fromFailure = (r) => (STATUS[r.error] ? err(STATUS[r.error], r.error === "invalid_name" && r.file ? "invalid_name" : r.error, "The change was not made.") : err(500, "server_error", "Something went wrong. Nothing was changed."));
+
+async function phaseColumnExists(db) {
+  try { await db.prepare("SELECT phase FROM websites LIMIT 1").first(); return true; } catch { return false; }
+}
 
 async function view(env, org) {
   const db = env.PORTAL_DB;
@@ -41,7 +50,12 @@ async function view(env, org) {
     organization: { id: org.id, name: org.name, slug: org.slug },
     capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", storage: Boolean(env.PORTAL_FILES) },
     limits: { maxWebsites: sites.MAX_WEBSITES, screenshotMaxBytes: wfiles.SCREENSHOT_MAX_BYTES, packageMaxBytes: wfiles.PACKAGE_MAX_BYTES },
-    websites: (await sites.listWebsitesAdmin(db, org.id)).map((w) => ({ ...w, package: pkgs.get(w.id) || null })),
+    websites: await Promise.all((await sites.listWebsitesAdmin(db, org.id)).map(async (w) => {
+      const milestones = await miles.listMilestonesAdmin(db, org.id, w.id);
+      return { ...w, package: pkgs.get(w.id) || null, stage: stageOf(w).key, milestones, progress: milestoneProgress(w, milestones) };
+    })),
+    phases: PHASES,
+    phaseAvailable: await phaseColumnExists(db),
     packagesAvailable: await packages.packagesAvailable(db),
   };
 }
@@ -56,12 +70,15 @@ export async function handleWebsitesApi(request, env, principal, path, deps = {}
   else if (rest.length === 2 && rest[1] === "screenshot") route = request.method === "GET" ? { kind: "screenshot_view", method: "GET", target: rest[0] } : { kind: "screenshot_set", method: "POST", target: rest[0] };
   else if (rest.length === 2 && rest[1] === "package") route = { kind: "package_set", method: "POST", target: rest[0] };
   else if (rest.length === 3 && rest[1] === "package" && ["publish", "remove"].includes(rest[2])) route = { kind: "package_" + rest[2], method: "POST", target: rest[0] };
+  else if (rest.length === 2 && rest[1] === "milestones") route = { kind: "milestone_create", method: "POST", target: rest[0] };
+  else if (rest.length === 4 && rest[1] === "milestones" && ["update", "delete", "move"].includes(rest[3])) route = { kind: "milestone_" + rest[3], method: "POST", target: rest[0], sub: rest[2] };
   else if (rest.length === 2 && rest[1] === "preview-check") route = { kind: "preview_check", method: "GET", target: rest[0] };
   else if (rest.length === 3 && rest[1] === "screenshot" && rest[2] === "remove") route = { kind: "screenshot_remove", method: "POST", target: rest[0] };
   if (!route) return null;
   if (request.method !== route.method) return json({ error: "method_not_allowed", message: "That method is not allowed here." }, 405, { Allow: route.method });
   if (!UUID.test(org)) return err(404, "not_found", "No such organization.");
   if (route.target !== undefined && !UUID.test(route.target)) return err(404, "not_found", "Not found.");
+  if (route.sub !== undefined && !UUID.test(route.sub)) return err(404, "not_found", "Not found.");
   if (route.method !== "GET") {
     if (env.PORTAL_ADMIN_WRITES !== "1") return err(403, "writes_disabled", "Changes are not enabled on this deployment.");
     if (!sameOriginWrite(request)) return err(403, "forbidden", "This request was not accepted.");
@@ -79,19 +96,50 @@ export async function handleWebsitesApi(request, env, principal, path, deps = {}
 
     if (route.kind === "view") return json(await view(env, orgRow));
     if (route.kind === "create") {
-      const read = await readJson(request, sites.WEBSITE_FIELDS);
+      const read = await readJson(request, [...sites.WEBSITE_FIELDS, "phase"]);
       if (read.response) return read.response;
-      const r = await sites.createWebsite(db, orgRow.id, read.body, actor, { now });
-      return r.ok ? json({ ok: true, id: r.id }, 201) : fromFailure(r);
+      const { phase, ...fields } = read.body;
+      if (phase !== undefined && phase !== null && !PHASES.includes(phase)) return err(422, "invalid_phase", "The change was not made.");
+      const r = await sites.createWebsite(db, orgRow.id, fields, actor, { now });
+      if (!r.ok) return fromFailure(r);
+      if (phase) { const p = await sites.setWebsitePhase(db, orgRow.id, r.id, phase, actor, { now }); if (!p.ok) return json({ ok: true, id: r.id, phaseSaved: false, phaseError: p.error }, 201); }
+      return json({ ok: true, id: r.id }, 201);
     }
     if (route.kind === "update") {
-      const read = await readJson(request, sites.WEBSITE_FIELDS);
+      const read = await readJson(request, [...sites.WEBSITE_FIELDS, "phase"]);
       if (read.response) return read.response;
-      const r = await sites.updateWebsite(db, orgRow.id, route.target, read.body, actor, { now });
-      return r.ok ? json({ ok: true }) : fromFailure(r);
+      const { phase, ...fields } = read.body;
+      if (phase !== undefined && phase !== null && !PHASES.includes(phase)) return err(422, "invalid_phase", "The change was not made.");
+      if (Object.keys(fields).length || phase === undefined) { const r = await sites.updateWebsite(db, orgRow.id, route.target, fields, actor, { now }); if (!r.ok) return fromFailure(r); }
+      // A status change keeps a phase that still fits (an explicit `phase` wins) and clears one that no longer does, so a launched website never stays "Awaiting approval".
+      if (phase !== undefined) { const p = await sites.setWebsitePhase(db, orgRow.id, route.target, phase, actor, { now }); if (!p.ok) return fromFailure(p); }
+      else if ("status" in fields) await sites.setWebsitePhase(db, orgRow.id, route.target, null, actor, { now, onlyIfInvalid: true }).catch(() => {});
+      return json({ ok: true });
     }
     if (route.kind === "archive" || route.kind === "restore") {
       const r = await sites.setWebsiteArchived(db, orgRow.id, route.target, route.kind === "archive", actor, { now });
+      return r.ok ? json({ ok: true, changed: !r.unchanged }) : fromFailure(r);
+    }
+    if (route.kind === "milestone_create") {
+      const read = await readJson(request, ["title", "detail", "status", "due_date"]);
+      if (read.response) return read.response;
+      const r = await miles.createMilestone(db, orgRow.id, route.target, read.body, actor, { now });
+      return r.ok ? json({ ok: true, id: r.id }, 201) : fromFailure(r);
+    }
+    if (route.kind === "milestone_update") {
+      const read = await readJson(request, ["title", "detail", "status", "due_date"]);
+      if (read.response) return read.response;
+      const r = await miles.updateMilestone(db, orgRow.id, route.target, route.sub, read.body, actor, { now });
+      return r.ok ? json({ ok: true }) : fromFailure(r);
+    }
+    if (route.kind === "milestone_delete") {
+      const r = await miles.deleteMilestone(db, orgRow.id, route.target, route.sub, actor, { now });
+      return r.ok ? json({ ok: true }) : fromFailure(r);
+    }
+    if (route.kind === "milestone_move") {
+      const read = await readJson(request, ["direction"]);
+      if (read.response) return read.response;
+      const r = await miles.moveMilestone(db, orgRow.id, route.target, route.sub, read.body.direction, actor, { now });
       return r.ok ? json({ ok: true, changed: !r.unchanged }) : fromFailure(r);
     }
     if (route.kind === "screenshot_set") {

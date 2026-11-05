@@ -65,7 +65,7 @@ test("the Production ID appears exactly once in the file (never inside the previ
 test("Production (top-level vars) and Staging (previews.vars) each carry the sender, the same public Turnstile site key and their OWN WorkOS settings; both enable the portal (Production since launch), only Staging also has the demo", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
   assert.deepEqual(config.vars, { ...shared, ASSESSMENT_NOTIFY_TO: "hello@frameworkco.ca", PORTAL_AUTH_CLIENT_ID: "client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_BASE_URL: "https://frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1", PORTAL_WEBSITE: "1" });
-  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1", PORTAL_DEMO: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1", PORTAL_SERVICES: "1", PORTAL_WEBSITE: "1" });
+  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1", PORTAL_DEMO: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1", PORTAL_SERVICES: "1", PORTAL_WEBSITE: "1", PORTAL_DISCOVERY: "1" });
 });
 
 test("the verified WorkOS issuer is pinned and belongs to the configured client id (not the bare api.workos.com base)", () => {
@@ -143,7 +143,7 @@ test("the sender is a valid From value that the Worker accepts as-is (no correct
 });
 
 test("only whitelisted NON-secret names may ever appear under vars", () => {
-  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED", "PORTAL_ALLOW_PRODUCTION", "PORTAL_BRANDING", "PORTAL_SERVICES", "PORTAL_WEBSITE", "PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_DEMO"]);
+  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED", "PORTAL_ALLOW_PRODUCTION", "PORTAL_BRANDING", "PORTAL_SERVICES", "PORTAL_WEBSITE", "PORTAL_DISCOVERY", "PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_DEMO"]);
   for (const name of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) {
     assert.equal(config.vars[name], "1", name + " is on in Production since launch (invitations are still limited to the allowlist secret)");
     assert.equal(config.previews.vars[name], "1", name + " is on for Staging (invitations are still limited to the allowlist secret)");
@@ -185,7 +185,7 @@ test("migrations_dir safeguard: both PORTAL_DB bindings point at migrations/port
   for (const d of [...config.d1_databases, ...config.previews.d1_databases].filter((d) => d.binding === "DB")) assert.equal(d.migrations_dir, undefined, d.database_name + ": the feedback binding is unchanged (default ./migrations)");
   const dir = new URL("../../migrations/portal/", import.meta.url);
   assert.ok(existsSync(dir));
-  assert.deepEqual(readdirSync(dir).filter((f) => f.endsWith(".sql")), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql", "0010_service_pricing.sql", "0011_websites.sql", "0012_website_management.sql", "0013_staff_access.sql"], "exactly the four reviewed portal migrations are visible through that directory");
+  assert.deepEqual(readdirSync(dir).filter((f) => f.endsWith(".sql")), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql", "0010_service_pricing.sql", "0011_websites.sql", "0012_website_management.sql", "0013_staff_access.sql", "0014_brand_requirements.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql", "0018_discovery.sql"], "exactly the four reviewed portal migrations are visible through that directory");
   const feedback = readdirSync(new URL("../../migrations/", import.meta.url)).filter((f) => f.endsWith(".sql"));
   assert.ok(feedback.length >= 6 && !feedback.some((f) => /portal/.test(f)), "the feedback migrations stay in ./migrations and are never visible to PORTAL_DB");
   const code = raw.replace(/^\s*\/\/.*$/gm, "");

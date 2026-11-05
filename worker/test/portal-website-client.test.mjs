@@ -17,7 +17,7 @@ const ADMIN = "admin@framework.test";
 const UUID0 = "00000000-0000-4000-8000-000000000000";
 
 async function setup({ flag = true, migrated = true, storage = true } = {}) {
-  const w = await makeWorld({ skip: migrated ? [] : ["0011_websites.sql", "0012_website_management.sql"] });
+  const w = await makeWorld({ skip: migrated ? [] : ["0011_websites.sql", "0012_website_management.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql"] });
   const bucket = fakeR2();
   if (flag) w.env.PORTAL_WEBSITE = "1";
   if (storage) w.env.PORTAL_FILES = bucket;

@@ -90,17 +90,41 @@ export function home(vm) {
   // The signed-in home: a short greeting and one card per built section. Each card is one link (title, short description, status, arrow). Sections that are
   // not built yet are a single quiet line, never a card, so nothing suggests they can be opened.
   const card = (a) => {
-    const st = a.key === "branding" ? brandStatus(vm.brand) : vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : "";
+    const st = a.key === "branding" ? brandStatus(vm.brand) : a.key === "website" ? websiteStatus(vm.website) : vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : "";
     return `<li><a class="hub" href="${e(href(vm, a.path))}"><span class="hub__top"><span class="hub__title">${e(a.title)}</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">${e(HOME_BLURB[a.key])}</span>${st ? `<span class="hub__status">${st}</span>` : ""}</a></li>`;
   };
   const servicesCard = vm.services
     ? `<li><a class="hub" href="${e(href(vm, "/services"))}"><span class="hub__top"><span class="hub__title">Client Services</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">Invoices, support requests and how to reach us</span>${vm.servicesAttention && vm.servicesAttention.length ? `<span class="hub__status"><span class="tile__status"><span class="tile__action"><span class="dot dot--attention" aria-hidden="true"></span>${e(vm.servicesAttention.join(" · "))}</span></span></span>` : ""}</a></li>`
     : "";
-  const active = AREAS.filter((a) => isLive(a.key)).map(card).join("") + servicesCard;
-  const soon = AREAS.filter((a) => !isLive(a.key));
+  // Business Profile is the onboarding step, not one of the service cards: a full-width section above them. The cards follow in a fixed order, Branding, Website, Marketing (once it is built), then any other built section.
+  const CARD_ORDER = ["branding", "website", "marketing", "content", "files"];
+  const cards = CARD_ORDER.map((k) => AREAS.find((a) => a.key === k)).filter((a) => a && isLive(a.key)).map(card).join("") + servicesCard;
+  const soon = AREAS.filter((a) => a.key !== "profile" && !isLive(a.key));
   return `<header class="page-head page-head--home">${vm.org && vm.org.name ? `<span class="eyebrow">${e(vm.org.name)}</span>` : ""}<h1 class="h1 h1--home">${e(welcomeFor(vm))}</h1></header>
-<nav aria-label="Your workspace"><ul class="hubs">${active}</ul></nav>
+${isLive("profile") ? onboarding(vm) : ""}<nav aria-label="Your workspace"><ul class="hubs">${cards}</ul></nav>
 ${soon.length ? `<p class="soon-line"><span class="soon-line__label">Coming soon</span> ${soon.map((a) => e(a.title)).join(" · ")}</p>` : ""}`;
+}
+
+/** The Business Profile onboarding section of the home page: full width, with its completion percentage and what is still required (the same status the profile pages use). */
+function onboarding(vm) {
+  const next = vm.nextAction && vm.nextAction.profile;
+  const label = !next ? "Open Business Profile" : next.state === "start" ? "Start your profile" : next.state === "continue" ? "Continue your profile" : next.state === "complete" ? "Review your profile" : "Open Business Profile";
+  const to = next && (next.state === "start" || next.state === "continue") && next.path ? next.path : "/profile";
+  const status = vm.moduleStatus ? tileStatus(vm.moduleStatus.profile) : "";
+  return `<section class="onboard" aria-labelledby="onboard-h"><div class="onboard__main"><p class="eyebrow">Getting started</p><h2 class="onboard__title" id="onboard-h">Business Profile</h2><p class="onboard__desc">${e(HOME_BLURB.profile)}. Everything else builds on this.</p></div>${status ? `<div class="onboard__status">${status}</div>` : ""}<div class="onboard__cta"><a class="btn btn--primary" href="${e(href(vm, to))}">${e(label)}<span class="visually-hidden"> (Business Profile)</span></a></div></section>
+`;
+}
+
+/**
+ * The Website card's status: where the website stands (In development, Awaiting client feedback, Awaiting approval, Live, Maintenance) and, only while it is being built, a progress bar computed
+ * from its real milestones. A live website shows Live, never a permanent 100%. No website at all: no status line (the card just invites a look).
+ * @param w { stage: {key, label, tone}, progress: {show, percent, done, total, next}, count, name } or null
+ */
+export function websiteStatus(w) {
+  if (!w || !w.stage) return "";
+  const bar = w.progress && w.progress.show ? `<progress class="meter" max="100" value="${w.progress.percent}" aria-hidden="true">${w.progress.percent}%</progress><p class="tile__pct">${w.progress.percent}% complete</p><p class="tile__note">${e(`${w.progress.done} of ${w.progress.total} milestones done`)}</p>` : "";
+  const more = w.count > 1 ? `<p class="tile__note">${e(`${w.count} websites`)}</p>` : "";
+  return `<div class="tile__status"><p class="tile__pct"><span class="status status--${e(w.stage.tone)}">${e(w.stage.label)}</span></p>${bar}${more}</div>`;
 }
 
 /* ------------------------------------------------------------------ standard workspace overview (shared) */
