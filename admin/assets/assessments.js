@@ -3,6 +3,7 @@
    can send email at all, a test-email button, and one-click recovery of anything that was saved but not emailed. */
 
 import { h, api, ApiError, fmtDateTime, shortRef, stateBlock, confirmDialog } from "./ui.js";
+import { badge, fold, statCard } from "./kit.js";
 
 // "YYYY-MM-DD" shown as a plain calendar day (no time-zone shifting).
 const dayFmt = new Intl.DateTimeFormat("en-CA", { dateStyle: "long", timeZone: "UTC" });
@@ -213,13 +214,16 @@ export async function render() {
           h("button", { class: "btn btn--secondary", type: "button", onclick: testEmail }, "Send test email"),
           data.unsent ? h("button", { class: "btn btn--primary", type: "button", onclick: () => resend(null) }, `Resend ${data.unsent} unsent`) : null)),
       feedback,
-      h("p", { class: "adm-banner" + (e.can_send ? "" : " adm-banner--alert") }, h("strong", null, e.can_send ? "Email delivery: ready. " : "Email delivery: NOT working. "), emailSummary(e),
-        dbInfo ? h("span", { class: "adm-banner__line" }, "Database environment: " + (dbInfo.environment ? dbInfo.environment + " (marker found)." : "not marked (expected for Production).")) : null,
-        h("span", { class: "adm-banner__line" }, "Spam check (Turnstile): " + ({ on: "on.", off: "off. The form relies on the hidden field, timing check and rate limit only.", misconfigured: "NOT enforced: set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET." })[data.spam_check])),
-      h("section", { class: "adm-section", "aria-label": "Summary" }, h("div", { class: "adm-metrics" },
-        metric("Requests", String(data.total)),
-        metric("Emailed", String(data.sent)),
-        metric("Not emailed", String(data.unsent), data.unsent ? "Saved here; use Resend once email works" : null))));
+      fold({ title: "Email delivery and spam check", open: !e.can_send,
+        badges: [badge(e.can_send ? "Email ready" : "Email not working", e.can_send ? "ok" : "bad"), badge(data.spam_check === "on" ? "Spam check on" : "Spam check " + (data.spam_check === "off" ? "off" : "misconfigured"), data.spam_check === "on" ? "ok" : "warn")],
+        body: h("ul", { class: "rk-lines" },
+          h("li", null, h("strong", { text: e.can_send ? "Email delivery: ready. " : "Email delivery: NOT working. " }), emailSummary(e)),
+          dbInfo ? h("li", { text: "Database environment: " + (dbInfo.environment ? dbInfo.environment + " (marker found)." : "not marked (expected for Production).") }) : null,
+          h("li", { text: "Spam check (Turnstile): " + ({ on: "on.", off: "off. The form relies on the hidden field, timing check and rate limit only.", misconfigured: "NOT enforced: set both TURNSTILE_SITE_KEY and TURNSTILE_SECRET." })[data.spam_check] })) }),
+      h("div", { class: "rk-stats", role: "group", "aria-label": "Summary" },
+        statCard({ label: "Requests", value: String(data.total), hint: "all time" }),
+        statCard({ label: "Emailed", value: String(data.sent), hint: "notification sent", tone: data.sent === data.total && data.total ? "ok" : "" }),
+        statCard({ label: "Not emailed", value: String(data.unsent), hint: data.unsent ? "Saved here; use Resend once email works" : "none waiting", tone: data.unsent ? "bad" : "" })));
   }
 
   const resultsLine = () => {
