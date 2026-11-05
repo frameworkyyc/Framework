@@ -19,6 +19,10 @@
  *   POST /discovery/content/image                     multipart: file (png, jpg or webp, 5 MB) + meta { kind, item, option, alt? }   a reference picture for one option
  *   POST /discovery/content/:id/image/delete          {}
  *   GET  /discovery/media/:id                         a reference picture, inline
+ *   GET  /discovery/retention                         the 90-day rule: clients with a relationship end date, and what would be deleted now (read-only)
+ *   POST /clients/:org/relationship                   { ended_on: "YYYY-MM-DD" | null }   record, change or clear the day the client relationship ended (needs migration 0019)
+ *   POST /discovery/retention/run                     { confirm: "RETENTION", dry_run?: true }   a dry run unless dry_run is false AND PORTAL_DISCOVERY_RETENTION is "1"
+ *   POST /clients/:org/discovery/:id/delete           { confirm: "DELETE" }   permanently deletes the assessment, its answers, links and files (and their backup copies)
  */
 import { UUID } from "./repo/common.js";
 import { getOrganizationById } from "./repo/orgs.js";
@@ -28,13 +32,14 @@ import { effectiveKind } from "./discovery/model.js";
 import { buildBrief, briefToMarkdown } from "./discovery/brief.js";
 import { adminDownloadInspiration, adminSetReference, adminClearReference, referenceResponse, REFERENCE_MAX_BYTES } from "./discovery/files.js";
 import { randomToken, sha256b64url } from "./crypto.js";
-import { discoveryEnabled } from "./config.js";
+import { discoveryEnabled, retentionEnabled } from "./config.js";
+import { eraseAssessment, retentionPlan, runRetention, RETENTION_DAYS } from "./discovery/retention.js";
 import { json, err, sameOriginWrite, readJson, readUpload } from "./admin-branding.js";
 
 const STATUS = {
   invalid_kind: 422, invalid_title: 422, invalid_actor: 422, invalid_days: 422, invalid_token: 422, invalid_item: 422, invalid_option: 422, invalid_label: 422, invalid_enabled: 422, invalid_sort_order: 422,
   nothing_to_change: 422, not_found: 404, not_submitted: 409, closed: 409, too_many: 409, type_not_allowed: 415, content_mismatch: 422, active_content: 422, image_dimensions: 422, empty_file: 422, no_file: 400,
-  file_too_large: 413, invalid_name: 422, storage_unavailable: 503, storage_write_failed: 502, storage_read_failed: 502, storage_delete_failed: 502, unavailable: 409,
+  file_too_large: 413, invalid_name: 422, invalid_date: 422, not_due: 409, confirm_required: 422, storage_unavailable: 503, storage_write_failed: 502, storage_read_failed: 502, storage_delete_failed: 502, unavailable: 409,
 };
 const fromFailure = (r) => (STATUS[r.error] ? json({ error: r.error, message: "The change was not made." }, STATUS[r.error]) : err(500, "server_error", "Something went wrong. Nothing was changed."));
 const MAX_UPLOAD = REFERENCE_MAX_BYTES + 256 * 1024;
@@ -47,14 +52,17 @@ function route(seg) {
     if (seg.length === 3 && seg[1] === "content" && seg[2] === "image") return { kind: "image_set", methods: ["POST"] };
     if (seg.length === 5 && seg[1] === "content" && seg[3] === "image" && seg[4] === "delete") return { kind: "image_clear", methods: ["POST"], target: seg[2] };
     if (seg.length === 3 && seg[1] === "media") return { kind: "media", methods: ["GET"], target: seg[2] };
+    if (seg.length === 2 && seg[1] === "retention") return { kind: "retention", methods: ["GET"] };
+    if (seg.length === 3 && seg[1] === "retention" && seg[2] === "run") return { kind: "retention_run", methods: ["POST"] };
     return null;
   }
+  if (seg[0] === "clients" && seg.length === 3 && seg[2] === "relationship") return { kind: "relationship", methods: ["POST"], org: seg[1] };
   if (seg[0] === "clients" && seg[2] === "discovery") {
     const org = seg[1];
     if (seg.length === 3) return { kind: "org", methods: ["GET", "POST"], org };
     const id = seg[3];
     if (seg.length === 4) return { kind: "one", methods: ["GET"], org, id };
-    if (seg.length === 5 && ["update", "review", "reopen", "archive", "links"].includes(seg[4])) return { kind: seg[4], methods: ["POST"], org, id };
+    if (seg.length === 5 && ["update", "review", "reopen", "archive", "links", "delete"].includes(seg[4])) return { kind: seg[4], methods: ["POST"], org, id };
     if (seg.length === 6 && seg[4] === "links" && seg[5] !== "" ) return null;
     if (seg.length === 7 && seg[4] === "links" && seg[6] === "revoke") return { kind: "revoke", methods: ["POST"], org, id, link: seg[5] };
     if (seg.length === 6 && seg[4] === "files") return { kind: "file", methods: ["GET"], org, id, file: seg[5] };
@@ -141,6 +149,36 @@ export async function handleDiscoveryApi(request, env, principal, path, deps = {
         if (res.ok) return json({ ok: true, id: res.id, expiresAt: res.expiresAt, url: `${base}/portal/discover/${token}` }, 201); // shown once: only its hash is stored
       }
       return res.ok ? json({ ok: true }) : fromFailure(res);
+    }
+    if (r.kind === "retention") {
+      const rels = await repo.listRelationshipEnds(db);
+      const plan = rels.available ? await retentionPlan(db, { now }) : { cutoff: null, due: [] };
+      return json({ available: rels.available, capabilities: { ...caps, retentionEnabled: retentionEnabled(env), backup: Boolean(env.PORTAL_FILES_BACKUP) }, days: RETENTION_DAYS, cutoff: plan.cutoff, relationships: rels.rows, due: plan.due });
+    }
+    if (r.kind === "retention_run") {
+      const read = await readJson(request, ["confirm", "dry_run"]);
+      if (read.response) return read.response;
+      if (read.body.confirm !== "RETENTION") return err(422, "confirm_required", "Type RETENTION to confirm.");
+      const out = await runRetention(env, { now, dryRun: read.body.dry_run !== false });
+      return json({ ok: out.ok, ...out });
+    }
+    if (r.kind === "relationship") {
+      const org = await getOrganizationById(db, r.org);
+      if (!org) return err(404, "not_found", "No such organization.");
+      const read = await readJson(request, ["ended_on"]);
+      if (read.response) return read.response;
+      if (!("ended_on" in read.body)) return err(422, "invalid_date", "The change was not made.");
+      const res = read.body.ended_on === null ? await repo.clearRelationshipEnd(db, org.id, actor, { now }) : await repo.setRelationshipEnd(db, org.id, read.body.ended_on, actor, { now });
+      return res.ok ? json({ ok: true, endedOn: res.endedOn || null }) : fromFailure(res);
+    }
+    if (r.kind === "delete") {
+      const org = await getOrganizationById(db, r.org);
+      if (!org) return err(404, "not_found", "No such organization.");
+      const read = await readJson(request, ["confirm"]);
+      if (read.response) return read.response;
+      if (read.body.confirm !== "DELETE") return err(422, "confirm_required", "Type DELETE to confirm.");
+      const res = await eraseAssessment({ db, bucket: env.PORTAL_FILES, backup: env.PORTAL_FILES_BACKUP }, { organizationId: org.id, assessmentId: r.id, actor, now });
+      return res.ok ? json({ ok: true, files: res.files }) : fromFailure(res);
     }
     if (r.kind === "file") {
       const org = await getOrganizationById(db, r.org);

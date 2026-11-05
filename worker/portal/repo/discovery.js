@@ -353,3 +353,44 @@ export async function listLiveStorageKeys(db, organizationId) {
   try { return (await db.prepare("SELECT storage_key FROM discovery_uploads WHERE organization_id = ? AND deleted_at IS NULL").bind(organizationId).all()).results.map((r) => r.storage_key); } catch (err) { if (isMissing(err)) return []; throw err; }
 }
 export { UUID };
+
+/* ------------------------------------------------------------------ client relationship end date (retention) */
+
+const VALID_ACTOR = (a) => typeof a === "string" && a.length >= 1 && a.length <= 254;
+const realDate = (s) => { if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s) || s < "2000-01-01") return false; const d = new Date(s + "T00:00:00.000Z"); return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s; };
+
+/** Organizations that have an end date recorded (needs migration 0019; { available:false } before it). */
+export async function listRelationshipEnds(db) {
+  try {
+    const rows = (await db.prepare("SELECT r.organization_id, o.name, r.ended_on, r.set_at, r.set_by, (SELECT count(*) FROM discovery_assessments a WHERE a.organization_id = r.organization_id) AS assessments FROM client_relationships r JOIN organizations o ON o.id = r.organization_id ORDER BY r.ended_on DESC LIMIT 200").all()).results;
+    return { available: true, rows: rows.map((r) => ({ organizationId: r.organization_id, organizationName: r.name, endedOn: r.ended_on, setAt: r.set_at, setBy: r.set_by, assessments: r.assessments })) };
+  } catch (err) { if (isMissing(err)) return { available: false, rows: [] }; throw err; }
+}
+
+export async function getRelationshipEnd(db, organizationId) {
+  try { const r = await db.prepare("SELECT ended_on FROM client_relationships WHERE organization_id = ?").bind(organizationId).first(); return { available: true, endedOn: r ? r.ended_on : null }; }
+  catch (err) { if (isMissing(err)) return { available: false, endedOn: null }; throw err; }
+}
+
+/** Records (or changes) the day a client relationship ended. Not in the future. Audited. */
+export async function setRelationshipEnd(db, organizationId, endedOn, actor, { now = new Date() } = {}) {
+  if (!VALID_ACTOR(actor)) return fail("invalid_actor");
+  if (!realDate(endedOn) || endedOn > isoTime(now).slice(0, 10)) return fail("invalid_date");
+  const at = isoTime(now);
+  const [r] = await db.batch([
+    db.prepare("INSERT INTO client_relationships (organization_id, ended_on, set_at, set_by) SELECT o.id, ?, ?, ? FROM organizations o WHERE o.id = ? ON CONFLICT (organization_id) DO UPDATE SET ended_on = excluded.ended_on, set_at = excluded.set_at, set_by = excluded.set_by").bind(endedOn, at, actor, organizationId),
+    audit(db, organizationId, "admin", actor.trim(), "relationship.ended", "organization", organizationId, at, { endedOn }),
+  ]);
+  return r.meta.changes ? ok({ endedOn }) : fail("not_found");
+}
+
+/** Removes the end date (the relationship continues): nothing is then due for deletion. Audited. */
+export async function clearRelationshipEnd(db, organizationId, actor, { now = new Date() } = {}) {
+  if (!VALID_ACTOR(actor)) return fail("invalid_actor");
+  const at = isoTime(now);
+  const [r] = await db.batch([
+    db.prepare("DELETE FROM client_relationships WHERE organization_id = ?").bind(organizationId),
+    db.prepare("INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, detail, visibility, created_at) SELECT ?, ?, 'admin', ?, 'relationship.resumed', 'organization', ?, NULL, 'internal', ? WHERE changes() > 0").bind(newId(), organizationId, actor.trim(), organizationId, at), // only when a date was actually cleared
+  ]);
+  return r.meta.changes ? ok() : fail("not_found");
+}

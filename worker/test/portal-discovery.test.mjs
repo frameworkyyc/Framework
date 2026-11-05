@@ -218,9 +218,9 @@ import { randomToken } from "../portal/crypto.js";
 
 const SAME = { "Sec-Fetch-Site": "same-origin", Origin: ORIGIN };
 
-async function portal({ discovery = true, branding = true } = {}) {
-  const w = await makePortal({ proposed: P });
-  w.env.PORTAL_FILES = fakeR2();
+async function portal({ discovery = true, branding = true, relationships = false } = {}) {
+  const w = await makePortal({ proposed: relationships ? [...P, "0019_client_relationship.sql"] : P });
+  w.env.PORTAL_FILES = fakeR2(); w.env.PORTAL_FILES_BACKUP = fakeR2();
   if (discovery) w.env.PORTAL_DISCOVERY = "1";
   if (branding) w.env.PORTAL_BRANDING = "1";
   const orgA = await w.org("alpha", "Alpha Co"), orgB = await w.org("beta", "Beta Co");
@@ -719,7 +719,8 @@ test("privacy: the guest welcome page carries the notice (guests only), and priv
   const policy = readFileSync(new URL("../../privacy.html", import.meta.url), "utf8");
   const sec = policy.slice(policy.indexOf('<h2 id="discovery">'), policy.indexOf('<h2 id="marketing">'));
   assert.ok(sec.length > 1500, "a Brand Discovery section exists");
-  for (const fact of [/no account and no sign-in/, /scrambled version of the link/, /PNG, JPG, WebP or PDF/, /second, private backup copy/, /90 days after that relationship ends/, /within 90 days after the removal/, /hello@frameworkco\.ca/, /within 30 days/, /14 days/]) assert.match(sec, fact);
+  for (const fact of [/no account and no sign-in/, /scrambled version of the link/, /PNG, JPG, WebP or PDF/, /second, private backup copy/, /90 days after that relationship ends/, /within 90 days after the removal/, /hello@frameworkco\.ca/, /within 30 days/, /14 days/, /backup copies of those files, at the same time/]) assert.match(sec, fact);
+  assert.doesNotMatch(policy, /scheduled process/, "the policy does not claim an automated backup purge, which is a switch that is off in the repository");
   assert.match(policy, /Brand Discovery answers, comments and inspiration files:<\/strong> kept while we work with the organization and for 90 days/, "the retention list names it");
 });
 
@@ -743,4 +744,138 @@ test("retention: removing a Discovery upload keeps only its type and size (name 
   const late = await backupPurge({ db, primary, backup, now: days(91), dryRun: false });
   assert.deepEqual([late.deleted, late.protected], [1, 1]);
   assert.equal(backup.store.has(key(1)), false, "the removed file's backup copy is gone"); assert.equal(backup.store.has(key(2)), true, "the live file's backup copy stays");
+});
+
+
+/* ---- permanent deletion and the 90-day retention job ---- */
+const DAY = 86400000;
+async function withFiles(w, org, make, n = 2) {
+  const { id, token } = await make(org);
+  const a = { id, organizationId: org.id };
+  const keys = [];
+  for (let i = 0; i < n; i++) {
+    const key = `org/${org.id}/discovery/00000000-0000-4000-8000-00000000010${i}`;
+    await w.env.PORTAL_FILES.put(key, new Uint8Array([i])); await w.env.PORTAL_FILES_BACKUP.put(key, new Uint8Array([i])); keys.push(key);
+    await repo.addUpload(w.db, a, { name: `f${i}.png`, ext: "png", contentType: "image/png", size: 10, sha256: "ab".repeat(32), key }, { type: "client", ref: "guest" }, { now: w.clock.now() });
+  }
+  const saved = await repo.saveAnswers(w.db, a, { "style.personality": { picks: { like: ["modern"], dislike: [], mode: "picks" }, comment: "Sam wrote this" } }, { nextStage: 1, by: { type: "client", ref: "guest" }, now: w.clock.now() });
+  assert.equal(saved.ok, true);
+  return { id, token, keys };
+}
+
+test("Admin: Delete permanently removes the assessment, its answers, links, upload records, files and backup copies, leaves a counts-only audit entry, and touches nothing else", async () => {
+  const { w, call, make, q, orgA, orgB, anon } = await adminWorld();
+  const mine = await withFiles(w, orgA, make), other = await withFiles(w, orgB, make, 1);
+  const url = `/clients/${orgA.id}/discovery/${mine.id}/delete`;
+  assert.equal((await call(url, { method: "POST", json: { confirm: "DELETE" }, noHeader: true })).status, 403, "writes need the Admin header");
+  assert.equal((await call(url, { method: "POST", json: {} })).status, 422, "the word DELETE is required");
+  assert.equal((await call(`/clients/${orgB.id}/discovery/${mine.id}/delete`, { method: "POST", json: { confirm: "DELETE" } })).status, 404, "another client's path does not reach it");
+  assert.equal(w.env.PORTAL_FILES.store.size, 3);
+  const done = await call(url, { method: "POST", json: { confirm: "DELETE" } });
+  assert.equal(done.status, 200); assert.equal(done.json.files, 2);
+  for (const k of mine.keys) { assert.equal(w.env.PORTAL_FILES.store.has(k), false); assert.equal(w.env.PORTAL_FILES_BACKUP.store.has(k), false, "the backup copy goes too"); }
+  assert.equal(q("SELECT count(*) AS n FROM discovery_assessments WHERE id = ?", mine.id)[0].n, 0);
+  for (const t of ["discovery_uploads", "discovery_answers", "discovery_links"]) assert.equal(q(`SELECT count(*) AS n FROM ${t} WHERE assessment_id = ?`, mine.id)[0].n, 0, t);
+  assert.equal(w.env.PORTAL_FILES.store.has(other.keys[0]), true, "another organization's file is untouched");
+  assert.equal(q("SELECT count(*) AS n FROM discovery_assessments WHERE id = ?", other.id)[0].n, 1);
+  const log = q("SELECT detail, actor_ref FROM activity_log WHERE action = 'discovery.erased'");
+  assert.equal(log.length, 1); assert.deepEqual(JSON.parse(log[0].detail), { files: 2, via: "admin" }); assert.equal(JSON.stringify(log).includes("Sam"), false);
+  assert.equal((await anon.get(`/portal/discover/${mine.token}`)).status, 404, "the guest link no longer works");
+  assert.equal((await call(url, { method: "POST", json: { confirm: "DELETE" } })).status, 404, "a second delete finds nothing");
+});
+
+test("Admin: if a file cannot be deleted nothing in the database changes, and the same request can be repeated", async () => {
+  const { w, call, make, q, orgA } = await adminWorld();
+  const mine = await withFiles(w, orgA, make);
+  const realDelete = w.env.PORTAL_FILES.delete.bind(w.env.PORTAL_FILES);
+  w.env.PORTAL_FILES.delete = async () => { throw new Error("locked"); };
+  const bad = await call(`/clients/${orgA.id}/discovery/${mine.id}/delete`, { method: "POST", json: { confirm: "DELETE" } });
+  assert.equal(bad.status, 502);
+  assert.equal(q("SELECT count(*) AS n FROM discovery_assessments WHERE id = ?", mine.id)[0].n, 1); assert.equal(q("SELECT count(*) AS n FROM discovery_uploads WHERE assessment_id = ?", mine.id)[0].n, 2);
+  w.env.PORTAL_FILES.delete = realDelete;
+  assert.equal((await call(`/clients/${orgA.id}/discovery/${mine.id}/delete`, { method: "POST", json: { confirm: "DELETE" } })).status, 200);
+  assert.equal(q("SELECT count(*) AS n FROM discovery_assessments")[0].n, 0);
+});
+
+test("relationship end date: Admin records, changes and clears it (not in the future, audited); before migration 0019 it is simply unavailable", async () => {
+  const { w, call, orgA, orgB, q } = await adminWorld({ relationships: true });
+  const url = `/clients/${orgA.id}/relationship`, today = w.clock.now().toISOString().slice(0, 10);
+  assert.equal((await call(url, { method: "POST", json: { ended_on: "2026-01-31" }, noHeader: true })).status, 403);
+  for (const bad of ["tomorrow", "2026-13-01", "2026-02-30", "1999-01-01", new Date(w.clock.now().getTime() + 2 * DAY).toISOString().slice(0, 10)]) assert.equal((await call(url, { method: "POST", json: { ended_on: bad } })).status, 422, String(bad));
+  assert.equal((await call("/clients/33333333-3333-4333-8333-333333333333/relationship", { method: "POST", json: { ended_on: today } })).status, 404);
+  assert.equal((await call(url, { method: "POST", json: { ended_on: "2026-01-31" } })).status, 200);
+  assert.equal((await call(url, { method: "POST", json: { ended_on: "2026-02-15" } })).status, 200);
+  assert.deepEqual(q("SELECT organization_id, ended_on, set_by FROM client_relationships"), [{ organization_id: orgA.id, ended_on: "2026-02-15", set_by: ADMIN }]);
+  const view = (await call("/discovery/retention")).json;
+  assert.equal(view.available, true); assert.equal(view.days, 90); assert.equal(view.capabilities.retentionEnabled, false); assert.equal(view.relationships.length, 1); assert.equal(view.relationships[0].organizationName, "Alpha Co");
+  assert.equal((await call(url, { method: "POST", json: { ended_on: null } })).status, 200);
+  assert.equal(q("SELECT count(*) AS n FROM client_relationships")[0].n, 0);
+  assert.equal((await call(`/clients/${orgB.id}/relationship`, { method: "POST", json: { ended_on: null } })).status, 404, "nothing to clear");
+  assert.deepEqual(q("SELECT action FROM activity_log WHERE action LIKE 'relationship.%' ORDER BY created_at, action").map((r) => r.action).sort(), ["relationship.ended", "relationship.ended", "relationship.resumed"]);
+  const before = await adminWorld();
+  assert.equal((await before.call("/discovery/retention")).json.available, false);
+  assert.equal((await before.call(`/clients/${before.orgA.id}/relationship`, { method: "POST", json: { ended_on: "2026-01-31" } })).status, 409);
+});
+
+test("retention job: OFF by default (a dry run only counts), real only with the switch AND an explicit end date 90+ days old, bounded, and it never touches the others", async () => {
+  const { w, call, make, q, orgA, orgB } = await adminWorld({ relationships: true });
+  const a = await withFiles(w, orgA, make), b = await withFiles(w, orgB, make, 1);
+  const today = (n) => new Date(w.clock.now().getTime() - n * DAY).toISOString().slice(0, 10);
+  const run = (body) => call("/discovery/retention/run", { method: "POST", json: { confirm: "RETENTION", ...body } });
+  assert.equal((await call("/discovery/retention/run", { method: "POST", json: { dry_run: false } })).status, 422, "typed confirmation required");
+  // archived and old, but NO end date recorded: never touched
+  await repo.archiveAssessment(w.db, orgA.id, a.id, A, { now: w.clock.now() });
+  let r = (await run({ dry_run: false })).json;
+  assert.deepEqual([r.due, r.erased, r.dryRun, r.enabled], [0, 0, true, false]);
+  await call(`/clients/${orgA.id}/relationship`, { method: "POST", json: { ended_on: today(89) } });
+  r = (await run({ dry_run: false })).json; assert.deepEqual([r.due, r.erased], [0, 0], "89 days is not yet due");
+  await call(`/clients/${orgA.id}/relationship`, { method: "POST", json: { ended_on: today(91) } });
+  r = (await run({})).json; assert.deepEqual([r.due, r.erased, r.dryRun], [1, 0, true], "a dry run reports what is due");
+  r = (await run({ dry_run: false })).json; assert.deepEqual([r.due, r.erased, r.dryRun, r.enabled], [1, 0, true, false], "asking for a real run while the switch is off is still a dry run");
+  assert.equal(q("SELECT count(*) AS n FROM discovery_assessments")[0].n, 2); assert.equal(w.env.PORTAL_FILES.store.size, 3);
+  w.env.PORTAL_DISCOVERY_RETENTION = "1";
+  assert.equal((await run({})).json.dryRun, true, "dry run is still the default with the switch on");
+  r = (await run({ dry_run: false })).json; assert.deepEqual([r.ok, r.due, r.erased, r.dryRun, r.enabled], [true, 1, 1, false, true]);
+  assert.equal(q("SELECT count(*) AS n FROM discovery_assessments WHERE id = ?", a.id)[0].n, 0); assert.equal(w.env.PORTAL_FILES.store.has(a.keys[0]), false); assert.equal(w.env.PORTAL_FILES_BACKUP.store.has(a.keys[1]), false);
+  assert.equal(q("SELECT count(*) AS n FROM discovery_assessments WHERE id = ?", b.id)[0].n, 1, "an organization with no end date is untouched"); assert.equal(w.env.PORTAL_FILES.store.has(b.keys[0]), true);
+  assert.deepEqual(JSON.parse(q("SELECT detail FROM activity_log WHERE action = 'discovery.erased'")[0].detail), { files: 2, via: "retention" });
+  // a few per run: five due assessments take two runs of three... (limit 3)
+  const many = []; for (let i = 0; i < 5; i++) many.push((await make(orgB, "More " + i)).id);
+  await call(`/clients/${orgB.id}/relationship`, { method: "POST", json: { ended_on: today(200) } });
+  const first = (await run({ dry_run: false })).json; assert.deepEqual([first.erased, first.remaining], [3, 3]);
+  const second = (await run({ dry_run: false })).json; assert.deepEqual([second.erased, second.remaining], [3, 0]);
+  assert.equal(q("SELECT count(*) AS n FROM discovery_assessments WHERE organization_id = ?", orgB.id)[0].n, 0);
+});
+
+test("retention job: clearing the date cancels it, a date changed after the plan stops the delete, an unreadable database or missing storage deletes nothing, and the cron only runs it when switched on", async () => {
+  const { w, make, q, orgA } = await adminWorld({ relationships: true });
+  const { eraseAssessment, runRetention, cutoffFor } = await import("../portal/discovery/retention.js");
+  const { runScheduled } = await import("../portal/scheduled.js");
+  const a = await withFiles(w, orgA, make);
+  const now = w.clock.now(), cutoff = cutoffFor(now);
+  assert.equal(cutoff, new Date(now.getTime() - 90 * DAY).toISOString().slice(0, 10));
+  const deps = { db: w.db, bucket: w.env.PORTAL_FILES, backup: w.env.PORTAL_FILES_BACKUP };
+  w.db.raw.prepare("INSERT INTO client_relationships (organization_id, ended_on, set_at, set_by) VALUES (?, ?, ?, 'x')").run(orgA.id, cutoff, now.toISOString());
+  w.db.raw.prepare("UPDATE client_relationships SET ended_on = ? WHERE organization_id = ?").run(new Date(now.getTime() - 10 * DAY).toISOString().slice(0, 10), orgA.id); // re-engaged after the plan
+  assert.equal((await eraseAssessment(deps, { organizationId: orgA.id, assessmentId: a.id, actor: "retention", now, endedBefore: cutoff })).error, "not_due");
+  assert.equal(q("SELECT count(*) AS n FROM discovery_assessments")[0].n, 1); assert.equal(w.env.PORTAL_FILES.store.size, 2, "files untouched when the date no longer qualifies");
+  w.db.raw.prepare("UPDATE client_relationships SET ended_on = ? WHERE organization_id = ?").run(cutoff, orgA.id);
+  const env = { PORTAL_DB: w.db, PORTAL_FILES: w.env.PORTAL_FILES, PORTAL_FILES_BACKUP: w.env.PORTAL_FILES_BACKUP, PORTAL_DISCOVERY_RETENTION: "1" };
+  assert.equal((await runRetention({ ...env, PORTAL_FILES: undefined }, { now, dryRun: false })).skipped, "storage_unavailable");
+  const broken = { prepare: () => { throw new Error("db down"); } };
+  const dead = await runRetention({ ...env, PORTAL_DB: broken }, { now, dryRun: false });
+  assert.deepEqual([dead.ok, dead.skipped, dead.erased], [false, "database_unreadable", 0]);
+  assert.equal(q("SELECT count(*) AS n FROM discovery_assessments")[0].n, 1);
+  const off = await runScheduled({ PORTAL_DB: w.db, PORTAL_FILES: w.env.PORTAL_FILES, PORTAL_FILES_BACKUP: w.env.PORTAL_FILES_BACKUP }, { now });
+  assert.equal(off.retention, undefined); assert.equal(q("SELECT count(*) AS n FROM discovery_assessments")[0].n, 1, "the cron does nothing about retention while it is switched off");
+  const on = await runScheduled(env, { now });
+  assert.equal(on.retention.erased, 1); assert.equal(q("SELECT count(*) AS n FROM discovery_assessments")[0].n, 0);
+});
+
+test("retention: the migration is additive, proposed only, and the code never reads archiving or status to decide a deletion", () => {
+  const sql = readFileSync(new URL("../../migrations/portal-proposed/0019_client_relationship.sql", import.meta.url), "utf8");
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS client_relationships/); assert.doesNotMatch(sql.replace(/--.*$/gm, "").replace(/ON DELETE RESTRICT/g, ""), /\b(DROP|DELETE|UPDATE|ALTER|INSERT)\b/i);
+  const code = readFileSync(new URL("../portal/discovery/retention.js", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  assert.doesNotMatch(code, /archived_at|organizations\b.*status/, "no inference from archiving or status");
+  assert.match(code, /FROM discovery_assessments a JOIN client_relationships r/, "only organizations with an explicit end date are ever planned");
 });
