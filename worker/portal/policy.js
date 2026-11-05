@@ -24,6 +24,8 @@ const GRANTS = Object.freeze({
   "branding.upload": Object.freeze(["owner", "member"]),
   "branding.delete_upload": Object.freeze(["owner"]),
   "branding.request": Object.freeze(["owner"]),
+  // Brand Discovery (only where PORTAL_DISCOVERY is on): everyone in the organization may fill in and send the assessment Framework assigned to it. Choosing is not ordering anything.
+  "discovery.respond": Object.freeze(["owner", "member"]),
   // Website (only where PORTAL_WEBSITE is on): everyone in the organization may see the websites Framework has published for it. Framework Admin alone creates and edits them.
   "website.view": Object.freeze(["owner", "member"]),
   // Asking about an Additional Service (a request, never an order): owners only, like a Branding quote request. Change and support requests use support.view and support.submit.

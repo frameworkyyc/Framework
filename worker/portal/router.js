@@ -5,7 +5,9 @@
  * Returns null (= "not mine"; worker/index.js then answers portalNotFound(), never the static site) when the portal is off, or the request is not for the portal or not on the
  * portal host. When it IS enabled but misconfigured it fails closed with a generic 503 for portal paths.
  */
-import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled, servicesEnabled, websiteEnabled } from "./config.js";
+import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled, servicesEnabled, websiteEnabled, discoveryEnabled } from "./config.js";
+import { handleGuest, isGuestPath, memberApi, MAX_REVIEW_BODY } from "./discovery/routes.js";
+import { listClientAssessments as listClientDiscoveries } from "./repo/discovery.js";
 import { errorPage, newRef, redirect, checkSameSiteMutation, securityHeaders, serializeCookie, safeReturnPath, VIEW_ROLE_COOKIE } from "./http.js";
 import { handleLogin, handleCallback, handleLogout } from "./auth.js";
 import { requireSession, requireOrgAccess, dbCall, Unavailable, unavailablePage, notFoundPage } from "./guard.js";
@@ -28,7 +30,7 @@ import { comingSoonKeys, LIVE_AREAS } from "./guided-data.js";
 import { moduleStatuses, nextActions } from "./module-status.js";
 import { readForm, readUpload, readUploads, declaredBodyProblem, MAX_PROFILE_FORM_BYTES, MAX_FEEDBACK_FORM_BYTES, UPLOAD_FORM_OVERHEAD } from "./form.js";
 import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
-import { checkCsrf } from "./sessions.js";
+import { checkCsrf, csrfFor } from "./sessions.js";
 import { can } from "./policy.js";
 import { getClientBrand, listClientUploads, uploadUsage, getBrandKit, listServiceRequests, createServiceRequest } from "./repo/brand.js";
 import { loadPricing, listPrices } from "./repo/prices.js";
@@ -134,6 +136,8 @@ async function noAccess(ctx) {
 /** The Coming Soon pages (members only, like every organization page) for each section that is not built yet; derived from the same list that drives Home. */
 const SOON = comingSoonKeys().join("|");
 const brandingOn = (ctx) => brandingEnabled(ctx.env);
+const discoveryOn = (ctx) => discoveryEnabled(ctx.env) && brandingEnabled(ctx.env);
+const DISCOVERY = memberApi(pages, { csrfFor, checkCsrf });
 const servicesOn = (ctx) => servicesEnabled(ctx.env);
 const websiteOn = (ctx) => websiteEnabled(ctx.env);
 
@@ -384,7 +388,8 @@ const BRANDING_ROUTES = [
       const newest = {}; // the newest request per section (listServiceRequests is newest first)
       for (const r of await listServiceRequests(ctx.db, org)) if (!newest[r.serviceKey]) newest[r.serviceKey] = r;
       const f = viewFilters(ctx.url);
-      return pages.brandingPage(ctx, a, brand, { canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, pricing: await loadPricing(ctx.db), notice: f.requested ? "sent" : f.requestDup ? "dup" : "" });
+      const discovery = discoveryOn(ctx) ? await listClientDiscoveries(ctx.db, org) : [];
+      return pages.brandingPage(ctx, a, brand, { discovery, canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, pricing: await loadPricing(ctx.db), notice: f.requested ? "sent" : f.requestDup ? "dup" : "" });
     },
   },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/request$/, action: "branding.view", postAction: "branding.request", bucket: "branding", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/branding`), post: (ctx, a) => requestBrandSection(ctx, a) },
@@ -399,6 +404,9 @@ const BRANDING_ROUTES = [
     },
   },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/files\/([^/]+)$/, action: "branding.view", run: (ctx, a, id) => downloadBrandFile(ctx, a, id, "asset") },
+  // Brand Discovery (only where PORTAL_DISCOVERY is on): the assessments assigned to this organization, answered by its own members. discovery/routes.js holds the logic.
+  { when: discoveryOn, re: /^\/portal\/o\/([^/]+)\/branding\/discovery$/, action: "branding.view", run: (ctx, a) => DISCOVERY.list(ctx, a) },
+  { when: discoveryOn, re: /^\/portal\/o\/([^/]+)\/branding\/discovery\/([0-9a-f-]{36})(?:\/(.*))?$/, action: "branding.view", postAction: "discovery.respond", bucket: "discovery", maxBody: () => MAX_REVIEW_BODY, run: (ctx, a, id, rest) => DISCOVERY.run(ctx, a, id, rest), post: (ctx, a, id, rest) => DISCOVERY.run(ctx, a, id, rest) },
 ];
 
 /* ------------------------------------------------------------------ Website (Phase 2; only where PORTAL_WEBSITE is on) */
@@ -793,6 +801,12 @@ export async function handlePortal(request, env, deps = {}) {
       // The static demonstration: no session, no database, no cookies, sample data only. Off everywhere except where demoEnabled says so (never a production host).
       response = ctx.demo ? handleDemo(ctx, path) : errorPage(404, { ref });
       logEvent({ evt: "request", method: request.method === "GET" || request.method === "HEAD" ? request.method : undefined, route: routeName(path), status: response.status, ms: Date.now() - started, ref });
+      return response;
+    }
+    if (isGuestPath(path) && discoveryEnabled(env)) {
+      // Discovery guest links: no session, no cookie, no account. The secret link is the credential (see discovery/routes.js); the response never repeats it.
+      response = await handleGuest(ctx, path);
+      logEvent({ evt: "request", method: request.method === "GET" || request.method === "HEAD" ? request.method : request.method === "POST" ? "POST" : undefined, route: routeName(path), status: response.status, ms: Date.now() - started, ref });
       return response;
     }
     const bucket = LIMITED[path];

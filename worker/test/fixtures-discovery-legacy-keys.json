@@ -1,0 +1,130 @@
+{
+ "style.personality": [
+  "modern",
+  "minimal",
+  "luxurious",
+  "traditional",
+  "bold",
+  "playful",
+  "industrial",
+  "organic",
+  "friendly",
+  "authoritative",
+  "refined",
+  "rugged",
+  "warm",
+  "technical",
+  "elegant",
+  "energetic"
+ ],
+ "style.direction": [
+  "modern",
+  "minimalist",
+  "luxury",
+  "traditional",
+  "bold",
+  "playful",
+  "industrial",
+  "organic",
+  "retro",
+  "editorial"
+ ],
+ "logo.type": [
+  "wordmark",
+  "lettermark",
+  "emblem",
+  "crest",
+  "pictorial",
+  "abstract",
+  "combination",
+  "mascot",
+  "script"
+ ],
+ "typography.fonts": [
+  "serif-classic",
+  "serif-modern",
+  "sans-geometric",
+  "sans-humanist",
+  "slab",
+  "script",
+  "display",
+  "mono",
+  "condensed"
+ ],
+ "tagline.tone": [
+  "friendly",
+  "professional",
+  "witty",
+  "inspiring",
+  "direct",
+  "warm",
+  "confident",
+  "understated",
+  "technical",
+  "premium"
+ ],
+ "tagline.style": [
+  "descriptive",
+  "promise",
+  "punchy",
+  "playful",
+  "question",
+  "heritage",
+  "aspirational",
+  "none"
+ ],
+ "colours.palettes": [
+  "neutral",
+  "earthy",
+  "vibrant",
+  "pastel",
+  "monochrome",
+  "luxury",
+  "coastal",
+  "sunset",
+  "forest",
+  "primary"
+ ],
+ "imagery.style": [
+  "lifestyle",
+  "studio",
+  "documentary",
+  "aerial",
+  "detail",
+  "flat",
+  "hand",
+  "abstract3d",
+  "architectural"
+ ],
+ "textures.surface": [
+  "paper",
+  "concrete",
+  "linen",
+  "marble",
+  "wood",
+  "lines",
+  "halftone",
+  "topographic",
+  "terrazzo",
+  "clean"
+ ],
+ "iconography.icons": [
+  "line",
+  "solid",
+  "duotone",
+  "rounded",
+  "sharp",
+  "hand",
+  "badge"
+ ],
+ "layout.system": [
+  "airy",
+  "modular",
+  "editorial",
+  "centred",
+  "fullbleed",
+  "dense",
+  "cards",
+  "split"
+ ]
+}
