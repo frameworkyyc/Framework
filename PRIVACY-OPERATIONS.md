@@ -154,7 +154,7 @@ The website records only a yes/no `marketing_opt_in` and the request time. Befor
 * "We do not currently use website analytics": true only while no analytics code or Cloudflare Web Analytics is enabled. Check the Cloudflare dashboard (Analytics → Web Analytics) is off.
 * "The Pixel is off unless you allow it": true while `consent.js` + `assessment.js` are unchanged and `META_PIXEL_ID` gating stays.
 * "We do not set cookies ourselves": true while no code sets cookies.
-* The effective date at the top of `privacy.html` must be the actual Production publication date. It is set to October 17, 2026; if deployment slips, change it and run `PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`.
+* The effective date at the top of `privacy.html` must be the actual Production publication date. It is set to November 5, 2026 (the Brand Discovery release); if deployment slips, change it and run `PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`.
 * The homepage "$2.5M+" figure is a combined, client-reported total; it never names or attributes an individual client's figure.
 
 ## 6. Client portal (private beta): data inventory and request handling
@@ -206,4 +206,4 @@ Public wording: `privacy.html` ("Brand Discovery" and the retention list). The g
 
 **Backup purge:** `PORTAL_BACKUP_PURGE` is not set in `wrangler.jsonc` (main or Staging), so the scheduled purge is OFF and the policy no longer claims it. The promise (a backup copy goes within 90 days of deletion) is kept by running Admin > Branding > Storage > backup purge at least monthly (dry run first, then type PURGE) until the switch is turned on by a reviewed change. A guest's file removed from the form, and an assessment deleted by Admin, are handled differently: an Admin deletion removes the backup copies at once; a guest-removed file waits for the purge.
 
-**Before enabling in Production:** update the effective date in `privacy.html` to the real publication date (`PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`).
+**Effective date:** set to November 5, 2026 for the Brand Discovery release; if the release slips to another day, change it and run `PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`.
