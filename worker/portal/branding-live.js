@@ -277,7 +277,17 @@ function bkSection(def, inner, prefix = "", badge = "") {
 export function brandingOverview(vm, brand, o = {}) {
   const { canUpload = false, uploadCount = 0, brandName = "", canRequest = false, csrf = "", requests = {}, notice = "" } = o;
   const live = Boolean(brand.published);
-  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1><p class="lead">${live ? `${brandName ? `The approved ${e(brandName)} brand` : "Your approved brand"}: logos, typography, colours and more. Download what you need, any time.` : "Your brand kit in nine parts. Anything that isn’t here yet can be requested below."}</p></header>`;
+  // Where Brand Discovery stands decides what this page should say first (and the card further down): "new" (not started), "progress", "sent" or "none".
+  const dc = o.discovery || [];
+  const dOpen = dc.filter((x) => x.status === "not_started" || x.status === "in_progress");
+  const dPick = dOpen[0] || dc[0];
+  const dState = !dPick ? "none" : dOpen.length ? (dOpen.some((x) => x.status === "not_started") ? "new" : "progress") : "sent";
+  const approved = brandName ? `The approved ${e(brandName)} brand` : "Your approved brand";
+  const leadText = dState === "new" ? (live ? `${approved} is below. First, start your Brand Discovery so Framework knows what to build next.` : "Start with your Brand Discovery below. It shows Framework the look and feel you want, and your brand is designed from it. Your approved brand will appear here when it is ready.")
+    : dState === "progress" ? (live ? `${approved} is below. Finish your Brand Discovery when you can: it guides what Framework builds next.` : "You are part-way through your Brand Discovery. Continue below, then Framework will design your brand from your answers. Your approved brand will appear here when it is ready.")
+    : dState === "sent" && !live ? "Thank you for completing your Brand Discovery. Framework is working from your answers, and your approved brand will appear here when it is ready. Anything else can be requested below."
+    : live ? `${approved}: logos, typography, colours and more. Download what you need, any time.` : "Your brand kit in nine parts. Anything that isn’t here yet can be requested below.";
+  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1><p class="lead">${leadText}</p></header>`;
   const banner = notice === "sent" ? `<p class="form-banner" role="status">Request sent. Framework will follow up.</p>` : notice === "dup" ? `<p class="form-banner" role="status">That request is already open, so we didn’t send it twice.</p>` : "";
 
   const assets = live ? brand.assets || [] : [];
@@ -398,13 +408,15 @@ export function brandingOverview(vm, brand, o = {}) {
   // One subtle, general note about starting prices for the whole page, shown only when a price is visible somewhere on it.
   const priceShown = ["typography", "colours", "tagline", "imagery", "layout", "textures", "iconography", "style"].some((k) => !comp[k].done && priceLabel(pricing[k])) || missingLogos.some((r) => priceLabel(r.entry)) && !comp.logo.done || Boolean(kitPrice);
   const pricingNote = priceShown ? `<p class="bk-pricing-note">${e(ESTIMATE_NOTE)}</p>` : "";
-  // Brand Discovery (only when Framework has assigned one and PORTAL_DISCOVERY is on): a quiet card at the top, separate from the approved brand below it.
-  const dc = o.discovery || [];
-  const dOpen = dc.filter((x) => x.status === "not_started" || x.status === "in_progress");
-  const dPick = dOpen[0] || dc[0];
+  // Brand Discovery (only when Framework has assigned one and PORTAL_DISCOVERY is on). Waiting for the client it is the loudest thing on the page (black, with a contrasting button);
+  // once sent it is a quiet confirmation. The link goes straight to the assessment when there is just one to do.
   const dHref = dc.length === 1 || (dPick && dOpen.length === 1) ? href(vm, `/branding/discovery/${dPick.id}`) : href(vm, "/branding/discovery");
-  const dWord = !dPick ? "" : dPick.status === "not_started" ? "Start" : dPick.status === "in_progress" ? "Continue" : "View";
-  const discoveryCard = dPick ? `<section class="bk-discovery" aria-labelledby="h-discovery"><div><span class="eyebrow">Not sure what you want?</span><h2 class="h3" id="h-discovery">Brand Discovery</h2><p class="muted">${dPick.status === "submitted" || dPick.status === "reviewed" ? "Thank you. Framework has your answers." : "A short, visual way to show Framework what you like. About 10 to 15 minutes, saved as you go."}</p></div><a class="btn ${dWord === "View" ? "" : "btn--primary"}" href="${e(dHref)}">${dWord}</a></section>` : "";
+  const cardOf = {
+    new: { cls: " bk-discovery--action", eyebrow: `<span class="bk-discovery__tag"><span class="dot dot--attention" aria-hidden="true"></span>Action needed</span>`, title: "Your Brand Discovery is ready", text: "A short, visual way to show Framework the look and feel you want. About 10 to 15 minutes, saved as you go.", btn: "Start Brand Discovery", btnCls: "btn btn--on-dark btn--lg" },
+    progress: { cls: " bk-discovery--action", eyebrow: `<span class="bk-discovery__tag"><span class="dot dot--attention" aria-hidden="true"></span>In progress</span>`, title: "Your Brand Discovery is waiting for you", text: "You have made a start, and your answers are saved. Pick up where you left off.", btn: "Continue Brand Discovery", btnCls: "btn btn--on-dark btn--lg" },
+    sent: { cls: "", eyebrow: `<span class="eyebrow">Brand Discovery</span>`, title: "Brand Discovery sent", text: "Thank you. Framework has your answers and will use them to shape your brand.", btn: "View Brand Discovery", btnCls: "btn" },
+  }[dState];
+  const discoveryCard = cardOf ? `<section class="bk-discovery${cardOf.cls}" aria-labelledby="h-discovery"><div class="bk-discovery__text">${cardOf.eyebrow}<h2 class="h3" id="h-discovery">${cardOf.title}</h2><p>${cardOf.text}</p></div><a class="${cardOf.btnCls}" href="${e(dHref)}">${cardOf.btn}</a></section>` : "";
   return head.replace(/<\/header>$/, `${pricingNote}</header>`) + banner + discoveryCard + nav + `<div class="bk">${parts.join("")}</div>` + more + meta + share + kit;
 }
 

@@ -74,10 +74,16 @@ export function tileStatus(s) {
 export function brandStatus(b) {
   if (!b || b.state === "unavailable") return b ? `<div class="tile__status"><p class="tile__pct tile__pct--muted">Status unavailable right now</p></div>` : "";
   const shared = b.uploads > 0 ? `<p class="tile__note">${plural(b.uploads, "file")} shared with Framework</p>` : "";
+  // Brand Discovery comes first and is never hidden by the brand's own status: a new or unfinished one asks for attention (a red dot and words); a sent one is a quiet note.
+  const ask = b.discovery === "new" ? "New Brand Discovery available" : b.discovery === "progress" ? "Brand Discovery in progress. Continue where you left off" : "";
+  const discovery = ask ? `<p class="tile__action"><span class="dot dot--attention" aria-hidden="true"></span>${ask}</p>` : b.discovery === "done" ? `<p class="tile__note">Brand Discovery sent. Thank you</p>` : "";
   return b.state === "published"
-    ? `<div class="tile__status"><p class="tile__pct"><span class="status status--live">Brand system published</span></p>${shared}</div>`
-    : `<div class="tile__status"><p class="tile__pct"><span class="status status--idle">Not published yet</span></p>${shared || `<p class="tile__note">Upload your existing brand materials</p>`}</div>`;
+    ? `<div class="tile__status">${discovery}<p class="tile__pct"><span class="status status--live">Brand system published</span></p>${shared}</div>`
+    : `<div class="tile__status">${discovery}<p class="tile__pct"><span class="status status--idle">Not published yet</span></p>${shared || `<p class="tile__note">Upload your existing brand materials</p>`}</div>`;
 }
+
+/** True while a Brand Discovery needs the client (new or unfinished): the Branding card wears a small red dot. */
+export const brandNeedsAttention = (b) => Boolean(b) && (b.discovery === "new" || b.discovery === "progress");
 
 export function home(vm) {
   const isLive = (key) => !vm.liveAreas || vm.liveAreas.includes(key);
@@ -91,7 +97,8 @@ export function home(vm) {
   // not built yet are a single quiet line, never a card, so nothing suggests they can be opened.
   const card = (a) => {
     const st = a.key === "branding" ? brandStatus(vm.brand) : a.key === "website" ? websiteStatus(vm.website) : vm.moduleStatus ? tileStatus(vm.moduleStatus[a.key]) : "";
-    return `<li><a class="hub" href="${e(href(vm, a.path))}"><span class="hub__top"><span class="hub__title">${e(a.title)}</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">${e(HOME_BLURB[a.key])}</span>${st ? `<span class="hub__status">${st}</span>` : ""}</a></li>`;
+    const flag = a.key === "branding" && brandNeedsAttention(vm.brand) ? `<span class="hub__flag"><span class="dot dot--attention" aria-hidden="true"></span><span class="visually-hidden">Needs your attention</span></span>` : "";
+    return `<li><a class="hub" href="${e(href(vm, a.path))}"><span class="hub__top"><span class="hub__title">${e(a.title)}${flag}</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">${e(HOME_BLURB[a.key])}</span>${st ? `<span class="hub__status">${st}</span>` : ""}</a></li>`;
   };
   const servicesCard = vm.services
     ? `<li><a class="hub" href="${e(href(vm, "/services"))}"><span class="hub__top"><span class="hub__title">Client Services</span><span class="hub__arrow tile__arrow" aria-hidden="true">→</span></span><span class="hub__desc">Invoices, support requests and how to reach us</span>${vm.servicesAttention && vm.servicesAttention.length ? `<span class="hub__status"><span class="tile__status"><span class="tile__action"><span class="dot dot--attention" aria-hidden="true"></span>${e(vm.servicesAttention.join(" · "))}</span></span></span>` : ""}</a></li>`
