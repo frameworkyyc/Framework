@@ -920,7 +920,7 @@ button.adm-lv__stage:hover { border-color: var(--ink); }
 .adm-dsc__retention .adm-table, .adm-dsc__retention form { margin-top: var(--space-3, 16px); }
 .adm-dsc__retention .adm-actions { margin-top: var(--space-3, 16px); }
 
-/* ---- Review kit (admin/assets/review-kit.js): at-a-glance reading of a submitted assessment. Reusable by any assessment type. ---- */
+/* ---- Admin kit (admin/assets/kit.js): at-a-glance reading of a submitted assessment. Reusable by any assessment type. ---- */
 .rk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .rk-stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin: 24px 0 16px; }
 .rk-stat { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 1px solid var(--hairline); border-radius: 12px; background: #fff; }
@@ -1019,3 +1019,102 @@ progress.rk-meter::-moz-progress-bar, progress.rk-bars__track::-moz-progress-bar
 .rk-font--deco { font-family: "Futura", "Century Gothic", "Avenir Next", "Trebuchet MS", sans-serif; font-weight: 500; text-transform: uppercase; letter-spacing: .12em; }
 .rk-font--old-style { font-family: Garamond, "EB Garamond", "Cormorant Garamond", Baskerville, "Times New Roman", serif; }
 .rk-font--condensed { font-family: "Arial Narrow", "Helvetica Neue Condensed", "Roboto Condensed", Impact, sans-serif; font-weight: 700; text-transform: uppercase; }
+
+
+/* =====================================================================================================================================================================
+   ADMIN DESIGN SYSTEM, layer 2 (rules in worker/admin/DESIGN-SYSTEM.md). One set of tokens, one look for every page: calm rounded surfaces, hairline borders, one accent per status.
+   This layer comes last on purpose: it brings the older components (metrics, tiles, to-do rows, tabs, banners) up to the same standard as the kit in kit.js.
+   ===================================================================================================================================================================== */
+:root {
+  --ok: #1E6B3C; --ok-bg: #EBF5EF; --warn: #8A5300; --warn-bg: #FBF2E1; --bad: #A12B2B; --bad-bg: #FBEBEB; --pend: #2F4B7C; --pend-bg: #EDF1F8;
+  --adm-radius: 12px; --adm-radius-sm: 8px; --adm-card-pad: 20px; --adm-card-border: 1px solid var(--hairline);
+  --adm-space-1: 8px; --adm-space-2: 12px; --adm-space-3: 16px; --adm-space-4: 24px; --adm-space-5: 32px; --adm-space-6: 48px;
+}
+/* page header: smaller, calmer title; the page's job in one line; actions to the right */
+.adm-head { margin-bottom: var(--adm-space-5); align-items: flex-end; }
+.adm-head .eyebrow { margin-bottom: 10px; }
+.adm-title { font-size: clamp(28px, 3.6vw, 40px); line-height: 1.1; letter-spacing: -0.015em; }
+.adm-sub { margin-top: 8px; max-width: 70ch; }
+.adm-section-title h2, .adm-h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.005em; }
+.adm-section + .adm-section { margin-top: clamp(32px, 4vw, 48px); }
+/* hairlines instead of heavy black rules above sections and lists */
+.adm-state, .adm-panel, .adm-dsc__new, .adm-dsc__panel, .adm-todo, .adm-settings__list, .adm-dash__empty, .adm-nav ul { border-top-color: var(--hairline); }
+.adm-nav .adm-nav__group:first-child ul { border-top-color: transparent; }
+/* sidebar: grouped, with icons */
+.adm-nav { gap: 20px; }
+.adm-nav__group ul { border-top: 0; }
+.adm-nav__title { margin: 0 0 6px 12px; font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); }
+.adm-nav__link { justify-content: flex-start; min-height: 40px; padding: 8px 12px; border-bottom: 0; border-radius: var(--adm-radius-sm); font-size: 15px; }
+.adm-nav__link .rk-ico { flex: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+a.adm-nav__link:hover { background: var(--mist); }
+.adm-nav__link[aria-current="page"] { background: var(--mist); }
+.adm-nav__link[aria-current="page"]::after { content: none; }
+.adm-nav__badge { margin-left: auto; border-radius: 999px; }
+/* cards: every summary tile, metric and KPI is one rounded surface */
+.adm-metrics, .adm-kpis { gap: 12px; border: 0; }
+.adm-metrics { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.adm-kpis { margin-bottom: var(--adm-space-5); }
+.adm-metric, .adm-metric + .adm-metric, .adm-kpi { padding: var(--adm-card-pad); border: var(--adm-card-border); border-radius: var(--adm-radius); background: var(--paper); }
+.adm-metric:nth-child(n+3) { border-top: var(--adm-card-border); }
+.adm-metric__label, .adm-kpi__label { font-size: 12px; letter-spacing: .06em; }
+.adm-metric__value, .adm-kpi__value { font-size: clamp(24px, 2.4vw, 30px); font-weight: 600; }
+a.adm-kpi:hover { border-color: var(--ink); }
+.adm-tile { border-radius: var(--adm-radius); padding: var(--adm-card-pad); }
+a.adm-tile--link:hover { border-color: var(--ink); background: var(--paper); }
+.adm-tile__value--text, .adm-tile .adm-tile__big { font-size: 20px; line-height: 1.25; }
+.adm-next { border-left-width: 1px; border: 1px solid transparent; border-radius: var(--adm-radius); }
+.adm-next--bad { border-color: var(--bad); } .adm-next--warn { border-color: var(--warn); } .adm-next--info { border-color: var(--pend); } .adm-next--ok { border-color: var(--ok); }
+/* things that need a person: separate rounded rows */
+.adm-todo { display: grid; gap: 8px; border-top: 0; }
+.adm-todo__item { padding: 12px 16px; border: var(--adm-card-border); border-left-width: 4px; border-radius: var(--adm-radius-sm); background: var(--paper); }
+.adm-todo__clear { padding: 14px 16px; border: var(--adm-card-border); border-left: 4px solid var(--ok); border-radius: var(--adm-radius-sm); background: var(--ok-bg); }
+/* notices, banners and empty states */
+.adm-notice, .adm-banner { border-radius: var(--adm-radius-sm); }
+.adm-notice { background: var(--mist); border-color: var(--hairline); }
+.adm-state { padding: 40px 24px; max-width: none; text-align: center; border: var(--adm-card-border); border-radius: var(--adm-radius); background: var(--mist); }
+.adm-state h2 { font-size: 20px; } .adm-state p { max-width: 52ch; margin-inline: auto; }
+.adm-panel { padding: 20px 0 4px; max-width: 760px; }
+/* tabs and filters: pill counts, rounded chips */
+.adm-tab__n { border-radius: 999px; }
+.adm-filter { border-radius: 999px; }
+/* tables: quiet header, comfortable rows */
+.adm-table thead th { font-size: 12px; letter-spacing: .06em; }
+.adm-table td { padding-block: 14px; }
+/* Settings hub and any hub of links */
+.adm-settings__list { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); max-width: none; border-top: 0; }
+.adm-settings__item { border: 0; }
+.rk-linkcard { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border: var(--adm-card-border); border-radius: var(--adm-radius); background: var(--paper); color: inherit; text-decoration: none; transition: border-color .15s ease; }
+.rk-linkcard:hover { border-color: var(--ink); }
+.rk-linkcard:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.rk-linkcard__ico { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--mist); }
+.rk-linkcard__text { display: grid; gap: 2px; min-width: 0; flex: 1; font-size: 14px; color: var(--slate); }
+.rk-linkcard__text strong { font-size: 16px; color: var(--ink); }
+.rk-linkcard > .rk-ico:last-child { flex: none; color: var(--slate); }
+.rk-ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.rk-empty { display: grid; justify-items: center; gap: 6px; padding: 32px 20px; text-align: center; border: var(--adm-card-border); border-radius: var(--adm-radius); background: var(--mist); }
+.rk-empty .rk-ico { width: 28px; height: 28px; color: var(--ok); }
+.rk-empty__title { margin: 0; font-weight: 600; } .rk-empty__body { margin: 0; color: var(--slate); font-size: 14px; max-width: 52ch; }
+@media (max-width: 640px) { .adm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .adm-state { padding: 32px 16px; } }
+/* every list, table and panel opens with the same hairline (the single ink rule above the whole page title area is gone) */
+.adm-scores, .adm-spec, .adm-list, .adm-dialog dl, .adm-empty, .adm-clientlist, .adm-brand__list, .adm-brand__row:first-child, .adm-reqlist, .adm-attnlist, .adm-approved__list, .adm-feed,
+.adm-pricing__list, .adm-table tbody tr:first-child, .adm-access .adm-table tbody tr:first-child { border-top-color: var(--hairline); }
+.adm-kpis { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+.adm-empty { max-width: none; padding: 28px 20px; text-align: center; border: var(--adm-card-border); border-radius: var(--adm-radius); background: var(--mist); }
+/* client list: one rounded list, a monogram before each name */
+.adm-clientlist { border: var(--adm-card-border); border-radius: var(--adm-radius); overflow: hidden; background: var(--paper); }
+.adm-clientlist li:last-child { border-bottom: 0; }
+.adm-clientlist .adm-clientrow { padding-inline: 16px; }
+.adm-clientrow__name { display: flex; align-items: center; gap: 12px; }
+.adm-clientrow__name::before { content: attr(data-mono); flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 600; letter-spacing: .04em; }
+.adm-settings__item { display: flex; } .adm-settings__item > .rk-linkcard { flex: 1; }
+/* expandable sections (accordions) are rounded rows with a little air between them; tiles fill the row instead of leaving gaps */
+.adm-acc { margin-bottom: 8px; border: var(--adm-card-border); border-radius: var(--adm-radius); background: var(--paper); }
+.adm-acc:last-child { border-bottom: var(--adm-card-border); }
+.adm-acc > .adm-acc__sum, .adm-acc--step > .adm-acc__sum { padding-left: 16px; }
+.adm-acc__sum::after { right: 18px; } .adm-acc--step .adm-acc__sum::after { right: 16px; }
+.adm-acc__body { padding-inline: 16px; }
+.adm-acc--quiet { background: var(--mist); }
+.adm-tiles:not(.adm-tiles--four) { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
+.adm-page .input, .adm-page select.input, .adm-page textarea.input { border-radius: var(--adm-radius-sm); }
+.adm-acc > .adm-acc__sum { padding-right: 44px; }
+@media (max-width: 640px) { .adm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .adm-kpi { padding: 14px; } }
