@@ -150,3 +150,9 @@
 .dq__paging button { min-height: 44px; padding: 8px 12px; font: inherit; color: inherit; background: transparent; border: 1px solid currentColor; cursor: pointer; }
 .dq__paging button:disabled { opacity: .45; cursor: default; }
 @media (max-width: 520px) { .dq__grid--paged { grid-template-columns: 1fr; } }
+
+/* the privacy notice on the guest welcome page */
+.dsc__privacy { margin-top: var(--space-5); padding: 20px; border: 1px solid var(--hairline); background: var(--mist); font-size: 14px; color: var(--slate); max-width: 46em; }
+.dsc__privacy p { margin: 0 0 var(--space-2); }
+.dsc__privacy p:last-child { margin-bottom: 0; }
+.dsc__privacy-h { margin: 0 0 var(--space-2); font-size: 15px; color: var(--ink); }

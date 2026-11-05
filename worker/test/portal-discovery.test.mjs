@@ -10,6 +10,8 @@ import { buildBrief, briefToMarkdown } from "../portal/discovery/brief.js";
 import * as repo from "../portal/repo/discovery.js";
 import { REQUIREMENT_ITEMS } from "../../admin/assets/brand-requirement-items.js";
 import { sha256b64url } from "../portal/crypto.js";
+import { backupPurge, restorableKeys } from "../portal/backup-purge.js";
+import { fakeR2 } from "./helpers/fake-r2.mjs";
 
 const P = []; // 0018 is now a normal applied migration (it was proposed while this was built)
 const ORG_A = "11111111-1111-4111-8111-111111111111", ORG_B = "22222222-2222-4222-8222-222222222222";
@@ -211,7 +213,6 @@ test("links: only the hash is stored, links expire and can be revoked, and a tok
 
 /* ====================================================================== routes: guest links and the signed-in way in */
 import { makeWorld as makePortal, ORIGIN, csrfOf } from "./helpers/portal-e2e.mjs";
-import { fakeR2 } from "./helpers/fake-r2.mjs";
 import * as S from "./helpers/sample-files.mjs";
 import { randomToken } from "../portal/crypto.js";
 
@@ -702,4 +703,44 @@ test("drawings: the heritage crest keeps its text inside the ribbon and clear of
       circles.forEach((c, i) => { assert.ok(Math.abs(Number(c[1]) - cxs[i]) < 0.05 && Math.abs(Number(c[2]) - cys[i]) < 0.05, `badge ${i + 1}: the symbol is centred in its circle`); assert.ok(18 * Number(groups[i][3]) <= Number(c[3]) * 2 * 0.7, "the symbol fills no more than 70% of the circle"); });
     }
   }
+});
+
+
+/* ---- privacy and retention ---- */
+test("privacy: the guest welcome page carries the notice (guests only), and privacy.html covers Brand Discovery with the same promises", async () => {
+  const { anon, ann, make, orgA } = await portal();
+  const { id, token } = await make(orgA);
+  const guest = await (await anon.get(`/portal/discover/${token}`)).text();
+  assert.match(guest, /<h2 class="dsc__privacy-h" id="dsc-privacy">Your privacy<\/h2>/);
+  for (const fact of [/only to prepare your brand brief/, /private backup copy/, /anyone who has it can open this form until it expires/, /90 days after that/, /hello@frameworkco\.ca/, /href="\/privacy\.html#discovery"/]) assert.match(guest, fact);
+  assert.doesNotMatch(guest, /<script[^>]*>[^<]/, "no inline script");
+  const member = await (await ann.get(`/portal/o/alpha/branding/discovery/${id}`)).text();
+  assert.doesNotMatch(member, /dsc-privacy/, "a signed-in client is covered by the portal section, so the guest notice is not repeated");
+  const policy = readFileSync(new URL("../../privacy.html", import.meta.url), "utf8");
+  const sec = policy.slice(policy.indexOf('<h2 id="discovery">'), policy.indexOf('<h2 id="marketing">'));
+  assert.ok(sec.length > 1500, "a Brand Discovery section exists");
+  for (const fact of [/no account and no sign-in/, /scrambled version of the link/, /PNG, JPG, WebP or PDF/, /second, private backup copy/, /90 days after that relationship ends/, /within 90 days after the removal/, /hello@frameworkco\.ca/, /within 30 days/, /14 days/]) assert.match(sec, fact);
+  assert.match(policy, /Brand Discovery answers, comments and inspiration files:<\/strong> kept while we work with the organization and for 90 days/, "the retention list names it");
+});
+
+test("retention: removing a Discovery upload keeps only its type and size (name and hash scrubbed), and its backup copy follows the 90-day rule", async () => {
+  const db = openPortalDb({ proposed: P });
+  db.raw.prepare("INSERT INTO organizations (id, slug, name) VALUES (?, 'alpha', 'Alpha Co')").run(ORG_A);
+  const made = await repo.createAssessment(db, { organizationId: ORG_A, kind: "brand", title: "Brand Discovery", recipientName: "Sam", actor: "a@b.c" }, { now: T0 });
+  const assessment = { id: made.id, organizationId: ORG_A };
+  const key = (n) => `org/${ORG_A}/discovery/00000000-0000-4000-8000-00000000000${n}`;
+  const add = (n) => repo.addUpload(db, assessment, { name: "Sam Private Name.png", ext: "png", contentType: "image/png", size: 10, sha256: "ab".repeat(32), key: key(n) }, { type: "client", ref: "guest" }, { now: T0 });
+  const one = await add(1), two = await add(2);
+  assert.equal((await repo.removeUpload(db, assessment, one.id, { type: "client", ref: "guest" }, { now: T0 })).ok, true);
+  const gone = db.raw.prepare("SELECT original_name, sha256, deleted_at FROM discovery_uploads WHERE id = ?").get(one.id);
+  assert.equal(gone.original_name, "deleted"); assert.equal(gone.sha256, "0".repeat(64)); assert.ok(gone.deleted_at);
+  assert.equal(db.raw.prepare("SELECT original_name FROM discovery_uploads WHERE id = ?").get(two.id).original_name, "Sam Private Name.png", "a kept file is untouched");
+  const primary = fakeR2(), backup = fakeR2();
+  await backup.put(key(1), new Uint8Array([1])); await backup.put(key(2), new Uint8Array([2])); // both objects missing from the main bucket: one deleted, one live
+  assert.deepEqual([...(await restorableKeys(db, [key(1), key(2)]))], [key(2)], "a deliberately removed file is never restored; a live one is");
+  const early = await backupPurge({ db, primary, backup, now: days(89), dryRun: false });
+  assert.deepEqual([early.deleted, early.waiting, early.protected], [0, 1, 1], "inside the 90 days the removed file waits; the live file is protected");
+  const late = await backupPurge({ db, primary, backup, now: days(91), dryRun: false });
+  assert.deepEqual([late.deleted, late.protected], [1, 1]);
+  assert.equal(backup.store.has(key(1)), false, "the removed file's backup copy is gone"); assert.equal(backup.store.has(key(2)), true, "the live file's backup copy stays");
 });

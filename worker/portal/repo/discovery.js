@@ -341,7 +341,7 @@ export async function getUpload(db, organizationId, assessmentId, id) {
 export async function removeUpload(db, assessment, id, by, { now = new Date() } = {}) {
   const at = isoTime(now);
   const [r] = await db.batch([
-    db.prepare("UPDATE discovery_uploads SET deleted_at = ?, deleted_by = ? WHERE id = ? AND assessment_id = ? AND organization_id = ? AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM discovery_assessments WHERE id = ? AND organization_id = ? AND status IN ('not_started', 'in_progress'))").bind(at, by.ref, id, assessment.id, assessment.organizationId, assessment.id, assessment.organizationId),
+    db.prepare("UPDATE discovery_uploads SET deleted_at = ?, deleted_by = ?, original_name = 'deleted', sha256 = '0000000000000000000000000000000000000000000000000000000000000000' WHERE id = ? AND assessment_id = ? AND organization_id = ? AND deleted_at IS NULL AND EXISTS (SELECT 1 FROM discovery_assessments WHERE id = ? AND organization_id = ? AND status IN ('not_started', 'in_progress'))").bind(at, by.ref, id, assessment.id, assessment.organizationId, assessment.id, assessment.organizationId),
     db.prepare("INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, detail, visibility, created_at) SELECT ?, ?, ?, ?, 'discovery.upload.removed', 'discovery', ?, ?, 'internal', ? WHERE changes() > 0").bind(newId(), assessment.organizationId, by.type, by.ref, assessment.id, JSON.stringify({ upload: id }), at),
   ]);
   return r.meta.changes ? ok() : fail("not_found");

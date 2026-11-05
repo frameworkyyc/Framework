@@ -46,7 +46,7 @@ Answers are stored in their own tables. Nothing here reads or writes `brand_kits
 - Uploads: type decided from content, size and count limits, never inline, stored as `application/octet-stream`, no key ever returned. SVG is not accepted from a recipient.
 - Every client-side read names the organization as well as the assessment id; another organization's id is "not found".
 - Answers can be written only while Not started or In progress; the condition is part of the write statement, so a save cannot slip in after a submit.
-- The assessments' discovery uploads are kept with the assessment (like invoices and website records) and are not removed by `deleteOrganizationFiles`.
+- The assessments' discovery uploads are kept with the assessment (like invoices and website records) and are not removed by `deleteOrganizationFiles`. Retention (answers and uploads: while the relationship continues and 90 days after) is a manual review today; the procedure, the guest deletion route and the known limits are in `PRIVACY-OPERATIONS.md` section 7. A removed upload keeps only its type and size (name and hash are scrubbed), and the backup purge sees `discovery_uploads`.
 
 ## Before Production
 
