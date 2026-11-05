@@ -97,7 +97,7 @@ const BRAND_QUESTIONS = Object.freeze([
   }),
   Object.freeze({
     key: "logo.type", section: "logo", multi: true, visual: "logo",
-    prompt: "Which kinds of logo do you like?", help: "“Your Brand” stands in for your name. Look at the form, not the details.",
+    prompt: "Which kinds of logo do you like?", help: "Framework is the example name. Look at the form, not the details.",
     options: Object.freeze([
       o("wordmark", "Wordmark", ["minimal", "modern"], { note: "Your name, set in type" }), o("lettermark", "Monogram", ["minimal", "modern"], { note: "Initials in a compact mark" }),
       o("emblem", "Emblem / badge", ["traditional", "ornate"], { note: "Name inside a seal or badge" }), o("crest", "Heritage crest", ["traditional", "ornate", "luxury"], { note: "Shield, ribbon, a sense of history" }),
@@ -105,8 +105,8 @@ const BRAND_QUESTIONS = Object.freeze([
       o("combination", "Symbol + wordmark", ["modern"], { note: "A symbol next to the name" }), o("mascot", "Mascot", ["playful", "approachable"], { note: "A character people remember" }),
       o("script", "Signature / script", ["luxury", "warm", "ornate"], { note: "Handwritten, personal" }),
       o("celestial", "Celestial", ["mystical", "ornate"], { note: "Moon, stars and sky" }), o("botanical", "Botanical", ["organic", "romantic"], { note: "Leaves, flowers and sprigs" }),
-      o("ornamental", "Ornamental illustration", ["ornate", "luxury"], { note: "Decorative frames and flourishes" }), o("spiritual", "Spiritual motif", ["holistic", "quiet"], { note: "Lotus, sacred geometry, symbols with meaning" }),
-      o("expressive", "Expressive emblem", ["mystical", "ornate", "warm"], { note: "A richly illustrated seal or badge" }),
+      o("ornamental", "Ornamental illustration", ["ornate", "luxury"], { note: "Decorative frames and flourishes" }), o("spiritual", "Spiritual motif", ["holistic", "quiet"], { note: "Lotus, sacred geometry, symbols with meaning", retired: true }),
+      o("expressive", "Expressive emblem", ["mystical", "ornate", "warm"], { note: "A richly illustrated seal or badge", retired: true }),
     ]),
   }),
   Object.freeze({

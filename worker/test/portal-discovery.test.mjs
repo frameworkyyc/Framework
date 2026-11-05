@@ -24,6 +24,18 @@ function world() {
 const eff = effectiveKind("brand", []);
 const A = "admin@framework.example";
 
+test("retired logo choices remain in saved answers but cannot be selected or re-enabled", () => {
+  const content = effectiveKind("brand", [{ item_key: "logo.type", option_key: "spiritual", enabled: 1 }]);
+  const questions = stageQuestions(content, content.stages[1]);
+  const logo = questions.find((q) => q.key === "logo.type");
+  assert.equal(logo.options.length, 12);
+  assert.deepEqual(logo.retiredOptions.map((o) => o.key), ["spiritual", "expressive"]);
+  const fields = new URLSearchParams({ "l:logo.type:wordmark": "1", "l:logo.type:spiritual": "1", "l:logo.type:expressive": "1" });
+  assert.deepEqual(readStageFields(fields, questions)["logo.type"].picks.like, ["wordmark"]);
+  const previous = new Map([["logo.type", { picks: { mode: "picks", like: ["spiritual"], dislike: ["expressive"] } }]]);
+  assert.deepEqual(readStageFields(fields, questions, previous)["logo.type"].picks, { mode: "picks", like: ["wordmark", "spiritual"], dislike: ["expressive"] });
+});
+
 test("the brand assessment covers all nine Branding sections, in six stages, using Branding's own keys", () => {
   const def = KINDS.brand;
   assert.equal(def.stages.length, 6);
@@ -260,6 +272,17 @@ test("guest link: no account needed; welcome, six steps with real cards, saved a
   assert.equal(r1.status, 303); assert.equal(loc(r1), `${base}/2`);
   let a = (await repo.getAssessment(w.db, orgA.id, id));
   assert.deepEqual([a.status, a.stage], ["in_progress", 2]);
+  const s2 = await text(await anon.get(`${base}/2`));
+  const logoImages = [...s2.matchAll(/src="\/assets\/img\/discovery-logos\/([a-z]+)\.png"/g)].map((m) => m[1]);
+  assert.deepEqual(logoImages.sort(), ["abstract", "botanical", "celestial", "combination", "crest", "emblem", "lettermark", "mascot", "ornamental", "pictorial", "script", "wordmark"]);
+  for (const key of logoImages) {
+    const png = readFileSync(new URL(`../../assets/img/discovery-logos/${key}.png`, import.meta.url));
+    assert.equal(png.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.equal(png.readUInt32BE(16), 2688);
+    assert.equal(png.readUInt32BE(20), 1536);
+  }
+  assert.doesNotMatch(s2, /name="l:logo\.type:(spiritual|expressive)"/);
+  assert.match(s2, /Framework is the example name/);
   const saved = await repo.getAnswers(w.db, id);
   assert.deepEqual(saved.get("style.personality"), { picks: { mode: "picks", like: ["modern", "minimal"], dislike: ["rugged"] }, comment: "Calm and clear" });
   const again = await text(await anon.get(`${base}/1`));
