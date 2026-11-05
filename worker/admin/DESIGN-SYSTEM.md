@@ -36,6 +36,7 @@ Page title: `.adm-title` (28 to 40px). Section title: `.adm-section-title h2` or
 | `attentionList(rows, { limit })` | the few things worth a person's time, rest behind "Show more" |
 | `emptyState({ title, body, action })` | "nothing here" with the one action that fixes it |
 | `linkCard({ href, title, body, icon })` | a hub entry that opens a page (Settings) |
+| `searchBox({ label, onInput })` | a boxed "find" field that filters rows already on the page |
 | `navIcon(name)` | 20px line icons (module ids, `check`, `chevron`) |
 
 Older shared pieces remain the way to do their job: `h`, `api`, `stateBlock`, `errorState`, `confirmDialog`, `fmtDate`, `fmtDateTime` (`ui.js`), the client tiles and section map (`client-dashboard.js`), `.adm-table`, `.adm-tabs`, `.adm-filter`, `.adm-banner`, `.adm-notice`.
