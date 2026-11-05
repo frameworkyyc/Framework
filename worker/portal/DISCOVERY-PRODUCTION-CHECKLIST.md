@@ -23,10 +23,10 @@ Status on 5 November 2026. Production is untouched. Nothing below is done on Pro
 - 0019 (client relationship end date) is **not** part of this release: it stays in `migrations/portal-proposed/` and can follow.
 
 ## 3. Image licensing (see `DISCOVERY-IMAGES.md`)
-- [ ] The 6 P1 images are replaced or have proof of licence (and model release for the photo of people): dark, bold, lifestyle, abstract3d, flatlay, blank.
-- [ ] Owner has the generation records and the generator's commercial-use terms for the AI-generated logos and direction images (P3).
-- [ ] The fictional business names in the images (Roselune, Stonefield Interiors, Savage Forms, The Boho Depot) were checked against real businesses.
-- Can follow the launch, but should be done soon: the 23 P2 photographs and textures (licence proof, or replace). Removing an image falls back to the generated sketch.
+- [x] Owner confirmed: photos and textures are from Unsplash (commercial use under its standard licence); the 12 logo examples are AI-generated. All existing images stay.
+- [ ] Quick rights review of the 7 flagged files (identifiable people or trademarks: lifestyle, flatlay, documentary, abstract3d, blank, and the direction images bold and dark). Each is keep-or-swap; none blocks the release if the owner accepts it for illustrative use.
+- [ ] Owner keeps the Unsplash page URL and photographer for each photo and texture, and the generation records and terms for the AI-generated images.
+- [ ] Owner states the source of the 20 design-direction images (most look AI-generated).
 
 ## 4. Privacy
 - [x] Guest welcome page shows a plain-language privacy notice; `privacy.html` has a "Brand Discovery" section and retention entry (PR #157, on Staging).
@@ -57,4 +57,4 @@ Know these before the apply run.
 3. Approve verify-only run, then read it.
 4. Approve the apply run.
 5. Approve merging the refreshed PR #156.
-6. Approve the set-up of the privacy effective date and the image decisions (P1) before step 5.
+6. Set the privacy effective date and decide the flagged-image reviews before step 5.
