@@ -135,6 +135,12 @@ ${files}${overall}${nav}
 </form></div>`;
 }
 
+/** Shown on the guest welcome page. Keep it in step with the "Brand Discovery" section of privacy.html (a test checks both). */
+export const PRIVACY_NOTICE = `<aside class="dsc__privacy" aria-labelledby="dsc-privacy"><h2 class="dsc__privacy-h" id="dsc-privacy">Your privacy</h2>
+<p>We use your answers, comments and any files you add only to prepare your brand brief. They are seen by Framework and the organization that sent you this link, and are stored privately, with a private backup copy.</p>
+<p>This link needs no account, so anyone who has it can open this form until it expires or is turned off. Please don’t share it.</p>
+<p>We keep your answers and files while we work with the organization and for 90 days after that, unless the law requires longer, and then delete them. To see, correct or delete your information sooner, email <a href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a>. Read our <a href="/privacy.html#discovery">privacy policy</a>.</p></aside>`;
+
 export function welcomeBody({ eff, assessment, base, resumeStage, mode = "guest" }) {
   const started = assessment.status === "in_progress";
   const hello = assessment.recipientName ? `Hello ${e(assessment.recipientName)}` : "Welcome";
@@ -142,7 +148,7 @@ export function welcomeBody({ eff, assessment, base, resumeStage, mode = "guest"
 <p class="dsc__lead">${e(eff.intro)}</p>
 <ul class="dsc__facts"><li><strong>${eff.stages.length}</strong> short steps</li><li><strong>About ${minutesLeft(eff, 1)}</strong> minutes</li><li><strong>Saved</strong> as you go</li></ul>
 <p><a class="btn btn--primary btn--lg" href="${e(base)}/${started ? resumeStage : 1}">${started ? `Continue at step ${resumeStage}` : "Start"}</a></p>
-<p class="muted small">There are no right or wrong answers. Choose what you like, mark what you don’t, and say “not sure” whenever you are.</p></div></div>`;
+<p class="muted small">There are no right or wrong answers. Choose what you like, mark what you don’t, and say “not sure” whenever you are.</p>${mode === "guest" ? PRIVACY_NOTICE : ""}</div></div>`;
 }
 
 export function doneBody({ eff, assessment, mode = "guest", backHref = null }) {

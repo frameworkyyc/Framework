@@ -180,3 +180,26 @@ Public wording: `privacy.html` ("The client portal" and the portal items elsewhe
 3. Removal of access: `migrations/portal-ops/emergency-offboard.sql` (revokes membership and sessions). Never delete the WorkOS user afterwards (a re-created user is refused as `email_conflict`).
 4. Erasure: only after the retention need has passed; reviewed manual deletion of the organization's answers, feedback and the person's portal user row (foreign keys protect history, so order matters); then the WorkOS user in the WorkOS dashboard; note that backups and provider logs expire on their own schedules. Record the request, the dates and what was removed.
 5. Inactive beta accounts: review every 12 months (calendar reminder); delete information no longer needed, subject to legal and operational requirements.
+
+## 7. Brand Discovery (guest links and assessments)
+
+Public wording: `privacy.html` ("Brand Discovery" and the retention list). The guest notice is `PRIVACY_NOTICE` in `worker/portal/discovery/pages.js`; a test keeps the two in step.
+
+| data | where | notes |
+| --- | --- | --- |
+| recipient name (as typed by Admin), title, status | D1 `discovery_assessments` | no email address is collected from guests |
+| answers and comments | D1 `discovery_answers`, `discovery_assessments.overall_comment` | free text can contain personal information |
+| guest links | D1 `discovery_links` | only the SHA-256 of the token; expiry (14 days default, max 90) and revocation |
+| inspiration files | private R2 `PORTAL_FILES`, area `discovery` (`org/<id>/discovery/<uuid>`), row in `discovery_uploads` | PNG, JPG, WebP, PDF; objects stored as application/octet-stream |
+| backup copies | private R2 `PORTAL_FILES_BACKUP` | copied by the Production cron; removed by the backup purge (needs `PORTAL_BACKUP_PURGE` = "1") 90 days after the file was deleted |
+| audit | D1 `activity_log` | ids, formats and sizes only, never names or answers |
+
+**Retention rule (proposed, owner-approved wording in the policy):** answers, comments and files are kept while the client relationship continues and for 90 days after it ends, unless the law requires longer; a file removed earlier leaves main storage at once and its backup copy goes within 90 days. **Today this is a manual review**, like the other records (see section 3): nothing deletes Discovery data automatically when a relationship ends. Known limits:
+
+* `deleteOrganizationFiles` deliberately skips the `discovery` area, and nothing deletes `discovery_*` rows. At offboarding (relationship end + 90 days) delete them by hand: tombstone the uploads, delete the objects under `org/<id>/discovery/`, then delete the rows in the order uploads, answers, links, assessments (foreign keys are RESTRICT), and note it in the request log.
+* The backup purge only removes a backup copy whose database row is a tombstone. Discovery uploads are now looked up too, so a removed file's copy goes 90 days after removal; objects under `discovery/` that no row points to are left for a human, as for other files.
+* An archived assessment is hidden but kept. Archiving is not deletion.
+
+**Requests from a guest** (access, correction, deletion): the guest emails hello@frameworkco.ca and names the organization the link came from. Confirm identity by replying to the address they wrote from and, where possible, with the organization's contact. Find the assessment in Admin > Brand Discovery (by organization and recipient name). Delete as above (one assessment at a time), revoke any live link first, then record it in the request log. Guests cannot delete answers themselves; they can remove their own files while the form is open.
+
+**Before enabling in Production:** confirm `PORTAL_BACKUP_PURGE` is set the way the policy says (the policy states a scheduled process removes backup copies), and update the effective date in `privacy.html` to the real publication date (`PRIVACY_PUBLISH=1 node --test worker/test/privacy.test.mjs`).
