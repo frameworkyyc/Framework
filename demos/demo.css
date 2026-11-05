@@ -179,3 +179,8 @@ form.is-done .form-done{display:block}
 .hero--dark .hero__lead,.hero--dark .trust span{color:rgba(255,255,255,.72)}
 .hero--dark .trust{border-color:rgba(255,255,255,.18)}
 .hero--dark .btn--ghost{color:#fff}
+
+/* Unsplash photo credits in the footer */
+.site-foot .wrap{flex-wrap:wrap}
+.photo-credits{flex-basis:100%;font-size:12px;line-height:1.5;opacity:.75}
+.photo-credits a{text-decoration:underline}

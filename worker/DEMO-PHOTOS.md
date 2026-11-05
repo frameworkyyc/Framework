@@ -1,6 +1,6 @@
 # Demo websites: photo shot list
 
-The four sample sites at `/demos/` (Fence & Decks, Landscaping, Renovations, General Contractor) have 24 photo slots. Each slot shows a labelled placeholder until its file exists; **drop a file in with the exact name below and the placeholder is replaced automatically** (no code change). A slot with no file keeps its placeholder, so a partly filled set never shows a broken image.
+The four sample sites at `/demos/` (Fence & Decks, Landscaping, Renovations, General Contractor) have 24 photo slots. Each slot shows a labelled placeholder until its file exists; **the photos below are in place (all 24 from Unsplash, 5 November 2026); to change one, replace the file with the same name and the page picks it up** (no code change). A slot with no file keeps its placeholder, so a partly filled set never shows a broken image.
 
 ## Where files go and how to prepare them
 - Folder: `assets/img/demos/<demo>/` with names `hero.jpg` and `project-1.jpg` to `project-5.jpg` (JPEG, lower-case).
@@ -52,3 +52,34 @@ The four sample sites at `/demos/` (Fence & Decks, Landscaping, Renovations, Gen
 | project-3.jpg | Project: second-storey addition |
 | project-4.jpg | Project: restaurant fit-out, Inglewood |
 | project-5.jpg | Project: acreage shop, Rocky View |
+
+## Credits (Unsplash)
+
+All 24 photos are from Unsplash and are used under the [Unsplash licence](https://unsplash.com/license) (free for commercial use; no permission or attribution required, but we credit the photographers in each demo's footer). The licence does not grant trademark rights or likeness releases: none of these photos shows an identifiable person or a readable brand. Each download was registered with Unsplash through its API as its guidelines ask. One edit: the house number on the pillar in `fence-deck/project-3` was painted out.
+
+| File | Photographer | Unsplash page |
+|---|---|---|
+| fence-deck/hero.jpg | [Kellen Riggin](https://unsplash.com/@kalaniparker?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/low-sun-behind-wooden-fence-ywPXOj8JtwU |
+| fence-deck/project-1.jpg | [Josh Lemmon](https://unsplash.com/@wolfie_website?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/backyard-with-wooden-fence-and-patio-x1rFTWcXoOc |
+| fence-deck/project-2.jpg | [Zac Gudakov](https://unsplash.com/@zacgudakov?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/white-wooden-bench-on-wooden-deck-z5_Tv41SZQg |
+| fence-deck/project-3.jpg | [ubeyonroad](https://unsplash.com/@ubeyonroad?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/modern-house-with-manicured-hedges-and-gate-4b25Ic2VjiQ |
+| fence-deck/project-4.jpg | [Sebastian Blumberg](https://unsplash.com/@sebhurblum?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/closed-brown-and-gray-wooden-gate-aHeCEZ4yNTM |
+| fence-deck/project-5.jpg | [Jonah Townsley](https://unsplash.com/@jonah_t?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/glass-railing-with-exit-sign-byNekVgbGj4 |
+| landscaping/hero.jpg | [Eli Chamoun](https://unsplash.com/@nvision_3d?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/stone-patio-with-wooden-chairs-iKQzPI3pwV4 |
+| landscaping/project-1.jpg | [Duc Van](https://unsplash.com/@duke91?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/a-fire-pit-in-the-middle-of-a-wooded-area-WCxD5p4TEKQ |
+| landscaping/project-2.jpg | [Sergej *****](https://unsplash.com/@skstrannik?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/stone-wall-with-plants-in-the-foreground-f7poIvVWtfg |
+| landscaping/project-3.jpg | [Jazmin Wong](https://unsplash.com/@jazziwong?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/spanish-style-house-with-desert-landscaping-8ckpfn2a-xg |
+| landscaping/project-4.jpg | [Sergej *****](https://unsplash.com/@skstrannik?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/paved-brick-pathway-winding-through-lush-green-garden-HbbpKDkmDKY |
+| landscaping/project-5.jpg | [Roger Starnes Sr](https://unsplash.com/@rstar50?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/vibrant-flower-garden-with-colorful-blooms-green-grass-and-hedge-OK-bkFlixzI |
+| renovations/hero.jpg | [Zac Gudakov](https://unsplash.com/@zacgudakov?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/a-large-kitchen-with-a-marble-island-and-white-cabinets-o-uPDNNSsDA |
+| renovations/project-1.jpg | [Clay Banks](https://unsplash.com/@claybanks?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/modern-kitchen-with-walnut-cabinetry-TDXF1KUyyTk |
+| renovations/project-2.jpg | [Smart Renovations](https://unsplash.com/@smartrenovationscanada?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/modern-bathroom-with-glass-enclosed-shower-and-marble-walls-Ies-rhvusTs |
+| renovations/project-3.jpg | [aes](https://unsplash.com/@aislinns?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/a-living-room-filled-with-furniture-and-a-fire-place-LTMPLbMfs08 |
+| renovations/project-4.jpg | [Pro Kitchen Remodeling SB County](https://unsplash.com/@pro_kitchen_remodeling?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/modern-kitchen-with-dark-wood-island-SP4OUfN_L5o |
+| renovations/project-5.jpg | [Lotus Design N Print](https://unsplash.com/@lotusdnp?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/white-ceramic-sink-beside-white-and-black-floral-wall-381usU9gjlE |
+| general-contractor/hero.jpg | [xiaoyu xie](https://unsplash.com/@nyenchen?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/a-row-of-wooden-beams-against-a-blue-sky-Qh00d1D8BFw |
+| general-contractor/project-1.jpg | [Alef Morais](https://unsplash.com/@alef_visuals?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/modern-house-with-large-windows-and-a-green-lawn-d2hYqpR0YS0 |
+| general-contractor/project-2.jpg | [Josh Lemmon](https://unsplash.com/@wolfie_website?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/white-detached-garage-with-paved-driveway-e9VNJmm5PzU |
+| general-contractor/project-3.jpg | [Brett Jordan](https://unsplash.com/@brett_jordan?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/brown-brick-building-during-daytime-jEP4vsHrSM8 |
+| general-contractor/project-4.jpg | [Alexander Faé](https://unsplash.com/@alexfae?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/brown-wooden-tables-and-chairs-inside-building-TivEEYzzhik |
+| general-contractor/project-5.jpg | [Winston Chen](https://unsplash.com/@winstonchen?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/concrete-industrial-building-with-large-windows-and-chimney-W3ULPIJPg8w |
