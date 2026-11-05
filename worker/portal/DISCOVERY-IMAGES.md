@@ -3,7 +3,7 @@
 Last updated 5 November 2026 after the owner's instructions.
 
 ## Decision
-The owner has confirmed that the **photos and textures (28 files) come from Unsplash**, which permits commercial use under its standard licence, and that the **12 logo examples are AI-generated**. All existing images are kept. Nothing is replaced only because the repository holds no licence record.
+The owner has confirmed that the **photos and textures (32 files) come from Unsplash**, which permits commercial use under its standard licence, and that the **12 logo examples are AI-generated**. All existing images are kept. Nothing is replaced only because the repository holds no licence record.
 
 ## What the records show
 - **Logos (12):** embedded C2PA content credentials mark them as AI-generated, which matches the owner's statement. Keep the generation records and the generator's commercial-use terms.
@@ -96,3 +96,7 @@ Remove the file and its key from the matching list at the top of `worker/portal/
 | textures | topographic.jpg | 75 | 3cb9ab5ffc | Unsplash (owner-stated, 5 Nov 2026); photographer and page URL not recorded | No |
 | textures | watercolour.jpg | 55 | 39770a8777 | Unsplash (owner-stated, 5 Nov 2026); photographer and page URL not recorded | No |
 | textures | wood.jpg | 79 | 530c771acb | Unsplash (owner-stated, 5 Nov 2026); photographer and page URL not recorded | No |
+| imagery | earthy.jpg | 141 | 51e69eeb3d | Unsplash, added 5 November 2026: [Hans](https://unsplash.com/@hansphoto?utm_source=framework&utm_medium=referral), [photo page](https://unsplash.com/photos/a-close-up-view-of-a-brown-substance-RN0v7qyjGUE); downloaded through the Unsplash API | No |
+| imagery | woody.jpg | 163 | 4b5ae78690 | Unsplash, added 5 November 2026: [Ruben Hanssen](https://unsplash.com/@rhfhanssen?utm_source=framework&utm_medium=referral), [photo page](https://unsplash.com/photos/brown-wood-logs-on-brown-dirt-road-0wl6_y8lTCM); downloaded through the Unsplash API | No |
+| imagery | holistic.jpg | 39 | 410647ce70 | Unsplash, added 5 November 2026: [Sean Stratton](https://unsplash.com/@seanstratton?utm_source=framework&utm_medium=referral), [photo page](https://unsplash.com/photos/black-stacking-stones-on-gray-surface-ObpCE_X3j6U); downloaded through the Unsplash API | No |
+| imagery | ethereal.jpg | 39 | 4cd0e68283 | Unsplash, added 5 November 2026: [Pascal Debrunner](https://unsplash.com/@debrupas?utm_source=framework&utm_medium=referral), [photo page](https://unsplash.com/photos/the-sun-is-shining-through-the-foggy-trees-RO9nomDWJk8); downloaded through the Unsplash API | No |

@@ -298,7 +298,7 @@ test("guest link: no account needed; welcome, six steps with real cards, saved a
     assert.equal(loc(r), `${base}/${n + 1}`, `step ${n}`);
   }
   const s6 = await text(await anon.get(`${base}/6`));
-  assert.match(s6, /Step 6 of 6/); assert.match(s6, /enctype="multipart\/form-data"/); assert.match(s6, /Your choices so far/); assert.match(s6, /Send to Framework/);
+  assert.match(s6, /Step 6 of 6/); assert.match(s6, /enctype="multipart\/form-data"/); assert.match(s6, /Review your answers/); assert.match(s6, /Submit Brand Discovery/); assert.doesNotMatch(s6, /Send to Framework|send them to us/);
   for (const sec of ["01 Logo", "02 Typography", "03 Brand Colours", "04 Tagline", "05 Brand Imagery", "06 Layout System", "07 Textures", "08 Iconography", "09 Design Style"]) assert.match(s6, new RegExp(sec), `${sec} appears in the review`);
   assert.match(s6, /not answered/, "unanswered questions are shown plainly");
 
@@ -465,7 +465,7 @@ test("Branding shows a Brand Discovery card only when Framework has assigned one
   const csrf = csrfOf(html1);
   await ann.send(`/portal/o/alpha/branding/discovery/${id}/1`, { method: "POST", body: new URLSearchParams({ csrf, "l:style.personality:modern": "1", go: "save" }).toString(), headers: { "Content-Type": "application/x-www-form-urlencoded", ...SAME } });
   assert.equal(snap(), before, "answering never writes to brand kits, assets, requirements, uploads or requests");
-  assert.match(await text(await ann.get("/portal/o/alpha/branding")), />Continue</);
+  assert.match(await text(await ann.get("/portal/o/alpha/branding")), />Continue Brand Discovery</);
 });
 
 /* ====================================================================== Admin API */
@@ -635,6 +635,7 @@ test("Admin: before migration 0018 the screens say so plainly and nothing breaks
 
 /* ====================================================================== inclusive content (any industry) */
 import { readFileSync } from "node:fs";
+import * as brandRepo from "../portal/repo/brand.js";
 const LEGACY = JSON.parse(readFileSync(new URL("./fixtures-discovery-legacy-keys.json", import.meta.url), "utf8")); // every question and option key as first released
 
 test("existing assessments stay compatible: every original question and option key still exists, answers using them still read and make a brief", () => {
@@ -878,4 +879,97 @@ test("retention: the migration is additive, proposed only, and the code never re
   const code = readFileSync(new URL("../portal/discovery/retention.js", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
   assert.doesNotMatch(code, /archived_at|organizations\b.*status/, "no inference from archiving or status");
   assert.match(code, /FROM discovery_assessments a JOIN client_relationships r/, "only organizations with an explicit end date are ever planned");
+});
+
+
+/* ---- client feedback round: final submit, dashboard flag, Branding card and intro, image progress, four new picture styles ---- */
+test("final step: no confusing instruction, a big Submit panel that says what it does, a plain Submit in the sticky bar, and nothing like it on the other steps", async () => {
+  const { anon, make, orgA } = await portal();
+  const { token } = await make(orgA);
+  for (const f of [{ "l:style.personality:modern": "1" }, { "l:logo.type:wordmark": "1" }, { "l:typography.fonts:serif-modern": "1" }, { "l:colours.palettes:luxury": "1" }, { "l:imagery.style:detail": "1" }]) { const n = [{ "l:style.personality:modern": 1 }, { "l:logo.type:wordmark": 2 }, { "l:typography.fonts:serif-modern": 3 }, { "l:colours.palettes:luxury": 4 }, { "l:imagery.style:detail": 5 }].find((x) => Object.keys(x)[0] === Object.keys(f)[0]); await guestPost(anon, token, Object.values(n)[0], { ...f, go: "next" }); }
+  const s6 = await text(await anon.get(`/portal/discover/${token}/6`));
+  assert.doesNotMatch(s6, /send them to us|check your choices and send/i);
+  assert.match(s6, /This is the last step: check your answers, then press Submit at the bottom/);
+  const panel = /<section class="dsubmit"[\s\S]*?<\/section>/.exec(s6)[0];
+  assert.match(panel, /Ready to submit\?/); assert.match(panel, /Press <strong>Submit<\/strong> to send your answers to Framework\. That completes your Brand Discovery/);
+  assert.match(panel, /<button class="btn btn--primary btn--lg dsubmit__btn" type="submit" name="go" value="submit">Submit Brand Discovery<\/button>/);
+  assert.match(s6, /<nav class="dsc__nav"[\s\S]*name="go" value="submit">Submit<\/button>/, "the sticky bar keeps a plain Submit, so it is reachable on a phone without scrolling");
+  assert.ok(s6.indexOf('class="dsubmit"') > s6.indexOf('id="q-overall"') && s6.indexOf('class="dsubmit"') < s6.indexOf('class="dsc__nav"'), "the panel comes after everything to fill in and before the nav");
+  assert.doesNotMatch(await text(await anon.get(`/portal/discover/${token}/3`)), /dsubmit/, "only the last step has a submit panel");
+  const sent = await guestMulti(anon, token, 6, { go: "submit", overall: "ok" }); assert.equal(sent.status, 303);
+  assert.match(await text(await anon.get(`/portal/discover/${token}`)), /Your Brand Discovery has been submitted/);
+});
+
+test("portal home: the Branding card carries a red dot and 'New Brand Discovery available' while one is not started, 'in progress' while under way, a quiet note once sent; a published brand never hides it", async () => {
+  const { w, ann, make, orgA, q } = await portal();
+  const home = async () => text(await ann.get("/portal/o/alpha"));
+  const card = (html) => /<a class="hub" href="[^"]*\/branding"[\s\S]*?<\/a>/.exec(html)[0];
+  assert.doesNotMatch(card(await home()), /Brand Discovery|hub__flag/, "nothing assigned: nothing shown");
+  const { id } = await make(orgA);
+  let c = card(await home());
+  assert.match(c, /<p class="tile__action"><span class="dot dot--attention" aria-hidden="true"><\/span>New Brand Discovery available<\/p>/); assert.match(c, /class="hub__flag"[\s\S]*Needs your attention/); assert.match(c, /Not published yet/);
+  assert.ok(brandRepo && (await brandRepo.saveBrandKit(w.db, orgA.id, { colours: [{ name: "Ink", role: "primary", hex: "#0a0a0a", note: "" }], typography: [] }, A)).ok);
+  assert.ok((await brandRepo.setBrandKitStatus(w.db, orgA.id, "published", A)).ok);
+  c = card(await home());
+  assert.match(c, /Brand system published/, "the brand's own status is still there"); assert.match(c, /New Brand Discovery available/, "and it does not hide the new assessment");
+  assert.ok(c.indexOf("New Brand Discovery available") < c.indexOf("Brand system published"), "the assessment is listed first");
+  q("UPDATE discovery_assessments SET status = 'in_progress', started_at = ? WHERE id = ?", w.clock.now().toISOString(), id);
+  c = card(await home()); assert.match(c, /Brand Discovery in progress\. Continue where you left off/); assert.doesNotMatch(c, /New Brand Discovery available/); assert.match(c, /hub__flag/);
+  q("UPDATE discovery_assessments SET status = 'submitted', submitted_at = ? WHERE id = ?", w.clock.now().toISOString(), id);
+  c = card(await home()); assert.match(c, /Brand Discovery sent\. Thank you/); assert.doesNotMatch(c, /hub__flag|dot--attention/, "the red dot goes once it is sent");
+  q("UPDATE discovery_assessments SET status = 'reviewed', reviewed_at = ?, reviewed_by = 'a@b.c' WHERE id = ?", w.clock.now().toISOString(), id);
+  assert.doesNotMatch(card(await home()), /hub__flag/);
+  const { id: id2 } = await make(orgA, "Second");
+  assert.match(card(await home()), /New Brand Discovery available/, "a second assessment brings the flag back");
+  const off = await portal({ discovery: false }); await off.make(off.orgA).catch(() => null);
+  assert.doesNotMatch(card(await text(await off.ann.get("/portal/o/alpha"))), /Brand Discovery|hub__flag/, "feature off: nothing shown");
+});
+
+test("Branding page: a black 'ready' card with a contrasting Start/Continue button while waiting, a quiet one once sent, and an introduction that matches the branding stage", async () => {
+  const { w, ann, make, orgA, q } = await portal();
+  const page = async () => text(await ann.get("/portal/o/alpha/branding"));
+  const lead = (html) => /<p class="lead">([\s\S]*?)<\/p>/.exec(html)[1];
+  assert.match(lead(await page()), /Your brand kit in nine parts/, "no assessment, no brand: the plain introduction");
+  const { id } = await make(orgA);
+  let html = await page(); let c = /<section class="bk-discovery[^"]*"[\s\S]*?<\/section>/.exec(html)[0];
+  assert.match(c, /bk-discovery--action/); assert.match(c, /<h2 class="h3" id="h-discovery">Your Brand Discovery is ready<\/h2>/); assert.doesNotMatch(c, /Not sure what you want/);
+  assert.match(c, /<a class="btn btn--on-dark btn--lg" href="[^"]*\/branding\/discovery\/[^"]+">Start Brand Discovery<\/a>/);
+  assert.match(lead(html), /Start with your Brand Discovery below/); assert.doesNotMatch(lead(html), /approved .* brand|Download what you need/);
+  assert.ok(html.indexOf("bk-discovery--action") < html.indexOf('class="bk-nav"'), "the card comes before the nine sections");
+  q("UPDATE discovery_assessments SET status = 'in_progress', started_at = ? WHERE id = ?", w.clock.now().toISOString(), id);
+  html = await page(); c = /<section class="bk-discovery[^"]*"[\s\S]*?<\/section>/.exec(html)[0];
+  assert.match(c, /waiting for you/); assert.match(c, />Continue Brand Discovery<\/a>/); assert.match(lead(html), /part-way through your Brand Discovery/);
+  assert.ok((await brandRepo.saveBrandKit(w.db, orgA.id, { colours: [{ name: "Ink", role: "primary", hex: "#0a0a0a", note: "" }], typography: [] }, A)).ok); assert.ok((await brandRepo.setBrandKitStatus(w.db, orgA.id, "published", A)).ok);
+  html = await page(); assert.match(lead(html), /is below\. Finish your Brand Discovery when you can/, "a published brand and an unfinished discovery: both are said, discovery first");
+  q("UPDATE discovery_assessments SET status = 'submitted', submitted_at = ? WHERE id = ?", w.clock.now().toISOString(), id);
+  html = await page(); c = /<section class="bk-discovery[^"]*"[\s\S]*?<\/section>/.exec(html)[0];
+  assert.doesNotMatch(c, /bk-discovery--action/, "once sent the card is quiet"); assert.match(c, /Brand Discovery sent/); assert.match(c, /View Brand Discovery/);
+  assert.match(lead(html), /logos, typography, colours and more/, "sent and published: the ordinary approved-brand introduction");
+  brandRepo.setBrandKitStatus(w.db, orgA.id, "draft", A); html = await page();
+  assert.match(lead(html), /Thank you for completing your Brand Discovery\. Framework is working from your answers/, "sent but not yet published: says what happens next");
+});
+
+test("picture questions: progress, a clear 'all reviewed' end with one way on, 'None of these' that finishes on the last set, and the four new styles", async () => {
+  const { anon, make, orgA } = await portal();
+  const { token } = await make(orgA);
+  await guestPost(anon, token, 1, { go: "next" }); await guestPost(anon, token, 2, { go: "next" }); await guestPost(anon, token, 3, { go: "next" }); await guestPost(anon, token, 4, { go: "next" });
+  const s5 = await text(await anon.get(`/portal/discover/${token}/5`));
+  const imagery = /<section class="dq"[^>]*data-visual-pages[^>]*aria-labelledby="q-imagery-style"[\s\S]*?<\/section>/.exec(s5);
+  assert.ok(imagery, "the imagery question is paged"); assert.equal((imagery[0].match(/class="dc dc--imagery"/g) || []).length, 16, "16 picture styles");
+  for (const [k, label] of [["earthy", "Earthy"], ["woody", "Woody"], ["holistic", "Holistic"], ["mystical", "Ethereal"]]) void k, label;
+  for (const k of ["earthy", "woody", "holistic", "ethereal"]) { assert.match(imagery[0], new RegExp(`name="l:imagery\\.style:${k}"`)); assert.match(imagery[0], new RegExp(`/assets/img/discovery-imagery/${k}\\.jpg`)); }
+  const js = readFileSync(new URL("../../assets/js/discovery.js", import.meta.url), "utf8");
+  for (const must of ["Reviewed \" + seen + \" of \"", "Showing images ", "That\\u2019s every image", "Continue to next section", "Review images again", "None of these, finish", "None of these, show more", "I\\u2019ve seen them all"]) assert.ok(js.includes(must.replace(/\\\\/g, "\\")), "js says: " + must);
+  const css = readFileSync(new URL("../../assets/css/discovery.css", import.meta.url), "utf8");
+  assert.match(css, /\.dq__grid\[hidden\], \.dq__paging\[hidden\], \.dq__done\[hidden\] \{ display: none; \}/, "hidden really hides grid, buttons and panel");
+  for (const k of ["earthy", "woody", "holistic", "ethereal"]) assert.ok(readFileSync(new URL(`../../assets/img/discovery-imagery/${k}.jpg`, import.meta.url)).length > 20000, k + " photo exists");
+});
+
+test("compatibility: the four new picture styles are appended, every original key is still there, and saved answers keep their meaning", async () => {
+  const q = KINDS.brand.questions.find((x) => x.key === "imagery.style");
+  const keys = q.options.map((o) => o.key);
+  assert.deepEqual(keys.slice(-4), ["earthy", "woody", "holistic", "ethereal"]);
+  const legacy = JSON.parse(readFileSync(new URL("./fixtures-discovery-legacy-keys.json", import.meta.url), "utf8"));
+  const was = legacy["imagery.style"]; for (const k of was) assert.ok(keys.includes(k), "still present: " + k);
+  assert.equal(new Set(keys).size, keys.length, "no duplicate keys");
 });

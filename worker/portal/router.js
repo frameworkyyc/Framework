@@ -315,8 +315,10 @@ async function brandCard(ctx, a) {
   if (!brandingOn(ctx)) return null;
   try {
     const org = a.membership.organizationId;
-    const [kit, uploads] = await Promise.all([dbCall(() => getBrandKit(ctx.db, org)), dbCall(() => listClientUploads(ctx.db, org))]);
-    return { state: kit && kit.status === "published" ? "published" : "draft", uploads: uploads.length };
+    const [kit, uploads, assessments] = await Promise.all([dbCall(() => getBrandKit(ctx.db, org)), dbCall(() => listClientUploads(ctx.db, org)), discoveryOn(ctx) ? dbCall(() => listClientDiscoveries(ctx.db, org)) : Promise.resolve([])]);
+    // Where Brand Discovery stands for this client, so the Branding card can ask for attention however the brand itself is doing: "new" (one not started), "progress" (one under way), "done" (all sent), "none".
+    const discovery = assessments.some((x) => x.status === "not_started") ? "new" : assessments.some((x) => x.status === "in_progress") ? "progress" : assessments.length ? "done" : "none";
+    return { state: kit && kit.status === "published" ? "published" : "draft", uploads: uploads.length, discovery };
   } catch (err) {
     if (err instanceof Unavailable) return { state: "unavailable", uploads: 0 };
     throw err;
