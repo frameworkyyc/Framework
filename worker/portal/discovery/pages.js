@@ -7,6 +7,7 @@
  */
 import { escapeHtml as e } from "../frame.js";
 import { visualFor } from "./visuals.js";
+import { DIRECTION_IMAGES, TEXTURE_IMAGES, IMAGERY_IMAGES, LOGO_IMAGES, FONT_KEYS as FONT_CLASS } from "./thumbs.js";
 import { stageQuestions, answerState } from "./model.js";
 import { SECTIONS, MODE_LABEL, TAG_LABEL } from "./catalogue.js";
 import { MAX_COMMENT, MAX_OVERALL_COMMENT } from "./model.js";
@@ -28,16 +29,6 @@ function stepper(eff, current, base, assessment) {
     return `<li class="dsc__step ${state}">${link}<span class="dsc__num">${s.n}</span><span class="dsc__label">${e(s.title)}</span>${s.n <= reached ? "</a>" : "</span>"}</li>`;
   }).join("")}</ol>`;
 }
-
-const FONT_CLASS = new Set(["serif-classic", "serif-modern", "sans-geometric", "sans-humanist", "slab", "script", "display", "mono", "condensed", "elegant-italic", "calligraphic", "handwritten", "deco", "old-style"]);
-
-const DIRECTION_IMAGES = new Set(["modern", "minimalist", "luxury", "traditional", "bold", "playful", "industrial", "organic", "retro", "editorial", "holistic", "mystical", "romantic", "bohemian", "feminine", "rustic", "futuristic", "gothic", "architectural", "dark"]);
-
-const TEXTURE_IMAGES = new Set(["paper", "concrete", "linen", "marble", "wood", "lines", "halftone", "topographic", "terrazzo", "watercolour", "floral", "gilded", "mosaic", "steel", "rust", "blank"]);
-
-const IMAGERY_IMAGES = new Set(["abstract3d", "botanical", "lifestyle", "detail", "hand", "aerial", "architectural", "documentary", "flat", "studio", "flatlay", "softfocus", "earthy", "woody", "holistic", "ethereal"]);
-
-const LOGO_IMAGES = new Set(["wordmark", "lettermark", "emblem", "crest", "pictorial", "abstract", "combination", "mascot", "script", "celestial", "botanical", "ornamental"]);
 
 function cardVisual(q, o, imageUrl) {
   if (o.imageId) return `<img class="dv dv--photo" src="${e(imageUrl(o.imageId))}" alt="${e(o.label)}" loading="lazy" width="480" height="300">`;
