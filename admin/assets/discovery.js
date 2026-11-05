@@ -2,6 +2,7 @@
    /admin/discovery/<client>/<assessment> (links, what the recipient answered, files, and the creative brief). Server text is never inserted as HTML. A secret link is
    shown once, when it is made, and never again (only its hash is stored). */
 import { h, api, fmtDateTime, errorState, confirmDialog } from "./ui.js";
+import { badge, statCard, card, fold, foldControls, barList, choiceGroups, attentionList } from "./review-kit.js";
 
 const STATUS = { not_started: ["Not started", "pending"], in_progress: ["In progress", "warn"], submitted: ["Submitted", "ok"], reviewed: ["Reviewed", "ok"] };
 const statusChip = (s) => h("span", { class: "adm-chip adm-chip--" + (STATUS[s] || ["", "pending"])[1], text: (STATUS[s] || [s])[0] });
@@ -135,29 +136,51 @@ async function detailPage(orgId, id, ctx) {
       data.links.length ? h("ul", { class: "adm-dsc__links" }, data.links.map((l) => h("li", null, h("span", null, h("strong", { text: l.label || "Link" }), ` · created ${fmtDateTime(l.createdAt)} · `, h("span", { class: "adm-chip adm-chip--" + (l.state === "active" ? "ok" : "pending"), text: l.state === "active" ? "Active" : l.state === "expired" ? "Expired" : "Revoked" }), l.state === "active" ? ` · expires ${fmtDateTime(l.expiresAt)}` : "", l.useCount ? ` · opened ${l.useCount} time${l.useCount === 1 ? "" : "s"}` : ""),
         l.state === "active" && writes() ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: async () => { if (await confirmDialog({ title: "Revoke this link?", body: "Anyone using it will no longer be able to open the assessment.", confirmLabel: "Revoke link" })) act(`/links/${encodeURIComponent(l.id)}/revoke`, {}, "Link revoked."); } }, "Revoke") : null))) : h("p", { class: "adm-muted", text: "No links yet." }));
   }
-  function briefPanel() {
+  const SECTION_STATUS = { answered: ["Answered", "ok"], partial: ["Partly answered", "warn"], not_sure: ["Not sure", "pending"], unanswered: ["Not answered", ""], not_included: ["Not included", ""] };
+  function overview() {
+    const b = data.brief, st = a().status, when = a().reviewedAt ? `Reviewed ${fmtDateTime(a().reviewedAt)}` : a().submittedAt ? `Submitted ${fmtDateTime(a().submittedAt)}` : a().startedAt ? `Started ${fmtDateTime(a().startedAt)}` : `Created ${fmtDateTime(a().createdAt)}`;
+    const cards = h("div", { class: "rk-stats" },
+      statCard({ label: "Status", value: (STATUS[st] || [st])[0], hint: when, tone: st === "submitted" ? "ok" : st === "in_progress" ? "warn" : "" }),
+      statCard({ label: "Branding sections", value: `${b.summary.sectionsAnswered} of ${b.summary.sectionsTotal}`, hint: "answered", meter: b.summary.sectionsTotal ? b.summary.sectionsAnswered / b.summary.sectionsTotal : 0 }),
+      statCard({ label: "Questions answered", value: String(data.answered), hint: a().recipientName ? `by ${a().recipientName}` : null }),
+      statCard({ label: "Inspiration files", value: String(data.uploads.length), hint: data.uploads.length ? "from the client" : "none added" }));
+    const tags = (list, tone) => list.length ? h("div", { class: "rk-tags" }, list.map((w) => badge(w, tone))) : h("p", { class: "adm-muted", text: "Not chosen." });
+    const direction = card("Strongest preferences", b.themes.length ? barList(b.themes.map((t) => ({ label: t.label, count: t.count }))) : h("p", { class: "adm-muted", text: "No preferences chosen yet." }), { id: "rk-dir" });
+    const voice = card("Personality and tone", h("div", null, h("h3", { class: "rk-sub", text: "Brand personality" }), tags(b.summary.personality, "ok"), h("h3", { class: "rk-sub", text: "Tone of voice" }), tags(b.summary.tone, "pending")), { id: "rk-voice" });
+    return [cards, h("div", { class: "rk-two" }, direction, voice), a().overallComment ? h("blockquote", { class: "rk-quote" }, h("span", { class: "rk-quote__label", text: "In their words" }), a().overallComment) : null];
+  }
+  function attention() {
     const b = data.brief;
-    const sec = (x) => h("details", { class: "adm-dsc__sec", open: x.status !== "unanswered" && x.status !== "not_included" ? true : null },
-      h("summary", null, h("span", { class: "adm-dsc__no", text: x.number }), h("strong", { text: x.label }), " ", h("span", { class: "adm-chip adm-chip--" + (x.status === "answered" ? "ok" : x.status === "partial" ? "warn" : "pending"), text: { answered: "Answered", partial: "Partly answered", not_sure: "Not sure", unanswered: "Not answered", not_included: "Not included" }[x.status] })),
-      x.items.map((it) => h("div", { class: "adm-dsc__item" }, h("p", { class: "adm-req__label", text: it.prompt }),
-        it.state === "not_sure" ? h("p", { text: "I’m not sure" }) : it.state === "surprise" ? h("p", { text: "Surprise me" + (it.dislikes.length ? " (but not: " + it.dislikes.map((d) => d.label).join(", ") + ")" : "") }) : null,
-        it.likes.length ? h("p", null, h("strong", { text: "Likes: " }), it.likes.map((l) => l.label).join(", ")) : null,
-        it.dislikes.length && it.state !== "surprise" ? h("p", null, h("strong", { text: "Not for me: " }), it.dislikes.map((l) => l.label).join(", ")) : null,
-        it.comment ? h("p", { class: "adm-dsc__quote", text: "“" + it.comment + "”" }) : null,
-        it.state === "none" ? h("p", { class: "adm-muted", text: "No answer." }) : null)));
-    return h("section", { class: "adm-dsc__panel", "aria-labelledby": "db-h" }, h("h2", { class: "adm-h2", id: "db-h" }, "Creative brief"),
-      h("p", { class: "adm-sub" }, `${b.summary.sectionsAnswered} of ${b.summary.sectionsTotal} Branding sections answered. This is a summary of preferences, kept separate from the approved brand: it never changes a brand kit, an asset or a requirement.`),
-      b.themes.length ? h("p", null, h("strong", { text: "At a glance: " }), b.themes.map((t) => `${t.label} (${t.count})`).join(", ")) : null,
-      b.summary.personality.length ? h("p", null, h("strong", { text: "Personality words: " }), b.summary.personality.join(", ")) : null,
-      b.summary.tone.length ? h("p", null, h("strong", { text: "Tone of voice: " }), b.summary.tone.join(", ")) : null,
-      a().overallComment ? h("p", { class: "adm-dsc__quote", text: "Overall: “" + a().overallComment + "”" }) : null,
-      h("h3", { class: "adm-h3" }, "Tensions and contradictions"),
-      b.conflicts.length ? h("ul", { class: "adm-dsc__flags" }, b.conflicts.map((c) => h("li", null, h("span", { class: "adm-chip adm-chip--" + (c.severity === "strong" ? "warn" : "pending"), text: c.type === "contradiction" ? "Contradiction" : c.severity === "strong" ? "Strong tension" : "Tension" }), " ", h("strong", { text: c.title + ". " }), c.detail, " ", h("span", { class: "adm-muted", text: "(" + c.sections.join(", ") + ")" })))) : h("p", { class: "adm-muted", text: "None found." }),
-      h("h3", { class: "adm-h3" }, "To clarify with the client"),
-      b.clarify.length ? h("ul", { class: "adm-dsc__flags" }, b.clarify.map((c) => h("li", null, h("strong", { text: c.section + ": " }), c.reason))) : h("p", { class: "adm-muted", text: "Nothing outstanding." }),
-      h("h3", { class: "adm-h3" }, "By Branding section"), b.sections.map(sec),
-      h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary", type: "button", onclick: async (ev) => { try { await navigator.clipboard.writeText(data.markdown); ev.target.textContent = "Brief copied"; } catch { ev.target.textContent = "Copy not available: select the text below"; } } }, "Copy brief as text")),
-      h("details", { class: "adm-dsc__raw" }, h("summary", { text: "Plain-text version" }), h("pre", { class: "adm-dsc__pre", text: data.markdown })));
+    const conflicts = b.conflicts.map((c) => ({ badge: c.type === "contradiction" ? "Contradiction" : c.severity === "strong" ? "Strong tension" : "Tension", tone: c.severity === "strong" ? "warn" : "pending", title: c.title, detail: c.detail, where: c.sections.join(", ") }));
+    const clarify = b.clarify.map((c) => ({ badge: c.section, tone: "", title: c.reason }));
+    return card("Worth a conversation", h("div", { class: "rk-two rk-two--flush" },
+      h("div", null, h("h3", { class: "rk-sub" }, "Conflicting preferences ", badge(String(conflicts.length), conflicts.length ? "warn" : "")), attentionList(conflicts, { limit: 3, empty: "None found." })),
+      h("div", null, h("h3", { class: "rk-sub" }, "To clarify with the client ", badge(String(clarify.length), clarify.length ? "pending" : "")), attentionList(clarify, { limit: 4, empty: "Nothing outstanding." }))), { id: "rk-attn", wide: true });
+  }
+  function selections() {
+    const b = data.brief;
+    const wrap = h("div", { class: "rk-folds" });
+    const itemView = (it) => {
+      const state = it.state === "not_sure" ? badge("Not sure", "pending") : it.state === "surprise" ? badge("Surprise me", "pending") : null;
+      const groups = it.state === "surprise" ? choiceGroups({ dislikes: it.dislikes }) : choiceGroups({ likes: it.likes, dislikes: it.dislikes });
+      return h("div", { class: "rk-item" }, h("h3", { class: "rk-item__q" }, it.prompt, state ? [" ", state] : null), ...groups,
+        it.comment ? h("blockquote", { class: "rk-note", text: it.comment }) : null,
+        it.state === "none" ? h("p", { class: "adm-muted", text: "No answer." }) : null);
+    };
+    b.sections.forEach((x) => {
+      const [t, tone] = SECTION_STATUS[x.status] || ["", ""];
+      const likes = x.likes.length, dislikes = x.dislikes.length;
+      wrap.append(fold({ number: x.number, title: x.label, open: false, meta: [likes ? `${likes} liked` : "", dislikes ? `${dislikes} not for me` : ""].filter(Boolean).join(" · "), badges: badge(t, tone), body: x.items.length ? x.items.map(itemView) : h("p", { class: "adm-muted", text: "Not part of this assessment." }) }));
+    });
+    return h("section", { class: "rk-selections", "aria-labelledby": "rk-sel" }, h("div", { class: "rk-card__head" }, h("h2", { class: "rk-card__title", id: "rk-sel", text: "What they chose" }), foldControls(wrap)),
+      h("p", { class: "adm-sub", text: "Pictures are the ones the client saw. A tick is a like; a cross is “not for me”. Open a section for the detail." }), wrap);
+  }
+  function management() {
+    return h("details", { class: "rk-manage" }, h("summary", { class: "rk-manage__sum" }, h("span", { class: "rk-card__title", text: "Manage this assessment" }), h("span", { class: "rk-fold__meta", text: "Secure links, review, reopen, archive, delete" })),
+      h("div", { class: "rk-manage__body" }, linksPanel(), actionsPanel(),
+        h("section", { class: "adm-dsc__panel" }, h("h2", { class: "adm-h2" }, "Plain-text version"), h("p", { class: "adm-sub" }, "The same brief as text, to paste into a document or message. It is a summary of preferences and never changes a brand kit, an asset or a requirement."),
+          h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary", type: "button", onclick: async (ev) => { try { await navigator.clipboard.writeText(data.markdown); ev.target.textContent = "Brief copied"; } catch { ev.target.textContent = "Copy not available: select the text below"; } } }, "Copy brief as text")),
+          h("details", { class: "adm-dsc__raw" }, h("summary", { text: "Show the text" }), h("pre", { class: "adm-dsc__pre", text: data.markdown })))));
   }
   function filesPanel() {
     return h("section", { class: "adm-dsc__panel", "aria-labelledby": "df-h" }, h("h2", { class: "adm-h2", id: "df-h" }, "Inspiration files"),
@@ -180,10 +203,12 @@ async function detailPage(orgId, id, ctx) {
         h("button", { class: "btn btn--secondary adm-actions__danger", type: "button", onclick: async () => { if (await confirmDialog({ title: "Delete this assessment permanently?", body: "Its answers, links and files are deleted for good, including the backup copies of the files. This is for a deletion request or the end of the retention period, and it cannot be undone.", confirmLabel: "Delete permanently" })) { try { await api(base + "/delete", { method: "POST", body: { confirm: "DELETE" } }); location.assign("/admin/discovery"); } catch (err) { s.say(errorText(err), "error"); } } } }, "Delete permanently")));
   }
   function draw() {
+    const open = management_open();
+    const mg = management(); if (open) mg.open = true;
     root.replaceChildren(...[...s.head, !writes() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look, but not change.") : null,
-      h("p", { class: "adm-sub" }, `Created ${fmtDateTime(a().createdAt)}${a().startedAt ? ` · started ${fmtDateTime(a().startedAt)}` : ""}${a().submittedAt ? ` · submitted ${fmtDateTime(a().submittedAt)}` : ""}${a().reviewedAt ? ` · reviewed ${fmtDateTime(a().reviewedAt)} by ${a().reviewedBy}` : ""}. ${data.answered} question${data.answered === 1 ? "" : "s"} answered.`),
-      linksPanel(), briefPanel(), filesPanel(), actionsPanel()].filter(Boolean));
+      ...overview(), attention(), selections(), filesPanel(), mg].filter(Boolean));
   }
+  const management_open = () => Boolean(root.querySelector("details.rk-manage[open]")) || Boolean(fresh);
   draw();
   return { title: data.assessment.title, node: root };
 }
