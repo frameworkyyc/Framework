@@ -51,7 +51,7 @@ const BRAND_STAGES = Object.freeze([
   Object.freeze({ n: 3, title: "Typography & tagline", blurb: "The shape of your letters and the way you speak both carry your personality.", sections: ["typography", "tagline"] }),
   Object.freeze({ n: 4, title: "Brand colours", blurb: "Colour sets the mood before anyone reads a word.", sections: ["colours"] }),
   Object.freeze({ n: 5, title: "Imagery, textures & icons", blurb: "The pictures, surfaces and little symbols that finish the look.", sections: ["imagery", "textures", "iconography"] }),
-  Object.freeze({ n: 6, title: "Layout & final review", blurb: "How your pages and printed pieces are put together. Then check your choices and send them to us.", sections: ["layout"], review: true }),
+  Object.freeze({ n: 6, title: "Layout & final review", blurb: "How your pages and printed pieces are put together. This is the last step: check your answers, then press Submit at the bottom.", sections: ["layout"], review: true }),
 ]);
 
 const BRAND_QUESTIONS = Object.freeze([
@@ -175,6 +175,8 @@ const BRAND_QUESTIONS = Object.freeze([
       o("architectural", "Architectural", ["serious", "technical"], { note: "Lines, structure, perspective" }),
       o("softfocus", "Soft & dreamy", ["ethereal", "romantic"], { note: "Glow, haze, gentle light" }), o("flatlay", "Styled flat lay", ["modern", "feminine"], { note: "Objects arranged from above" }),
       o("botanical", "Botanical & natural", ["organic", "holistic"], { note: "Leaves, flowers, natural light" }),
+      o("earthy", "Earthy", ["organic", "warm"], { note: "Clay, soil and warm earth tones" }), o("woody", "Woody", ["organic", "rugged"], { note: "Timber, forests and natural materials" }),
+      o("holistic", "Holistic", ["holistic", "organic"], { note: "Balanced stones, calm and wellbeing" }), o("ethereal", "Ethereal & mystical", ["mystical", "ethereal"], { note: "Dreamlike, atmospheric, spiritual" }),
     ]),
   }),
   Object.freeze({

@@ -35,7 +35,7 @@ const DIRECTION_IMAGES = new Set(["modern", "minimalist", "luxury", "traditional
 
 const TEXTURE_IMAGES = new Set(["paper", "concrete", "linen", "marble", "wood", "lines", "halftone", "topographic", "terrazzo", "watercolour", "floral", "gilded", "mosaic", "steel", "rust", "blank"]);
 
-const IMAGERY_IMAGES = new Set(["abstract3d", "botanical", "lifestyle", "detail", "hand", "aerial", "architectural", "documentary", "flat", "studio", "flatlay", "softfocus"]);
+const IMAGERY_IMAGES = new Set(["abstract3d", "botanical", "lifestyle", "detail", "hand", "aerial", "architectural", "documentary", "flat", "studio", "flatlay", "softfocus", "earthy", "woody", "holistic", "ethereal"]);
 
 const LOGO_IMAGES = new Set(["wordmark", "lettermark", "emblem", "crest", "pictorial", "abstract", "combination", "mascot", "script", "celestial", "botanical", "ornamental"]);
 
@@ -108,6 +108,12 @@ export const uploadErrorText = (code) => errorText[code] || "That file could not
 /**
  * @param {object} o { eff, assessment, stage (object), answers (Map), uploads, base, csrf, imageUrl, notice, error, limits, mode: 'guest'|'member', backHref }
  */
+/** The final step\u2019s call to action: says what pressing the button does, and is the biggest thing on the page. */
+const submitPanel = `<section class="dsubmit" aria-labelledby="q-submit"><h2 class="dsubmit__title" id="q-submit">Ready to submit?</h2>
+<p class="dsubmit__text">Press <strong>Submit</strong> to send your answers to Framework. That completes your Brand Discovery. You can still go back and change anything until you do.</p>
+<button class="btn btn--primary btn--lg dsubmit__btn" type="submit" name="go" value="submit">Submit Brand Discovery</button>
+<p class="dsubmit__alt">Not ready yet? Use <strong>Save and finish later</strong> below and come back any time.</p></section>`;
+
 export function stageBody(o) {
   const { eff, assessment, stage, answers, uploads = [], base, csrf, imageUrl, notice, error, mode = "guest" } = o;
   const qs = stageQuestions(eff, stage);
@@ -122,7 +128,7 @@ ${uploads.length ? `<ul class="dfiles">${uploads.map((u) => `<li><span>${e(u.nam
   const nav = `<nav class="dsc__nav" aria-label="Move between steps">
 ${stage.n > 1 ? `<button class="btn btn--ghost" type="submit" name="go" value="back" formnovalidate>Back</button>` : `<span></span>`}
 <span class="dsc__nav-right"><button class="btn btn--quiet" type="submit" name="go" value="save" formnovalidate>Save and finish later</button>
-${review ? `<button class="btn btn--primary" type="submit" name="go" value="submit">Send to Framework</button>` : `<button class="btn btn--primary" type="submit" name="go" value="next">Continue</button>`}</span></nav>`;
+${review ? `<button class="btn btn--primary" type="submit" name="go" value="submit">Submit</button>` : `<button class="btn btn--primary" type="submit" name="go" value="next">Continue</button>`}</span></nav>`;
   return `<div class="dsc dsc--${e(mode)}" data-dsc>
 <header class="dsc__top"><p class="dsc__meta"><strong>Step ${stage.n} of ${total}</strong> · about ${left} minute${left === 1 ? "" : "s"} left</p>${stepper(eff, stage.n, base, assessment)}</header>
 ${notice ? `<p class="dsc__notice" role="status">${e(notice)}</p>` : ""}${error ? `<p class="dsc__error" role="alert">${e(error)}</p>` : ""}
@@ -130,8 +136,8 @@ ${notice ? `<p class="dsc__notice" role="status">${e(notice)}</p>` : ""}${error 
 ${csrf ? `<input type="hidden" name="csrf" value="${e(csrf)}">` : ""}
 <div class="dsc__intro"><h1 class="dsc__h1">${e(stage.title)}</h1><p class="dsc__lead">${e(stage.blurb)}</p></div>
 ${qs.map((q) => question(q, answers.get(q.key), imageUrl)).join("")}
-${review ? `<section class="dq dq--review" aria-labelledby="q-review"><header class="dq__head"><span class="eyebrow">Review</span><h2 class="dq__title" id="q-review">Your choices so far</h2><p class="dq__help">Check everything is right. You can change any step before you send it.</p></header>${summary(eff, answers, base)}</section>` : ""}
-${files}${overall}${nav}
+${review ? `<section class="dq dq--review" aria-labelledby="q-review"><header class="dq__head"><span class="eyebrow">Last step</span><h2 class="dq__title" id="q-review">Review your answers</h2><p class="dq__help">Check everything looks right. You can change any step before you submit.</p></header>${summary(eff, answers, base)}</section>` : ""}
+${files}${overall}${review ? submitPanel : ""}${nav}
 </form></div>`;
 }
 
@@ -153,7 +159,7 @@ export function welcomeBody({ eff, assessment, base, resumeStage, mode = "guest"
 
 export function doneBody({ eff, assessment, mode = "guest", backHref = null }) {
   return `<div class="dsc dsc--welcome dsc--${e(mode)}"><div class="dsc__intro dsc__intro--hero"><span class="eyebrow">${e(eff.label)}</span><h1 class="dsc__h1">Thank you${assessment.recipientName ? `, ${e(assessment.recipientName)}` : ""}</h1>
-<p class="dsc__lead">${assessment.status === "reviewed" ? "Framework has read your answers and will be in touch about what comes next." : "Your answers are with Framework. We will read them carefully and get back to you."}</p>
+<p class="dsc__lead">${assessment.status === "reviewed" ? "Framework has read your answers and will be in touch about what comes next." : "Your Brand Discovery has been submitted. Your answers are with Framework, and we will read them carefully and get back to you."}</p>
 ${backHref ? `<p><a class="btn btn--primary" href="${e(backHref)}">Back to Branding</a></p>` : `<p class="muted small">You can close this page.</p>`}</div></div>`;
 }
 
