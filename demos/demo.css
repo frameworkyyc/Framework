@@ -48,6 +48,10 @@ p{margin:0}
 .ph::before{content:"";position:absolute;inset:0;z-index:-1;opacity:.22;background:var(--ph-pattern)}
 .ph::after{content:attr(data-photo);position:absolute;left:16px;bottom:16px;max-width:calc(100% - 32px);padding:7px 12px;font:500 12px/1.3 "General Sans",system-ui,sans-serif;letter-spacing:.04em;color:#fff;background:rgba(10,10,10,.45);backdrop-filter:blur(6px);border-radius:999px}
 
+/* A real photo replaces the placeholder (see demo.js): fills the box, hides the shot label and the pattern. */
+.ph--photo::before,.ph--photo::after{display:none}
+.ph--photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+
 /* Hero */
 .hero{padding:clamp(56px,8vw,104px) 0}
 .hero h1{font-size:clamp(42px,6vw,76px)}
