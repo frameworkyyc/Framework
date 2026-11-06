@@ -7,6 +7,7 @@
   var LABEL = { "general-contractor": "General Contracting", "fence-deck": "Fence & Decks", renovations: "Renovations / Restoration", landscaping: "Landscaping" };
   var VIBE = { rugged: "Rugged", modern: "Modern", minimal: "Minimal", friendly: "Friendly" };
   var COLOURS = [["Ember", "#C2410C"], ["Amber", "#F2B705"], ["Forest", "#2F6B3F"], ["Teal", "#0F766E"], ["Sky", "#1D6FB8"], ["Navy", "#1E3A8A"], ["Berry", "#9D174D"], ["Plum", "#6D28D9"], ["Clay", "#8C6A43"], ["Slate", "#475569"], ["Black", "#111111"]];
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var state = { d: "", v: "", c: "", n: "" };
   var flow = $("#flow"), stage = $("#stage"), frame = $("#frame"), device = $("#device"), view = $("#view"), cover = $("#cover"), urlEl = $("#url");
   var open1 = $("#open"), open2 = $("#open2"), openbar = $("#openbar");
@@ -30,8 +31,17 @@
   function setStep(i, mode) { var s = steps[i - 1]; s.classList.add("is-open"); s.classList.toggle("is-done", mode === "done"); }
   function summary(i, text) { var el = $("[data-summary]", steps[i - 1]); if (el) el.textContent = text; }
   function unlock(n) { if (n <= unlocked) return; unlocked = n; steps[n - 1].hidden = false; }
-  // Page position stays put when a choice is made: nothing here scrolls the page. The next step simply appears below the one just answered.
+  // Guided scrolling: after a choice the next step glides into view just below the white header (below the pinned preview on tablet and phone). It only advances after a
+  // first-time selection; changing an earlier choice never moves the page. The preview stays pinned and the page scrolls normally (no separate scrollbar).
   function narrow() { return window.innerWidth <= 1000; }
+  function goTo(n) {
+    var s = steps[n - 1]; if (!s) return;
+    setTimeout(function () {
+      var head = $(".top"), under = (head ? head.getBoundingClientRect().bottom : 68) + (narrow() ? (stage.hidden ? 0 : stage.offsetHeight) + 12 : 20);
+      var slide = 0; try { slide = new DOMMatrix(getComputedStyle(s).transform).m42 || 0; } catch (e) { /* no transform */ } // the step is still sliding in: aim at where it settles
+      window.scrollTo({ top: Math.max(0, s.getBoundingClientRect().top - slide + window.scrollY - under), behavior: reduce ? "auto" : "smooth" });
+    }, 120);
+  }
 
   function mark(k, v) {
     var group = k === "d" ? $$(".opt--disc") : k === "v" ? $$(".opt--vibe") : $$("#swatches button[role=radio]");
@@ -81,14 +91,14 @@
   function choose(k, v) {
     if (k === "d") {
       var first = !state.d; state.d = v; mark("d", v); summary(1, LABEL[v]); setStep(1, "done"); T().send("discipline", v);
-      showStage(); if (!first) pushToFrame(); unlock(2); if (!state.v) setStep(2, "open"); refresh();
+      showStage(); if (!first) pushToFrame(); unlock(2); if (!state.v) { setStep(2, "open"); goTo(2); } refresh();
     } else if (k === "v") {
       var firstV = !state.v; state.v = v; mark("v", v); summary(2, VIBE[v]); setStep(2, "done"); T().send("vibe", v); pushToFrame(); unlock(3);
-      if (firstV && !state.c) setStep(3, "open"); refresh();
+      if (firstV && !state.c) { setStep(3, "open"); goTo(3); } refresh();
     } else if (k === "c") {
       var hex = cleanHex(v); if (!hex) return; var firstC = !state.c; state.c = hex; mark("c", hex); var nm = (COLOURS.filter(function (c) { return c[1] === hex; })[0] || ["Custom"])[0];
       $("#colour-name").textContent = nm + " " + hex; summary(3, nm); setStep(3, "done"); T().send("colour", hex); pushToFrame(); unlock(4);
-      if (firstC && !state.n) setStep(4, "open"); refresh();
+      if (firstC && !state.n) { setStep(4, "open"); goTo(4); } refresh();
     }
   }
   $$(".opt--disc,.opt--vibe").forEach(function (b) { b.addEventListener("click", function () { choose(b.dataset.k, b.dataset.v); }); });
