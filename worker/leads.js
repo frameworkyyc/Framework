@@ -3,18 +3,18 @@
  *
  * Candidates are found by the separate finder Worker (`framework-leadgen`); its D1 database is bound here as LEADGEN_DB and is only ever READ
  * (every statement that reaches it goes through finderSelect, which refuses anything but one SELECT). They are imported into the outreach_*
- * tables of PORTAL_DB (proposed migration 0022), reviewed by the owner in Admin, given a tracking link on approval (demo_links, migration 0021),
+ * tables of PORTAL_DB (proposed migration 0024), reviewed by the owner in Admin, given a tracking link on approval (demo_links, migration 0021),
  * and emailed only after the owner approved the exact text. Public side: /u/<token> (unsubscribe) and POST /api/leads/webhook (delivery events).
  * The Admin API is worker/admin/leads-api.js.
  *
- * Without migration 0022 nothing here throws to a visitor: the public paths answer politely and do nothing.
+ * Without migration 0024 nothing here throws to a visitor: the public paths answer politely and do nothing.
  */
 import { bytesToB64url, b64urlToBytes, hmacHex, timingSafeEqualStrings } from "./portal/crypto.js";
 import { signingKey, tokenForLinkId, newLinkId, tablesReady } from "./demo-traffic.js";
 import { sendEmail, emailConfigured, notifyRecipient, readTextLimited, oneLine } from "./assessment.js";
 import { json } from "./shared.js";
 
-export const MIGRATION = "0022_leads.sql";
+export const MIGRATION = "0024_leads.sql";
 export const STATUSES = ["new", "approved", "ready", "contacted", "replied", "won", "dismissed"];
 export const APPROACHES = [
   { id: "observation", label: "A specific observation about their web presence" },
@@ -429,7 +429,8 @@ export function sendingMode(env) {
 
 export async function getLead(db, id) { return LEAD_ID.test(String(id)) ? one(db, "SELECT * FROM outreach_leads WHERE id = ?", id) : null; }
 
-export const isOptedOut = (lead, contacts = []) => /^Opted out/i.test(lead.dismiss_reason || "") || contacts.some((c) => c.opted_out_at);
+/** A lead has opted out when it was dismissed as such (unsubscribe link, spam complaint, or marked by the owner). One opted-out ADDRESS only blocks that address (see the recipient checks). */
+export const isOptedOut = (lead) => /^Opted out/i.test(lead.dismiss_reason || "");
 
 async function isSuppressed(db, email) { return !!email && !!(await one(db, "SELECT 1 AS x FROM outreach_suppressions WHERE email = ?", String(email).toLowerCase())); }
 
@@ -439,16 +440,16 @@ export async function preferredRecipient(db, leadId) {
 }
 
 /** Follow-up rules: lead contacted, no reply, not opted out, last live send at least 5 days ago, no follow-up yet. */
-export async function followupState(db, lead, now = new Date()) {
+export async function followupState(db, lead, now = new Date(), ignoreMessageId = null) {
   const no = (reason, extra = {}) => ({ allowed: false, reason, ...extra });
   if (lead.status !== "contacted") return no("A follow-up is possible only after the first email was sent");
   if (lead.replied_at) return no("They already replied");
-  if (isOptedOut(lead, await many(db, "SELECT opted_out_at FROM outreach_contacts WHERE lead_id = ?", lead.id))) return no("They opted out");
+  if (isOptedOut(lead)) return no("They opted out");
   const first = await one(db, "SELECT sent_at FROM outreach_messages WHERE lead_id = ? AND kind = 'first' AND is_test = 0 AND status = 'sent' ORDER BY sent_at DESC LIMIT 1", lead.id);
   if (!first || !first.sent_at) return no("No sent first email");
   const due = new Date(Date.parse(first.sent_at) + FOLLOWUP_DAYS * 86400000);
   if (due > now) return no(`Follow up after ${due.toISOString().slice(0, 10)} (${FOLLOWUP_DAYS} days after the first email)`, { due_at: due.toISOString() });
-  const have = await one(db, "SELECT 1 AS x FROM outreach_messages WHERE lead_id = ? AND kind = 'followup' AND is_test = 0 AND status IN ('approved', 'sending', 'sent', 'bounced', 'complained')", lead.id);
+  const have = await one(db, "SELECT 1 AS x FROM outreach_messages WHERE lead_id = ? AND kind = 'followup' AND is_test = 0 AND status IN ('approved', 'sending', 'sent', 'bounced', 'complained') AND id <> ?", lead.id, ignoreMessageId || "");
   if (have) return no("A follow-up was already sent");
   return { allowed: true, reason: null, due_at: due.toISOString() };
 }
@@ -479,8 +480,7 @@ export function nextAction(lead, f = {}) {
 export async function sendBlockers(env, lead, msg, contact, mode, now = new Date()) {
   const db = env.PORTAL_DB, out = [];
   const add = (c, t) => out.push([c, t]);
-  const contacts = await many(db, "SELECT opted_out_at FROM outreach_contacts WHERE lead_id = ?", lead.id);
-  if (isOptedOut(lead, contacts)) add("opted_out", "This lead opted out");
+  if (isOptedOut(lead)) add("opted_out", "This lead opted out");
   else if (["dismissed", "replied", "won"].includes(lead.status)) add("lead_inactive", `Lead is ${lead.status}: no more email`);
   else if (msg.kind === "first" && !["approved", "ready"].includes(lead.status)) add("lead_inactive", lead.status === "contacted" ? "The first email was already sent" : "Approve the lead first");
   else if (msg.kind === "followup" && lead.status !== "contacted") add("lead_inactive", "A follow-up needs a sent first email");
@@ -491,7 +491,7 @@ export async function sendBlockers(env, lead, msg, contact, mode, now = new Date
   else if (contact.eligibility !== "eligible") add("recipient_not_eligible", "This address is not confirmed yet (review it first)");
   if (msg.to_email && (await isSuppressed(db, msg.to_email))) add("suppressed", "This address is suppressed (unsubscribed, bounced or marked as spam)");
   if (msg.kind === "first" && lintFirstEmail(msg.subject, msg.body)) add("pricing_in_first_email", "A first email may not mention pricing, rates or \"free\"");
-  if (msg.kind === "followup") { const f = await followupState(db, lead, now); if (!f.allowed && lead.status === "contacted") add("followup_not_allowed", f.reason); }
+  if (msg.kind === "followup") { const f = await followupState(db, lead, now, msg.id); if (!f.allowed && lead.status === "contacted") add("followup_not_allowed", f.reason); }
   if (msg.status !== "approved") add("not_approved", "The email is not approved yet");
   if (mode.blocked) add(mode.blocked[0], mode.blocked[1]);
   return out;
@@ -552,8 +552,8 @@ export async function draftMessage(env, leadId, approach, ctx) {
   if (!lead) return fail(404, "not_found");
   const id = approach || "observation";
   if (!APPROACHES.some((a) => a.id === id)) return fail(422, "validation_failed", { field: "approach" });
-  if (!["approved", "ready"].includes(lead.status)) return fail(409, lead.status === "new" ? "approve_first" : "lead_inactive");
   if (await one(db, "SELECT 1 AS x FROM outreach_messages WHERE lead_id = ? AND kind = 'first' AND is_test = 0 AND status IN ('sending', 'sent', 'bounced', 'complained')", lead.id)) return fail(409, "first_email_already_sent");
+  if (!["approved", "ready"].includes(lead.status)) return fail(409, lead.status === "new" ? "approve_first" : "lead_inactive");
   return writeDraft(env, lead, { approach: id, kind: "first" }, ctx);
 }
 
@@ -621,8 +621,7 @@ export async function reopenLead(env, leadId, ctx) {
   const lead = await getLead(db, leadId);
   if (!lead) return fail(404, "not_found");
   if (lead.status !== "dismissed") return fail(409, "not_dismissed");
-  const contacts = await many(db, "SELECT opted_out_at FROM outreach_contacts WHERE lead_id = ?", lead.id);
-  if (isOptedOut(lead, contacts)) return fail(409, "opted_out");
+  if (isOptedOut(lead)) return fail(409, "opted_out");
   const sent = await one(db, "SELECT 1 AS x FROM outreach_messages WHERE lead_id = ? AND is_test = 0 AND status IN ('sending', 'sent', 'bounced', 'complained')", lead.id);
   if (lead.contacted_at || sent) return fail(409, "already_contacted");
   await db.batch([
@@ -753,7 +752,7 @@ export async function approveMessage(env, leadId, ctx) {
   if (msg.status === "approved") return { ok: true, message: msg };
   if (!["draft", "failed"].includes(msg.status)) return fail(409, "message_locked");
   if (!signingKey(env)) return fail(409, "secret_missing");
-  if (isOptedOut(lead, await many(db, "SELECT opted_out_at FROM outreach_contacts WHERE lead_id = ?", lead.id)) || ["dismissed", "replied", "won"].includes(lead.status)) return fail(409, "lead_inactive");
+  if (isOptedOut(lead) || ["dismissed", "replied", "won"].includes(lead.status)) return fail(409, "lead_inactive");
   if (msg.kind === "first" ? lead.status !== "approved" : lead.status !== "contacted") return fail(409, "lead_inactive");
   if (msg.kind === "first" && lintFirstEmail(msg.subject, msg.body)) return fail(422, "pricing_in_first_email");
   let contact = msg.contact_id ? await one(db, "SELECT * FROM outreach_contacts WHERE id = ? AND lead_id = ?", msg.contact_id, lead.id) : null;

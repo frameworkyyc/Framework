@@ -92,7 +92,6 @@ async function list(url, env, now) {
       EXISTS (SELECT 1 FROM outreach_contacts c WHERE c.lead_id = l.id AND c.type = 'email' AND c.eligibility = 'eligible' AND c.opted_out_at IS NULL AND NOT EXISTS (SELECT 1 FROM outreach_suppressions s WHERE s.email = lower(c.value))) AS has_eligible_email,
       EXISTS (SELECT 1 FROM outreach_contacts c WHERE c.lead_id = l.id AND c.type = 'email') AS has_email,
       (SELECT c.value FROM outreach_contacts c WHERE c.lead_id = l.id AND c.type = 'phone' ORDER BY c.id LIMIT 1) AS phone,
-      EXISTS (SELECT 1 FROM outreach_contacts c WHERE c.lead_id = l.id AND c.opted_out_at IS NOT NULL) AS contact_opted_out,
       (SELECT m.status FROM outreach_messages m WHERE m.lead_id = l.id AND m.is_test = 0 ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) AS msg_status,
       (SELECT m.sent_at FROM outreach_messages m WHERE m.lead_id = l.id AND m.kind = 'first' AND m.is_test = 0 AND m.status = 'sent' ORDER BY m.sent_at DESC LIMIT 1) AS first_sent_at,
       EXISTS (SELECT 1 FROM outreach_messages m WHERE m.lead_id = l.id AND m.kind = 'followup' AND m.is_test = 0 AND m.status IN ('approved', 'sending', 'sent', 'bounced', 'complained')) AS followup_live${demoCols}
@@ -100,7 +99,7 @@ async function list(url, env, now) {
   const counts = Object.fromEntries(STATUSES.map((s) => [s, 0]));
   for (const r of await all(db, "SELECT status, COUNT(*) AS n FROM outreach_leads GROUP BY status")) if (r.status in counts) counts[r.status] = r.n;
   const leads = rows.map((r) => {
-    const optedOut = isOptedOut(r, []) || flag(r.contact_opted_out);
+    const optedOut = isOptedOut(r);
     const due = r.first_sent_at ? new Date(Date.parse(r.first_sent_at) + FOLLOWUP_DAYS * 86400000) : null;
     const followup = { allowed: r.status === "contacted" && !r.replied_at && !optedOut && !!due && due <= now && !flag(r.followup_live), due_at: due ? due.toISOString() : null };
     return {
@@ -125,7 +124,7 @@ async function leadOut(env, lead, now) {
   const preferred = await db.prepare("SELECT 1 AS x FROM outreach_contacts c WHERE c.lead_id = ? AND c.type = 'email' AND c.eligibility = 'eligible' AND c.opted_out_at IS NULL AND NOT EXISTS (SELECT 1 FROM outreach_suppressions s WHERE s.email = lower(c.value))").bind(lead.id).first();
   const followup = await followupState(db, lead, now);
   const live = await db.prepare("SELECT 1 AS x FROM outreach_messages WHERE lead_id = ? AND kind = 'followup' AND is_test = 0 AND status IN ('approved', 'sending', 'sent', 'bounced', 'complained')").bind(lead.id).first();
-  const optedOut = isOptedOut(lead, contacts);
+  const optedOut = isOptedOut(lead);
   return { ...lead, opted_out: optedOut, next_action: nextAction(lead, { hasEligible: !!preferred, hasEmail: contacts.some((c) => c.type === "email"), msgStatus: msg && msg.status, followup, followupLive: !!live }) };
 }
 

@@ -219,7 +219,7 @@ function renderList(ctx) {
     catch (err) { main.replaceChildren(errorState(err, ctx.retry)); syncBtn.hidden = true; return; }
     if (!st.ready) {
       syncBtn.hidden = true;
-      main.replaceChildren(emptyState({ title: "Leads isn’t set up yet", body: `The database tables (proposed migration ${st.migration || "0022_leads.sql"}) have not been applied, so nothing can be imported or saved until they are. Nothing else is affected.` }));
+      main.replaceChildren(emptyState({ title: "Leads isn’t set up yet", body: `The database tables (proposed migration ${st.migration || "0024_leads.sql"}) have not been applied, so nothing can be imported or saved until they are. Nothing else is affected.` }));
       return;
     }
     const strip = setupStrip(st);

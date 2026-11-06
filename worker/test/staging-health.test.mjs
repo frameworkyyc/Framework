@@ -30,6 +30,8 @@ const goodEnv = () => ({
   PORTAL_WEBSITE: { type: "plain_text", text: "1" },
   PORTAL_DISCOVERY: { type: "plain_text", text: "1" },
   PORTAL_REQUESTS: { type: "plain_text", text: "1" },
+  LEADS_SENDING: { type: "plain_text", text: "1" },
+  LEADS_TEST_RECIPIENT: { type: "plain_text", text: "owner@example.test" },
   PORTAL_ADMIN_WRITES: { type: "plain_text", text: "1" },
   PORTAL_INVITE_SENDING: { type: "plain_text", text: "1" },
   ...Object.fromEntries(expected.secrets.required.map((n) => [n, { type: "secret_text" }])),
@@ -37,6 +39,7 @@ const goodEnv = () => ({
   ASSETS: { type: "assets" },
   DB: { type: "d1", id: expected.websiteDb.id, database_id: expected.websiteDb.id },
   PORTAL_DB: { type: "d1", id: expected.d1.id, database_id: expected.d1.id },
+  LEADGEN_DB: { type: "d1", id: "3162e849-ac70-4a1b-b37b-051430d24c39", database_id: "3162e849-ac70-4a1b-b37b-051430d24c39" },
   PORTAL_FILES: { type: "r2_bucket", bucket_name: "framework-portal-files-staging" },
   PORTAL_FILES_BACKUP: { type: "r2_bucket", bucket_name: "framework-portal-files-staging-backup" },
   PORTAL_RATE_LIMITER: { type: "ratelimit", namespace_id: "4101", simple: { limit: 20, period: 60 } },
@@ -357,7 +360,7 @@ test("the expected-config file matches wrangler.jsonc (Staging databases, non-se
   assert.equal(String(p.ratelimits[0].namespace_id), expected.bindings.PORTAL_RATE_LIMITER.namespace_id);
   const prod = cfg.d1_databases.map((d) => d.database_id);
   assert.deepEqual(Object.keys(expected.forbiddenDatabaseIds).sort(), prod.sort(), "the forbidden ids are exactly Production's databases");
-  assert.deepEqual([...Object.keys(expected.bindings)].sort(), ["ASSETS", "DB", "PORTAL_DB", "PORTAL_FILES", "PORTAL_FILES_BACKUP", "PORTAL_RATE_LIMITER"]);
+  assert.deepEqual([...Object.keys(expected.bindings)].sort(), ["ASSETS", "DB", "LEADGEN_DB", "PORTAL_DB", "PORTAL_FILES", "PORTAL_FILES_BACKUP", "PORTAL_RATE_LIMITER"]);
   for (const n of expected.forbiddenNames) assert.ok(!strip(read("wrangler.jsonc")).includes(n), n + " must not be in the configuration");
   for (const [n, want] of Object.entries(expected.switches)) { assert.equal(p.vars[n] === undefined ? null : p.vars[n], want, n + " matches the Staging block"); assert.ok(cfg.vars[n] === undefined || cfg.vars[n] === "1", n + " is at most the launch value \"1\" at the top level (Production)"); }
   assert.equal(expected.worker, cfg.name);
