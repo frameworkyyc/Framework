@@ -6,7 +6,7 @@
  *   GET  /discovery                                   { available, enabled, kinds, assessments: [{ id, organizationId, organizationName, title, status, answered, uploads, activeLinks, ... }] }   ?org=<id> narrows it
  *   GET  /clients/:org/discovery                      the same, for one client
  *   POST /clients/:org/discovery                      { kind, title, recipient_name? }                       create and assign
- *   GET  /clients/:org/discovery/:id                  one assessment: links, files, progress, the creative brief (+ Markdown)
+ *   GET  /clients/:org/discovery/:id                  one assessment: links, files, progress, the creative brief (+ Markdown); once Submitted or Reviewed also `exportMarkdown`, the AI-ready full submission
  *   POST /clients/:org/discovery/:id/update           { title?, recipient_name? }
  *   POST /clients/:org/discovery/:id/review           { note? }        Submitted -> Reviewed
  *   POST /clients/:org/discovery/:id/reopen           {}               Submitted/Reviewed -> In progress
@@ -14,6 +14,7 @@
  *   POST /clients/:org/discovery/:id/links            { label?, days? }  -> { url, expiresAt }   the URL is shown ONCE; only its hash is stored
  *   POST /clients/:org/discovery/:id/links/:link/revoke
  *   GET  /clients/:org/discovery/:id/files/:file      an inspiration file, as a download
+ *   GET  /clients/:org/discovery/:id/export.pdf       the whole submission as a PDF download (Submitted or Reviewed only; nothing stored, no migration)
  *   GET  /discovery/content?kind=brand                the questions and options as the recipient sees them, with what Admin has changed
  *   POST /discovery/content                           { kind, item, option?, label?, description?, enabled? } | { ..., add: { label, description? } } | { ..., move: "up"|"down" } | { ..., reset: true }
  *   POST /discovery/content/image                     multipart: file (png, jpg or webp, 5 MB) + meta { kind, item, option, alt? }   a reference picture for one option
@@ -30,6 +31,9 @@ import * as repo from "./repo/discovery.js";
 import { KINDS, KIND_KEYS, SECTIONS } from "./discovery/catalogue.js";
 import { effectiveKind } from "./discovery/model.js";
 import { buildBrief, briefToMarkdown } from "./discovery/brief.js";
+import { buildExport, exportMarkdown, exportFilename } from "./discovery/export.js";
+import { renderExportPdf } from "./discovery/pdf.js";
+import { getProfileAnswers } from "./repo/business-profile.js";
 import { adminDownloadInspiration, adminSetReference, adminClearReference, referenceResponse, REFERENCE_MAX_BYTES } from "./discovery/files.js";
 import { randomToken, sha256b64url } from "./crypto.js";
 import { discoveryEnabled, retentionEnabled } from "./config.js";
@@ -66,6 +70,7 @@ function route(seg) {
     if (seg.length === 6 && seg[4] === "links" && seg[5] !== "" ) return null;
     if (seg.length === 7 && seg[4] === "links" && seg[6] === "revoke") return { kind: "revoke", methods: ["POST"], org, id, link: seg[5] };
     if (seg.length === 6 && seg[4] === "files") return { kind: "file", methods: ["GET"], org, id, file: seg[5] };
+    if (seg.length === 5 && seg[4] === "export.pdf") return { kind: "export_pdf", methods: ["GET"], org, id };
   }
   return null;
 }
@@ -128,7 +133,21 @@ export async function handleDiscoveryApi(request, env, principal, path, deps = {
       const [links, uploads, answers, content] = await Promise.all([repo.listLinks(db, org.id, a.id, { now }), repo.listUploads(db, org.id, a.id), repo.getAnswers(db, a.id), repo.listContent(db, a.kind)]);
       const eff = effectiveKind(a.kind, content.rows);
       const brief = buildBrief(eff, answers, { uploads: uploads.length, overallComment: a.overallComment });
-      return json({ available: true, capabilities: caps, organization: { id: org.id, name: org.name, slug: org.slug }, assessment: a, links, uploads, brief, markdown: briefToMarkdown(brief, { client: org.name, title: a.title }), answered: answers.size });
+      const done = a.status === "submitted" || a.status === "reviewed";
+      const exportText = done ? exportMarkdown(buildExport({ organization: org, assessment: a, eff, answers, uploads, profile: await getProfileAnswers(db, org.id) })) : null;
+      return json({ available: true, capabilities: caps, organization: { id: org.id, name: org.name, slug: org.slug }, assessment: a, links, uploads, brief, markdown: briefToMarkdown(brief, { client: org.name, title: a.title }), exportMarkdown: exportText, answered: answers.size });
+    }
+    if (r.kind === "export_pdf") {
+      const org = await getOrganizationById(db, r.org);
+      if (!org) return err(404, "not_found", "No such organization.");
+      const a = await repo.getAssessment(db, org.id, r.id);
+      if (!a) return err(404, "not_found", "Not found.");
+      if (a.status !== "submitted" && a.status !== "reviewed") return err(409, "not_submitted", "Only a submitted assessment can be exported.");
+      const [uploads, answers, content, profile] = await Promise.all([repo.listUploads(db, org.id, a.id), repo.getAnswers(db, a.id), repo.listContent(db, a.kind), getProfileAnswers(db, org.id)]);
+      const model = buildExport({ organization: org, assessment: a, eff: effectiveKind(a.kind, content.rows), answers, uploads, profile });
+      return new Response(renderExportPdf(model, { exportedOn: now }), { status: 200, headers: {
+        "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${exportFilename(model, "pdf")}"`,
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
     }
     if (["update", "review", "reopen", "archive", "links", "revoke"].includes(r.kind)) {
       const org = await getOrganizationById(db, r.org);

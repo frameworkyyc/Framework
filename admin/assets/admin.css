@@ -1109,6 +1109,9 @@ details[open] > .rk-fold__sum::after, details[open] > .rk-manage__sum::after { m
 .rk-fbcard { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) 190px; }
 .adm-nav__link, .adm-nav__link:has(.adm-nav__badge) { gap: 12px; }
 .adm-idhead__actions .btn { white-space: nowrap; }
+.adm-export { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin: 0; }
+.adm-export[hidden] { display: none; }
+@media (max-width: 640px) { .adm-export { flex-direction: column; } }
 .adm-settings__item > .rk-linkcard { display: flex; padding: 18px 0; gap: 16px; }
 
 /* Requests (admin/assets/requests.js): the answers, quotes and files of one request. Ruled lines, no boxes or shadows. */
