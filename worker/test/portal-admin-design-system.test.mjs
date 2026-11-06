@@ -51,3 +51,20 @@ test("status colours in the design-system layer always have a text or icon partn
   assert.match(kit, /export const badge = \(text, tone/, "a badge always carries text");
   assert.match(kit, /rk-sr/, "tiles name their state to screen readers");
 });
+
+test("the rebuilt pages use the shared kit instead of their own markup for summaries, folds and empty states", () => {
+  const uses = { "overview.js": ["navIcon", "badge"], "feedback.js": ["statCard", "badge", "fold"], "support-global.js": ["statCard"], "assessments.js": ["badge", "fold", "statCard"], "discovery.js": ["statCard", "emptyState", "fold"],
+    "clients.js": ["statCard", "searchBox"], "invoices.js": ["statCard"], "approved-emails.js": ["fold"], "settings.js": ["linkCard", "fold"], "client-services.js": ["fold"], "websites.js": ["fold"] };
+  for (const [file, names] of Object.entries(uses)) {
+    const src = read("admin/assets/" + file);
+    const imp = src.match(/import \{([^}]*)\} from "\.\/kit\.js";/);
+    assert.ok(imp, file + " imports the kit");
+    for (const n of names) assert.ok(imp[1].split(",").map((x) => x.trim()).includes(n), `${file} uses ${n}`);
+  }
+});
+
+test("pages that must stay read-only or form-free keep their controls in the kit, and the support conversation no longer collides with the requirements grid", () => {
+  assert.ok(!/h\("input"/.test(strip(read("admin/assets/clients.js"))), "clients.js has no form control of its own");
+  assert.match(read("admin/assets/support.js"), /class: "adm-acc adm-sreq"/);
+  assert.ok(!/class: "adm-acc adm-req"/.test(read("admin/assets/support.js")));
+});

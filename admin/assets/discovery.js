@@ -228,7 +228,7 @@ async function contentPage(ctx) {
   const load = () => api("/discovery/content?kind=brand");
   try { data = await load(); } catch (err) { return { title: "Discovery content", node: h("div", { class: "adm-page" }, errorState(err, ctx.retry)) }; }
   const root = h("div", { class: "adm-page adm-dsc" });
-  const s = shell(root, { title: "Questions and pictures", sub: "Reword, hide, reorder and add options, and attach a real picture to any option. Changes apply to every assessment, including ones in progress. Nothing you change here alters answers already given.", back: h("a", { class: "adm-back", href: "/admin/discovery", "data-link": "" }, "← All assessments") });
+  const s = shell(root, { title: "Questions and pictures", sub: "Reword, hide, reorder and add options, and attach a real picture to any. Changes apply to every assessment, including ones in progress, and never alter answers already given.", back: h("a", { class: "adm-back", href: "/admin/discovery", "data-link": "" }, "← All assessments") });
   const writes = () => Boolean(data.capabilities && data.capabilities.writes);
   let busy = false;
   async function act(body, ok) {
@@ -284,7 +284,7 @@ async function contentPage(ctx) {
   function draw() {
     const open = new Set([...root.querySelectorAll("details.adm-dsc__q[open]")].map((d) => d.id));
     root.replaceChildren(...[...s.head, !data.available ? h("p", { class: "adm-banner" }, "Discovery needs a database update that hasn’t been applied here yet.") : null, !writes() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look, but not change.") : null,
-      h("p", { class: "adm-sub" }, "Built-in options draw a sketch. Text cards (words, fonts, taglines) have no picture to attach."), ...data.questions.map((q) => { const d = question(q); if (open.has(d.id)) d.open = true; return d; })].filter(Boolean));
+      h("p", { class: "adm-sub" }, "Built-in options draw a sketch. Text cards (words, fonts, taglines) have no picture to attach."), h("div", { class: "adm-dsc__qs" }, ...data.questions.map((q) => { const d = question(q); if (open.has(d.id)) d.open = true; return d; }))].filter(Boolean));
   }
   draw();
   return { title: "Discovery content", node: root };

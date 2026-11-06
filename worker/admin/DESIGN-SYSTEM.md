@@ -53,6 +53,23 @@ The sidebar is grouped in `admin.js` (`NAV_GROUPS`: Inbox, Assessments, People, 
 - **Hub** (Settings): link cards.
 - **Form**: labelled fields in one column, the primary button last, the destructive action apart (`.adm-actions__danger`).
 
+## How each page applies it
+
+| Page | Pattern | What it shows first |
+| --- | --- | --- |
+| Overview | dashboard | what needs attention, then summary cards, then a two-column board; empty sections are one quiet line; recent feedback as cards |
+| Feedback | list | stat cards (responses, satisfaction, recommend, needs attention), filters, a compact table; the share form sits in a closed fold; written feedback comes before ratings on a response |
+| Support Requests | list | stat cards, then request rows with status chips; a conversation page is one open request |
+| Assessments | list | a delivery-health fold (open only when email is broken), stat cards, search, the requests |
+| Brand Discovery | list, detail | stat cards and assessment rows; assigning and retention are folds; the review is the benchmark dashboard |
+| Clients | list, dashboard | summary cards, a find box once there are six or more, monogram rows; a client is a card dashboard |
+| Invoices, Websites, Branding | client sub-pages | stat cards or rows first; creating something new is a fold; long help text is a fold |
+| Approved Emails | list | one compact add row, then address rows; the Cloudflare-setting list is a fold |
+| Service Pricing, Additional Services | long forms | one fold per group or service with a one-line summary; the save bar stays in view |
+| Settings | hub | link cards |
+
+Patterns worth reusing: **rows** (`.adm-reqlist` with `.adm-reqrow`: client, title, a line of facts, status chips), **long forms as folds** (`fold()` per group, a summary in `meta`, a status in `badges`, open state kept across a save), **stat cards first** (`.rk-stats` with `statCard`), **quiet empties** (`.rk-quiet` for a section with nothing, `emptyState` for a whole list).
+
 ## Rules that are tested
 
 - No `innerHTML`, `insertAdjacentHTML` or inline `style` in the kit or the review pages; server text is always set as text.

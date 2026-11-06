@@ -4,6 +4,7 @@
 
 import { h, api, errorState, fmtDateTime } from "./ui.js";
 import { chip } from "./client-dashboard.js";
+import { statCard } from "./kit.js";
 
 const CATEGORY = { website_change: "Website change", design_revision: "Logo or design revision", technical_issue: "Technical issue", general: "General support" };
 const STATUS = { new: "New", in_review: "In review", quoted: "Quote sent", approved: "Approved", in_progress: "In progress", completed: "Completed", declined: "Declined" };
@@ -49,6 +50,10 @@ export async function render(ctx) {
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Support Requests"),
       h("p", { class: "adm-sub" }, "Requests from every client. Open one to read the conversation, reply and update its status."))),
+    h("div", { class: "rk-stats", role: "group", "aria-label": "Summary" },
+      statCard({ label: "Needs attention", value: String(data.totals.attention), hint: data.totals.attention ? "new or replied to" : "all looked at", tone: data.totals.attention ? "warn" : "ok" }),
+      statCard({ label: "Open", value: String(data.totals.open), hint: "not completed or declined" }),
+      statCard({ label: "All requests", value: String(data.totals.total), hint: "from every client" })),
     live, emailLine, tabs,
     data.requests.length ? h("ul", { class: "adm-reqlist", "aria-label": "Support requests" }, data.requests.map(row)) : h("div", { class: "adm-state", role: "status" }, h("h2", { text: et }), eb ? h("p", { text: eb }) : null));
   return { title: "Support Requests", node };
