@@ -1,4 +1,4 @@
-// Fence & Decks: motion and interaction for the cinematic layout. Content is real HTML first; this adds depth, reveals and the selectors.
+// Fence & Decks: calm homepage motion, plus the optional Explore panels (materials, fence styles, studio, estimator, answers). Content is real HTML first.
 (function () {
   var doc = document.documentElement;
   var motion = doc.classList.contains("motion");
@@ -47,7 +47,7 @@
     function open(id, userClick) {
       items.forEach(function (it) { var on = it.getAttribute("data-i") === id; it.classList.toggle("is-open", on); var b = $(".xi__h button", it); if (b) b.setAttribute("aria-expanded", String(on)); });
       panes.forEach(function (p) { p.hidden = p.getAttribute("data-p") !== id; });
-      if (userClick && small() && stage) { requestAnimationFrame(function () { var it = items.filter(function (x) { return x.getAttribute("data-i") === id; })[0], b = it && $(".xi__h button", it); if (!b) return; var sb = stage.getBoundingClientRect().bottom, r = b.getBoundingClientRect(); if (r.top < sb + 8) window.scrollBy({ top: r.top - sb - 14, behavior: "smooth" }); }); }
+      if (userClick && small() && stage) { requestAnimationFrame(function () { var it = items.filter(function (x) { return x.getAttribute("data-i") === id; })[0], b = it && $(".xi__h button", it), sc = it && it.closest(".pn__body"); if (!b || !sc) return; var sb = stage.getBoundingClientRect().bottom, r = b.getBoundingClientRect(); if (r.top < sb + 8) sc.scrollBy({ top: r.top - sb - 14, behavior: "smooth" }); }); }
     }
     items.forEach(function (it, i) {
       var b = $(".xi__h button", it);
@@ -58,7 +58,7 @@
   });
 
   /* ---- Find my match ---- */
-  var finder = $("[data-finder]"), matXp = $("#decking [data-xp]");
+  var finder = $("[data-finder]"), matXp = $("#pn-materials [data-xp]");
   if (finder && matXp) {
     var MAT = {
       pt: { cost: 1, up: 4, life: 2, nat: 3, name: "Pressure-treated pine", why: "It keeps the budget lean and is easy to repair, as long as you are happy to seal it regularly." },
@@ -79,7 +79,7 @@
     var show = function (go) {
       var k = best(), m = MAT[k]; out.textContent = "";
       var b = document.createElement("b"); b.textContent = m.name; out.appendChild(b); out.appendChild(document.createTextNode(" is your best match. " + m.why));
-      var btn = document.createElement("button"); btn.type = "button"; btn.textContent = "Show me"; btn.addEventListener("click", function () { openMat(k, false); var r = matXp.getBoundingClientRect(); window.scrollTo({ top: window.scrollY + r.top - 100, behavior: "smooth" }); }); out.appendChild(btn);
+      var btn = document.createElement("button"); btn.type = "button"; btn.textContent = "Show me"; btn.addEventListener("click", function () { openMat(k, false); }); out.appendChild(btn);
       if (go) openMat(k, false);
     };
     $$("button[role=radio]", finder).forEach(function (b) {
@@ -109,15 +109,42 @@
     sync();
   }
 
-  /* ---- Reviews: a quiet crossfade ---- */
-  var rev = $("[data-rev]");
-  if (rev) {
-    var qs = $$(".rq", rev), dots = $$(".c-rev__dots button", rev), cur = 0, timer, paused = false, vis = false;
-    var go = function (i) { cur = (i + qs.length) % qs.length; qs.forEach(function (q, k) { q.classList.toggle("is-on", k === cur); }); dots.forEach(function (d, k) { d.setAttribute("aria-pressed", String(k === cur)); }); };
-    dots.forEach(function (d, k) { d.addEventListener("click", function () { go(k); restart(); }); });
-    var restart = function () { clearInterval(timer); if (motion && vis && !paused) timer = setInterval(function () { go(cur + 1); }, 7500); };
-    rev.addEventListener("mouseenter", function () { paused = true; restart(); }); rev.addEventListener("mouseleave", function () { paused = false; restart(); });
-    rev.addEventListener("focusin", function () { paused = true; restart(); }); rev.addEventListener("focusout", function () { paused = false; restart(); });
-    if ("IntersectionObserver" in window) new IntersectionObserver(function (es) { vis = es[0].isIntersecting; restart(); }, { threshold: 0.3 }).observe(rev); else { vis = true; restart(); }
+  /* ---- Explore panels ---- */
+  var openPn = null, lastFocus = null;
+  function focusables(root) { return $$("a[href],button:not([disabled]),input:not([disabled]),select,textarea,summary,[tabindex]:not([tabindex='-1'])", root).filter(function (e) { return e.offsetParent !== null || e === document.activeElement; }); }
+  function openPanel(id, fromHash) {
+    var el = document.getElementById("pn-" + id); if (!el) return;
+    if (openPn && openPn !== el) closePanel(true);
+    lastFocus = document.activeElement; openPn = el;
+    el.hidden = false; void el.offsetWidth; el.classList.add("is-in");
+    doc.classList.add("pn-open");
+    var body = $(".pn__body", el); if (body) body.scrollTop = 0;
+    setTimeout(function () { var x = $("[data-pn-close]", el); if (x) x.focus({ preventScroll: true }); }, 60);
+    if (!fromHash && history.replaceState) history.replaceState(null, "", "#explore-" + id);
+    window.dispatchEvent(new Event("resize"));
   }
+  function closePanel(quiet) {
+    if (!openPn) return; var el = openPn; openPn = null; el.classList.remove("is-in");
+    var done = function () { el.hidden = true; }; if (motion) setTimeout(done, 520); else done();
+    doc.classList.remove("pn-open");
+    if (!quiet) { if (history.replaceState) history.replaceState(null, "", location.pathname + location.search); if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true }); }
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-pn]");
+    if (t) { e.preventDefault(); openPanel(t.getAttribute("data-pn")); return; }
+    if (e.target.closest("[data-pn-close]")) { closePanel(); return; }
+    var a = openPn && e.target.closest("a[href^='#']");
+    if (a && !a.hasAttribute("data-pn")) { var id = a.getAttribute("href").slice(1); closePanel(true); var dest = id && document.getElementById(id); if (dest) { e.preventDefault(); setTimeout(function () { dest.scrollIntoView({ behavior: motion ? "smooth" : "auto" }); }, 60); } }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!openPn) return;
+    if (e.key === "Escape") { e.preventDefault(); closePanel(); return; }
+    if (e.key !== "Tab") return;
+    var f = focusables(openPn); if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  function fromHash() { var m = /^#explore-([a-z]+)$/.exec(location.hash); if (m && document.getElementById("pn-" + m[1])) openPanel(m[1], true); else if (openPn) closePanel(true); }
+  window.addEventListener("hashchange", fromHash); fromHash();
 })();

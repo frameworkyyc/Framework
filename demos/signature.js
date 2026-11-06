@@ -43,7 +43,7 @@
   });
 
   if (slug === "fence-deck") {
-    var box = $(".hero__grid .ph, .c-hero__bg");
+    var box = $(".hero__grid .ph");
     if (box && motion) {
       var sl = document.createElement("div"); sl.className = "slats"; sl.setAttribute("aria-hidden", "true");
       for (var i = 0; i < 12; i++) { var s = document.createElement("span"); s.className = "slat"; s.style.setProperty("--i", i); sl.appendChild(s); }
