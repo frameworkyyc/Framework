@@ -15,6 +15,7 @@ import { seoStatusesForClient } from "./repo/website-seo.js";
 import { pricingFrom, ESTIMATE_NOTE } from "./branding-pricing.js";
 import { organiseServices } from "./service-relevance.js";
 import { listClientServiceSettings } from "./repo/client-service-settings.js";
+import { listClientServiceLinks } from "./repo/client-service-links.js";
 
 const FLASH = { requested: "Thanks. Your request was sent. Framework will get in touch before any work starts.", dup: "You have already asked for this service. Framework will be in touch." };
 
@@ -40,12 +41,12 @@ export async function loadServiceCatalogue(ctx, o) {
   const db = ctx.db, org = o.organizationId;
   const all = await listClientServices(db);
   if (!all.length) return null;
-  const [prices, requests, states, settings, media, context] = await Promise.all([listPrices(db), listServiceRequests(db, org, { openOnly: true }), listClientServiceStates(db, org), listClientServiceSettings(db, org), listServiceMedia(db), contextFor(db, org)]);
+  const [prices, requests, states, settings, media, context, linkRows] = await Promise.all([listPrices(db), listServiceRequests(db, org, { openOnly: true }), listClientServiceStates(db, org), listClientServiceSettings(db, org), listServiceMedia(db), contextFor(db, org), listClientServiceLinks(db, org)]);
   const priced = pricingFrom(prices.rows);
   const open = new Set(requests.map((r) => r.serviceKey));
   const items = organiseServices(all, context, states.items, settings.items).map((s) => {
     const p = priced[s.key], shown = p && p.type !== "included" ? p : null;
-    return { ...s, price: shown ? shown.label : "", priceType: shown ? shown.type : "", requested: open.has(requestKeyOfService(s.key)), media: media.get(s.key) || [] };
+    return { ...s, price: shown ? shown.label : "", priceType: shown ? shown.type : "", requested: open.has(requestKeyOfService(s.key)), media: media.get(s.key) || [], link: linkRows.links[s.key] ? linkRows.links[s.key].url : "" };
   });
   return { items, canRequest: o.canRequest, csrf: o.csrf, flash: o.flash || "", mediaBase: o.mediaBase, formAction: o.formAction };
 }
@@ -59,34 +60,59 @@ const isHttps = (u) => typeof u === "string" && /^https:\/\/[^\s"'<>]+$/.test(u)
 const PREVIEWS = Object.freeze({
   "client-admin-portal": { art: "portal", alt: "Concept illustration of a client admin portal" },
   "invoice-sender": { art: "invoice", alt: "Concept illustration of an invoice" },
-  "digital-business-cards": { art: "digital-card", alt: "Concept illustration of a digital business card on a phone", example: { href: "https://frameworkco.ca/card", img: "/assets/img/og-card.png", w: 1200, h: 630, alt: "Preview of Framework's own digital business card", label: "Framework's own digital business card" } },
+  "digital-business-cards": { phone: { src: "/assets/img/portal/framework-card.png", w: 780, h: 1878, alt: "Framework's own digital business card on a phone: logo, name, Save Contact, Call, Text, Email and links", href: "https://frameworkco.ca/card" } },
   "seo-visibility": { art: "seo", alt: "Concept illustration of a search results page" },
 });
-const previewOf = (s) => (!s.media.length && Object.prototype.hasOwnProperty.call(PREVIEWS, s.key) ? PREVIEWS[s.key] : null);
-const thumbOf = (cat, s) => (s.media.length ? { src: `${cat.mediaBase}/${s.media[0].id}`, alt: s.media[0].alt || "" } : previewOf(s) ? { src: `/assets/img/portal/${previewOf(s).art}.svg`, alt: "" } : null);
+const previewOf = (s) => (!s.media.length && Object.hasOwn(PREVIEWS, s.key) ? PREVIEWS[s.key] : null);
+
+/** Services whose client already has the real thing (Admin entered its address): what the button says and what the card is called. */
+const OWNED = Object.freeze({ "digital-business-cards": { open: "View Your Digital Business Card", ask: "Ask for a change", title: "Your digital business card", live: "Active · Your card is live" } });
+const ownedOf = (s) => (Object.hasOwn(OWNED, s.key) && isHttps(s.link) ? OWNED[s.key] : null);
+
+const thumbOf = (cat, s) => {
+  if (ownedOf(s)) return null; // the client's own card has no picture here: Framework's example must never stand in for it
+  if (s.media.length) return { src: `${cat.mediaBase}/${s.media[0].id}`, w: 640, h: 400, top: false };
+  const pv = previewOf(s);
+  if (pv && pv.phone) return null; // the phone screenshot is shown once, in the open card: no second copy beside the name
+  return pv ? { src: `/assets/img/portal/${pv.art}.svg`, w: 640, h: 400, top: false } : null;
+};
+
+/** The client's OWN card: a prominent button to their address, and plain words that it is theirs and not Framework's example. */
+function ownPanel(s, o) {
+  let host = "";
+  try { host = new URL(s.link).hostname; } catch { host = ""; }
+  return `<div class="svc-gallery svc-gallery--one"><div class="svc-own"><p class="svc-own__k">Your own card</p><h4 class="svc-own__t">${e(o.title)}</h4>${host ? `<p class="svc-own__h">${e(host)}</p>` : ""}<p class="svc-own__n">This is the card Framework made for you. It is your card, not Framework's example.</p><a class="btn svc-own__btn" href="${e(s.link)}" target="_blank" rel="noopener noreferrer">${e(o.open)}<span class="visually-hidden"> (opens in a new tab)</span></a></div></div>`;
+}
+
+/** Framework's own live card as ONE example: the whole screenshot in a phone-shaped frame at its true proportions (never cropped or stretched), with a link to the live card. */
+function phoneFigure(pv) {
+  return `<div class="svc-gallery svc-gallery--one"><figure class="svc-phone"><div class="svc-phone__frame"><img class="svc-phone__img" src="${e(pv.src)}" width="${pv.w}" height="${pv.h}" alt="${e(pv.alt)}" loading="lazy" decoding="async"></div><figcaption class="svc-phone__cap"><span class="svc-concept svc-concept--real">Real example</span> Framework's own digital business card.</figcaption><a class="btn svc-phone__btn" href="${e(pv.href)}" target="_blank" rel="noopener noreferrer">View live example<span class="visually-hidden"> (opens in a new tab)</span></a></figure></div>`;
+}
 
 function gallery(cat, s) {
+  const own = ownedOf(s);
+  if (own) return ownPanel(s, own);
   const pv = previewOf(s);
+  if (pv && pv.phone) return phoneFigure(pv.phone);
   if (pv) {
-    const concept = `<figure class="svc-fig"><img class="svc-fig__img" src="/assets/img/portal/${e(pv.art)}.svg" width="640" height="400" alt="${e(pv.alt)}" loading="lazy" decoding="async"><figcaption class="svc-fig__cap muted small"><span class="svc-concept">Concept</span> An illustration of the idea, not a client project.</figcaption></figure>`;
-    const real = pv.example ? `<figure class="svc-fig"><a href="${e(pv.example.href)}" target="_blank" rel="noopener noreferrer"><img class="svc-fig__img" src="${e(pv.example.img)}" width="${pv.example.w}" height="${pv.example.h}" alt="${e(pv.example.alt)}" loading="lazy" decoding="async"></a><figcaption class="svc-fig__cap muted small"><span class="svc-concept svc-concept--real">Real example</span> <a class="text-link" href="${e(pv.example.href)}" target="_blank" rel="noopener noreferrer">${e(pv.example.label)}<span class="visually-hidden"> (opens in a new tab)</span></a></figcaption></figure>` : "";
-    return `<div class="svc-gallery${pv.example ? "" : " svc-gallery--one"}">${concept}${real}</div>`;
+    return `<div class="svc-gallery svc-gallery--one"><figure class="svc-fig"><img class="svc-fig__img" src="/assets/img/portal/${e(pv.art)}.svg" width="640" height="400" alt="${e(pv.alt)}" loading="lazy" decoding="async"><figcaption class="svc-fig__cap muted small"><span class="svc-concept">Concept</span> An illustration of the idea, not a client project.</figcaption></figure></div>`;
   }
   if (!s.media.length) return "";
   return `<div class="svc-gallery${s.media.length === 1 ? " svc-gallery--one" : ""}">${s.media.map((m) => `<figure class="svc-fig"><img class="svc-fig__img" src="${e(`${cat.mediaBase}/${m.id}`)}" alt="${e(m.alt)}" loading="lazy" decoding="async">${m.caption ? `<figcaption class="svc-fig__cap muted small">${e(m.caption)}</figcaption>` : ""}</figure>`).join("")}</div>`;
 }
 
 function card(cat, s, open) {
+  const owned = ownedOf(s), cta = owned ? owned.ask : (s.ctaLabel || "Request Service");
   const control = s.requested
     ? `<span class="status status--active">Requested</span>`
     : cat.canRequest
-      ? `<form method="post" action="${e(cat.formAction)}"><input type="hidden" name="csrf" value="${e(cat.csrf)}"><input type="hidden" name="service" value="${e(s.key)}"><button class="btn btn--primary" type="submit">${e(s.ctaLabel || "Request Service")}<span class="visually-hidden"> (${e(s.name)})</span></button></form>`
-      : `<span class="btn" aria-disabled="true">${e(s.ctaLabel || "Request Service")}</span>`;
-  const tags = [s.recommended ? `<span class="svc-tag svc-tag--recommended">Recommended</span>` : "", s.featured ? `<span class="svc-tag">Featured</span>` : "", s.suggested && !s.recommended ? `<span class="svc-tag">Suggested for you</span><span class="svc-reason muted small">${e(s.suggested)}</span>` : "", s.category ? `<span class="svc-cat muted small">${e(s.category)}</span>` : ""].join("");
+      ? `<form method="post" action="${e(cat.formAction)}"><input type="hidden" name="csrf" value="${e(cat.csrf)}"><input type="hidden" name="service" value="${e(s.key)}"><button class="btn ${owned ? "" : "btn--primary"}" type="submit">${e(cta)}<span class="visually-hidden"> (${e(s.name)})</span></button></form>`
+      : `<span class="btn" aria-disabled="true">${e(cta)}</span>`;
+  const tags = [owned ? `<span class="svc-tag svc-tag--live">${e(owned.live)}</span>` : "", s.recommended ? `<span class="svc-tag svc-tag--recommended">Recommended</span>` : "", s.featured ? `<span class="svc-tag">Featured</span>` : "", s.suggested && !s.recommended ? `<span class="svc-tag">Suggested for you</span><span class="svc-reason muted small">${e(s.suggested)}</span>` : "", s.category ? `<span class="svc-cat muted small">${e(s.category)}</span>` : ""].join("");
   const benefits = s.benefits && s.benefits.length ? `<h4 class="svc-h">What you get</h4><ul class="svc-benefits">${s.benefits.map((b) => `<li>${e(b)}</li>`).join("")}</ul>` : "";
   const demo = isHttps(s.demoUrl) ? `<p class="svc-demo"><a class="text-link" href="${e(s.demoUrl)}" target="_blank" rel="noopener noreferrer">${e(s.demoLabel || "See an example")}<span class="visually-hidden"> (opens in a new tab)</span></a></p>` : "";
   const priceLine = s.price ? `<p class="svc-price">${e(s.price)}</p>` : "";
-  return `<li><details class="svc-card${s.recommended || s.featured || s.suggested ? " svc-card--lead" : ""}"${open ? " open" : ""}><summary class="svc-card__sum${thumbOf(cat, s) ? " svc-card__sum--thumb" : ""}">${thumbOf(cat, s) ? `<img class="svc-card__thumb" src="${e(thumbOf(cat, s).src)}" width="640" height="400" alt="" loading="lazy" decoding="async">` : ""}<span class="svc-card__tags">${tags}</span><span class="svc-card__title">${e(s.name)}</span>${(s.tagline || s.description) ? `<span class="svc-card__tagline">${e(s.tagline || s.description)}</span>` : ""}<span class="svc-card__more" aria-hidden="true"></span></summary><div class="svc-card__body">${gallery(cat, s)}<div class="svc-card__text">${s.tagline && s.description ? `<p class="svc-card__lead">${e(s.description)}</p>` : ""}${s.problem ? `<h4 class="svc-h">The problem</h4><p>${e(s.problem)}</p>` : ""}${benefits}${s.why ? `<h4 class="svc-h">Why you might need it</h4><p>${e(s.why)}</p>` : ""}${demo}</div><div class="svc-card__cta">${priceLine}${control}</div></div></details></li>`;
+  return `<li><details class="svc-card${owned || s.recommended || s.featured || s.suggested ? " svc-card--lead" : ""}"${open || owned ? " open" : ""}><summary class="svc-card__sum${thumbOf(cat, s) ? " svc-card__sum--thumb" : ""}">${thumbOf(cat, s) ? `<img class="svc-card__thumb" src="${e(thumbOf(cat, s).src)}" width="${thumbOf(cat, s).w}" height="${thumbOf(cat, s).h}" alt="" loading="lazy" decoding="async">` : ""}<span class="svc-card__tags">${tags}</span><span class="svc-card__title">${e(s.name)}</span>${(s.tagline || s.description) ? `<span class="svc-card__tagline">${e(s.tagline || s.description)}</span>` : ""}<span class="svc-card__more" aria-hidden="true"></span></summary><div class="svc-card__body">${gallery(cat, s)}<div class="svc-card__text">${owned ? `<p class="svc-card__lead">Framework manages this card for you. To change your details or links, ask for a change below.</p>` : ""}${!owned && s.tagline && s.description ? `<p class="svc-card__lead">${e(s.description)}</p>` : ""}${!owned && s.problem ? `<h4 class="svc-h">The problem</h4><p>${e(s.problem)}</p>` : ""}${owned ? "" : benefits}${!owned && s.why ? `<h4 class="svc-h">Why you might need it</h4><p>${e(s.why)}</p>` : ""}${owned ? "" : demo}</div><div class="svc-card__cta">${owned ? "" : priceLine}${control}</div></div></details></li>`;
 }
 
 /** The section: a short lead, then one expandable card per service. The first highlighted (featured or suggested) card starts open; the rest are one tidy line each. */

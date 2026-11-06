@@ -45,6 +45,8 @@ export const EXCLUDED = {
   request_files: "client reference files and designs; not part of this refresh",
   request_quotes: "quotes and agreements; not part of this refresh",
   request_type_settings: "per-environment service settings",
+  // Service links (migration 0023): the address of a client's own digital business card, entered by Admin per environment.
+  client_service_links: "per-client addresses entered in Admin; not part of this refresh",
 };
 
 /** Tables SQLite/D1 manage themselves. */
