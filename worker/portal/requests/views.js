@@ -27,6 +27,7 @@ const G = {
   dashboard: '<rect x="3" y="3" width="8" height="10"/><rect x="13" y="3" width="8" height="6"/><rect x="13" y="11" width="8" height="10"/><rect x="3" y="15" width="8" height="6"/>', spark: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>',
   flow: '<rect x="3" y="4" width="6" height="5"/><rect x="15" y="4" width="6" height="5"/><rect x="9" y="15" width="6" height="5"/><path d="M6 9v3h12V9M12 12v3"/>', link: '<path d="M10 14l4-4M8 12l-2 2a3 3 0 0 0 4 4l2-2M16 12l2-2a3 3 0 0 0-4-4l-2 2"/>',
   calc: '<rect x="5" y="3" width="14" height="18"/><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h2M16 11v6"/>', plus: '<rect x="4" y="4" width="16" height="16"/><path d="M12 8v8M8 12h8"/>',
+  branding: '<rect x="3" y="3" width="11" height="11"/><rect x="10" y="10" width="11" height="11"/>', website: '<rect x="3" y="4" width="18" height="16"/><path d="M3 9h18M9 9v11"/>', support: '<path d="M4 5h16v11h-9l-5 4v-4H4z"/><path d="M8 10h8"/>',
   deliverable: '<rect x="4" y="4" width="16" height="16"/><path d="M4 15l5-5 4 4 3-3 4 4"/>', seo: '<circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/>', development: '<path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>', requests: '<path d="M4 6h16M4 12h16M4 18h10"/>',
 };
 export const icon = (key, cls = "rq-icon") => `<svg class="${e(cls)}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true" focusable="false">${G[key] || G.plus}</svg>`;
@@ -178,14 +179,77 @@ ${empty ? `<div class="empty"><strong>No requests yet.</strong>Start with <a cla
 }
 
 /** The block at the top of Home: what waits for the person, and the services as active or available. */
-export function homeBlock(vm, summary, { counts = {}, canRequest = true } = {}) {
-  const need = summary.actions.length
-    ? `<section class="rq-home__need" aria-labelledby="rq-hn"><h2 class="h3" id="rq-hn">Needs your action <span class="rq-count">${summary.actionCount}</span></h2><ul class="rq-rows">${summary.actions.slice(0, 5).map((a) => `<li><a class="rq-row rq-row--action" href="${e(href(vm, `/requests/${a.id}`))}"><span class="rq-row__icon">${icon((getType(a.typeKey) || {}).icon || a.kind)}</span><span class="rq-row__main"><span class="rq-row__title">${e(a.title)}</span><span class="rq-row__meta">${e(a.typeLabel)}</span></span><span class="rq-row__state"><span class="rq-row__need">${e(ACTION_LABEL[a.reason] || "")}</span></span><span class="rq-row__bar"></span></a></li>`).join("")}</ul>${summary.actionCount > 5 ? `<p><a class="text-link" href="${e(href(vm, "/requests"))}">See all ${summary.actionCount}</a></p>` : ""}</section>` : "";
-  const cells = Object.values(KINDS).map((k) => {
-    const c = counts[k.key] || 0;
-    return `<li><a class="rq-svc" href="${e(href(vm, k.path))}">${icon(k.key, "rq-svc__icon")}<span class="rq-svc__t">${e(k.label)}</span><span class="rq-svc__s"><span class="status status--${c ? "active" : "idle"}">${c ? `${plural(c, "request")} in progress` : canRequest ? "Available to request" : "Available"}</span></span><span class="rq-svc__d">${e(k.blurb)}</span></a></li>`;
-  }).join("");
-  return `<div class="rq-home">${need}<section class="rq-home__svc" aria-labelledby="rq-hs"><h2 class="h3" id="rq-hs">Your services</h2><ul class="rq-svcs">${cells}</ul><p><a class="text-link" href="${e(href(vm, "/requests"))}">My Requests${summary.open ? ` (${summary.open} open)` : ""}</a></p></section></div>`;
+/** The six service blocks, in the order the portal presents them. */
+const BLOCKS = [
+  { key: "branding", label: "Branding", path: "/branding", desc: "Identity, logos, brand guidelines and Brand Discovery." },
+  { key: "website", label: "Websites", path: "/website", desc: "Website development, hosting, maintenance and management." },
+  { key: "seo", label: "SEO", path: "/seo", desc: "Search visibility, optimization and performance." },
+  { key: "deliverable", label: "Deliverables", path: "/deliverables", desc: "Business cards, posters, social graphics and branded materials." },
+  { key: "development", label: "Custom Development", path: "/development", desc: "Applications, dashboards, integrations and automation." },
+  { key: "support", label: "Support", path: "/services/requests", desc: "Assistance, service requests and client communication." },
+];
+const blockIcon = { branding: "branding", website: "website", seo: "seo", deliverable: "deliverable", development: "development", support: "support" };
+
+/** What one block says about its service: Active (something is live or under way), Needs you, or Available to request. Always words as well as a marker. */
+function blockState(k, d) {
+  const need = (d.needs || {})[k] || 0, open = (d.counts || {})[k] || 0;
+  if (k === "branding") {
+    const b = d.brand;
+    if (b && b.state === "unavailable") return { tone: "idle", text: "Status unavailable right now" };
+    if (b && (b.discovery === "new" || b.discovery === "progress")) return { tone: "attention", text: b.discovery === "new" ? "Brand Discovery waiting for you" : "Brand Discovery in progress" };
+    if (b && b.state === "published") return { tone: "live", text: "Active · Brand system published" };
+    return { tone: "idle", text: "Available · Not published yet" };
+  }
+  if (k === "website") {
+    const w = d.website;
+    if (!w || !w.stage) return { tone: "idle", text: "Available to request" };
+    return { tone: "live", text: `Active · ${w.stage.label}${w.count > 1 ? ` · ${plural(w.count, "website")}` : ""}` };
+  }
+  if (k === "support") {
+    if (!d.support) return null;
+    const s = d.support;
+    if (s.attention.length) return { tone: "attention", text: s.attention.join(" · ") };
+    return s.open ? { tone: "live", text: `Active · ${plural(s.open, "open request")}` } : { tone: "idle", text: "Available · Ask for help any time" };
+  }
+  if (need) return { tone: "attention", text: `${need} waiting for you` };
+  return open ? { tone: "live", text: `Active · ${plural(open, "request")} in progress` } : { tone: "idle", text: "Available to request" };
+}
+
+function serviceBlock(vm, b, d) {
+  const st = blockState(b.key, d);
+  const inner = `<span class="hm-block__top">${icon(blockIcon[b.key], "hm-block__icon")}<span class="hm-block__go" aria-hidden="true">→</span></span>
+<span class="hm-block__title">${e(b.label)}</span><span class="hm-block__desc">${e(b.desc)}</span>
+<span class="hm-block__state"><span class="status status--${st ? e(st.tone) : "idle"}">${e(st ? st.text : "Not available yet")}</span></span>`;
+  return st ? `<li><a class="hm-block" href="${e(href(vm, b.path))}">${inner}</a></li>` : `<li><div class="hm-block hm-block--off" role="group" aria-label="${e(b.label)}, not available yet">${inner}</div></li>`;
+}
+
+/** What waits for the person: only when something does. At most five rows, then a link to everything. */
+function needBlock(vm, summary) {
+  if (!summary.actions.length) return "";
+  const rows = summary.actions.slice(0, 5).map((a) => `<li><a class="rq-row rq-row--action" href="${e(href(vm, `/requests/${a.requestId || a.id}`))}"><span class="rq-row__icon">${icon((getType(a.typeKey) || {}).icon || a.kind || "doc")}</span><span class="rq-row__main"><span class="rq-row__title">${e(a.title)}</span><span class="rq-row__meta">${e(a.typeLabel || typeLabel(a.typeKey))}</span></span><span class="rq-row__state"><span class="rq-row__need">${e(ACTION_LABEL[a.reason] || a.label || "")}</span></span><span class="rq-row__bar"></span></a></li>`).join("");
+  return `<section class="hm-need" aria-labelledby="hm-need-h"><h2 class="h3" id="hm-need-h">Needs your action <span class="rq-count">${summary.actionCount}</span></h2><ul class="rq-rows">${rows}</ul><p class="hm-need__all"><a class="text-link" href="${e(href(vm, "/requests"))}">All requests${summary.open ? ` (${summary.open} open)` : ""}</a></p></section>`;
+}
+
+/** Business Profile as a compact, secondary strip: how far along it is and one action. */
+function profileStrip(vm, d) {
+  const s = d.profile && d.profile.status, n = d.profile && d.profile.next;
+  const label = !n ? "Open Business Profile" : n.state === "start" ? "Start your profile" : n.state === "continue" ? "Continue your profile" : n.state === "complete" ? "Review your profile" : "Open Business Profile";
+  const to = n && (n.state === "start" || n.state === "continue") && n.path ? n.path : "/profile";
+  const ready = s && s.state === "ready" && Number.isInteger(s.percent) && s.percent >= 0 && s.percent <= 100;
+  const left = ready && Number.isInteger(s.requiredRemaining) ? s.requiredRemaining : 0;
+  const progress = ready
+    ? `<p class="hm-profile__pct"><strong>${s.percent}% complete</strong>${left > 0 ? ` · ${plural(left, "required answer")} left` : ""}</p><progress class="meter" max="100" value="${s.percent}" aria-label="Business Profile ${s.percent}% complete">${s.percent}%</progress>`
+    : `<p class="hm-profile__pct hm-profile__pct--muted">${s && s.state === "unavailable" ? "Progress unavailable right now" : "Tell us about your business"}</p>`;
+  return `<section class="hm-profile" aria-labelledby="hm-pf-h"><h2 class="hm-profile__t" id="hm-pf-h">Business Profile</h2><div class="hm-profile__bar">${progress}</div><a class="btn btn--small" href="${e(href(vm, to))}">${e(label)}</a></section>`;
+}
+
+/**
+ * The signed-in Home where the request area is on: the greeting, six equal service blocks, what needs the person (only when something does), and the Business Profile.
+ * d: { summary, counts: {kind: open}, needs: {kind: waiting}, brand, website, support: {open, attention[]} | null, profile: {status, next} }
+ */
+export function unifiedHome(vm, greeting, d) {
+  return `${greeting}<section class="hm-services" aria-labelledby="hm-svc-h"><h2 class="visually-hidden" id="hm-svc-h">Your services</h2><ul class="hm-grid">${BLOCKS.map((b) => serviceBlock(vm, b, d)).join("")}</ul></section>
+${needBlock(vm, d.summary)}${profileStrip(vm, d)}`;
 }
 
 /* ------------------------------------------------------------------ one request */

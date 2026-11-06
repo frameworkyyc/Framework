@@ -85,6 +85,9 @@ export function brandStatus(b) {
 /** True while a Brand Discovery needs the client (new or unfinished): the Branding card wears a small red dot. */
 export const brandNeedsAttention = (b) => Boolean(b) && (b.discovery === "new" || b.discovery === "progress");
 
+/** The greeting that opens Home: the organization name and the welcome. */
+export const homeGreeting = (vm) => `<header class="page-head page-head--home">${vm.org && vm.org.name ? `<span class="eyebrow">${e(vm.org.name)}</span>` : ""}<h1 class="h1 h1--home">${e(welcomeFor(vm))}</h1></header>`;
+
 export function home(vm) {
   const isLive = (key) => !vm.liveAreas || vm.liveAreas.includes(key);
   if (!vm.liveAreas) {

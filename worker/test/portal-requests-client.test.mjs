@@ -76,16 +76,26 @@ test("flag on: the full navigation (ten entries for an owner, Invoices only for 
 test("Home: services as active or available, and what needs the person's action", async () => {
   const { w, ann, mia, text, create, d, userOf } = await setup();
   let home = await text(ann, "");
-  assert.match(home, /Your services/); assert.equal((home.match(/Available to request/g) || []).length, 3); assert.ok(!/Needs your action/.test(home));
+  // one design: greeting, six equal blocks in order, then (only when something waits) the needs block, then a compact Business Profile; nothing from the older layout
+  const blocks = [...home.matchAll(/<a class="hm-block" href="([^"]+)"><span class="hm-block__top">[\s\S]*?<span class="hm-block__title">([^<]+)</g)].map((m) => [m[2], m[1].replace("/portal/o/alpha", "")]);
+  assert.deepEqual(blocks, [["Branding", "/branding"], ["Websites", "/website"], ["SEO", "/seo"], ["Deliverables", "/deliverables"], ["Custom Development", "/development"], ["Support", "/services/requests"]]);
+  assert.equal((home.match(/class="hm-block"/g) || []).length, 6);
+  assert.equal((home.match(/Your services/g) || []).length, 1, "only the screen-reader heading of the grid"); assert.match(home, /class="visually-hidden" id="hm-svc-h">Your services/);
+  for (const gone of ["Coming soon", "Client Services", 'class="hubs"', 'class="onboard"', "Getting started"]) assert.ok(!home.includes(gone), gone + " is gone from Home");
+  assert.ok(home.indexOf("hm-grid") < home.indexOf("hm-profile"), "the Business Profile comes after the six blocks");
+  assert.ok(home.indexOf("page-head--home") < home.indexOf("hm-grid"), "the greeting comes first");
+  assert.ok(!/Needs your action/.test(home), "no empty needs block");
+  assert.match(home, /status--idle">Available to request/);
   const id = await create(ann);
-  home = await text(ann, ""); assert.match(home, /1 request in progress/);
+  home = await text(ann, ""); assert.match(home, /status--live">Active · 1 request in progress/);
   await repo.setStatus(w.db, (await w.org("x1")).id ?? "", id, "in_review", STAFF).catch(() => {});
   const orgId = sql(w.db, "SELECT organization_id o FROM requests")[0].o;
   await repo.setStatus(w.db, orgId, id, "in_review", STAFF);
   await repo.approveRequest(w.db, orgId, id, { via: "staff_record", actorLabel: STAFF }); await repo.setStatus(w.db, orgId, id, "in_progress", STAFF);
   await svc.adminUpload(d(), { organizationId: orgId, requestId: id, role: "proof", file: { bytes: png(), name: "p.png" }, actor: STAFF });
   await repo.setStatus(w.db, orgId, id, "client_review", STAFF);
-  home = await text(mia, ""); assert.match(home, /Needs your action/); assert.match(home, /Review the design/);
+  home = await text(mia, ""); assert.match(home, /Needs your action/); assert.match(home, /Review the design/); assert.match(home, /status--attention">1 waiting for you/);
+  assert.ok(home.indexOf("hm-grid") < home.indexOf("hm-need") && home.indexOf("hm-need") < home.indexOf("hm-profile"), "order: blocks, needs, profile");
   assert.match(await text(mia, "/requests"), /Needs your action/);
 });
 
