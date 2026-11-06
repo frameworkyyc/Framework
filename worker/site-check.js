@@ -9,12 +9,16 @@
  *
  * Every check records what happened (HTTP status, redirects, protection seen, timings, the failure reason) so a person can see why. Pure apart from the injected
  * fetch: pass `fetchImpl` in tests. The address comes from finder data (untrusted), so only public http(s) hosts on ports 80/443 are ever requested.
+ *
+ * SYNCED COPY: the finder Worker (frameworkyyc/framework-leadgen, src/site-check.js) uses this exact file so Admin and the finder cannot disagree about a site.
+ * Change it in BOTH repositories together (the finder's test compares the file's SHA-256 with the value recorded in its README).
  */
 
 export const SITE_STATES = Object.freeze(["online", "offline", "unverified"]);
 export const CHECK_TIMEOUT_MS = 9000;
 export const MAX_HOPS = 6;
 const READ_LIMIT = 24 * 1024; // enough to recognise a challenge page; the rest of the body is never read
+export const KEEP_LIMIT = 500_000; // with keepBody (the finder, which scores the page and finds contacts on it)
 // A browser-compatible agent (many sites refuse anything else) that still says who is asking.
 export const CHECK_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 FrameworkSiteCheck/1.0 (+https://frameworkco.ca)";
 const HEADERS = { "User-Agent": CHECK_UA, Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-CA,en;q=0.9", "Upgrade-Insecure-Requests": "1" };
@@ -93,19 +97,19 @@ export function describeError(e) {
 
 /* ---------- the requests ---------- */
 
-async function readStart(res) {
+async function readStart(res, limit = READ_LIMIT) {
   try {
     if (!res.body) return "";
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let text = "";
-    while (text.length < READ_LIMIT) {
+    while (text.length < limit) {
       const { value, done } = await reader.read();
       if (done) break;
       text += dec.decode(value, { stream: true });
     }
     reader.cancel().catch(() => {}); // the rest is not wanted; never wait for it
-    return text.slice(0, READ_LIMIT);
+    return text.slice(0, limit);
   } catch { return ""; }
 }
 
@@ -119,7 +123,7 @@ const cookiesOf = (res) => {
  * One address, following redirects by hand (each hop is checked to be a public web address, and cookies are carried so a cookie-setting redirect is not mistaken
  * for a loop). Returns { ok, status, finalUrl, hops, ms, protection, body, headers } or { ok: false, error, hops, ms }.
  */
-async function attempt(url, fetchImpl, timeoutMs, now) {
+async function attempt(url, fetchImpl, timeoutMs, now, limit = READ_LIMIT) {
   const started = now();
   const jar = new Map();
   let current = new URL(url.href), hops = 0;
@@ -145,7 +149,7 @@ async function attempt(url, fetchImpl, timeoutMs, now) {
       current = next;
       continue;
     }
-    const body = res.status >= 200 && res.status < 600 ? await readStart(res) : "";
+    const body = res.status >= 200 && res.status < 600 ? await readStart(res, limit) : "";
     return { ok: true, status: res.status, finalUrl: current.href, hops, ms: now() - started, headers: res.headers, protection: detectProtection(res.status, res.headers, body), body, bytes: body.length };
   }
 }
@@ -187,19 +191,20 @@ const RANK = { online: 3, offline: 2, unverified: 1 };
  *   { state, reason, httpStatus, finalUrl, redirects, protection, attempts: [{ url, status, error, ms }], summary, checkedAt }
  * or { state: "unverified", reason: "not a public web address" } for an address that must not be requested.
  */
-export async function checkSite(website, { fetchImpl = globalThis.fetch, timeoutMs = CHECK_TIMEOUT_MS, now = () => Date.now(), pause = (ms) => new Promise((r) => setTimeout(r, ms)), at = new Date() } = {}) {
+export async function checkSite(website, { fetchImpl = globalThis.fetch, timeoutMs = CHECK_TIMEOUT_MS, now = () => Date.now(), pause = (ms) => new Promise((r) => setTimeout(r, ms)), at = new Date(), keepBody = false } = {}) {
   const checkedAt = at.toISOString();
+  const limit = keepBody ? KEEP_LIMIT : READ_LIMIT;
   const target = normaliseTarget(website);
-  if (!target) return { state: "unverified", reason: "not a public web address", httpStatus: null, finalUrl: null, redirects: 0, protection: null, attempts: [], summary: "Unverified: the address on file is not a public web address.", checkedAt };
-  if (typeof fetchImpl !== "function") return { state: "unverified", reason: "no network access to check from", httpStatus: null, finalUrl: null, redirects: 0, protection: null, attempts: [], summary: "Unverified: no network access to check from.", checkedAt };
+  if (!target) return { state: "unverified", reason: "not a public web address", httpStatus: null, finalUrl: null, redirects: 0, protection: null, attempts: [], summary: "Unverified: the address on file is not a public web address.", checkedAt, html: null };
+  if (typeof fetchImpl !== "function") return { state: "unverified", reason: "no network access to check from", httpStatus: null, finalUrl: null, redirects: 0, protection: null, attempts: [], summary: "Unverified: no network access to check from.", checkedAt, html: null };
 
   const attempts = [];
   let best = null, bestAttempt = null, sawProtection = null, connectFailures = 0, tried = 0;
   for (const url of candidates(target)) {
-    let a = await attempt(url, fetchImpl, timeoutMs, now);
+    let a = await attempt(url, fetchImpl, timeoutMs, now, limit);
     tried++;
     let verdict = judge(a);
-    if (verdict.temporary) { await pause(1200); const again = await attempt(url, fetchImpl, timeoutMs, now); tried++; const v2 = judge(again); attempts.push(rec(url, a, verdict)); a = again; verdict = v2.state === "online" ? v2 : { ...verdict, ...(v2.status ? { status: v2.status, reason: v2.reason } : {}), state: v2.state === "unverified" && v2.temporary ? "offline" : v2.state, reason: v2.state === "unverified" && v2.temporary ? `server error on every try (HTTP ${v2.status})` : v2.reason }; }
+    if (verdict.temporary) { await pause(1200); const again = await attempt(url, fetchImpl, timeoutMs, now, limit); tried++; const v2 = judge(again); attempts.push(rec(url, a, verdict)); a = again; verdict = v2.state === "online" ? v2 : { ...verdict, ...(v2.status ? { status: v2.status, reason: v2.reason } : {}), state: v2.state === "unverified" && v2.temporary ? "offline" : v2.state, reason: v2.state === "unverified" && v2.temporary ? `server error on every try (HTTP ${v2.status})` : v2.reason }; }
     attempts.push(rec(url, a, verdict));
     if (verdict.protected || (a.ok && a.protection)) sawProtection = a.protection || sawProtection || "bot protection";
     if (!a.ok && !a.loop) connectFailures++;
@@ -214,8 +219,10 @@ export async function checkSite(website, { fetchImpl = globalThis.fetch, timeout
   const finalUrl = bestAttempt && bestAttempt.finalUrl ? bestAttempt.finalUrl : null;
   const result = {
     state: best.state, reason: best.reason, httpStatus: best.status || null, finalUrl, redirects: bestAttempt ? bestAttempt.hops || 0 : 0,
-    protection: sawProtection || (best.protected ? "bot protection" : null), attempts, checkedAt,
+    protection: sawProtection || (best.protected ? "bot protection" : null), attempts, checkedAt, html: null,
   };
+  // The page itself, only when asked for, only for a site proven online, and only if it is HTML (a JSON or PDF home page cannot be scored or searched for contacts).
+  if (keepBody) result.html = best.state === "online" && bestAttempt && /html/i.test(String(bestAttempt.headers && bestAttempt.headers.get("content-type") || "")) ? bestAttempt.body : null;
   result.summary = summarise(result);
   return result;
 }

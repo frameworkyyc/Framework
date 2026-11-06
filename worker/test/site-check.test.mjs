@@ -180,3 +180,15 @@ test("the check never throws, whatever the site does", async () => {
   const r = await checkSite("https://a.ca", { fetchImpl: null, at: AT });
   assert.equal(r.state, "unverified");
 });
+
+test("keepBody (used by the finder) returns the home page only for a site proven online with an HTML page, and nothing otherwise", async () => {
+  const HTMLH = { "content-type": "text/html; charset=utf-8" };
+  const page = "<html><body>" + "x".repeat(50000) + "</body></html>";
+  let r = await run("https://a.ca", { "*": R(200, HTMLH, page) }, { keepBody: true });
+  assert.equal(r.state, "online"); assert.equal(r.html.length, page.length, "the whole page, not just the 24 KB used to spot challenge pages");
+  r = await run("https://a.ca", { "*": R(200, HTMLH, page) });
+  assert.equal(r.html, null, "without keepBody no page is returned");
+  r = await run("https://a.ca", { "*": R(200, { "content-type": "application/json" }, "{}") }, { keepBody: true });
+  assert.deepEqual([r.state, r.html], ["online", null], "a JSON home page cannot be scored");
+  for (const res of [R(403, HTMLH, "denied"), R(404, HTMLH, "nope"), R(200, HTMLH, "<title>Just a moment...</title>")]) assert.equal((await run("https://a.ca", { "*": res }, { keepBody: true })).html, null);
+});

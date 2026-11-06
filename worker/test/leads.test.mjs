@@ -1202,3 +1202,22 @@ test("recheck: drafts and reasons never claim a site is offline unless a check c
     }
   }
 });
+
+test("coordination with the finder: its 'offline' (proven) and 'unverified' (could not be judged) rows import with matching wording, a null score for unverified, and drafts that claim only what was proven", async () => {
+  const w = world();
+  w.f.add({ name: "Proven Gone Co", website: "https://provengone.ca/", site_status: "offline", site_score: 85, site_issues: '["Checked 2026-11-06: offline, home page not found (HTTP 404)","HTTP status 404"]', contacts: [] });
+  w.f.add({ name: "Guarded Finder Co", website: "https://guardedfinder.ca/", site_status: "unverified", site_issues: '["Checked 2026-11-06: unverified, blocked or protected (HTTP 403, Cloudflare challenge)","Bot protection seen: Cloudflare challenge"]', contacts: [] });
+  w.f.raw.prepare("UPDATE leads SET site_score = NULL WHERE name = 'Guarded Finder Co'").run();
+  assert.equal((await w.api("POST", "/leads/sync")).status, 200);
+  const gone = w.q("SELECT * FROM outreach_leads WHERE name = 'Proven Gone Co'")[0], guarded = w.q("SELECT * FROM outreach_leads WHERE name = 'Guarded Finder Co'")[0];
+  assert.deepEqual([gone.site_status, gone.reason], ["offline", "Website doesn't load (provengone.ca); 4.6★ from 77 reviews."]);
+  assert.deepEqual([guarded.site_status, guarded.site_score], ["unverified", null]);
+  assert.match(guarded.reason, /^Website couldn't be checked automatically \(guardedfinder\.ca\); it may be protected, not offline; /);
+  assert.deepEqual(JSON.parse(guarded.site_issues), ["Checked 2026-11-06: unverified, blocked or protected (HTTP 403, Cloudflare challenge)", "Bot protection seen: Cloudflare challenge"]);
+  const d = composeDraft({ ...guarded, rating: 4.8, review_count: 40 }, { demoUrl: "https://staging.frameworkco.ca/d/x", approach: "observation" });
+  assert.ok(!/doesn't load|isn't loading/.test(d.subject + d.body));
+  assert.match(composeDraft({ ...gone, rating: 4.8, review_count: 40 }, { demoUrl: "https://staging.frameworkco.ca/d/x", approach: "observation" }).body, /doesn't load for me/);
+  // only legacy 'broken' rows are queued for a check; rows the finder already judged are left alone
+  const f = withSite(w, { "*": SR(200, {}, "ok") });
+  assert.equal((await w.api("POST", "/leads/recheck-sites", {})).body.checked, 0); assert.equal(f.calls.length, 0);
+});
