@@ -25,7 +25,7 @@ function brand() {
 }
 
 // How the sidebar is grouped (worker/admin/DESIGN-SYSTEM.md). A module not listed here still appears, after the groups.
-const NAV_GROUPS = [[null, ["overview"]], ["Inbox", ["feedback", "support", "requests"]], ["Assessments", ["assessments", "discovery"]], ["People", ["clients", "approved-emails"]], ["Setup", ["additional-services", "service-pricing", "settings"]]];
+const NAV_GROUPS = [[null, ["overview"]], ["Inbox", ["feedback", "support", "requests"]], ["Assessments", ["assessments", "discovery"]], ["Marketing", ["demo-traffic"]], ["People", ["clients", "approved-emails"]], ["Setup", ["additional-services", "service-pricing", "settings"]]];
 
 function navItem(m) {
   const a = h("a", { class: "adm-nav__link", href: m.path, "data-link": "", "data-module": m.id }, navIcon(m.id), h("span", { text: m.label }));

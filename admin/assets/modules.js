@@ -11,6 +11,7 @@ export const MODULES = [
   { id: "requests", label: "Requests", path: "/admin/requests", enabled: true, load: () => import("./requests.js") },
   { id: "assessments", label: "Assessments", path: "/admin/assessments", enabled: true, load: () => import("./assessments.js") },
   { id: "discovery", label: "Brand Discovery", path: "/admin/discovery", enabled: true, load: () => import("./discovery.js") },
+  { id: "demo-traffic", label: "Demo traffic", path: "/admin/demo-traffic", enabled: true, load: () => import("./demo-traffic.js") },
 
   { id: "clients", label: "Clients", path: "/admin/clients", enabled: true, load: () => import("./clients.js") },
   { id: "approved-emails", label: "Approved Emails", path: "/admin/approved-emails", enabled: true, load: () => import("./approved-emails.js") },
