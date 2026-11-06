@@ -3,6 +3,7 @@
    Removing an address stops future invitations and emails to it; it never ends anyone's existing access. Server text is never inserted as HTML. */
 
 import { h, api, fmtDate, stateBlock, errorState, confirmDialog } from "./ui.js";
+import { fold, badge } from "./kit.js";
 
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const ERRORS = {
@@ -65,16 +66,15 @@ export async function render(ctx) {
       } }, "Remove") : null));
 
     const pending = data.setting.addresses.filter((a) => !a.inList);
-    const setting = data.setting.addresses.length ? h("section", { class: "adm-approved__setting", "aria-labelledby": "ae-setting-h" },
-      h("h2", { id: "ae-setting-h", class: "adm-approved__h", text: "Also approved in the Cloudflare setting" }),
+    const setting = data.setting.addresses.length ? fold({ title: "Also approved in the Cloudflare setting", meta: plural(data.setting.addresses.length, "address", "addresses"), body: h("div", { class: "adm-approved__setting" },
       h("p", { class: "adm-sub", text: "These addresses come from the Cloudflare secret PORTAL_INVITE_ALLOWLIST and are approved too. They can only be removed there. Add them to the list above to manage them here; once all are added, the secret can be deleted." }),
       h("ul", { class: "adm-approved__list adm-approved__list--setting", "aria-label": "Addresses approved in the Cloudflare setting" }, data.setting.addresses.map((a) => h("li", { class: "adm-approved__row" },
         h("span", { class: "adm-approved__email", text: a.email }), h("span", { class: "adm-approved__meta", text: a.inList ? "Also in the list above" : "Setting only" })))),
-      writes && pending.length ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => act(() => api("/approved-emails/import", { method: "POST", body: {} }), (r) => `${plural(r.added, "address", "addresses")} added to the list.`) }, `Add ${plural(pending.length, "address", "addresses")} to the list`) : null) : null;
+      writes && pending.length ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => act(() => api("/approved-emails/import", { method: "POST", body: {} }), (r) => `${plural(r.added, "address", "addresses")} added to the list.`) }, `Add ${plural(pending.length, "address", "addresses")} to the list`) : null) }) : null;
 
     root.replaceChildren(...[
       h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Approved Emails"),
-        h("p", { class: "adm-sub" }, "Only these addresses can be invited to a client portal or receive its invoice and support emails. Removing one never ends anyone’s existing access."))),
+        h("p", { class: "adm-sub" }, "Only these addresses can be invited to a client portal or receive its emails. Removing one never ends existing access."))),
       data.available ? null : h("p", { class: "adm-banner" }, "The approved list isn’t available on this deployment yet (its database migration hasn’t been applied). Only the Cloudflare setting applies."),
       data.available && !data.capabilities.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at the list, but not change it.") : null,
       form,

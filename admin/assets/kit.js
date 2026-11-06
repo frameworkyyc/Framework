@@ -104,3 +104,6 @@ export function navIcon(name) {
   const path = document.createElementNS(NS, "path"); path.setAttribute("d", ICONS[name] || ICONS.check); svg.append(path);
   return svg;
 }
+
+/** A boxed "find" field that filters what is already on the page. It changes nothing on the server. */
+export const searchBox = ({ label, placeholder, onInput }) => h("input", { class: "input adm-search__input rk-find", type: "search", placeholder: placeholder || label, "aria-label": label, autocomplete: "off", oninput: (ev) => onInput(ev.target.value.trim().toLowerCase()) });

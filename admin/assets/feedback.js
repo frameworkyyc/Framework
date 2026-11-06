@@ -2,6 +2,7 @@
 
 import { sharePanel } from "./feedback-share.js";
 import { feedbackTabs } from "./feedback-tabs.js";
+import { statCard, badge, fold } from "./kit.js";
 import { h, api, ApiError, fmtDate, fmtDateTime, shortRef, clientName, permissionShort, rating5, score, meter10, stateBlock, confirmDialog } from "./ui.js";
 
 const RATING_LABELS = [
@@ -47,6 +48,7 @@ const COLUMNS = {
   testimonial: { label: "Testimonial", cell: (r) => h("td", { "data-label": "Testimonial" }, permissionShort(r.testimonial_permission)) },
   logo: { label: "Portfolio", cell: (r) => h("td", { "data-label": "Portfolio" }, r.logo_permission) },
   revenue: { label: "Revenue", cell: (r) => h("td", { "data-label": "Revenue" }, r.revenue ? r.revenue : h("span", { class: "adm-muted" }, "Not answered")) },
+  permissions: { label: "Permission", cell: (r) => h("td", { "data-label": "Permission" }, h("span", { class: "adm-badges" }, /^Yes/.test(r.testimonial_permission || "") ? badge("Testimonial", "ok") : null, r.logo_permission === "Yes" ? badge("Portfolio", "ok") : null, !/^Yes/.test(r.testimonial_permission || "") && r.logo_permission !== "Yes" ? h("span", { class: "adm-muted", text: "None given" }) : null)) },
   view: {
     label: "",
     cell: (r) => h("td", { "data-label": "" }, h("a", { class: "adm-link", href: "/admin/feedback/" + encodeURIComponent(r.id), "data-link": "", "aria-label": "View response from " + (clientName(r) || "Ref " + shortRef(r.id)) }, "View response →")),
@@ -58,6 +60,20 @@ export function responseTable(rows, keys) {
   return h("table", { class: "adm-table" },
     h("thead", null, h("tr", null, cols.map((c) => h("th", { scope: "col" }, c.label || h("span", { class: "visually-hidden" }, "Actions")))))
     , h("tbody", null, rows.map((r) => h("tr", null, cols.map((c) => c.cell(r))))));
+}
+
+/** Recent responses as cards: who, when, how happy, whether they will recommend, what they allow, and whether it still needs a look. */
+export function responseCards(rows) {
+  return h("ul", { class: "rk-fbcards" }, rows.map((r) => {
+    const name = clientName(r) || "Business not provided";
+    const low = needsAttention(r);
+    const bar = (label, n) => h("div", { class: "rk-fbcard__bar" }, h("span", { text: label }), h("progress", { max: "10", value: String(n), "aria-label": `${label}: ${n} of 10` }), h("strong", { text: `${n}/10` }));
+    return h("li", null, h("a", { class: "rk-fbcard", href: "/admin/feedback/" + encodeURIComponent(r.id), "data-link": "", "aria-label": "View response from " + name },
+      h("span", { class: "rk-fbcard__top" }, h("strong", { class: "rk-fbcard__name", text: name }), "reviewed_at" in r ? badge(r.reviewed_at ? "Reviewed" : "Unreviewed", r.reviewed_at ? "" : "warn") : null),
+      h("span", { class: "rk-fbcard__sub", text: (r.attribution_name ? r.attribution_name + " · " : "") + fmtDate(r.created_at) }),
+      bar("Satisfaction", r.satisfaction), bar("Recommend", r.recommend),
+      h("span", { class: "rk-fbcard__tags" }, low ? badge("Needs attention", "bad") : null, /^Yes/.test(r.testimonial_permission || "") ? badge("Testimonial", "ok") : null, r.logo_permission === "Yes" ? badge("Portfolio", "ok") : null)));
+  }));
 }
 
 const emptyFeedback = () =>
@@ -97,7 +113,7 @@ async function renderList(ctx) {
     bar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.filter === active.id)));
     note.hidden = active.id !== "attention";
     note.textContent = NEEDS_ATTENTION_HINT;
-    const keys = ["client", "date", "satisfaction", "recommend", "improvement", "testimonial", "logo", "revenue", "view"];
+    const keys = ["client", "date", "satisfaction", "recommend", "permissions", "view"];
     results.replaceChildren(
       shown.length
         ? responseTable(shown, keys)
@@ -120,6 +136,13 @@ async function renderList(ctx) {
   paint();
 
   const share = await sharePanel();
+  const avg = (k) => (rows.length ? rows.reduce((a, r) => a + (Number(r[k]) || 0), 0) / rows.length : null);
+  const unrev = rows.filter((r) => "reviewed_at" in r && !r.reviewed_at).length, low = rows.filter(needsAttention).length;
+  const stats = rows.length ? h("div", { class: "rk-stats" },
+    statCard({ label: "Responses", value: String(data.total), hint: unrev ? `${unrev} not reviewed` : "all reviewed", tone: unrev ? "warn" : "" }),
+    statCard({ label: "Satisfaction", value: avg("satisfaction").toFixed(1), hint: "average out of 10", meter: avg("satisfaction") / 10 }),
+    statCard({ label: "Would recommend", value: avg("recommend").toFixed(1), hint: "average out of 10", meter: avg("recommend") / 10 }),
+    statCard({ label: "Needs attention", value: String(low), hint: low ? "low scores or a worse site" : "nothing flagged", tone: low ? "warn" : "ok" })) : null;
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" },
       h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Feedback"),
@@ -127,7 +150,8 @@ async function renderList(ctx) {
       h("div", { class: "adm-actions" }, h("a", { class: "btn btn--secondary", href: "/api/admin/feedback/export", download: "" }, "Export CSV")),
     ),
     feedbackTabs("client"),
-    share,
+    stats,
+    fold({ title: "Share the form and send invitations", meta: "Link, copy and invitation email", body: share }),
     data.reviewed_supported ? null : h("p", { class: "adm-banner" }, "Reviewed tracking is off. Apply migrations/0002_add_reviewed_at.sql in the D1 console to enable it."),
     rows.length ? bar : null,
     note,
@@ -218,16 +242,16 @@ async function renderDetail(ctx, id) {
       h("div", { class: "adm-score" }, h("p", { class: "adm-metric__label" }, "Would recommend"), h("div", { class: "adm-score__value" }, String(r.recommend), h("span", { class: "adm-score__max" }, "/ 10")), meter10(r.recommend)),
     )),
 
-    section("Experience", spec(RATING_LABELS.map(([k, label]) => [label, rating5(r[k])]))),
-    section("Improvement", spec([["Compared with previous website", improvementText(r.improvement)]])),
-    section("Business impact", impact.length ? list(withOther(impact, r.impact_other)) : null),
-    section("Value", spec([["Fair price at market rates", r.fair_price], ["Annual revenue", has(r.revenue) ? r.revenue : h("span", { class: "adm-muted" }, "Not answered")]])),
-
     section("Written feedback", spec([["What they like most", r.liked, true], has(r.could_improve) ? ["What could be better", r.could_improve, true] : null], "adm-spec--text")),
 
     hasTestimonialBlock ? section("Testimonial",
       has(r.testimonial) ? h("blockquote", { class: "adm-quote", text: r.testimonial }) : null,
       spec([["Permission to use", r.testimonial_permission], attribution.length ? ["Attribution", attribution.join(" · ")] : null])) : null,
+
+    section("Experience", spec(RATING_LABELS.map(([k, label]) => [label, rating5(r[k])]), "adm-spec--grid")),
+    section("Improvement", spec([["Compared with previous website", improvementText(r.improvement)]])),
+    section("Business impact", impact.length ? list(withOther(impact, r.impact_other)) : null),
+    section("Value", spec([["Fair price at market rates", r.fair_price], ["Annual revenue", has(r.revenue) ? r.revenue : h("span", { class: "adm-muted" }, "Not answered")]])),
 
     section("Portfolio permission", spec([["Display name and logo as a client", r.logo_permission]])),
     section("Future services", services.length ? list(withOther(services, r.services_other)) : null),

@@ -2,6 +2,7 @@
    Settings; here Admin decides how it is presented to THIS client: the order (their own, else the global one), a Recommended label, and whether a service is shown, hidden, or left out because the
    client already has it. Services the client already has, or that Framework is already doing for them, are never promoted, whatever is set here. Server text is never inserted as HTML. */
 import { h, api, errorState } from "./ui.js";
+import { fold, badge } from "./kit.js";
 
 const STATE = { automatic: "Shown", hidden: "Hidden from this client", owned: "Already has it (not promoted)" };
 const ERROR = {
@@ -20,6 +21,7 @@ export async function render(orgId, ctx) {
   const root = h("div", { class: "adm-page adm-clsvc" });
   const live = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
   let busy = false;
+  const openSvc = new Set(); // which services are open, kept across a save
   const canWrite = () => Boolean(data.capabilities && data.capabilities.writes);
   const say = (text, tone = "info") => { live.textContent = text; live.className = "adm-msg is-" + tone; live.setAttribute("role", tone === "error" ? "alert" : "status"); live.hidden = !text; if (text) live.focus({ preventScroll: false }); };
 
@@ -37,9 +39,9 @@ export async function render(orgId, ctx) {
     const rec = h("input", { id: k + "-rec", type: "checkbox", checked: sv.recommended ? true : null, disabled: canWrite() ? null : true });
     const mv = (dir, label) => h("button", { class: "btn btn--secondary adm-small", type: "button", disabled: canWrite() && !(dir === "up" ? i === 0 : i === all.length - 1) ? null : true, "aria-label": `${label}: ${sv.name}`, onclick: () => act({ key: sv.key, move: dir }, `${sv.name} moved ${dir === "up" ? "up" : "down"} for this client.`) }, label);
     const flags = [sv.recommended ? "Recommended" : null, sv.state === "hidden" ? "Hidden" : null, sv.state === "owned" ? "Already has it" : null, sv.autoHas && !sv.state ? "Already being done by Framework" : null, !sv.enabled ? "Switched off for everyone" : null].filter(Boolean);
-    return h("li", { class: "adm-clsvc__row" },
-      h("div", { class: "adm-clsvc__what" }, h("span", { class: "adm-clsvc__pos", "aria-hidden": "true", text: String(i + 1).padStart(2, "0") }), h("div", null, h("p", { class: "adm-req__label", text: sv.name }), sv.category ? h("p", { class: "adm-req__auto", text: sv.category }) : null,
-        flags.length ? h("p", { class: "adm-clsvc__flags" }, flags.map((f) => h("span", { class: "adm-chip", text: f }))) : null)),
+    const item = fold({ number: String(i + 1).padStart(2, "0"), title: sv.name, meta: sv.category || null, open: openSvc.has(sv.key),
+      badges: flags.length ? flags.map((f) => badge(f, f === "Recommended" ? "ok" : "")) : badge("Shown", "ok"),
+      body:
       h("div", { class: "adm-clsvc__set" },
         h("div", { class: "adm-field" }, h("label", { for: k + "-st", text: "Visibility for this client" }), stateSel),
         h("div", { class: "adm-field" }, h("label", { for: k + "-n", text: "Note" }), note),
@@ -47,7 +49,9 @@ export async function render(orgId, ctx) {
         canWrite() ? h("div", { class: "adm-actions" },
           h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => act({ key: sv.key, state: stateSel.value, ...(stateSel.value === "automatic" ? {} : { note: note.value }) }, `${sv.name}: visibility saved.`) }, "Save visibility"),
           h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => act({ key: sv.key, recommended: rec.checked }, `${sv.name}: ${rec.checked ? "marked Recommended" : "no longer Recommended"} for this client.`) }, "Save Recommended"),
-          mv("up", "Move up"), mv("down", "Move down")) : null));
+          mv("up", "Move up"), mv("down", "Move down")) : null) });
+    item.addEventListener("toggle", () => { if (item.open) openSvc.add(sv.key); else openSvc.delete(sv.key); });
+    return h("li", { class: "adm-clsvc__row" }, item);
   }
 
   function draw() {

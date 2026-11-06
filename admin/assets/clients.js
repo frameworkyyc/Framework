@@ -2,6 +2,7 @@
    Access management lives in clients-access.js; the Business Profile review below stays read-only. */
 
 import { h, api, fmtDate, stateBlock } from "./ui.js";
+import { statCard, searchBox } from "./kit.js";
 import { newClientPanel, accessSections } from "./clients-access.js";
 import { actionsMenu, deleteClient, restoreClient } from "./clients-delete.js";
 import { dashboard, sectionMap, stepAccordion, disclosure, chip, icon, STATE_TEXT } from "./client-dashboard.js";
@@ -58,14 +59,28 @@ async function renderList(ctx) {
         h("span", { class: "adm-clientrow__date", text: "Deleted " + fmtDate(c.archived_at) })),
       writes ? h("button", { class: "btn btn--secondary adm-small", type: "button", "aria-label": `Restore ${c.name}`, onclick: () => restoreClient(c, { notify: ctx.notify, after: done }) }, "Restore") : null))) }) : null;
   const create = newClientPanel({ navigate: ctx.navigate, writesEnabled: writes });
+  // At a glance: how many clients, how far their Business Profiles are, and who has not started. Filtering by name only hides rows on this page; nothing is changed.
+  const pcts = rows.map((c) => (c.profile ? Math.max(0, Math.min(100, Number(c.profile.percent) || 0)) : null)).filter((n) => n !== null);
+  const avgPct = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null, notStarted = pcts.filter((n) => n === 0).length;
+  const stats = rows.length ? h("div", { class: "rk-stats", role: "group", "aria-label": "Summary" },
+    statCard({ label: "Clients", value: String(rows.length), hint: deleted.length ? `${deleted.length} deleted` : "active" }),
+    avgPct === null ? null : statCard({ label: "Business Profile", value: avgPct + "%", hint: "average completion", meter: avgPct / 100 }),
+    avgPct === null ? null : statCard({ label: "Not started", value: String(notStarted), hint: notStarted ? "no Business Profile answers yet" : "everyone has started", tone: notStarted ? "warn" : "ok" })) : null;
+  const find = rows.length >= 6 ? searchBox({ label: "Find a client", onInput: (q) => {
+    let n = 0;
+    list.querySelectorAll("li.adm-clientitem").forEach((li) => { const hit = !q || li.textContent.toLowerCase().includes(q); li.hidden = !hit; if (hit) n += 1; });
+    status.textContent = q ? `${plural(n, "organization")} match.` : `${plural(rows.length, "organization")}.`;
+  } }) : null;
+  const status = h("p", { class: "adm-sub", role: "status" }, `${plural(rows.length, "organization")}.`);
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Clients"),
       h("p", { class: "adm-sub" }, h("span", { class: "adm-sub--full" }, "Client organizations, the people who can open their portal, and their Business Profiles."), h("span", { class: "adm-sub--short" }, "Manage your client organizations."))), h("div", { class: "adm-actions" }, create.button)),
     writes ? null : h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at clients, but not create them or change who has access."),
     create.panel,
     data.profile_available ? null : h("p", { class: "adm-banner" }, "Business Profile data isn’t available on this deployment (its database migration hasn’t been applied)."),
+    stats, find,
     rows.length ? list : stateBlock({ title: "No client organizations yet", body: writes ? "Use New client to add the first one, then invite its first owner." : "Nothing has been created yet. Changes are switched off on this site." }),
-    rows.length ? h("p", { class: "adm-sub", role: "status" }, `${plural(rows.length, "organization")}.`) : null,
+    rows.length ? status : null,
     trash,
   );
   return { title: "Clients", node };

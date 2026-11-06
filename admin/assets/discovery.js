@@ -1,8 +1,9 @@
 /* Framework Admin — Discovery assessments: /admin/discovery (assign and track), /admin/discovery/content (edit the questions, options and reference pictures),
    /admin/discovery/<client>/<assessment> (links, what the recipient answered, files, and the creative brief). Server text is never inserted as HTML. A secret link is
    shown once, when it is made, and never again (only its hash is stored). */
-import { h, api, fmtDateTime, errorState, confirmDialog } from "./ui.js";
-import { badge, statCard, card, fold, foldControls, barList, choiceGroups, attentionList } from "./kit.js";
+import { h, api, fmtDate, fmtDateTime, errorState, confirmDialog } from "./ui.js";
+import { badge, statCard, emptyState, card, fold, foldControls, barList, choiceGroups, attentionList } from "./kit.js";
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 
 const STATUS = { not_started: ["Not started", "pending"], in_progress: ["In progress", "warn"], submitted: ["Submitted", "ok"], reviewed: ["Reviewed", "ok"] };
 const statusChip = (s) => h("span", { class: "adm-chip adm-chip--" + (STATUS[s] || ["", "pending"])[1], text: (STATUS[s] || [s])[0] });
@@ -18,10 +19,10 @@ const errorText = (err) => ERROR[err && err.code] || "That didn’t work and not
 const orgHref = (org) => "/admin/clients/" + encodeURIComponent(org);
 const detailHref = (org, id) => `/admin/discovery/${encodeURIComponent(org)}/${encodeURIComponent(id)}`;
 
-function shell(root, { title, sub, back }) {
+function shell(root, { title, sub, back, actions }) {
   const live = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
   const say = (text, tone = "info") => { live.textContent = text; live.className = "adm-msg is-" + tone; live.setAttribute("role", tone === "error" ? "alert" : "status"); live.hidden = !text; if (text && tone === "error") live.focus(); };
-  return { say, head: [back || null, h("div", { class: "adm-idhead" }, h("div", { class: "adm-idhead__text" }, h("span", { class: "eyebrow" }, "Discovery"), h("h1", { class: "adm-title", tabindex: "-1" }, title), sub ? h("p", { class: "adm-sub" }, sub) : null)), live] };
+  return { say, head: [back || null, h("div", { class: "adm-idhead" }, h("div", { class: "adm-idhead__text" }, h("span", { class: "eyebrow" }, "Discovery"), h("h1", { class: "adm-title", tabindex: "-1" }, title), sub ? h("p", { class: "adm-sub" }, sub) : null), actions ? h("div", { class: "adm-idhead__actions" }, actions) : null), live] };
 }
 
 export async function render(ctx) {
@@ -40,7 +41,7 @@ async function listPage(ctx) {
   try { [data, clients, ret] = await Promise.all([api("/discovery"), api("/clients"), api("/discovery/retention").catch(() => null)]); } catch (err) { return { title: "Discovery", node: h("div", { class: "adm-page" }, errorState(err, ctx.retry)) }; }
   const root = h("div", { class: "adm-page adm-dsc" });
   const writes = Boolean(data.capabilities && data.capabilities.writes);
-  const s = shell(root, { title: "Brand Discovery", sub: h("span", null, "Visual assessments that help a client or prospect show what they like. Recipients need no account: send them a secure link, or they can complete it in their Client Portal Branding area. Answers never change a brand kit. ", h("a", { class: "adm-link", href: "/admin/discovery/content", "data-link": "" }, "Edit the questions and pictures")) });
+  const s = shell(root, { title: "Brand Discovery", sub: "Visual assessments a client or prospect fills in from a secure link or in their portal. Answers never change a brand kit.", actions: h("a", { class: "btn btn--secondary", href: "/admin/discovery/content", "data-link": "" }, "Edit questions and pictures") });
   const org = h("select", { id: "dsc-org", class: "input" }, h("option", { value: "" }, "Choose a client"), clients.clients.filter((c) => c.status === "active").map((c) => h("option", { value: c.id, selected: new URLSearchParams(location.search).get("org") === c.id ? true : null, text: c.name })));
   const kind = h("select", { id: "dsc-kind", class: "input" }, (data.kinds || []).map((k) => h("option", { value: k.kind, text: k.label })));
   const title = h("input", { id: "dsc-title", class: "input", type: "text", maxlength: "120", value: "Brand Discovery", autocomplete: "off" });
@@ -50,7 +51,6 @@ async function listPage(ctx) {
     if (!org.value) { s.say("Choose a client first.", "error"); return; }
     try { const r = await api("/clients/" + encodeURIComponent(org.value) + "/discovery", { method: "POST", body: { kind: kind.value, title: title.value, recipient_name: who.value || undefined } }); ctx.navigate ? ctx.navigate(detailHref(org.value, r.id)) : (location.href = detailHref(org.value, r.id)); } catch (err) { s.say(errorText(err), "error"); }
   } },
-    h("h2", { class: "adm-h2" }, "Assign a new assessment"),
     h("div", { class: "adm-dsc__fields" },
       h("div", { class: "adm-field" }, h("label", { for: "dsc-org", text: "Client" }), org), h("div", { class: "adm-field" }, h("label", { for: "dsc-kind", text: "Type" }), kind),
       h("div", { class: "adm-field" }, h("label", { for: "dsc-title", text: "Title" }), title), h("div", { class: "adm-field" }, h("label", { for: "dsc-who", text: "Recipient" }), who)),
@@ -60,17 +60,25 @@ async function listPage(ctx) {
   const list = h("div", { class: "adm-dsc__list" });
   function draw() {
     const rows = data.assessments.filter((a) => !filter.value || a.status === filter.value);
-    list.replaceChildren(rows.length ? h("table", { class: "adm-table" }, h("thead", null, h("tr", null, ["Client", "Assessment", "Status", "Answered", "Files", "Links", "Created"].map((t) => h("th", { scope: "col", text: t })))),
-      h("tbody", null, rows.map((a) => h("tr", null,
-        h("td", null, h("a", { class: "adm-link", href: orgHref(a.organizationId), "data-link": "" }, a.organizationName)),
-        h("td", null, h("a", { class: "adm-link", href: detailHref(a.organizationId, a.id), "data-link": "" }, a.title), a.recipientName ? h("div", { class: "adm-muted", text: a.recipientName }) : null),
-        h("td", null, statusChip(a.status)), h("td", { text: String(a.answered) }), h("td", { text: String(a.uploads) }), h("td", { text: String(a.activeLinks) }), h("td", { text: fmtDateTime(a.createdAt) }))))) : h("p", { class: "adm-sub", text: data.assessments.length ? "Nothing with that status." : "No assessments yet. Assign one above." }));
+    list.replaceChildren(rows.length ? h("ul", { class: "adm-reqlist", "aria-label": "Assessments" }, rows.map((a) => h("li", null, h("a", { class: "adm-reqrow", href: detailHref(a.organizationId, a.id), "data-link": "" },
+      h("span", { class: "adm-reqrow__main" }, h("span", { class: "adm-reqrow__client", text: a.organizationName }), h("span", { class: "adm-reqrow__title", text: a.title }),
+        h("span", { class: "adm-sub", text: [a.recipientName ? "for " + a.recipientName : "", `${a.answered} answered`, a.uploads ? plural(a.uploads, "file") : "", "created " + fmtDate(a.createdAt)].filter(Boolean).join(" · ") })),
+      h("span", { class: "adm-reqrow__chips" }, statusChip(a.status), a.activeLinks ? badge(plural(a.activeLinks, "active link"), "pending") : null),
+      h("span", { class: "adm-reqrow__go", "aria-hidden": "true", text: "→" }))))) : emptyState({ title: data.assessments.length ? "Nothing with that status" : "No assessments yet", body: data.assessments.length ? null : "Assign the first one with “Assign a new assessment” below." }));
   }
   draw();
+  const count = (st) => data.assessments.filter((a) => a.status === st).length;
+  const stats = data.assessments.length ? h("div", { class: "rk-stats" },
+    statCard({ label: "Assigned", value: String(data.assessments.length), hint: "across all clients" }),
+    statCard({ label: "In progress", value: String(count("in_progress") + count("not_started")), hint: count("not_started") ? `${count("not_started")} not started` : "being filled in", tone: count("in_progress") ? "warn" : "" }),
+    statCard({ label: "Ready to review", value: String(count("submitted")), hint: "submitted by the client", tone: count("submitted") ? "ok" : "" }),
+    statCard({ label: "Reviewed", value: String(count("reviewed")), hint: "done" })) : null;
   root.replaceChildren(...[...s.head, !data.available ? h("p", { class: "adm-banner" }, "Discovery needs a database update that hasn’t been applied here yet. Nothing is lost: it will appear here once it is.") : null,
     !data.capabilities.enabled ? h("p", { class: "adm-banner" }, "Discovery is switched off for clients on this site (PORTAL_DISCOVERY). You can prepare assessments, but links and the Branding card stay inactive until it is on.") : null,
     !writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look, but not change.") : null,
-    data.available ? form : null, h("div", { class: "adm-dsc__bar" }, h("h2", { class: "adm-h2" }, "Assessments"), filter), list, retentionPanel(ret, clients, writes, s)].filter(Boolean));
+    stats, h("div", { class: "adm-dsc__bar" }, h("h2", { class: "adm-h2" }, "Assessments"), filter), list,
+    data.available ? fold({ title: "Assign a new assessment", meta: "Choose a client, then share a secure link", open: !data.assessments.length || Boolean(new URLSearchParams(location.search).get("org")), body: form }) : null,
+    retentionPanel(ret, clients, writes, s)].filter(Boolean));
   return { title: "Discovery", node: root };
 }
 
@@ -105,7 +113,7 @@ function retentionPanel(ret, clients, writes, s) {
       d.available ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary", type: "button", disabled: writes ? null : true, onclick: check }, "Check what would be deleted")) : null].filter(Boolean));
   }
   redraw();
-  return h("section", { class: "adm-dsc__retention", "aria-labelledby": "ret-h" }, h("h2", { class: "adm-h2", id: "ret-h" }, "Retention and deletion"), body);
+  return fold({ title: "Retention and deletion", meta: "How long answers and files are kept", body });
 }
 
 /* ------------------------------------------------------------------ one assessment */
@@ -220,7 +228,7 @@ async function contentPage(ctx) {
   const load = () => api("/discovery/content?kind=brand");
   try { data = await load(); } catch (err) { return { title: "Discovery content", node: h("div", { class: "adm-page" }, errorState(err, ctx.retry)) }; }
   const root = h("div", { class: "adm-page adm-dsc" });
-  const s = shell(root, { title: "Questions and pictures", sub: "Reword, hide, reorder and add options, and attach a real picture to any option. Changes apply to every assessment, including ones in progress. Nothing you change here alters answers already given.", back: h("a", { class: "adm-back", href: "/admin/discovery", "data-link": "" }, "← All assessments") });
+  const s = shell(root, { title: "Questions and pictures", sub: "Reword, hide, reorder and add options, and attach a real picture to any. Changes apply to every assessment, including ones in progress, and never alter answers already given.", back: h("a", { class: "adm-back", href: "/admin/discovery", "data-link": "" }, "← All assessments") });
   const writes = () => Boolean(data.capabilities && data.capabilities.writes);
   let busy = false;
   async function act(body, ok) {
@@ -276,7 +284,7 @@ async function contentPage(ctx) {
   function draw() {
     const open = new Set([...root.querySelectorAll("details.adm-dsc__q[open]")].map((d) => d.id));
     root.replaceChildren(...[...s.head, !data.available ? h("p", { class: "adm-banner" }, "Discovery needs a database update that hasn’t been applied here yet.") : null, !writes() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look, but not change.") : null,
-      h("p", { class: "adm-sub" }, "Built-in options draw a sketch. Text cards (words, fonts, taglines) have no picture to attach."), ...data.questions.map((q) => { const d = question(q); if (open.has(d.id)) d.open = true; return d; })].filter(Boolean));
+      h("p", { class: "adm-sub" }, "Built-in options draw a sketch. Text cards (words, fonts, taglines) have no picture to attach."), h("div", { class: "adm-dsc__qs" }, ...data.questions.map((q) => { const d = question(q); if (open.has(d.id)) d.open = true; return d; }))].filter(Boolean));
   }
   draw();
   return { title: "Discovery content", node: root };

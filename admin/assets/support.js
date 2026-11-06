@@ -132,7 +132,7 @@ export async function render(orgId, ctx, opts = {}) {
 
   function card(r) {
     const host = h("div", { class: "adm-reqbody" });
-    const det = h("details", { class: "adm-acc adm-req", id: "req-" + r.id, open: opened.has(r.id) ? true : null, ontoggle: (ev) => { if (ev.target.open) { opened.add(r.id); openThread(r.id, host); } else opened.delete(r.id); } },
+    const det = h("details", { class: "adm-acc adm-sreq", id: "req-" + r.id, open: opened.has(r.id) ? true : null, ontoggle: (ev) => { if (ev.target.open) { opened.add(r.id); openThread(r.id, host); } else opened.delete(r.id); } },
       h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title" }, r.title), h("span", { class: "adm-acc__meta" },
         r.needsLook ? chip("pending", "New activity", "info") : null, chip(r.closed ? "plain" : "ok", STATUS[r.status]), chip(r.scope === "change" ? "warn" : "plain", r.scope === "change" ? "Change (may be billable)" : "Support"))),
       h("div", { class: "adm-acc__body" }, h("p", { class: "adm-sub", text: `${CATEGORY[r.category]}${r.websiteName ? ` · About website: ${r.websiteName}` : ""} · opened ${fmtDateTime(r.createdAt)} · last message ${fmtDateTime(r.lastMessageAt)}` }), host));

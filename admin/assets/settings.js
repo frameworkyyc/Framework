@@ -4,7 +4,7 @@
    A price is a starting estimate, not a quote: there is no checkout, payment or invoicing. Server text is never inserted as HTML. */
 
 import { contentEditor } from "./service-content.js";
-import { linkCard } from "./kit.js";
+import { linkCard, fold, foldControls, badge } from "./kit.js";
 import { h, api, fmtDate, stateBlock, errorState } from "./ui.js";
 import { BRAND_SECTIONS } from "./brand-sections.js";
 
@@ -74,10 +74,12 @@ async function pricingPage(ctx) {
     }
     row.fields = new Map();
 
-    const group = (title, no, services) => h("section", { class: "adm-pricing__group", "aria-labelledby": `sp-h-${no}` },
-      h("h2", { class: "adm-pricing__h", id: `sp-h-${no}` }, no === "kit" || no === "website" || no === "addon" ? null : h("span", { class: "adm-bk-no", text: no }), title),
-      no === "addon" ? h("p", { class: "adm-sub" }, "The optional services on each client’s Website page. Here you set what they cost; to rename, describe, show, hide or reorder them, use ", h("a", { class: "adm-link", href: "/admin/settings/additional-services", "data-link": "" }, "Additional Services"), ".") : null,
-      h("ul", { class: "adm-pricing__list" }, services.map(row)));
+    const group = (title, no, services) => {
+      const priced = services.filter((x) => state.get(x.key).type === "starting_at" && state.get(x.key).price).map((x) => Number(state.get(x.key).price)).filter(Number.isFinite);
+      return fold({ id: `sp-h-${no}`, title, number: /^\d\d$/.test(no) ? no : null, meta: `${plural(services.length, "service")} · ${priced.length ? "from " + money(Math.min(...priced)) : "custom quote"}`,
+        body: [no === "addon" ? h("p", { class: "adm-sub" }, "The optional services on each client’s Website page. Here you set what they cost; to rename, describe, show, hide or reorder them, use ", h("a", { class: "adm-link", href: "/admin/settings/additional-services", "data-link": "" }, "Additional Services"), ".") : null,
+          h("ul", { class: "adm-pricing__list" }, services.map(row))].filter(Boolean) });
+    };
     const groups = BRAND_SECTIONS.map((sec) => group(sec.title, sec.no, data.services.filter((s) => s.section === sec.key))).concat(group("Complete Brand Kit", "kit", data.services.filter((s) => s.section === "all")), group("Website", "website", data.services.filter((s) => s.section === "website")), group("Additional services", "addon", data.services.filter((s) => s.section === "addon")));
 
     const form = h("form", { class: "adm-form adm-pricing__form", novalidate: true, "aria-label": "Service prices", onsubmit: async (ev) => {
@@ -102,11 +104,12 @@ async function pricingPage(ctx) {
       try { draw(await api("/service-pricing")); } catch { /* the old view stays; the message says what happened */ }
       busy = false; root.removeAttribute("aria-busy");
       speak(outcome.text, outcome.tone);
-    } }, ...groups, h("div", { class: "adm-actions" }, save));
+    } }, h("div", { class: "rk-folds-bar" }, foldControls({ querySelectorAll: (q) => form.querySelectorAll(q) })), ...groups, h("div", { class: "adm-actions adm-pricing__save" }, save));
 
     root.replaceChildren(...[
       h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin · Settings"), h("h1", { class: "adm-title", tabindex: "-1" }, "Service Pricing"),
-        h("p", { class: "adm-sub" }, "What it costs. The starting price of each Branding design service, in Canadian dollars. One price applies to every client. Clients see it quietly beside the request button, only for a section they have nothing in yet, and it is recorded with their request. These are estimates, not quotes: there is no checkout, payment or invoicing here."))),
+        h("p", { class: "adm-sub" }, "The starting price of each service, in Canadian dollars. One price applies to every client. Estimates only, not quotes: there is no checkout or invoicing here."))),
+      fold({ title: "How clients see these prices", body: h("p", { class: "adm-sub" }, "Clients see a price quietly beside the request button, only for a section they have nothing in yet, and it is recorded with their request.") }),
       data.available ? null : h("p", { class: "adm-banner" }, "Service pricing isn’t available on this deployment yet (its database migration hasn’t been applied), so clients see no prices. The values below are the defaults and can’t be saved."),
       data.available && !data.capabilities.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at the prices, but not change them.") : null,
       say,
@@ -131,6 +134,7 @@ const SERVICE_ERRORS = {
 const serviceErrorText = (e) => SERVICE_ERRORS[e && e.code] || (e && e.data && SERVICE_ERRORS[e.data.error]) || "That didn’t work and nothing was changed. Please try again.";
 
 async function servicesPage(ctx) {
+  const openSvc = new Set(); // which services are open, kept across a save
   const busyRef = { busy: false };
   const root = h("div", { class: "adm-page adm-services" });
   const say = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
@@ -178,11 +182,14 @@ async function servicesPage(ctx) {
       priceLine,
       h("div", { class: "adm-actions" }, save, move("up", "Move up"), move("down", "Move down")),
       h("p", { class: "adm-pricing__meta", text: s.stored && s.updatedAt ? `Updated ${fmtDate(s.updatedAt)}${s.updatedBy && !/^migration/.test(s.updatedBy) ? ` by ${s.updatedBy}` : ""}` : "Built-in default" }));
-      return h("div", { class: "adm-services__card" }, basics, contentEditor({ s, data, editable, speak, redraw: async () => { try { draw(await api("/additional-services")); } catch { /* the old view stays */ } }, busyRef }));
+      const body = h("div", { class: "adm-services__card" }, basics, contentEditor({ s, data, editable, speak, redraw: async () => { try { draw(await api("/additional-services")); } catch { /* the old view stays */ } }, busyRef }));
+      const item = fold({ title: s.name, id: "svc-" + s.key, open: openSvc.has(s.key), meta: s.description, badges: badge(s.enabled === false ? "Hidden" : "Shown to clients", s.enabled === false ? "" : "ok"), body });
+      item.addEventListener("toggle", () => { if (item.open) openSvc.add(s.key); else openSvc.delete(s.key); });
+      return item;
     };
     root.replaceChildren(...[
       h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin · Settings"), h("h1", { class: "adm-title", tabindex: "-1" }, "Additional Services"),
-        h("p", { class: "adm-sub" }, "What is offered: the optional services listed under “Additional Services” on every client’s Website page. Edit a service’s name and description, show or hide it, and put the services in order. Each has a Request Service button; a request goes to Framework like any other and never authorizes work."),
+        h("p", { class: "adm-sub" }, "The optional services on every client’s Website page. Edit a service’s name and description, show or hide it, and put the services in order. Each has a Request Service button; a request goes to Framework like any other and never authorizes work."),
         h("p", { class: "adm-sub" }, "What it costs is separate: set or change prices in ", h("a", { class: "adm-link", href: "/admin/settings/service-pricing#sp-h-addon", "data-link": "" }, "Service Pricing"), ". A price appears to clients only when you set one there."))),
       data.available ? null : h("p", { class: "adm-banner" }, "The catalogue can’t be edited on this deployment yet (its database migration hasn’t been applied). Clients see the built-in defaults shown below."),
       data.available && !data.capabilities.writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at the services, but not change them.") : null,
