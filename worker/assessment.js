@@ -359,10 +359,10 @@ export const notifyRecipient = (env) => String(env.ASSESSMENT_NOTIFY_TO || "").t
 export const oneLine = (v, max = 200) => String(v == null ? "" : v).replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 
 /**
- * Send one email through Resend. Never throws. Resolves { ok: true } or { ok: false, error } where `error` is a short,
+ * Send one email through Resend. Never throws. Resolves { ok: true, id? } (the provider's message id) or { ok: false, error } where `error` is a short,
  * secret-free reason that is stored with the request: 'config:<reason>', 'provider <status>: <message>', 'network:<name>'.
  */
-export async function sendEmail(env, { to, replyTo, subject, text, html, idempotencyKey }, fetchImpl = fetch) {
+export async function sendEmail(env, { to, replyTo, subject, text, html, idempotencyKey, headers }, fetchImpl = fetch) {
   const config = emailConfig(env);
   if (!config.ok) {
     console.warn("assessment email not sent: not configured:", config.reason);
@@ -372,10 +372,14 @@ export async function sendEmail(env, { to, replyTo, subject, text, html, idempot
     const res = await fetchImpl("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json", ...(idempotencyKey ? { "Idempotency-Key": String(idempotencyKey).slice(0, 256) } : {}) }, // the provider ignores a repeat with the same key, so a retry can never double-send
-      body: JSON.stringify({ from: config.from, to: [to], reply_to: replyTo, subject, text, html }),
+      body: JSON.stringify({ from: config.from, to: [to], reply_to: replyTo, subject, text, html, ...(headers && typeof headers === "object" && Object.keys(headers).length ? { headers } : {}) }), // optional extra message headers (List-Unsubscribe for outreach)
       signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
     });
-    if (res.ok) return { ok: true };
+    if (res.ok) {
+      let id = null;
+      try { id = (await res.json()).id; } catch { /* no JSON body: the send still succeeded */ }
+      return typeof id === "string" && id ? { ok: true, id: id.slice(0, 100) } : { ok: true }; // the provider's message id, when it gave one (delivery events are matched by it)
+    }
     let message = "";
     try { message = oneLine((await res.json()).message); } catch { /* no JSON body */ }
     const error = `provider ${res.status}${message ? ": " + message : ""}`;

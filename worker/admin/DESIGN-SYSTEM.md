@@ -63,6 +63,7 @@ The sidebar is grouped in `admin.js` (`NAV_GROUPS`: Inbox, Assessments, People, 
 - **Detail**: header (name, status chip), the stat row, folds for the sections.
 - **Hub** (Settings): link cards.
 - **Report** (Demo traffic): a one-line caveat, filters (period, one checkbox) beside the prominent export button, stat cards, a fold per visitor whose body (a timestamped timeline, `.dt-timeline`) loads when opened, then a ruled list of items with a copy button (`.dt-link`) and a closed Manage fold for create, revoke and delete. A colour choice is a square SVG swatch (`.dt-swatch`, fill attribute, no inline style). Details: `worker/DEMO-TRAFFIC.md`.
+- **Leads** (`leads.js`, `lead-panel.js`, `lead-pitch.js`, `lead-review.js`): a **segmented status filter** (`.ld-seg`, counts, scrolls sideways on a phone), ruled lead rows with a tick box, a **sticky bulk bar** (`.ld-bulk`) while anything is selected, a **review screen** (`.ld-mail` blocks, mode banner, one "Send N emails" button; nothing sends without it), and a single-column lead panel: next-action box, status action bar, then folds. Activity is the Demo traffic report (`/admin/leads/activity`).
 - **Form**: labelled fields in one column, the primary button last, the destructive action apart (`.adm-actions__danger`).
 
 ## How each page applies it
