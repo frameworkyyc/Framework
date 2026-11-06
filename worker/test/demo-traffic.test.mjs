@@ -501,3 +501,33 @@ test("wiring: /d/* runs the Worker first, the public routes are in index.js, the
   assert.ok(!/DROP |DELETE FROM|ALTER |\bUPDATE /i.test(sql.replace(/--.*$/gm, "")), "additive only");
   assert.ok(!/ip_?address|user_?agent|\bua\b/i.test(sql.replace(/--.*$/gm, "")), "no column can hold an address or a user agent");
 });
+
+/* ---------------- Do Not Track and Global Privacy Control, enforced on the server ---------------- */
+
+test("opt-out: a request with DNT: 1 or Sec-GPC: 1 creates no journey and no event anywhere (link, events and enquiry)", async () => {
+  const { optedOut } = await import("../demo-traffic.js");
+  assert.equal(optedOut(get("/", { headers: { ...humanHeaders(), DNT: "1" } })), true);
+  assert.equal(optedOut(get("/", { headers: { ...humanHeaders(), "Sec-GPC": "1" } })), true);
+  assert.equal(optedOut(get("/", { headers: { ...humanHeaders(), DNT: "0" } })), false);
+  assert.equal(optedOut(get("/")), false);
+
+  for (const optHeader of [{ DNT: "1" }, { "Sec-GPC": "1" }]) {
+    const w = world();
+    const { token } = await addLink(w);
+    // the tracking link still redirects to /demos/ like any visit, but writes nothing and carries no journey id
+    const r = await handleDemoLink(get("/d/" + token, { headers: { ...humanHeaders(), ...optHeader } }), w.env);
+    assert.equal(r.status, 302);
+    assert.equal(r.headers.get("Location"), ORIGIN + "/demos/");
+    // an events request from an opted-out client is accepted and dropped
+    const e = await handleDemoEvents(ev(JID, [{ t: "view" }, { t: "active" }, { t: "company", v: "Summit Fencing" }], { headers: { ...humanHeaders(), ...optHeader } }), w.env);
+    assert.equal(e.status, 204);
+    assert.equal(w.q("SELECT count(*) AS n FROM demo_journeys")[0].n, 0);
+    assert.equal(w.q("SELECT count(*) AS n FROM demo_events")[0].n, 0);
+    // an enquiry sent with the header does not record a journey either, and still succeeds
+    const ENV = { ...w.env, RESEND_API_KEY: "re_test", ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", ASSESSMENT_NOTIFY_TO: "hello@frameworkco.ca" };
+    const post = new Request(ORIGIN + "/api/contact", { method: "POST", headers: { "Content-Type": "application/json", Origin: ORIGIN, ...optHeader }, body: JSON.stringify({ name: "A", email: "a@b.ca", message: "hi", elapsed_ms: 8000, journey: JID }) });
+    assert.equal((await handleContactSubmit(post, ENV, { fetch: async () => new Response("{}", { status: 200 }) })).status, 200);
+    assert.equal(w.q("SELECT count(*) AS n FROM demo_journeys")[0].n, 0);
+    assert.equal(w.q("SELECT count(*) AS n FROM demo_events")[0].n, 0);
+  }
+});
