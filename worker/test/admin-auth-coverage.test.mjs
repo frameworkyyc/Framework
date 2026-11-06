@@ -25,6 +25,7 @@ const API = [
   ["GET", "/api/admin/approved-emails"], ["POST", "/api/admin/approved-emails"], ["POST", "/api/admin/approved-emails/remove"], ["POST", "/api/admin/approved-emails/import"],
   ["GET", `/api/admin/clients/${UUID}/invoices`], ["GET", `/api/admin/clients/${UUID}/support`], ["GET", `/api/admin/clients/${UUID}/branding`], ["GET", `/api/admin/clients/${UUID}/branding/files/${UUID}/download`],
   ["GET", "/api/admin/support"], ["GET", `/api/admin/clients/${UUID}/websites/${UUID}/seo/keywords`], ["POST", `/api/admin/clients/${UUID}/websites/${UUID}/seo/keywords/${UUID}/checks`], ["GET", "/api/admin/requests"], ["GET", "/api/admin/requests/attention"], ["POST", "/api/admin/requests/settings"], ["GET", `/api/admin/clients/${UUID}/requests`], ["POST", `/api/admin/clients/${UUID}/requests/${UUID}/status`], ["POST", `/api/admin/clients/${UUID}/requests/${UUID}/quotes`], ["GET", "/api/admin/services/attention"], ["POST", "/api/admin/services/notifications/process"],
+  ["GET", `/api/admin/clients/${UUID}/discovery/${UUID}/export.pdf`], ["GET", `/api/admin/clients/${UUID}/profile-export`], ["GET", `/api/admin/clients/${UUID}/profile-export.pdf`],
   ["GET", "/api/admin/feedback"], ["GET", "/api/admin/portal-feedback"], ["GET", "/api/admin/assessments"], ["GET", "/api/admin/database"], ["GET", "/api/admin/zz-not-a-route"],
 ];
 
