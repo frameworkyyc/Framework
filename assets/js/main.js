@@ -37,9 +37,18 @@
   });
 
   /* ---- Contact form ----
-     Validates required fields, then opens the visitor's email app with the message pre-filled. */
+     Validates required fields, then sends the message through /api/contact (worker/contact.js). If sending fails the visitor is told so and given the email address. */
   var form = document.getElementById("contact-form");
   if (!form) return;
+
+  /* Arriving from a demo website ("Make it yours"): pre-fill the business name and say which demo they liked. */
+  (function () {
+    var q = new URLSearchParams(window.location.search), biz = (q.get("business") || "").replace(/[\u0000-\u001F<>]/g, "").trim().slice(0, 60);
+    var demos = { "fence-deck": "Fence & Decks", landscaping: "Landscaping", renovations: "Renovations", "general-contractor": "General Contractor" };
+    var demo = demos[q.get("demo")], bizInput = document.getElementById("business"), msg = document.getElementById("message");
+    if (biz && bizInput && !bizInput.value) bizInput.value = biz;
+    if (demo && msg && !msg.value) msg.value = "I'd like a website like the " + demo + " demo" + (biz ? ", made for " + biz : "") + ".";
+  })();
 
   var success = document.getElementById("form-success");
   var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -61,29 +70,66 @@
     });
   });
 
+  var errorBox = document.getElementById("form-error");
+  var submitBtn = form.querySelector('[type="submit"]');
+  var loadedAt = Date.now();
+  var submissionId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : String(loadedAt) + "-" + Math.random().toString(16).slice(2); // one id per attempt, reused on retry
+  var mailto = form.dataset.mailto || "hello@frameworkco.ca";
+
+  /* Cloudflare Turnstile spam check: shown only when the site supplies a key (the same key the assessment form uses). */
+  var turnstileBox = document.getElementById("contact-turnstile");
+  var turnstileToken = "", turnstileWidget = null, turnstileOn = false;
+  if (turnstileBox && window.fetch) {
+    window.fetch("/api/assessment/config").then(function (r) { return r.ok ? r.json() : null; }).then(function (cfg) {
+      if (!cfg || !cfg.turnstileSiteKey) return;
+      turnstileOn = true; turnstileBox.hidden = false;
+      var s = document.createElement("script");
+      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true;
+      s.onload = function () {
+        if (!window.turnstile) return;
+        turnstileWidget = window.turnstile.render(turnstileBox, { sitekey: cfg.turnstileSiteKey,
+          callback: function (t) { turnstileToken = t; }, "expired-callback": function () { turnstileToken = ""; }, "error-callback": function () { turnstileToken = ""; } });
+      };
+      document.head.appendChild(s);
+    }).catch(function () { /* no spam check available: the server decides */ });
+  }
+  var resetTurnstile = function () { turnstileToken = ""; if (turnstileWidget !== null && window.turnstile) { try { window.turnstile.reset(turnstileWidget); } catch (e) { /* ignore */ } } };
+
+  var showError = function (text, link) {
+    errorBox.textContent = text;
+    if (link) { var a = document.createElement("a"); a.href = link.href; a.textContent = link.label; errorBox.appendChild(a); errorBox.appendChild(document.createTextNode(".")); }
+    errorBox.hidden = false;
+  };
+  var failure = function () {
+    // Honest failure: the message was not sent. Keep what they typed and offer the direct way in.
+    var val = function (id) { return form.elements[id].value.trim(); };
+    var href = "mailto:" + mailto + "?subject=" + encodeURIComponent("New project enquiry — frameworkco.ca") + "&body=" + encodeURIComponent(val("message"));
+    showError("We couldn't send your message just now. Please try again, or email us directly at ", { href: href, label: mailto });
+    submitBtn.disabled = false; resetTurnstile();
+  };
+
   form.addEventListener("submit", function (e) {
     e.preventDefault();
+    errorBox.hidden = true;
 
     var firstInvalid = null;
     form.querySelectorAll("[required]").forEach(function (input) {
       if (!validateField(input) && !firstInvalid) firstInvalid = input;
     });
     if (firstInvalid) { firstInvalid.focus(); return; }
+    if (turnstileOn && !turnstileToken) { showError("Please complete the check above, then send your message."); return; }
 
     var val = function (id) { return form.elements[id].value.trim(); };
-    var lines = ["Name: " + val("name"), "Email: " + val("email")];
-    if (val("business")) lines.push("Business: " + val("business"));
-    if (val("project_type")) lines.push("Project type: " + val("project_type"));
-    lines.push("", val("message"));
-
-    var href = "mailto:" + form.dataset.mailto +
-      "?subject=" + encodeURIComponent("New project enquiry — frameworkco.ca") +
-      "&body=" + encodeURIComponent(lines.join("\n"));
-
-    form.hidden = true;
-    success.hidden = false;
-    success.focus();
-    window.location.href = href;
+    submitBtn.disabled = true;
+    window.fetch("/api/contact", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: val("name"), email: val("email"), business: val("business"), project_type: val("project_type"), message: val("message"),
+        hp: form.elements.hp ? form.elements.hp.value : "", turnstile_token: turnstileToken, elapsed_ms: Date.now() - loadedAt, submission_id: submissionId, page: window.location.pathname })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("status " + r.status);
+      form.hidden = true; success.hidden = false; success.focus();
+      if (window.fwTrack) window.fwTrack("generate_lead", { form: "contact" });
+    }).catch(failure);
   });
 })();
 

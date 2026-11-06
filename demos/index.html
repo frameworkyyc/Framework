@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo websites — Framework</title>
+<meta name="description" content="Explore live sample websites for contractors and trades, then make one yours: add your name, colour and photos and enquire with Framework.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@600,700&f[]=general-sans@400,500,600&display=swap">
+<link rel="stylesheet" href="showroom.css">
+</head>
+<body>
+<header><div class="wrap">
+  <a class="brand" href="../index.html" aria-label="Framework home"><svg viewBox="0 0 1092 1092" aria-hidden="true"><rect width="1092" height="1092" fill="#0A0A0A"/><path fill="#FFFFFF" d="M302 245H815V347H411V741L302 851Z"/><path fill="#FFFFFF" d="M435 517L512 440H815V545H534V842H435Z"/></svg>Framework</a>
+  <a class="btn btn--primary" href="../contact.html" data-enquire>Start a project</a>
+</div></header>
+<main>
+  <section class="wrap intro">
+    <div><p class="eyebrow">— Demo websites</p><h1>Your work deserves a website this good.</h1></div>
+    <p><span id="for-line"></span>Four live sample sites for the trades. <strong>Explore them below</strong>, then make one yours: add your name, colour and photos in seconds and see it on the site.</p>
+  </section>
+
+  <section class="show" id="showroom" aria-label="Live demo showroom">
+    <div class="wrap show__grid">
+      <div>
+        <div class="show__list" role="tablist" aria-label="Demo websites">
+          <button class="pick" role="tab" type="button" data-demo="fence-deck" aria-selected="true" style="--ac:#E07B4A"><img src="../assets/img/demos/fence-deck/tab.jpg" alt="" width="96" height="60" loading="lazy"><span class="pick__t"><b>Fence &amp; Decks</b><em>Ridgeline Fence &amp; Deck</em><small>Rugged and craft-built. Boards lift away to reveal the work, and you can price a fence or deck live.</small></span></button>
+          <button class="pick" role="tab" type="button" data-demo="landscaping" aria-selected="false" style="--ac:#8CC46A"><img src="../assets/img/demos/landscaping/tab.jpg" alt="" width="96" height="60" loading="lazy"><span class="pick__t"><b>Landscaping</b><em>Foothills Grove Landscaping</em><small>Calm and organic. An iris opens on the yard, then watch it through four Alberta seasons.</small></span></button>
+          <button class="pick" role="tab" type="button" data-demo="renovations" aria-selected="false" style="--ac:#D9BF98"><img src="../assets/img/demos/renovations/tab.jpg" alt="" width="96" height="60" loading="lazy"><span class="pick__t"><b>Renovations</b><em>Hearth &amp; Hall Renovations</em><small>Refined and editorial. Doors part on the finished room, and before-and-afters reveal with a drag.</small></span></button>
+          <button class="pick" role="tab" type="button" data-demo="general-contractor" aria-selected="false" style="--ac:#F2B705"><img src="../assets/img/demos/general-contractor/tab.jpg" alt="" width="96" height="60" loading="lazy"><span class="pick__t"><b>General Contractor</b><em>Keystone Build Co.</em><small>Bold and industrial. Slams in on schedule, with a live project tracker clients can scrub.</small></span></button>
+        </div>
+        <p class="show__note">Every demo also draws itself as you scroll: a line-drawing build of the trade's work.</p>
+      </div>
+
+      <div class="stage">
+        <div class="stage__bar">
+          <div class="seg" role="group" aria-label="Preview size"><button type="button" class="desk" data-mode="desktop" aria-pressed="true">Desktop</button><button type="button" data-mode="phone" aria-pressed="false">Phone</button></div>
+          <a class="stage__open" href="fence-deck.html" data-open target="_blank" rel="noopener">Open full site ↗</a>
+        </div>
+        <div class="device" data-mode="desktop">
+          <div class="chrome"><i></i><i></i><i></i><span class="url" data-url>ridgelinefence.ca</span></div>
+          <div class="view" data-view>
+            <span class="view__load" data-load>Loading preview</span>
+            <iframe title="Live demo website preview" data-frame loading="lazy"></iframe>
+            <button class="cover" type="button" data-cover aria-label="Click to explore the live demo"><span>Click to explore ↕</span></button>
+          </div>
+        </div>
+        <div class="brand-bar" aria-label="Make it yours">
+          <label>Your business name<input type="text" maxlength="60" placeholder="e.g. Total Fencing Solutions" autocomplete="organization" data-name></label>
+          <fieldset><legend>Your colour</legend><div class="sw" data-sw></div></fieldset>
+          <label>Your photos<span class="up"><input type="file" accept="image/jpeg,image/png,image/webp" multiple data-photos><span data-photos-note>Add photos</span></span></label>
+        </div>
+        <div class="stage__cta">
+          <p data-privacy>Try it: type your name, pick a colour, add a photo of your work. It stays in your browser: nothing is uploaded or saved.</p>
+          <button type="button" class="reset" data-reset>Reset</button>
+          <a class="btn btn--light" href="../contact.html" data-enquire>Get this made for me →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap cards" aria-labelledby="cards-h">
+    <h2 id="cards-h">Four trades. Four personalities.</h2>
+    <p class="cards__lead">Each site is designed around how that trade wins work. Open one in full, or look at it above.</p>
+    <div class="cgrid">
+      <a class="card" href="fence-deck.html" data-card="fence-deck" style="--ac:#B5552B"><span class="card__img"><img src="../assets/img/demos/fence-deck/thumb.jpg" alt="A finished composite deck with outdoor furniture" width="900" height="560" loading="lazy"><span class="card__tag">Rugged</span></span><span class="card__b"><h3>Fence &amp; Decks</h3><p>Fencing, decks, gates and repairs.</p><ul class="card__feat"><li>Live price estimator</li><li>Boards-lift cinematic opening</li></ul><span class="card__go">Open site →</span></span></a>
+      <a class="card" href="landscaping.html" data-card="landscaping" style="--ac:#2F6B3F"><span class="card__img"><img src="../assets/img/demos/landscaping/thumb.jpg" alt="A house with a stone patio and garden" width="900" height="560" loading="lazy"><span class="card__tag">Organic</span></span><span class="card__b"><h3>Landscaping</h3><p>Design, hardscape, sod and maintenance.</p><ul class="card__feat"><li>Four seasons with real weather</li><li>Iris-open hero</li></ul><span class="card__go">Open site →</span></span></a>
+      <a class="card" href="renovations.html" data-card="renovations" style="--ac:#8C6A43"><span class="card__img"><img src="../assets/img/demos/renovations/thumb.jpg" alt="A bright finished kitchen with a large island" width="900" height="560" loading="lazy"><span class="card__tag">Refined</span></span><span class="card__b"><h3>Renovations</h3><p>Kitchens, bathrooms and basements.</p><ul class="card__feat"><li>Drag-to-reveal before and after</li><li>Doors-part opening</li></ul><span class="card__go">Open site →</span></span></a>
+      <a class="card" href="general-contractor.html" data-card="general-contractor" style="--ac:#B98A00"><span class="card__img"><img src="../assets/img/demos/general-contractor/thumb.jpg" alt="A modern two-storey house" width="900" height="560" loading="lazy"><span class="card__tag">Bold</span></span><span class="card__b"><h3>General Contractor</h3><p>Custom homes, additions and fit-outs.</p><ul class="card__feat"><li>Live project tracker</li><li>Slam-in hero and ticker</li></ul><span class="card__go">Open site →</span></span></a>
+    </div>
+  </section>
+
+  <section class="wrap why" aria-labelledby="why-h">
+    <h2 id="why-h">Built to win the job, not just look good.</h2>
+    <div class="why__g">
+      <div><b>Yours in minutes</b><span>Your name, colour, photos and reviews. Nothing generic.</span></div>
+      <div><b>Fast on every phone</b><span>Light, accessible pages. Most visitors will see it on a phone, so we start there.</span></div>
+      <div><b>Made to be enquired about</b><span>Click-to-call, a short quote form and trust signals right where they are needed.</span></div>
+      <div><b>Moves with your trade</b><span>Interactions that show your work: price estimates, schedules, before and afters.</span></div>
+    </div>
+  </section>
+
+  <section class="cta"><div class="wrap">
+    <h2>Like what you see? We'll build yours, with your name, your photos and your reviews.</h2>
+    <a class="btn btn--light" href="../contact.html" data-enquire>Start a project</a>
+  </div></section>
+</main>
+<footer><div class="wrap">© Framework · Calgary, Alberta · <a href="../index.html">frameworkco.ca</a></div></footer>
+<script src="showroom.js" defer></script>
+</body>
+</html>

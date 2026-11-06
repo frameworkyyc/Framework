@@ -32,3 +32,7 @@
   Referrer-Policy: no-referrer
   Cache-Control: no-cache
   X-Frame-Options: DENY
+
+# Demo websites: sample sites shared by link in outreach. Keep the illustrative businesses out of search results.
+/demos/*
+  X-Robots-Tag: noindex, nofollow
