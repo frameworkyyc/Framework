@@ -10,7 +10,7 @@
   function seen(el, cb, margin) { if (!("IntersectionObserver" in window)) { cb(); return; } var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { io.disconnect(); cb(); } }, { threshold: 0.35, rootMargin: margin || "0px" }); io.observe(el); }
 
   /* ---- Opening: headline words, one animation style per trade ---- */
-  var h1 = $(".hero h1");
+  var h1 = $(".hero h1, .c-hero h1");
   if (h1 && motion) {
     var label = h1.textContent.trim(), n = 0;
     h1.setAttribute("aria-label", label);
@@ -43,7 +43,7 @@
   });
 
   if (slug === "fence-deck") {
-    var box = $(".hero__grid .ph");
+    var box = $(".hero__grid .ph, .c-hero__bg");
     if (box && motion) {
       var sl = document.createElement("div"); sl.className = "slats"; sl.setAttribute("aria-hidden", "true");
       for (var i = 0; i < 12; i++) { var s = document.createElement("span"); s.className = "slat"; s.style.setProperty("--i", i); sl.appendChild(s); }
@@ -78,21 +78,21 @@
     }
     function draw() {
       var a = "", ground = 170, W = 600;
-      a += '<path d="M0 ' + ground + 'H600" stroke="#fff" stroke-width="1.5" fill="none"/>';
+      a += '<path d="M0 ' + ground + 'H600" stroke="currentColor" stroke-width="1.5" fill="none"/>';
       if (type === "deck") {
         var bays = clamp(Math.round(area / 90), 2, 7), w = 420 + (area - 80) / 520 * 150, x0 = (W - w) / 2, step = w / bays, top = 98;
-        a += '<path d="M' + x0 + " " + top + "H" + (x0 + w) + "V" + (top + 14) + "H" + x0 + 'Z" stroke="#fff" fill="none" stroke-width="1.6"/>';
-        for (var i = 0; i <= bays; i++) a += '<path d="M' + (x0 + i * step - 4) + " " + (top + 14) + "V" + ground + 'h8V' + (top + 14) + '" stroke="#fff" fill="none" stroke-opacity=".75"/>';
-        if (extra) for (var j = 0; j <= bays; j++) { var px = x0 + j * step; a += '<path d="M' + px + " " + top + "V" + (top - 46) + '" stroke="#fff" fill="none" stroke-width="1.6"/>'; if (j < bays) a += '<path d="M' + px + " " + (top - 46) + "H" + (px + step) + "M" + px + " " + (top - 6) + "H" + (px + step) + '" stroke="#fff" fill="none" stroke-opacity=".8"/><path d="M' + (px + 14) + " " + (top - 6) + "L" + (px + 38) + " " + (top - 40) + '" stroke="#fff" fill="none" stroke-opacity=".3"/>'; }
+        a += '<path d="M' + x0 + " " + top + "H" + (x0 + w) + "V" + (top + 14) + "H" + x0 + 'Z" stroke="currentColor" fill="none" stroke-width="1.6"/>';
+        for (var i = 0; i <= bays; i++) a += '<path d="M' + (x0 + i * step - 4) + " " + (top + 14) + "V" + ground + 'h8V' + (top + 14) + '" stroke="currentColor" fill="none" stroke-opacity=".75"/>';
+        if (extra) for (var j = 0; j <= bays; j++) { var px = x0 + j * step; a += '<path d="M' + px + " " + top + "V" + (top - 46) + '" stroke="currentColor" fill="none" stroke-width="1.6"/>'; if (j < bays) a += '<path d="M' + px + " " + (top - 46) + "H" + (px + step) + "M" + px + " " + (top - 6) + "H" + (px + step) + '" stroke="currentColor" fill="none" stroke-opacity=".8"/><path d="M' + (px + 14) + " " + (top - 6) + "L" + (px + 38) + " " + (top - 40) + '" stroke="currentColor" fill="none" stroke-opacity=".3"/>'; }
       } else {
         var bay = clamp(Math.round(len / 16), 2, 12), w2 = 380 + (len - 20) / 180 * 190, x1 = (W - w2) / 2, st = w2 / bay, h = tall === 6 ? 90 : 60, t = ground - h;
-        for (var k = 0; k <= bay; k++) a += '<path d="M' + (x1 + k * st - 3) + " " + (t - 8) + "V" + (ground + 12) + 'h6V' + (t - 8) + 'Z" stroke="#fff" fill="none" stroke-width="1.5"/>';
+        for (var k = 0; k <= bay; k++) a += '<path d="M' + (x1 + k * st - 3) + " " + (t - 8) + "V" + (ground + 12) + 'h6V' + (t - 8) + 'Z" stroke="currentColor" fill="none" stroke-width="1.5"/>';
         for (var m = 0; m < bay; m++) {
           var bx = x1 + m * st + 4, bw = st - 8;
-          if (type === "cedar") { for (var q = 0; q < Math.floor(bw / 8); q++) a += '<path d="M' + (bx + q * 8) + " " + t + "V" + ground + '" stroke="#fff" stroke-opacity=".55" fill="none"/>'; a += '<path d="M' + bx + " " + (t + 14) + "h" + bw + "M" + bx + " " + (ground - 14) + "h" + bw + '" stroke="#fff" stroke-opacity=".9" fill="none"/>'; }
-          else { for (var q2 = 0; q2 < Math.floor(bw / 10); q2++) a += '<path d="M' + (bx + 3 + q2 * 10) + " " + (t + 4) + "V" + (ground - 4) + '" stroke="#fff" stroke-opacity=".6" fill="none"/>'; a += '<path d="M' + bx + " " + (t + 4) + "h" + bw + "M" + bx + " " + (ground - 4) + "h" + bw + '" stroke="#fff" fill="none"/>'; }
+          if (type === "cedar") { for (var q = 0; q < Math.floor(bw / 8); q++) a += '<path d="M' + (bx + q * 8) + " " + t + "V" + ground + '" stroke="currentColor" stroke-opacity=".55" fill="none"/>'; a += '<path d="M' + bx + " " + (t + 14) + "h" + bw + "M" + bx + " " + (ground - 14) + "h" + bw + '" stroke="currentColor" stroke-opacity=".9" fill="none"/>'; }
+          else { for (var q2 = 0; q2 < Math.floor(bw / 10); q2++) a += '<path d="M' + (bx + 3 + q2 * 10) + " " + (t + 4) + "V" + (ground - 4) + '" stroke="currentColor" stroke-opacity=".6" fill="none"/>'; a += '<path d="M' + bx + " " + (t + 4) + "h" + bw + "M" + bx + " " + (ground - 4) + "h" + bw + '" stroke="currentColor" fill="none"/>'; }
         }
-        if (extra) { var gx = x1 + st * Math.floor(bay / 2); a += '<path d="M' + gx + " " + (t + 6) + "h" + st + "V" + ground + "H" + gx + 'Z" stroke="#fff" stroke-width="2.4" fill="none"/>'; }
+        if (extra) { var gx = x1 + st * Math.floor(bay / 2); a += '<path d="M' + gx + " " + (t + 6) + "h" + st + "V" + ground + "H" + gx + 'Z" stroke="currentColor" stroke-width="2.4" fill="none"/>'; }
       }
       svg.innerHTML = a;
     }
