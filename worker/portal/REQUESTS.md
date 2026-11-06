@@ -31,6 +31,10 @@ Status: **Phase 1 is live on Staging only: migration `0020_requests.sql` is appl
 - Home is one design: greeting, six equal service blocks (Branding, Websites, SEO, Deliverables, Custom Development, Support; 3x2 on desktop, 2x3 on tablet, 1x6 on phones), then "Needs your action" only when something waits, then a compact Business Profile strip. Each block says in words whether the service is Active, needs the person, or is Available to request. Built in `requests/views.js` (`unifiedHome`); flag off keeps the original Home.
 - Header: from 1024px the brand and account controls are row one and the ten navigation links sit on their own ruled row, so they cannot collide; below 1024px the links become a Menu button with the same ten entries. Tested for overflow, overlap and layout shift at 1440, 1366, 1180, 1024, 820, 768, 390 and 320px.
 
+## SEO
+
+`/seo` opens with a search performance dashboard and tracked keywords; see `worker/portal/SEO-MONITORING.md` for how it works, the Search Console and rank-tracking architecture, and the dependencies and costs. Migration `0021_seo_keywords.sql` is proposed, not applied.
+
 ## Safety properties (all tested)
 
 - Flag off: nothing changes; new routes are 404.

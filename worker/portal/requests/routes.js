@@ -12,6 +12,8 @@ import { getClientBrand } from "../repo/brand.js";
 import { listClientWebsites } from "../repo/client-websites.js";
 import { getSeoForClient } from "../repo/website-seo.js";
 import * as supportRepo from "../repo/support.js";
+import * as seoKw from "../repo/seo-keywords.js";
+import { seoDashboard } from "./seo-view.js";
 
 const STATUS = {
   forbidden: 403, not_found: 404, closed: 409, conflict: 409, not_permitted_move: 409, revision_limit: 409, quote_not_open: 409, acceptance_closed: 409, quote_required: 409,
@@ -32,17 +34,42 @@ export function buildRequestRoutes(h) {
 
   /* ---------------------------------------------------------------- sections */
 
-  const section = (kind) => async (ctx, a) => {
+  const section = (kind) => async (ctx, a, _arg, o = {}) => {
     const org = a.membership.organizationId, vm = vmOf(ctx, a);
     const [all, settings, summary] = await Promise.all([repo.listClientRequests(ctx.db, org), settingsMap(ctx), repo.clientSummary(ctx.db, org, { owner: owner(a) })]);
-    let extra = "";
+    let extra = "", lead = "";
     if (kind === "seo") {
       let sites = []; try { sites = await listClientWebsites(ctx.db, org); } catch { sites = []; }
       const seoOf = new Map();
       for (const s of sites) { const d = await getSeoForClient(ctx.db, org, s.id); if (d) seoOf.set(s.id, d); }
+      const flash = ["kw-added", "kw-removed"].includes(ctx.url.searchParams.get("flash")) ? ctx.url.searchParams.get("flash") : "";
+      const keywords = await seoKw.listKeywords(ctx.db, org, { client: true });
+      lead = seoDashboard(vm, { sites, seoOf, keywords, canManage: can(a.membership.role, "seo.keywords"), csrf: pages.csrfOf(ctx, a), flash, error: o.error || "", values: o.values || {} });
       extra = views.seoOverview(vm, sites, seoOf);
     }
-    return shell(ctx, a, KINDS[kind].label, views.sectionPage(vm, kind, { requests: all.filter((r) => r.kind === kind), settings, actions: summary.actions, canRequest: can(a.membership.role, "requests.submit"), extra }));
+    return shell(ctx, a, KINDS[kind].label, views.sectionPage(vm, kind, { requests: all.filter((r) => r.kind === kind), settings, actions: summary.actions, canRequest: can(a.membership.role, "requests.submit"), extra, lead }), o.status || 200);
+  };
+
+  /* tracked keywords (SEO): owners add and stop tracking; Framework records the results */
+  const addKeyword = async (ctx, a) => {
+    const read = await readForm(ctx.request, 8 * 1024);
+    if (read.error) return errorPage(read.error, { ref: ctx.ref });
+    if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) { log(ctx, a, "seo.keyword.add", "rejected", { reason: "csrf", status: 403 }); return errorPage(403, { ref: ctx.ref }); }
+    const values = { keyword: read.fields.get("keyword") || "", location: read.fields.get("location") || "", website: read.fields.get("website") || "" };
+    const res = UUID.test(values.website) ? await seoKw.addKeyword(ctx.db, a.membership.organizationId, values.website, values, a.session.userId, { now: ctx.now }) : { ok: false, error: "not_found" };
+    if (!res.ok) { log(ctx, a, "seo.keyword.add", "refused", { reason: res.error, status: statusOf(res.error) }); return section("seo")(ctx, a, undefined, { error: res.error, values, status: res.error === "not_found" ? 404 : res.error === "duplicate" || res.error === "too_many" ? 409 : 422 }); }
+    log(ctx, a, "seo.keyword.add", "saved", { status: 303 });
+    return redirect(`${vmOf(ctx, a).base}/seo?flash=kw-added#sd-kw-h`);
+  };
+  const removeKeyword = async (ctx, a, id) => {
+    if (!UUID.test(id)) return notFoundPage(ctx);
+    const read = await readForm(ctx.request, 4 * 1024);
+    if (read.error) return errorPage(read.error, { ref: ctx.ref });
+    if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) { log(ctx, a, "seo.keyword.remove", "rejected", { reason: "csrf", status: 403 }); return errorPage(403, { ref: ctx.ref }); }
+    const res = await seoKw.archiveKeyword(ctx.db, a.membership.organizationId, id, a.session.userId, { now: ctx.now });
+    if (!res.ok) return notFoundPage(ctx);
+    log(ctx, a, "seo.keyword.remove", "saved", { status: 303 });
+    return redirect(`${vmOf(ctx, a).base}/seo?flash=kw-removed#sd-kw-h`);
   };
 
   async function legacySupport(ctx, a) {
@@ -178,6 +205,8 @@ export function buildRequestRoutes(h) {
   return [
     { ...on, re: /^\/portal\/o\/([^/]+)\/deliverables$/, action: "requests.view", run: section("deliverable") },
     { ...on, re: /^\/portal\/o\/([^/]+)\/seo$/, action: "requests.view", run: section("seo") },
+    { ...on, re: /^\/portal\/o\/([^/]+)\/seo\/keywords$/, action: "requests.view", postAction: "seo.keywords", bucket: "requests", run: async (ctx, a) => redirect(`${vmOf(ctx, a).base}/seo`), post: addKeyword },
+    { ...on, re: /^\/portal\/o\/([^/]+)\/seo\/keywords\/([^/]+)\/remove$/, action: "requests.view", postAction: "seo.keywords", bucket: "requests", run: async (ctx, a) => redirect(`${vmOf(ctx, a).base}/seo`), post: removeKeyword },
     { ...on, re: /^\/portal\/o\/([^/]+)\/development$/, action: "requests.view", run: section("development") },
     { ...on, re: /^\/portal\/o\/([^/]+)\/requests$/, action: "requests.view", postAction: "requests.submit", bucket: "requests", maxBody: () => BODY, run: hub, post: create },
     { ...on, re: /^\/portal\/o\/([^/]+)\/requests\/new$/, action: "requests.submit", run: newForm },
