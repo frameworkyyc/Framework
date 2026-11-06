@@ -1159,3 +1159,26 @@ details.rk-fold { border: var(--adm-card-border); border-radius: var(--adm-radiu
 .adm-dsc__list { margin-bottom: 24px; }
 .rk-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14px; }
 .rk-find { display: block; width: 100%; max-width: 420px; margin: 0 0 12px; } li.adm-clientitem[hidden] { display: none; }
+/* Approved Emails: the add form is one compact row; addresses are rounded rows */
+.adm-approved__add { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 12px 16px; align-items: end; max-width: none; margin: 0 0 var(--adm-space-3); padding: 16px; border: var(--adm-card-border); border-radius: var(--adm-radius); background: var(--paper); }
+.adm-approved__add .adm-field { margin: 0; } .adm-approved__add .adm-field__hint { grid-column: auto; }
+.adm-approved__add .adm-actions { margin: 0; }
+.adm-approved__list { display: grid; gap: 8px; border-top: 0; }
+.adm-approved__row { padding: 12px 16px; border: var(--adm-card-border); border-radius: var(--adm-radius); background: var(--paper); }
+@media (max-width: 760px) { .adm-approved__add { grid-template-columns: minmax(0, 1fr); } .adm-approved__add .adm-actions .btn { width: 100%; } }
+/* Service Pricing: grouped folds, a save bar that stays in view */
+.adm-pricing__form { display: grid; gap: 8px; }
+.adm-pricing__form details.rk-fold { margin: 0; }
+.rk-folds-bar { display: flex; justify-content: flex-end; margin: 0 0 4px; }
+.adm-pricing__save { position: sticky; bottom: 0; z-index: 2; margin: 8px 0 0; padding: 12px 0; background: linear-gradient(to top, var(--paper) 70%, rgba(255, 255, 255, 0)); }
+.adm-services__list { display: grid; gap: 8px; } .adm-services__list details.rk-fold { margin: 0; }
+.rk-fold__meta { overflow-wrap: anywhere; }
+.adm-clsvc__list { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; } .adm-clsvc__row { border: 0; padding: 0; display: block; } .adm-clsvc__row details.rk-fold { margin: 0; }
+.adm-sreq { margin: 12px 0; }
+/* Feedback detail: the ratings read as a grid of small facts */
+.adm-spec--grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); column-gap: 32px; }
+/* Discovery content editor: each question is a rounded, collapsible row */
+.adm-dsc__qs { display: grid; gap: 8px; margin-top: var(--adm-space-3); }
+.adm-dsc__q { border: var(--adm-card-border); border-radius: var(--adm-radius); background: var(--paper); padding: 0 16px; }
+.adm-dsc__q summary { padding: 14px 0; min-height: 52px; }
+.adm-dsc__q[open] > summary { border-bottom: 1px solid var(--hairline); margin-bottom: 4px; }

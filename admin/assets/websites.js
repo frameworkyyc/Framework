@@ -5,6 +5,7 @@
 
 import { h, api, confirmDialog, errorState, fmtDate } from "./ui.js";
 import { chip } from "./client-dashboard.js";
+import { fold } from "./kit.js";
 import { seoPanel } from "./website-seo.js";
 
 const STATUS = { existing: "Existing website", in_development: "In development", live: "Live" };
@@ -248,12 +249,12 @@ export async function render(orgId, ctx) {
     root.replaceChildren(...[
       back,
       h("div", { class: "adm-idhead" }, h("div", { class: "adm-idhead__text" }, h("span", { class: "eyebrow" }, "Client"), h("h1", { class: "adm-title", tabindex: "-1" }, "Websites"),
-        h("p", { class: "adm-sub" }, `${data.organization.name}. Each website of this client, where it stands and who manages it. Clients see the published ones in the Website section of their portal.`),
-        h("p", { class: "adm-sub adm-ws__services" }, "The “Additional services” offered on this client’s Website page are the same for every client: ", h("a", { class: "adm-link", href: "/admin/settings/additional-services", "data-link": "" }, "manage Additional Services"), " (names, descriptions, order, shown or hidden) or ", h("a", { class: "adm-link", href: "/admin/settings/service-pricing#sp-h-addon", "data-link": "" }, "set their prices in Service Pricing"), ". To reorder, recommend or hide them for this client only, use ", h("a", { class: "adm-link", href: "/admin/clients/" + encodeURIComponent(orgId) + "/additional-services", "data-link": "" }, "this client’s Additional Services"), "."))),
+        h("p", { class: "adm-sub" }, `${data.organization.name}. Each website of this client, where it stands and who manages it. Clients see the published ones in the Website section of their portal.`),)),
       !canWrite() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at the websites, but not change them.") : !data.capabilities.storage ? h("p", { class: "adm-banner" }, "File storage isn’t available on this site, so screenshots can’t be added.") : null,
       live,
       active.length ? h("div", { class: "adm-ws__list" }, active.map(siteCard)) : h("p", { class: "adm-muted" }, "No website yet. A client with no website simply has none listed here: add one when they have one, or when Framework starts building it."),
       adding,
+      fold({ title: "About the Additional services on this page", meta: "Same for every client", body: h("p", { class: "adm-sub adm-ws__services" }, "The “Additional services” offered on this client’s Website page are the same for every client: ", h("a", { class: "adm-link", href: "/admin/settings/additional-services", "data-link": "" }, "manage Additional Services"), " (names, descriptions, order, shown or hidden) or ", h("a", { class: "adm-link", href: "/admin/settings/service-pricing#sp-h-addon", "data-link": "" }, "set their prices in Service Pricing"), ". To reorder, recommend or hide them for this client only, use ", h("a", { class: "adm-link", href: "/admin/clients/" + encodeURIComponent(orgId) + "/additional-services", "data-link": "" }, "this client’s Additional Services"), ".") }),
       archived.length ? h("details", { class: "adm-acc adm-acc--quiet", id: "ws-archived", open: opened.has("ws-archived") ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add("ws-archived"); else opened.delete("ws-archived"); } },
         h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: "Archived websites" }), h("span", { class: "adm-acc__meta" }, chip("plain", String(archived.length)))), h("div", { class: "adm-acc__body" }, archived.map(siteCard))) : null,
     ].filter(Boolean));

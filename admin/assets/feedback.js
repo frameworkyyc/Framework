@@ -242,16 +242,16 @@ async function renderDetail(ctx, id) {
       h("div", { class: "adm-score" }, h("p", { class: "adm-metric__label" }, "Would recommend"), h("div", { class: "adm-score__value" }, String(r.recommend), h("span", { class: "adm-score__max" }, "/ 10")), meter10(r.recommend)),
     )),
 
-    section("Experience", spec(RATING_LABELS.map(([k, label]) => [label, rating5(r[k])]))),
-    section("Improvement", spec([["Compared with previous website", improvementText(r.improvement)]])),
-    section("Business impact", impact.length ? list(withOther(impact, r.impact_other)) : null),
-    section("Value", spec([["Fair price at market rates", r.fair_price], ["Annual revenue", has(r.revenue) ? r.revenue : h("span", { class: "adm-muted" }, "Not answered")]])),
-
     section("Written feedback", spec([["What they like most", r.liked, true], has(r.could_improve) ? ["What could be better", r.could_improve, true] : null], "adm-spec--text")),
 
     hasTestimonialBlock ? section("Testimonial",
       has(r.testimonial) ? h("blockquote", { class: "adm-quote", text: r.testimonial }) : null,
       spec([["Permission to use", r.testimonial_permission], attribution.length ? ["Attribution", attribution.join(" · ")] : null])) : null,
+
+    section("Experience", spec(RATING_LABELS.map(([k, label]) => [label, rating5(r[k])]), "adm-spec--grid")),
+    section("Improvement", spec([["Compared with previous website", improvementText(r.improvement)]])),
+    section("Business impact", impact.length ? list(withOther(impact, r.impact_other)) : null),
+    section("Value", spec([["Fair price at market rates", r.fair_price], ["Annual revenue", has(r.revenue) ? r.revenue : h("span", { class: "adm-muted" }, "Not answered")]])),
 
     section("Portfolio permission", spec([["Display name and logo as a client", r.logo_permission]])),
     section("Future services", services.length ? list(withOther(services, r.services_other)) : null),
