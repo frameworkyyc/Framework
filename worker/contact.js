@@ -10,6 +10,7 @@
  * Configuration is the assessment form's (RESEND_API_KEY, ASSESSMENT_FROM, ASSESSMENT_NOTIFY_TO, TURNSTILE_SITE_KEY / TURNSTILE_SECRET).
  */
 import { json } from "./shared.js";
+import { recordEnquiry, optedOut, JOURNEY_ID } from "./demo-traffic.js";
 import { validEmail, emailConfigured, notifyRecipient, sendEmail, turnstileState, verifyTurnstile, readTextLimited, oneLine } from "./assessment.js";
 
 const MAX_BODY_BYTES = 16 * 1024;
@@ -96,5 +97,9 @@ export async function handleContactSubmit(request, env, deps = {}) {
   const key = typeof body.submission_id === "string" && /^[\w-]{8,64}$/.test(body.submission_id) ? "contact-" + body.submission_id : undefined;
   const sent = await sendEmail(env, { to: notifyRecipient(env), replyTo: data.email, subject: mail.subject, text: mail.text, html: mail.html, idempotencyKey: key }, fetchImpl);
   if (!sent.ok) { console.error("contact email not delivered:", sent.error); return json({ error: "delivery_failed" }, 502); }
+  // Demo-page traffic: note that this journey sent an enquiry (the optional `journey` id from the demo page). Stores nothing from the form, and a failure here never changes the response.
+  if (typeof body.journey === "string" && JOURNEY_ID.test(body.journey)) {
+    try { if (!optedOut(request)) await recordEnquiry(env, body.journey, now); } catch { /* analytics must never affect the enquiry */ }
+  }
   return json({ ok: true });
 }

@@ -9,6 +9,8 @@
  *   POST /api/assessment        Free Online Presence Assessment request (stores in D1, emails Framework)
  *   GET  /api/assessment/config public IDs the page needs (Turnstile site key, Meta Pixel ID)
  *   POST /api/contact           Website contact form (emails Framework; stores nothing)
+ *   GET  /d/<token>             opaque demo tracking link, redirects to /demos/ (worker/demo-traffic.js)
+ *   POST /api/demo-events       anonymous demo-page interaction events (204; stored privately, shown only in Admin)
  *   GET  /api/client-revenue    the combined client revenue total for the homepage (no per-client data)
  *   GET  /api/feedback/export   CSV / JSON export, requires  Authorization: Bearer <FEEDBACK_EXPORT_TOKEN>
  *
@@ -24,6 +26,7 @@ import { handleAdmin } from "./admin/router.js";
 import { combinedRevenue } from "./revenue.js";
 import { handleAssessmentSubmit, handleAssessmentConfig } from "./assessment.js";
 import { handleContactSubmit } from "./contact.js";
+import { handleDemoLink, handleDemoEvents } from "./demo-traffic.js";
 import { handleCardPage } from "./card.js";
 import { handlePortal, portalNotFound } from "./portal/router.js";
 import { runScheduled } from "./portal/scheduled.js";
@@ -331,6 +334,12 @@ export default {
     } catch (err) {
       console.error("assessment error", err && err.message);
       return json({ error: "server_error" }, 500);
+    }
+
+    // Public: demo-page traffic (see worker/demo-traffic.js). /d/<token> is an opaque tracking link that redirects to /demos/; events are anonymous and stored only in PORTAL_DB.
+    if (path.startsWith("/d/")) return handleDemoLink(request, env, deps);
+    if (path === "/api/demo-events") {
+      try { return await handleDemoEvents(request, env, deps); } catch (err) { console.error("demo events error", err && err.message); return new Response(null, { status: 204 }); }
     }
 
     // Public: website contact form (see worker/contact.js).

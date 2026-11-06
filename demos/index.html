@@ -4,91 +4,195 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Demo websites — Framework</title>
-<meta name="description" content="Explore live sample websites for contractors and trades, then make one yours: add your name, colour and photos and enquire with Framework.">
+<meta name="description" content="Choose your trade, your style and your colour, add your company name and watch a sample website take shape. No sign-up.">
 <meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://api.fontshare.com">
 <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
-<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@600,700&f[]=general-sans@400,500,600&display=swap">
-<link rel="stylesheet" href="showroom.css">
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@600,700&f[]=general-sans@400,500,600&f[]=cabinet-grotesk@800&f[]=satoshi@300,500&f[]=gambetta@500&display=swap">
+<link rel="stylesheet" href="studio.css">
 </head>
-<body>
-<header><div class="wrap">
+<body data-track>
+<header class="top"><div class="wrap top__in">
   <a class="brand" href="../index.html" aria-label="Framework home"><svg viewBox="0 0 1092 1092" aria-hidden="true"><rect width="1092" height="1092" fill="#0A0A0A"/><path fill="#FFFFFF" d="M302 245H815V347H411V741L302 851Z"/><path fill="#FFFFFF" d="M435 517L512 440H815V545H534V842H435Z"/></svg>Framework</a>
-  <a class="btn btn--primary" href="../contact.html" data-enquire>Start a project</a>
+  <a class="btn btn--dark" href="../contact.html" data-enquire>Start a project</a>
 </div></header>
+
 <main>
-  <section class="wrap intro">
-    <div><p class="eyebrow">— Demo websites</p><h1>Your work deserves a website this good.</h1></div>
-    <p><span id="for-line"></span>Four live sample sites for the trades. <strong>Explore them below</strong>, then make one yours: add your name, colour and photos in seconds and see it on the site.</p>
+  <section class="wrap hello">
+    <h1><span>Your next customer is looking for a contractor.</span> <span>Will they find you?</span></h1>
   </section>
 
-  <section class="show" id="showroom" aria-label="Live demo showroom">
-    <div class="wrap show__grid">
-      <div>
-        <div class="show__list" role="tablist" aria-label="Demo websites">
-          <button class="pick" role="tab" type="button" data-demo="fence-deck" aria-selected="true" style="--ac:#E07B4A"><img src="../assets/img/demos/fence-deck/tab.jpg" alt="" width="96" height="60" loading="lazy"><span class="pick__t"><b>Fence &amp; Decks</b><em>Ridgeline Fence &amp; Deck</em><small>Rugged and craft-built. Boards lift away to reveal the work, and you can price a fence or deck live.</small></span></button>
-          <button class="pick" role="tab" type="button" data-demo="landscaping" aria-selected="false" style="--ac:#8CC46A"><img src="../assets/img/demos/landscaping/tab.jpg" alt="" width="96" height="60" loading="lazy"><span class="pick__t"><b>Landscaping</b><em>Foothills Grove Landscaping</em><small>Calm and organic. An iris opens on the yard, then watch it through four Alberta seasons.</small></span></button>
-          <button class="pick" role="tab" type="button" data-demo="renovations" aria-selected="false" style="--ac:#D9BF98"><img src="../assets/img/demos/renovations/tab.jpg" alt="" width="96" height="60" loading="lazy"><span class="pick__t"><b>Renovations</b><em>Hearth &amp; Hall Renovations</em><small>Refined and editorial. Doors part on the finished room, and before-and-afters reveal with a drag.</small></span></button>
-          <button class="pick" role="tab" type="button" data-demo="general-contractor" aria-selected="false" style="--ac:#F2B705"><img src="../assets/img/demos/general-contractor/tab.jpg" alt="" width="96" height="60" loading="lazy"><span class="pick__t"><b>General Contractor</b><em>Keystone Build Co.</em><small>Bold and industrial. Slams in on schedule, with a live project tracker clients can scrub.</small></span></button>
-        </div>
-        <p class="show__note">Every demo also draws itself as you scroll: a line-drawing build of the trade's work.</p>
-      </div>
+  <section class="pitch" aria-labelledby="pitch-h">
+    <div class="wrap">
+      <h2 id="pitch-h" class="pitch__h"><span>Get found.</span> <span>Earn trust.</span> <span>Win the enquiry.</span></h2>
+      <p class="pitch__p">We build websites that help customers discover your business on Google, see the quality of your work and take the next step.</p>
+    </div>
+  </section>
 
-      <div class="stage">
-        <div class="stage__bar">
-          <div class="seg" role="group" aria-label="Preview size"><button type="button" class="desk" data-mode="desktop" aria-pressed="true">Desktop</button><button type="button" data-mode="phone" aria-pressed="false">Phone</button></div>
-          <a class="stage__open" href="fence-deck.html" data-open target="_blank" rel="noopener">Open full site ↗</a>
+  <section class="wrap intro" aria-labelledby="intro-h">
+    <h2 id="intro-h">Your work deserves a website this good.</h2>
+    <p>Choose your discipline and see what’s possible.</p>
+  </section>
+
+  <div class="wrap flow" id="flow" data-stage="start">
+    <div class="steps" id="steps">
+
+      <section class="step is-open" id="step-1" data-step="1" aria-labelledby="h-1">
+        <h2 id="h-1" class="step__h"><span class="step__n">1</span><span class="step__t">Choose your discipline</span><span class="step__s" data-summary></span></h2>
+        <div class="step__b">
+          <div class="opts opts--disc" role="radiogroup" aria-labelledby="h-1">
+            <button type="button" role="radio" aria-checked="false" class="opt opt--disc" data-k="d" data-v="general-contractor"><img src="../assets/img/demos/general-contractor/thumb.jpg" alt="" width="900" height="560" decoding="async"><span>General Contracting</span></button>
+            <button type="button" role="radio" aria-checked="false" class="opt opt--disc" data-k="d" data-v="fence-deck"><img src="../assets/img/demos/fence-deck/thumb.jpg" alt="" width="900" height="560" decoding="async"><span>Fence &amp; Decks</span></button>
+            <button type="button" role="radio" aria-checked="false" class="opt opt--disc" data-k="d" data-v="renovations"><img src="../assets/img/demos/renovations/thumb.jpg" alt="" width="900" height="560" decoding="async"><span>Renovations / Restoration</span></button>
+            <button type="button" role="radio" aria-checked="false" class="opt opt--disc" data-k="d" data-v="landscaping"><img src="../assets/img/demos/landscaping/thumb.jpg" alt="" width="900" height="560" decoding="async"><span>Landscaping</span></button>
+          </div>
+          <p class="hint">No account, no email, no sign-up.</p>
         </div>
-        <div class="device" data-mode="desktop">
-          <div class="chrome"><i></i><i></i><i></i><span class="url" data-url>ridgelinefence.ca</span></div>
-          <div class="view" data-view>
-            <span class="view__load" data-load>Loading preview</span>
-            <iframe title="Live demo website preview" data-frame loading="lazy"></iframe>
-            <button class="cover" type="button" data-cover aria-label="Click to explore the live demo"><span>Click to explore ↕</span></button>
+      </section>
+
+      <section class="step" id="step-2" data-step="2" aria-labelledby="h-2" hidden>
+        <h2 id="h-2" class="step__h"><span class="step__n">2</span><span class="step__t">Choose your vibe</span><span class="step__s" data-summary></span></h2>
+        <div class="step__b">
+          <div class="opts opts--vibe" role="radiogroup" aria-labelledby="h-2">
+            <button type="button" role="radio" aria-checked="false" class="opt opt--vibe" data-k="v" data-v="rugged"><b class="vs vs--rugged">Aa</b><span>Rugged</span><small>Bold, heavy, built tough</small></button>
+            <button type="button" role="radio" aria-checked="false" class="opt opt--vibe" data-k="v" data-v="modern"><b class="vs vs--modern">Aa</b><span>Modern</span><small>Clean, crisp, confident</small></button>
+            <button type="button" role="radio" aria-checked="false" class="opt opt--vibe" data-k="v" data-v="minimal"><b class="vs vs--minimal">Aa</b><span>Minimal</span><small>Quiet, spacious, refined</small></button>
+            <button type="button" role="radio" aria-checked="false" class="opt opt--vibe" data-k="v" data-v="friendly"><b class="vs vs--friendly">Aa</b><span>Friendly</span><small>Warm, rounded, welcoming</small></button>
           </div>
         </div>
-        <div class="brand-bar" aria-label="Make it yours">
-          <label>Your business name<input type="text" maxlength="60" placeholder="e.g. Total Fencing Solutions" autocomplete="organization" data-name></label>
-          <fieldset><legend>Your colour</legend><div class="sw" data-sw></div></fieldset>
-          <label>Your photos<span class="up"><input type="file" accept="image/jpeg,image/png,image/webp" multiple data-photos><span data-photos-note>Add photos</span></span></label>
+      </section>
+
+      <section class="step" id="step-3" data-step="3" aria-labelledby="h-3" hidden>
+        <h2 id="h-3" class="step__h"><span class="step__n">3</span><span class="step__t">Choose your colour</span><span class="step__s" data-summary></span></h2>
+        <div class="step__b">
+          <div class="sw" role="radiogroup" aria-labelledby="h-3" id="swatches"></div>
+          <p class="hint" id="colour-name" aria-live="polite">Your colour sets buttons, highlights and details across the site.</p>
         </div>
-        <div class="stage__cta">
-          <p data-privacy>Try it: type your name, pick a colour, add a photo of your work. It stays in your browser: nothing is uploaded or saved.</p>
-          <button type="button" class="reset" data-reset>Reset</button>
-          <a class="btn btn--light" href="../contact.html" data-enquire>Get this made for me →</a>
+      </section>
+
+      <section class="step" id="step-4" data-step="4" aria-labelledby="h-4" hidden>
+        <h2 id="h-4" class="step__h"><span class="step__n">4</span><span class="step__t">Add your company name <em>Optional</em></span><span class="step__s" data-summary></span></h2>
+        <div class="step__b">
+          <form class="name" id="name-form" autocomplete="off">
+            <label for="company">Company name</label>
+            <div class="name__row"><input id="company" name="company" type="text" maxlength="60" placeholder="e.g. Prairie Fence Co." autocomplete="organization" enterkeyhint="done"><button class="btn btn--dark" type="submit">See your name on the website</button></div>
+            <p class="hint">Optional. It appears on your preview and full demo. <button type="button" class="linkbtn" id="name-clear" hidden>Remove it</button></p>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <aside class="stage" id="stage" aria-label="Your website preview" hidden>
+      <div class="stage__bar"><div class="seg" role="group" aria-label="Preview size"><button type="button" data-mode="desktop" aria-pressed="true">Desktop</button><button type="button" data-mode="phone" aria-pressed="false">Phone</button></div></div>
+      <div class="device" id="device" data-mode="desktop">
+        <div class="chrome"><i></i><i></i><i></i><span class="url" id="url">yourcompany.ca</span></div>
+        <div class="view" id="view"><iframe id="frame" title="Preview of your website" tabindex="-1"></iframe><button class="cover" type="button" id="cover" aria-label="Scroll through the preview"><span>Tap to scroll the preview</span></button></div>
+      </div>
+      <a class="open" id="open" href="site.html">Open your website <span aria-hidden="true">→</span></a>
+      <p class="stage__f">Sample business and photos. <a href="../contact.html" data-enquire>Get this made for me</a></p>
+    </aside>
+  </div>
+
+  <section class="wrap sec" aria-labelledby="trade-h">
+    <div class="sec__in">
+      <h2 id="trade-h" class="sec__h">Built by someone who knows the trade.</h2>
+      <div class="sec__b">
+        <p class="sec__strong">Founded by a Calgary carpenter with over 10,000 hours in the trade.</p>
+        <p>Our founder has run crews, coordinated projects from the office and worked across residential, commercial and industrial jobs. That’s why we know what your customers look for before they pick up the phone: proof the work is real, where you work and an easy way to reach you. We build your website around that.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap sec" aria-labelledby="offer-h">
+    <div class="sec__in sec__in--wide">
+      <h2 id="offer-h" class="sec__h">Your website. Handled.</h2>
+      <p class="sec__lead">Each website is scoped to what your business needs now. What can wait, can wait.</p>
+      <div class="cols">
+        <div class="col">
+          <h3 class="col__h">You receive</h3>
+          <ul class="lines">
+            <li>A custom website designed around your trade and your name</li>
+            <li>Pages that say what you do and where you work</li>
+            <li>The writing, so you don’t start from a blank page</li>
+            <li>A site that works on a phone, with a clear way to get in touch</li>
+            <li>A logo and brand too, if you don’t have one yet</li>
+          </ul>
+        </div>
+        <div class="col">
+          <h3 class="col__h">We handle</h3>
+          <ul class="lines">
+            <li>Structure, design, copywriting and build</li>
+            <li>Testing on phones before launch</li>
+            <li>The foundations search engines look for: clear structure, fast pages and guidance on your Google Business Profile</li>
+            <li>Launch, and support after it</li>
+          </ul>
+        </div>
+        <div class="col">
+          <h3 class="col__h">Getting started</h3>
+          <ol class="lines lines--n">
+            <li><b>1</b>Talk to us about what you do, where you work and the jobs you want more of. There’s no obligation past that conversation.</li>
+            <li><b>2</b>Send photos of past work if you have them. If not, we’ll talk about that too.</li>
+            <li><b>3</b>We design, build and launch it.</li>
+          </ol>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="wrap cards" aria-labelledby="cards-h">
-    <h2 id="cards-h">Four trades. Four personalities.</h2>
-    <p class="cards__lead">Each site is designed around how that trade wins work. Open one in full, or look at it above.</p>
-    <div class="cgrid">
-      <a class="card" href="fence-deck.html" data-card="fence-deck" style="--ac:#B5552B"><span class="card__img"><img src="../assets/img/demos/fence-deck/thumb.jpg" alt="A finished composite deck with outdoor furniture" width="900" height="560" loading="lazy"><span class="card__tag">Rugged</span></span><span class="card__b"><h3>Fence &amp; Decks</h3><p>Fencing, decks, gates and repairs.</p><ul class="card__feat"><li>Live price estimator</li><li>Boards-lift cinematic opening</li></ul><span class="card__go">Open site →</span></span></a>
-      <a class="card" href="landscaping.html" data-card="landscaping" style="--ac:#2F6B3F"><span class="card__img"><img src="../assets/img/demos/landscaping/thumb.jpg" alt="A house with a stone patio and garden" width="900" height="560" loading="lazy"><span class="card__tag">Organic</span></span><span class="card__b"><h3>Landscaping</h3><p>Design, hardscape, sod and maintenance.</p><ul class="card__feat"><li>Four seasons with real weather</li><li>Iris-open hero</li></ul><span class="card__go">Open site →</span></span></a>
-      <a class="card" href="renovations.html" data-card="renovations" style="--ac:#8C6A43"><span class="card__img"><img src="../assets/img/demos/renovations/thumb.jpg" alt="A bright finished kitchen with a large island" width="900" height="560" loading="lazy"><span class="card__tag">Refined</span></span><span class="card__b"><h3>Renovations</h3><p>Kitchens, bathrooms and basements.</p><ul class="card__feat"><li>Drag-to-reveal before and after</li><li>Doors-part opening</li></ul><span class="card__go">Open site →</span></span></a>
-      <a class="card" href="general-contractor.html" data-card="general-contractor" style="--ac:#B98A00"><span class="card__img"><img src="../assets/img/demos/general-contractor/thumb.jpg" alt="A modern two-storey house" width="900" height="560" loading="lazy"><span class="card__tag">Bold</span></span><span class="card__b"><h3>General Contractor</h3><p>Custom homes, additions and fit-outs.</p><ul class="card__feat"><li>Live project tracker</li><li>Slam-in hero and ticker</li></ul><span class="card__go">Open site →</span></span></a>
+  <section class="wrap sec" aria-labelledby="words-h">
+    <div class="sec__in">
+      <h2 id="words-h" class="sec__h">In their words.</h2>
+      <figure class="words">
+        <blockquote><p>“I'm happy with the way that Framework utilized geographic design elements and animations that drew the eye, but didn't capture attention at the expense of the information being presented. Their team incorporated our graphic designer's notes, palettes, and overall design approach to our brand and dove into our vibe. Very happy with the aesthetic and navigability of both versions of the website.”</p></blockquote>
+        <figcaption><strong>Aurora Surveys</strong><span>Geomatics engineering, British Columbia and the Canadian North. Framework client: website design and build.</span><a href="../portfolio.html#au-title">See the Aurora Surveys project</a></figcaption>
+      </figure>
     </div>
   </section>
 
-  <section class="wrap why" aria-labelledby="why-h">
-    <h2 id="why-h">Built to win the job, not just look good.</h2>
-    <div class="why__g">
-      <div><b>Yours in minutes</b><span>Your name, colour, photos and reviews. Nothing generic.</span></div>
-      <div><b>Fast on every phone</b><span>Light, accessible pages. Most visitors will see it on a phone, so we start there.</span></div>
-      <div><b>Made to be enquired about</b><span>Click-to-call, a short quote form and trust signals right where they are needed.</span></div>
-      <div><b>Moves with your trade</b><span>Interactions that show your work: price estimates, schedules, before and afters.</span></div>
+  <section class="wrap sec" aria-labelledby="faq-h">
+    <div class="sec__in">
+      <h2 id="faq-h" class="sec__h">Common questions.</h2>
+      <div class="faq">
+        <details><summary>Will the website get me to the top of Google?</summary><p>Nobody can promise a ranking, and we won’t. What we do is build the foundations search engines look for: a clear structure, pages that say what you do and where you work, fast pages on a phone, and guidance on your Google Business Profile.</p></details>
+        <details><summary>How much does a contractor website cost?</summary><p>It depends on what your business needs, so we scope each project instead of quoting from a price list. A short conversation, or the free assessment, is the quickest way to learn what you’d need now and what can wait.</p></details>
+        <details><summary>What do I need to get started?</summary><p>A conversation. Tell us what you do, where you work and what kind of jobs you want more of. Photos of past work help a great deal, and if you don’t have good ones yet we can talk about that too.</p></details>
+        <details><summary>Do you stay involved after the website launches?</summary><p>Yes. A website isn’t finished at launch. We stay involved to refine it and to build on it as your business grows.</p></details>
+      </div>
     </div>
   </section>
 
-  <section class="cta"><div class="wrap">
-    <h2>Like what you see? We'll build yours, with your name, your photos and your reviews.</h2>
-    <a class="btn btn--light" href="../contact.html" data-enquire>Start a project</a>
-  </div></section>
+  <section class="cta" aria-labelledby="cta-h">
+    <div class="wrap">
+      <h2 id="cta-h" class="cta__h">Let’s make this your website.</h2>
+      <p class="cta__p">Tell us what you do and where you work. A short conversation is all it takes to start.</p>
+      <div class="cta__row"><a class="btn btn--light" href="../contact.html#contact-form" data-enquire>Start your project</a><a class="cta__link" href="../assessment.html">Or get a free online presence assessment</a></div>
+    </div>
+  </section>
 </main>
-<footer><div class="wrap">© Framework · Calgary, Alberta · <a href="../index.html">frameworkco.ca</a></div></footer>
-<script src="showroom.js" defer></script>
+
+<div class="openbar" id="openbar" hidden><a class="open open--bar" id="open2" href="site.html">Open your website <span aria-hidden="true">→</span></a></div>
+
+<footer class="foot"><div class="wrap foot__in">
+  <details class="priv" id="priv">
+    <summary>Privacy: what we record</summary>
+    <div class="priv__b">
+      <p>So Framework can see which styles are popular, we keep simple, private counts. No cookies, no account and no email address.</p>
+      <ul>
+        <li>Which tracking link brought you here, if you used one. That shows which link was opened, not who you are.</li>
+        <li>The discipline, vibe and colour you choose.</li>
+        <li>A company name only if you press “See your name on the website”.</li>
+        <li>Whether you open the full demo or send an enquiry.</li>
+        <li>Your rough country and device type. Never your IP address, browser details, email or the contents of an enquiry.</li>
+      </ul>
+      <p>Kept for up to 180 days and visible only to Framework staff. If your browser sends Do Not Track or Global Privacy Control, nothing is recorded, not even a link visit. See the <a href="../privacy.html">privacy policy</a>.</p>
+    </div>
+  </details>
+  <span class="foot__c">© Framework · Calgary, Alberta · <a href="../index.html">frameworkco.ca</a></span>
+</div></footer>
+
+<script src="track.js" defer></script>
+<script src="studio.js" defer></script>
 </body>
 </html>
