@@ -67,6 +67,13 @@
   sw.addEventListener("click", function (e) { var b = e.target.closest("button[data-c]"); if (!b) return; state.accent = b.getAttribute("data-c"); $("input[type=color]", sw).value = state.accent.toLowerCase(); var d = api(); if (d) d.setAccent(state.accent); pressed(); links(); });
   $("input[type=color]", sw).addEventListener("input", function (e) { state.accent = hex(e.target.value); var d = api(); if (d) d.setAccent(state.accent); pressed(); links(); });
   photos.addEventListener("change", function () { state.files = [].slice.call(photos.files).slice(0, 6); var d = api(), n = d ? d.setPhotos(state.files) : 0; note.textContent = state.files.length ? state.files.length + (state.files.length === 1 ? " photo added" : " photos added") : "Add photos"; });
+  $$("[data-presets] button").forEach(function (b) {
+    b.style.setProperty("--c", b.getAttribute("data-c"));
+    b.addEventListener("click", function () {
+      state.name = clean(b.getAttribute("data-name")); state.accent = hex(b.getAttribute("data-c")); nameIn.value = state.name; $("input[type=color]", sw).value = state.accent.toLowerCase();
+      var d = api(); if (d) { d.setName(state.name); d.setAccent(state.accent); } pressed(); links();
+    });
+  });
   $("[data-reset]").addEventListener("click", function () { state.name = ""; state.accent = ""; state.files = []; nameIn.value = ""; photos.value = ""; note.textContent = "Add photos"; pressed(); var d = api(); if (d) d.reset(); links(); });
 
   // Phones get the phone preview only

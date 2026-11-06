@@ -1,4 +1,5 @@
 /* Framework demo showroom (demos/index.html). Framework identity: black and white, sharp corners, ruled lines. */
+@view-transition{navigation:auto}
 *,*::before,*::after{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:#fff;color:#0A0A0A;font:400 17px/1.6 "General Sans",Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
@@ -81,6 +82,12 @@ header .wrap{display:flex;align-items:center;justify-content:space-between;heigh
 .up{position:relative;display:inline-flex;align-items:center;gap:10px;padding:13px 16px;border:1px dashed rgba(255,255,255,.45);cursor:pointer;font:500 14px/1 "General Sans",system-ui,sans-serif;letter-spacing:0;text-transform:none;color:#fff;white-space:nowrap;min-height:46px}
 .up input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
 .up:hover{border-color:#fff}
+.presets{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.presets span{font:600 11.5px/1 "General Sans",system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-right:4px}
+.presets button{padding:9px 14px;border:1px solid rgba(255,255,255,.3);background:none;color:#fff;font:500 14px/1 "General Sans",system-ui,sans-serif;cursor:pointer;transition:background .2s,color .2s,border-color .2s}
+.presets button:hover{background:#fff;color:#0A0A0A}
+.presets button::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c);margin-right:8px}
+.mbar{display:none}
 .stage__cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
 .stage__cta p{margin:0;font-size:13px;color:rgba(255,255,255,.55);flex:1;min-width:220px}
 .stage__cta .reset{background:none;border:0;color:rgba(255,255,255,.7);text-decoration:underline;cursor:pointer;font-size:14px;padding:8px}
@@ -129,4 +136,9 @@ footer{padding:32px 0;color:#8a8a8a;font-size:14px}
   .seg .desk{display:none}
 }
 @media (max-width:620px){.cgrid{grid-template-columns:1fr}.why__g{grid-template-columns:1fr}.brand-bar{grid-template-columns:1fr}.stage__cta .btn{width:100%}.wrap{width:calc(100% - 32px)}.show__list{margin-inline:-16px;padding-inline:16px}}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.intro h1,.intro p,.intro .eyebrow{animation:rise .8s cubic-bezier(.2,.7,.2,1) both}
+.intro h1{animation-delay:.08s}.intro>p{animation-delay:.2s}
+.show{animation:rise .9s cubic-bezier(.2,.7,.2,1) .25s both}
+@media (max-width:900px){.mbar{display:block;position:fixed;left:12px;right:12px;bottom:12px;z-index:40}.mbar .btn{width:100%;background:#0A0A0A;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.3)}body{padding-bottom:84px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}

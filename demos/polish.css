@@ -1,0 +1,258 @@
+/* Framework demo websites — layout, type and motion polish (loads after signature.css). Each trade gets its own layout language. */
+
+/* ---------- Global type, rhythm and page transitions ---------- */
+@view-transition{navigation:auto}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.4s;animation-timing-function:cubic-bezier(.2,.7,.2,1)}
+html{scroll-padding-top:92px}
+h1,h2,h3{text-wrap:balance}
+p,blockquote{text-wrap:pretty}
+h1 em,h2 em{font-style:normal;color:var(--accent-ink,var(--accent))}
+.section-head h2{font-size:clamp(34px,5.2vw,68px);line-height:1}
+.section-head p{max-width:56ch}
+.stats strong,.trust strong{font-variant-numeric:tabular-nums}
+.btn{min-height:48px}
+
+/* ---------- Openings ---------- */
+.collage{position:relative;width:100%;justify-self:end;max-height:700px}
+.collage .ph{position:absolute;min-height:0;border-radius:var(--radius);overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.2);transform:translate3d(var(--tx,0),calc(var(--ty,0px) + var(--sy,0px)),0);transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+.hero__grid .collage .ph{min-height:0}
+.chip{position:absolute;z-index:5;display:flex;align-items:center;gap:10px;padding:12px 16px;background:#fff;color:#16181B;font:600 13.5px/1.2 var(--body-font);box-shadow:0 18px 40px rgba(0,0,0,.18);border-radius:calc(var(--radius) * .8);transform:translate3d(var(--tx,0),calc(var(--ty,0px) + var(--sy,0px)),0);transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+.chip i{width:9px;height:9px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 0 rgba(22,163,74,.6);animation:ping 2s ease-out infinite}
+@keyframes ping{to{box-shadow:0 0 0 10px rgba(22,163,74,0)}}
+.tag{position:absolute;left:0;bottom:0;z-index:2;padding:8px 12px;background:var(--accent);color:var(--on-accent);font:700 11px/1 var(--body-font);letter-spacing:.14em;text-transform:uppercase}
+.scroll-cue{display:inline-flex;align-items:center;gap:10px;font:600 12px/1 var(--body-font);letter-spacing:.16em;text-transform:uppercase;opacity:.8}
+.scroll-cue::after{content:"";width:1px;height:34px;background:currentColor;transform-origin:50% 0;animation:cue 2s ease-in-out infinite}
+@keyframes cue{0%{transform:scaleY(0)}50%{transform:scaleY(1)}100%{transform:scaleY(1);opacity:0}}
+
+/* Fence & Decks: big craft headline, three-photo collage */
+.hero--fence{padding:clamp(36px,5vw,76px) 0 clamp(56px,7vw,100px);overflow:hidden}
+.hero--fence .hero__grid{grid-template-columns:1.04fr .96fr;gap:clamp(24px,4vw,72px);align-items:center}
+.hero--fence h1{font-size:clamp(44px,5.9vw,88px);line-height:.97;letter-spacing:-.035em}
+.hero--fence .collage{aspect-ratio:4/5}
+.hero--fence .collage__main{inset:0 0 15% 14%}
+.hero--fence .collage__main img{object-position:60% 82%}
+.hero--fence .collage__a{width:47%;aspect-ratio:1;left:0;bottom:0;border:7px solid var(--bg)}
+.hero--fence .collage__b{width:33%;aspect-ratio:4/5;right:-2%;top:-3%;border:7px solid var(--bg)}
+.hero--fence .chip{left:2%;top:14%}
+
+/* Landscaping: a taller, calmer bleed with project thumbnails */
+.hero--bleed{min-height:min(860px,calc(100svh - 118px));display:flex}
+.hero--bleed .hero__inner{display:flex;align-items:flex-end;width:100%;padding:clamp(96px,12vw,150px) 0 clamp(36px,5vw,64px);background:linear-gradient(0deg,rgba(6,18,10,.78),rgba(6,18,10,.18) 62%,rgba(6,18,10,.34))}
+.hero--bleed h1{font-size:clamp(44px,6.2vw,94px);line-height:.98;max-width:16ch}
+.hero--bleed h1 em{color:var(--accent-on-dark,#CDE6B8)}
+.hero--bleed .hero__row{display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap}
+.hero__thumbs{display:flex;gap:12px;align-items:flex-end}
+.hero__thumbs a{position:relative;display:block;width:clamp(96px,10vw,148px);aspect-ratio:3/4;border-radius:var(--radius);overflow:hidden;box-shadow:0 18px 40px rgba(0,0,0,.35);border:3px solid rgba(255,255,255,.9);transition:transform .4s cubic-bezier(.2,.7,.2,1)}
+.hero__thumbs a:nth-child(2){margin-bottom:22px}
+.hero__thumbs a:hover{transform:translateY(-6px) rotate(-1.5deg)}
+.hero__thumbs .ph{position:absolute;inset:0;min-height:0;border-radius:0}
+.hero__thumbs span{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:22px 10px 8px;background:linear-gradient(0deg,rgba(0,0,0,.7),transparent);color:#fff;font:600 11px/1.2 var(--body-font);letter-spacing:.06em}
+
+/* Renovations: an arched photograph and a quiet editorial headline */
+.hero--reno{padding:clamp(32px,5vw,72px) 0 clamp(48px,7vw,96px);text-align:left}
+.hero--reno .hero__grid{grid-template-columns:1.02fr .98fr;gap:clamp(28px,5vw,88px);align-items:center}
+.hero--reno h1{font-size:clamp(42px,5.2vw,80px);line-height:1;letter-spacing:-.03em}
+.hero--reno .trust{justify-content:flex-start}
+.hero--reno .hero__lead{margin-inline:0}
+.hero--reno .collage{aspect-ratio:4/5;max-width:560px}
+.hero--reno .collage__main{inset:0;border-radius:999px 999px 4px 4px;box-shadow:0 40px 80px rgba(60,40,20,.22)}
+.hero--reno .collage__main img{object-position:60% 50%}
+.hero--reno .collage__a{width:38%;aspect-ratio:1;left:-10%;bottom:7%;border-radius:50%;border:8px solid var(--bg)}
+.hero--reno .chip{right:-4%;bottom:20%;border-radius:2px;flex-direction:column;align-items:flex-start;gap:2px;padding:16px 20px}
+.hero--reno .chip b{font:400 22px/1.1 var(--display-font);letter-spacing:-.01em}
+.hero--reno .chip span{font-weight:500;color:#6B635B;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
+
+/* General Contractor: blueprint grid, a cut-corner hero photo and site cards */
+.hero--gc{position:relative;overflow:hidden;padding:clamp(40px,6vw,88px) 0 clamp(56px,7vw,104px)}
+.hero--gc::before{content:"";position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:64px 64px;mask-image:radial-gradient(80% 90% at 70% 40%,#000,transparent);-webkit-mask-image:radial-gradient(80% 90% at 70% 40%,#000,transparent)}
+.hero--gc .wrap{position:relative}
+.hero--gc .hero__grid{grid-template-columns:1fr 1fr;gap:clamp(24px,4vw,64px);align-items:center}
+.hero--gc h1{font-size:clamp(44px,5.9vw,92px);line-height:.96;letter-spacing:-.04em}
+.hero--gc .collage{aspect-ratio:1/1;max-width:640px}
+.hero--gc .collage .ph{border-radius:2px;box-shadow:0 30px 60px rgba(0,0,0,.5)}
+.hero--gc .collage__main{inset:0 0 0 12%;clip-path:polygon(0 0,100% 0,100% 86%,86% 100%,0 100%)}
+.hero--gc .collage__a{width:38%;aspect-ratio:4/3;left:0;top:6%;border:4px solid var(--band-bg,#121417)}
+.hero--gc .collage__b{width:34%;aspect-ratio:1;left:4%;bottom:-3%;border:4px solid var(--band-bg,#121417)}
+.hero--gc .chip{right:2%;bottom:3%;background:var(--accent);color:var(--on-accent);border-radius:2px}
+.hero--gc .chip i{background:#121417;animation:none}
+
+/* ---------- Services: one layout language per trade ---------- */
+.service{transition:background .3s,color .3s,transform .35s cubic-bezier(.2,.7,.2,1),padding .3s}
+body[data-demo=fence-deck] .services{display:block;border:0;background:none;border-radius:0;overflow:visible}
+body[data-demo=fence-deck] .service{display:grid;grid-template-columns:56px 1.1fr 1.7fr 28px;align-items:baseline;gap:20px;padding:26px 0;border-top:1px solid var(--line);background:none}
+body[data-demo=fence-deck] .service:last-child{border-bottom:1px solid var(--line)}
+body[data-demo=fence-deck] .service h3{font-size:clamp(24px,2.8vw,38px)}
+body[data-demo=fence-deck] .service::after{content:"→";color:var(--accent);font-size:24px;transition:transform .3s}
+body[data-demo=fence-deck] .service:hover{padding-left:14px;background:color-mix(in srgb,var(--accent) 6%,transparent)}
+body[data-demo=fence-deck] .service:hover::after{transform:translateX(6px)}
+body[data-demo=landscaping] .services{gap:16px;background:none;border:0;border-radius:0;overflow:visible}
+body[data-demo=landscaping] .service{border:1px solid var(--line);border-radius:26px;padding:34px 30px;background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+body[data-demo=landscaping] .service:hover{transform:translateY(-6px);background:var(--surface);box-shadow:0 24px 50px rgba(30,60,40,.12)}
+body[data-demo=landscaping] .service__n{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:var(--accent);color:var(--on-accent)}
+body[data-demo=renovations] .services{grid-template-columns:1fr 1fr;gap:0 clamp(32px,6vw,96px);border:0;background:none;border-radius:0;overflow:visible}
+body[data-demo=renovations] .service{grid-template-columns:64px 1fr;column-gap:20px;row-gap:8px;padding:34px 0;border-top:1px solid var(--line);background:none}
+body[data-demo=renovations] .service__n{grid-row:span 2;font:400 38px/1 var(--display-font);letter-spacing:-.02em}
+body[data-demo=renovations] .service h3{font-size:clamp(24px,2.4vw,32px)}
+body[data-demo=renovations] .service:hover{padding-left:12px}
+body[data-demo=general-contractor] .services{gap:0;background:none;border:0;border-radius:0;overflow:visible}
+body[data-demo=general-contractor] .service{border:2px solid var(--ink);margin:-1px;background:var(--surface);padding:34px 30px;min-height:240px;align-content:space-between}
+body[data-demo=general-contractor] .service__n{font-size:54px;letter-spacing:-.04em;color:var(--accent-ink,#B98A00);line-height:.9}
+body[data-demo=general-contractor] .service:hover{background:var(--accent);color:var(--on-accent);transform:translate(-4px,-4px);box-shadow:8px 8px 0 var(--ink);z-index:2}
+body[data-demo=general-contractor] .service:hover p,body[data-demo=general-contractor] .service:hover .service__n{color:var(--on-accent)}
+
+/* ---------- Stats and process ---------- */
+.stats{gap:0}
+.stats>div{padding:6px clamp(14px,3vw,44px);border-left:1px solid rgba(255,255,255,.2)}
+.stats>div:first-child{border-left:0;padding-left:0}
+.stats strong{font-size:clamp(38px,5vw,76px);letter-spacing:-.04em;white-space:nowrap}
+.stats span{display:block;margin-top:10px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;opacity:.65}
+.steps{position:relative;gap:clamp(16px,3vw,40px)}
+.steps::before,.steps::after{content:"";position:absolute;left:0;right:0;top:0;height:2px}
+.steps::before{background:var(--line)}
+.steps::after{background:var(--accent);transform:scaleX(0);transform-origin:0 50%;transition:transform 1.8s cubic-bezier(.6,0,.2,1) .2s}
+.steps.is-in::after{transform:scaleX(1)}
+.step{border-top:0;padding-top:38px;position:relative}
+.step::after{content:"";position:absolute;top:-6px;left:0;width:14px;height:14px;border-radius:50%;background:var(--bg);border:3px solid var(--accent)}
+.step::before{font-size:clamp(28px,3vw,40px);letter-spacing:-.03em;font-weight:var(--display-weight,600)}
+
+/* ---------- Projects: captions on hover, swipe on phones ---------- */
+.projects .ph--photo::after{display:block;content:attr(data-cap);left:0;right:0;bottom:0;max-width:none;padding:56px 20px 18px;border-radius:0;background:linear-gradient(0deg,rgba(0,0,0,.78),transparent);backdrop-filter:none;font:600 15px/1.3 var(--body-font);letter-spacing:.01em;opacity:0;transform:translateY(10px);transition:opacity .35s,transform .35s;pointer-events:none;z-index:2}
+.projects .ph--photo:hover::after,.projects .ph--photo:focus-visible::after{opacity:1;transform:none}
+.projects .ph{border-radius:var(--radius)}
+.motion .projects .ph.rv{opacity:1;transform:none}
+.motion .projects .ph.rv::before{content:"";display:block;position:absolute;inset:0;z-index:4;background:var(--bg);transform-origin:50% 0;transition:transform 1s cubic-bezier(.7,0,.2,1) var(--d,0ms);opacity:1}
+.motion .projects .ph.rv.in::before{transform:scaleY(0)}
+@media (hover:none){.projects .ph--photo::after{opacity:1;transform:none;padding-top:40px;font-size:13.5px}}
+
+/* ---------- Reviews, FAQ, form ---------- */
+.review{transition:transform .35s cubic-bezier(.2,.7,.2,1),box-shadow .35s}
+.review:hover{transform:translateY(-4px);box-shadow:0 24px 50px rgba(0,0,0,.08)}
+.review blockquote::before{content:"“";display:block;font:var(--display-weight,600) 76px/.7 var(--display-font);color:var(--accent-ink,var(--accent));margin-bottom:6px;height:34px}
+.faq details{transition:background .25s}
+.faq summary{padding-block:4px;min-height:44px;align-items:center}
+.faq details::details-content{block-size:0;overflow:clip;transition:block-size .35s ease,content-visibility .35s ease allow-discrete}
+.faq details[open]::details-content{block-size:auto}
+:root{interpolate-size:allow-keywords}
+.faq details[open] summary::after{transform:rotate(180deg)}
+.faq summary::after{transition:transform .3s}
+input,select,textarea{min-height:50px}
+textarea{min-height:130px}
+form.card input:focus,form.card select:focus,form.card textarea:focus{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 20%,transparent)}
+.form-done{animation:pop .5s cubic-bezier(.2,.9,.3,1.3)}
+.form-done::before{content:"✓";display:inline-grid;place-items:center;width:26px;height:26px;margin-right:10px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-weight:700}
+@keyframes pop{from{opacity:0;transform:scale(.94)}}
+
+/* ---------- Landscaping: afternoon to dusk, and year-round care ---------- */
+.dusk{--d:0}
+.dusk__stage{position:relative;aspect-ratio:16/9;overflow:hidden;border-radius:var(--radius);background:#0d170f;isolation:isolate}
+.dusk__stage .ph{position:absolute;inset:0;min-height:0;border-radius:0}
+.dusk__stage .ph img{filter:brightness(calc(1 - var(--d) * .56)) saturate(calc(1 + var(--d) * .12)) contrast(calc(1 + var(--d) * .08))}
+.dusk__tint{position:absolute;inset:0;z-index:1;mix-blend-mode:multiply;background:linear-gradient(180deg,#3a4d94 0%,#7a5f9a 45%,#ff9a4d 100%);opacity:calc(var(--d) * .85);pointer-events:none}
+.dusk__lamp{position:absolute;z-index:2;left:var(--x);top:var(--y);width:clamp(70px,10vw,150px);aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,236,180,1) 0%,rgba(255,190,90,.6) 22%,rgba(255,150,50,.18) 46%,transparent 66%);mix-blend-mode:screen;opacity:clamp(0,calc((var(--d) - .28) * 2.4),1);pointer-events:none}
+.dusk__tag{position:absolute;left:clamp(14px,3vw,32px);bottom:clamp(14px,3vw,32px);z-index:3;padding:16px 20px;background:rgba(8,16,10,.55);backdrop-filter:blur(10px);color:#fff;border-radius:calc(var(--radius) * .6);max-width:min(420px,calc(100% - 28px))}
+.dusk__tag b{display:block;font:var(--display-weight,500) 24px/1.1 var(--display-font);margin-bottom:4px}
+.dusk__tag span{font-size:14.5px;opacity:.85}
+.dusk__ctl{display:grid;gap:8px;margin-top:22px}
+.dusk__ctl input{color:var(--ink)}
+.dusk__scale{display:flex;justify-content:space-between;font:600 12.5px/1 var(--body-font);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.care{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:40px}
+.care article{padding:24px 22px;border:1px solid var(--line);border-radius:22px;background:var(--surface);transition:transform .35s cubic-bezier(.2,.7,.2,1),box-shadow .35s}
+.care article:hover{transform:translateY(-5px);box-shadow:0 22px 44px rgba(30,60,40,.1)}
+.care small{display:block;font:700 12px/1 var(--body-font);letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.care h3{font-size:24px;margin:10px 0 8px}
+.care p{font-size:15px;color:var(--muted)}
+
+/* ---------- Renovations: hotspot tour ---------- */
+.tour__tabs{margin-bottom:20px}
+.tour__tabs button{border-radius:0}
+.tour__stage{position:relative;overflow:hidden;background:#1a1613;line-height:0}
+.tour__frame{position:relative;line-height:0}
+.tour__frame img{width:100%;height:auto;display:block}
+.tour__hots{position:absolute;inset:0}
+.hot{position:absolute;left:var(--x);top:var(--y);width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:2px solid #fff;background:rgba(20,16,12,.55);backdrop-filter:blur(4px);color:#fff;font:700 15px/1 var(--body-font);cursor:pointer;z-index:2;display:grid;place-items:center;transition:transform .25s,background .25s}
+.hot::before{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid #fff;animation:hotping 2.2s ease-out infinite}
+.hot:hover,.hot[aria-pressed=true]{background:var(--accent);transform:scale(1.12)}
+.hot[aria-pressed=true]::before{animation:none;opacity:0}
+@keyframes hotping{from{transform:scale(1);opacity:.9}to{transform:scale(1.9);opacity:0}}
+.tour__card{position:absolute;left:clamp(14px,2.5vw,28px);bottom:clamp(14px,2.5vw,28px);z-index:3;width:min(380px,calc(100% - 28px));padding:20px 22px;background:#fff;color:var(--ink);line-height:1.5;box-shadow:0 24px 60px rgba(0,0,0,.3);animation:cardin .45s cubic-bezier(.2,.8,.2,1)}
+.tour__card small{display:block;font:700 11.5px/1 var(--body-font);letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.tour__card b{display:block;font:var(--display-weight,400) 26px/1.1 var(--display-font);margin:8px 0 6px;letter-spacing:-.01em}
+.tour__card p{font-size:15px;color:var(--muted)}
+@keyframes cardin{from{opacity:0;transform:translateY(12px)}}
+.tour__facts{list-style:none;margin:22px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
+.tour__facts li{background:var(--surface);padding:20px 24px;display:grid;gap:4px}
+.tour__facts b{font:var(--display-weight,400) 26px/1.1 var(--display-font)}
+.tour__facts span{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* ---------- Mobile ---------- */
+@media (max-width:960px){
+  .hero--fence .hero__grid,.hero--reno .hero__grid,.hero--gc .hero__grid{grid-template-columns:1fr}
+  .collage{justify-self:center;max-width:560px!important;order:-1}
+  .hero--fence .collage{aspect-ratio:16/11}
+  .hero--fence .collage__main{inset:0 0 14% 16%}
+  .hero--gc .collage{aspect-ratio:16/11}
+  .hero--reno .collage{aspect-ratio:1/1;max-width:300px!important}
+  .hero--reno .chip{right:0}
+  body[data-demo=general-contractor] .services{grid-template-columns:1fr 1fr}
+  .care{grid-template-columns:1fr 1fr}
+}
+@media (max-width:760px){
+  .section{padding:clamp(52px,12vw,76px) 0}
+  .section-head{margin-bottom:30px;gap:12px}
+  .section-head h2{font-size:clamp(32px,9vw,44px)}
+  .hero--fence,.hero--reno,.hero--gc{padding-top:24px}
+  .hero--fence h1,.hero--gc h1,.hero--reno h1{font-size:clamp(40px,11.5vw,56px)}
+  .hero--bleed{min-height:calc(100svh - 150px)}
+  .hero--bleed h1{font-size:clamp(42px,12vw,60px)}
+  .hero--bleed .hero__inner{padding-top:90px;background:linear-gradient(0deg,rgba(6,18,10,.9),rgba(6,18,10,.5) 70%,rgba(6,18,10,.55))}
+  .demo-bar .wrap{padding:8px 0;gap:6px 16px;font-size:12px}
+  .hero--fence .collage__a{width:40%}
+  .hero--fence .collage__b{width:30%;right:0}
+  .hero--gc .collage__a,.hero--gc .collage__b{display:none}
+  .hero--gc .chip{right:6px;bottom:6px}
+  .collage{margin-bottom:8px}
+  .hero__thumbs{display:none}
+  .hero__lead{font-size:17px;margin:16px 0 24px}
+  .trust{gap:18px 26px;margin-top:28px;padding-top:20px}
+  .trust strong{font-size:23px}
+  .chip{padding:10px 12px;font-size:12px}
+  /* compact services */
+  body[data-demo=fence-deck] .service{grid-template-columns:38px 1fr;gap:6px 12px;padding:20px 0}
+  body[data-demo=fence-deck] .service::after{display:none}
+  body[data-demo=fence-deck] .service p{grid-column:2}
+  body[data-demo=landscaping] .service{padding:22px 20px;border-radius:20px}
+  body[data-demo=renovations] .services{grid-template-columns:1fr}
+  body[data-demo=renovations] .service{padding:24px 0}
+  body[data-demo=general-contractor] .services{grid-template-columns:1fr}
+  body[data-demo=general-contractor] .service{min-height:0;padding:24px 22px;gap:10px}
+  .service h3{font-size:22px}
+  .stats{grid-template-columns:1fr 1fr;gap:28px 0}
+  .stats>div:nth-child(odd){border-left:0;padding-left:0}
+  .stats strong{font-size:clamp(40px,12vw,56px)}
+  .steps{grid-template-columns:1fr;gap:0}
+  .steps::before,.steps::after{left:6px;right:auto;top:0;bottom:0;width:2px;height:auto}
+  .steps::after{transform:scaleY(0);transform-origin:50% 0}
+  .steps.is-in::after{transform:scaleY(1)}
+  .step{padding:0 0 26px 34px}
+  .step::after{top:2px;left:0}
+  /* swipeable galleries and reviews */
+  .projects,.reviews{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;margin-inline:-16px;padding:0 16px 14px;scroll-padding-inline:16px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .projects::-webkit-scrollbar,.reviews::-webkit-scrollbar{display:none}
+  .projects .ph:nth-child(n){flex:0 0 80%;grid-column:auto;min-height:300px;scroll-snap-align:center}
+  .reviews .review{flex:0 0 84%;scroll-snap-align:center}
+  .review blockquote{font-size:17px}
+  /* full-screen menu */
+  .site-head.is-open .nav{position:fixed;top:68px;left:0;right:0;bottom:0;height:calc(100svh - 68px);padding:20px 24px 120px;flex-direction:column;gap:0;background:var(--bg);overflow:auto;animation:menuin .35s cubic-bezier(.2,.8,.2,1);z-index:19}
+  .site-head.is-open .nav a{padding:18px 0;font:var(--display-weight,600) 30px/1.1 var(--display-font);letter-spacing:-.02em;border-bottom:1px solid var(--line);color:var(--ink)}
+  .dusk__stage{aspect-ratio:4/5}
+  .dusk__stage .ph img{object-position:42% 50%}
+  .care{grid-template-columns:1fr 1fr;gap:10px;margin-top:28px}
+  .care article{padding:18px 16px;border-radius:18px}
+  .care h3{font-size:20px}
+  .care p{font-size:14px}
+  .tour__facts{grid-template-columns:1fr}
+  .tour__card{position:static;width:auto;box-shadow:none;border-top:3px solid var(--accent)}
+  .hot{width:38px;height:38px;margin:-19px 0 0 -19px}
+}
+@keyframes menuin{from{opacity:0;transform:translateY(-10px)}}
+@media (prefers-reduced-motion:reduce){.chip i,.hot::before,.scroll-cue::after{animation:none}.collage .ph,.chip{transition:none}.motion .projects .ph.rv::before{display:none}}
