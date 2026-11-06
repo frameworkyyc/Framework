@@ -10,7 +10,7 @@ const root = new URL("../../", import.meta.url);
 
 // ---- the reviewed public surface (change these on purpose, in a reviewed commit) ----
 const APPROVED_ROOT_FILES = [
-  "404.html", "_headers", "about.html", "assessment.html", "card.html", "client-feedback.html", "contact.html",
+  "404.html", "_headers", "about.html", "assessment.html", "card.html", "client-feedback.html", "contact.html", "contractor-websites.html",
   "index.html", "me.html", "method.html", "portfolio.html", "privacy.html", "robots.txt", "services.html", "sitemap.xml",
 ];
 const APPROVED_ROOT_DIRS = ["admin", "assets", "demos"]; // demos/: public sample websites for outreach (static HTML, CSS, JS only)
