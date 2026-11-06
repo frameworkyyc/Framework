@@ -41,6 +41,15 @@
   var form = document.getElementById("contact-form");
   if (!form) return;
 
+  /* Arriving from a demo website ("Make it yours"): pre-fill the business name and say which demo they liked. */
+  (function () {
+    var q = new URLSearchParams(window.location.search), biz = (q.get("business") || "").replace(/[\u0000-\u001F<>]/g, "").trim().slice(0, 60);
+    var demos = { "fence-deck": "Fence & Decks", landscaping: "Landscaping", renovations: "Renovations", "general-contractor": "General Contractor" };
+    var demo = demos[q.get("demo")], bizInput = document.getElementById("business"), msg = document.getElementById("message");
+    if (biz && bizInput && !bizInput.value) bizInput.value = biz;
+    if (demo && msg && !msg.value) msg.value = "I'd like a website like the " + demo + " demo" + (biz ? ", made for " + biz : "") + ".";
+  })();
+
   var success = document.getElementById("form-success");
   var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

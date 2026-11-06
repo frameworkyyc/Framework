@@ -11,10 +11,11 @@
 <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800&f[]=switzer@400,500,600&f[]=general-sans@500,600&display=swap">
 <link rel="stylesheet" href="demo.css">
+<link rel="stylesheet" href="signature.css">
 <style>:root{--bg:#F3F4F5;--surface:#FFFFFF;--ink:#121417;--muted:#5A6068;--line:#DDE0E4;--accent:#F2B705;--on-accent:#121417;--ph-a:#2A2F36;--ph-b:#F2B705;--ph-c:#0E1013;--band-bg:#121417;--band-ink:#F3F4F5;--radius:4px;--display-font:"Cabinet Grotesk",sans-serif;--body-font:"Switzer",system-ui,sans-serif;--display-weight:800;--display-tracking:-0.03em;--ph-pattern:repeating-linear-gradient(45deg,rgba(255,255,255,.4) 0 1px,transparent 1px 22px)}</style>
 </head>
-<body>
-<div class="demo-bar"><div class="wrap"><span><strong>Sample website by Framework.</strong> Business and reviews are illustrative.</span><span class="demo-bar__links"><a href="./" data-keep-for>All demos</a><a href="../contact.html">Get a site like this →</a></span></div></div>
+<body data-demo="general-contractor">
+<div class="demo-bar"><div class="wrap"><span><strong>Sample website by Framework.</strong> Business and reviews are illustrative.</span><span class="demo-bar__links"><a href="./" data-keep-for>All demos</a><a href="../contact.html" data-enquire>Get a site like this →</a></span></div></div>
 <header class="site-head"><div class="wrap">
   <a class="logo" href="#top"><span class="logo__mark" data-biz-initial>K</span><span data-biz>Keystone Build Co.</span></a>
   <nav class="nav" aria-label="Main"><a href="#services">Services</a><a href="#projects">Projects</a><a href="#reviews">Reviews</a><a href="#faq">FAQ</a><a href="#quote">Contact</a></nav>
@@ -23,6 +24,9 @@
 </div></header>
 <main id="top">
 <section class="hero hero--dark"><div class="wrap hero__grid"><div><span class="eyebrow">Residential &amp; light commercial</span><h1>Built right. From foundation to final walkthrough.</h1><p class="hero__lead">Custom homes, additions, garages and commercial fit-outs, managed by one accountable team with transparent costs and a real schedule.</p><div class="btn-row"><a class="btn btn--primary" href="#quote">Get a free quote</a><a class="btn btn--ghost" href="tel:4035550163">Call (403) 555-0163</a></div><div class="trust"><div><strong>4.8 ★</strong><span>86 Google reviews</span></div><div><strong>20 yrs</strong><span>Building in Alberta</span></div><div><strong>COR</strong><span>Certified safety program</span></div></div></div><div class="ph" role="img" aria-label="Hero photo: framed house mid-build against open sky" data-photo="Hero photo: framed house mid-build against open sky" data-src="../assets/img/demos/general-contractor/hero.jpg"></div></div></section>
+<!--sig:ticker-->
+<div class="ticker" aria-hidden="true"><div class="ticker__in"><span>Fully licensed &amp; insured</span><span>WCB covered</span><span>Fixed-price contracts</span><span>Permits handled</span><span>Weekly site updates</span><span>Own crews, no surprises</span><span>Fully licensed &amp; insured</span><span>WCB covered</span><span>Fixed-price contracts</span><span>Permits handled</span><span>Weekly site updates</span><span>Own crews, no surprises</span></div></div>
+<!--/sig:ticker-->
 
 <section class="build build--wire" id="build" aria-labelledby="build-h"><div class="build__stick"><div class="wrap build__grid">
   <div class="build__copy"><span class="eyebrow">Watch it come together</span><h2 id="build-h">From foundation to final walkthrough.</h2><p class="build__lead">Scroll to watch a building go up, phase by phase, on schedule.</p>
@@ -44,6 +48,27 @@
   <div class="section-head"><span class="eyebrow">How it works</span><h2>Simple from quote to cleanup.</h2></div>
   <div class="steps"><div class="step"><h3>Scope &amp; budget</h3><p>We define the project and give you a detailed cost breakdown.</p></div><div class="step"><h3>Drawings &amp; permits</h3><p>Architect, engineer and City approvals, coordinated by us.</p></div><div class="step"><h3>Construction</h3><p>Scheduled trades, weekly site meetings and a shared progress log.</p></div><div class="step"><h3>Closeout</h3><p>Final inspections, deficiency walkthrough and warranty handover.</p></div></div>
 </div></section>
+<!--sig:tracker-->
+<section class="section" id="tracker"><div class="wrap">
+  <div class="section-head"><span class="eyebrow">Total visibility</span><h2>Every job, in plain sight.</h2><p>Clients follow schedule, budget and site photos from their phone. Drag the week to see how a build unfolds.</p></div>
+  <div class="trk">
+    <div class="seg trk__pick" role="tablist" aria-label="Project"><button type="button" role="tab" aria-selected="true" data-job="addition">Elbow Park addition</button><button type="button" role="tab" aria-selected="false" data-job="fitout">Kensington café fit-out</button></div>
+    <div class="trk__board">
+      <div class="trk__main">
+        <div class="trk__top"><div><b data-t-name>Elbow Park rear addition</b><span data-t-meta></span></div><span class="trk__chip" data-t-chip>On schedule</span></div>
+        <ol class="trk__phases"></ol>
+        <label class="trk__scrub"><span>Project week <output data-week-out>0</output></span><input type="range" min="0" max="22" step="1" value="0" data-week aria-label="Project week"><span style="font-weight:400;color:var(--muted)" data-week-of>of 22</span></label>
+      </div>
+      <div class="trk__side">
+        <div class="trk__photo"><img alt="Latest site photo" src="../assets/img/demos/general-contractor/project-2.jpg" decoding="async"><span></span></div>
+        <div class="trk__budget"><div><span>Invoiced to date</span><span data-pct></span></div><strong data-spent>$0</strong><div class="trk__meter"><i></i></div></div>
+        <ul class="trk__checks"></ul>
+      </div>
+    </div>
+  </div>
+  <p class="sig-note">Sample project data for demonstration. Your clients would see their own job.</p>
+</div></section>
+<!--/sig:tracker-->
 
 <section class="section" id="projects" style="padding-top:0"><div class="wrap">
   <div class="section-head"><span class="eyebrow">Recent work</span><h2>Projects</h2></div>
@@ -85,5 +110,7 @@
 <div class="mobile-bar"><a class="btn btn--ghost" href="tel:4035550163">Call</a><a class="btn btn--primary" href="#quote">Free quote</a></div>
 <script src="demo.js" defer></script>
 <script src="motion.js" defer></script>
+<script src="signature.js" defer></script>
+<script src="yours.js" defer></script>
 </body>
 </html>

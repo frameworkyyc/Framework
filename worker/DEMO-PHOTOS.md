@@ -83,3 +83,7 @@ All 24 photos are from Unsplash and are used under the [Unsplash licence](https:
 | general-contractor/project-3.jpg | [Brett Jordan](https://unsplash.com/@brett_jordan?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/brown-brick-building-during-daytime-jEP4vsHrSM8 |
 | general-contractor/project-4.jpg | [Alexander Faé](https://unsplash.com/@alexfae?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/brown-wooden-tables-and-chairs-inside-building-TivEEYzzhik |
 | general-contractor/project-5.jpg | [Winston Chen](https://unsplash.com/@winstonchen?utm_source=framework&utm_medium=referral) | https://unsplash.com/photos/concrete-industrial-building-with-large-windows-and-chimney-W3ULPIJPg8w |
+
+## Derived images and personalisation
+- `assets/img/demos/<demo>/thumb.jpg` (900 x 560) and `tab.jpg` (240 x 150) are small crops used by the showroom at `/demos/` (cards and tabs). They are cut from existing photos (Fence & Decks project-2, Landscaping hero, Renovations hero, General Contractor project-1). If you replace one of those, regenerate the crop so the showroom stays in step. The credits for those photos already cover the crops.
+- Visitors can try their own business name, colour and photos on any demo ("Make it yours"). Photos they choose stay in their browser as temporary object URLs; nothing is uploaded or stored.

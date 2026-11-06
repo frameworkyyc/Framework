@@ -11,10 +11,11 @@
 <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=gambetta@500,600&f[]=satoshi@400,500,700&f[]=general-sans@500,600&display=swap">
 <link rel="stylesheet" href="demo.css">
+<link rel="stylesheet" href="signature.css">
 <style>:root{--bg:#F4F6F0;--surface:#FFFFFF;--ink:#16241A;--muted:#56635A;--line:#DCE3D6;--accent:#2F6B3F;--on-accent:#fff;--accent-on-dark:#CDE6B8;--ph-a:#244A2E;--ph-b:#9CC27A;--ph-c:#132016;--band-bg:#16241A;--band-ink:#F4F6F0;--radius:18px;--display-font:"Gambetta",Georgia,serif;--body-font:"Satoshi",system-ui,sans-serif;--display-weight:500;--display-tracking:-0.015em;--ph-pattern:repeating-radial-gradient(circle at 30% 80%,rgba(255,255,255,.5) 0 1px,transparent 1px 26px)}</style>
 </head>
-<body>
-<div class="demo-bar"><div class="wrap"><span><strong>Sample website by Framework.</strong> Business and reviews are illustrative.</span><span class="demo-bar__links"><a href="./" data-keep-for>All demos</a><a href="../contact.html">Get a site like this →</a></span></div></div>
+<body data-demo="landscaping">
+<div class="demo-bar"><div class="wrap"><span><strong>Sample website by Framework.</strong> Business and reviews are illustrative.</span><span class="demo-bar__links"><a href="./" data-keep-for>All demos</a><a href="../contact.html" data-enquire>Get a site like this →</a></span></div></div>
 <header class="site-head"><div class="wrap">
   <a class="logo" href="#top"><span class="logo__mark" data-biz-initial>F</span><span data-biz>Foothills Grove Landscaping</span></a>
   <nav class="nav" aria-label="Main"><a href="#services">Services</a><a href="#projects">Projects</a><a href="#reviews">Reviews</a><a href="#faq">FAQ</a><a href="#quote">Contact</a></nav>
@@ -49,6 +50,17 @@
   <div class="section-head"><span class="eyebrow">Recent work</span><h2>Projects</h2></div>
   <div class="projects"><div class="ph" role="img" aria-label="Project: flagstone patio with fire pit, Springbank" data-photo="Project: flagstone patio with fire pit, Springbank" data-src="../assets/img/demos/landscaping/project-1.jpg"></div><div class="ph" role="img" aria-label="Project: tiered retaining wall, Discovery Ridge" data-photo="Project: tiered retaining wall, Discovery Ridge" data-src="../assets/img/demos/landscaping/project-2.jpg"></div><div class="ph" role="img" aria-label="Project: front-yard xeriscape" data-photo="Project: front-yard xeriscape" data-src="../assets/img/demos/landscaping/project-3.jpg"></div><div class="ph" role="img" aria-label="Project: paving-stone walkway" data-photo="Project: paving-stone walkway" data-src="../assets/img/demos/landscaping/project-4.jpg"></div><div class="ph" role="img" aria-label="Project: new sod and perennial beds" data-photo="Project: new sod and perennial beds" data-src="../assets/img/demos/landscaping/project-5.jpg"></div></div>
 </div></section>
+<!--sig:seasons-->
+<section class="section" id="seasons" style="padding-top:0"><div class="wrap">
+  <div class="section-head"><span class="eyebrow">Built for Alberta</span><h2>Beautiful in every season.</h2><p>We design yards that look great in July and still hold up in January. Watch one yard through the year.</p></div>
+  <div class="seasons__stage" data-season="summer">
+    <div class="ph" role="img" aria-label="A finished stone patio and backyard" data-photo="Project: stone patio and backyard" data-src="../assets/img/demos/landscaping/hero.jpg"></div>
+    <canvas aria-hidden="true"></canvas>
+    <div class="seasons__tag" aria-live="polite"><b></b><span></span></div>
+  </div>
+  <div class="seasons__tabs" role="tablist" aria-label="Season"><button type="button" role="tab" aria-selected="false" data-season="spring">Spring<small>Beds wake up</small><i></i></button><button type="button" role="tab" aria-selected="true" data-season="summer">Summer<small>Patio season</small><i></i></button><button type="button" role="tab" aria-selected="false" data-season="autumn">Autumn<small>Tuck it in</small><i></i></button><button type="button" role="tab" aria-selected="false" data-season="winter">Winter<small>Built to last</small><i></i></button></div>
+</div></section>
+<!--/sig:seasons-->
 
 <section class="section" id="reviews" style="padding-top:0"><div class="wrap">
   <div class="section-head"><span class="eyebrow">Reviews</span><h2>What homeowners say.</h2></div>
@@ -85,5 +97,7 @@
 <div class="mobile-bar"><a class="btn btn--ghost" href="tel:4035550178">Call</a><a class="btn btn--primary" href="#quote">Free quote</a></div>
 <script src="demo.js" defer></script>
 <script src="motion.js" defer></script>
+<script src="signature.js" defer></script>
+<script src="yours.js" defer></script>
 </body>
 </html>
