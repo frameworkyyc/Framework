@@ -17,8 +17,8 @@ h1,h2,p{margin:0}
 /* ---- Flow ---- */
 .flow{display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(24px,4vw,64px);padding-bottom:clamp(56px,8vw,112px);align-items:start}
 .flow[data-stage=preview]{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}
-/* desktop: room below the last step so the pinned preview stays pinned (top below the header) all the way to the footer instead of releasing early */
-@media (min-width:1001px){.flow[data-stage=preview] .steps{padding-bottom:clamp(120px,16vh,200px)}}
+/* desktop: room below the last step so a step can glide up under the header while the pinned preview stays pinned (top below the header) instead of releasing early */
+@media (min-width:1001px){.flow[data-stage=preview] .steps{padding-bottom:calc(100vh - 200px)}}
 .steps{display:grid;gap:0;border-top:1px solid #0A0A0A}
 .step{border-bottom:1px solid #E0E0E0;padding:clamp(18px,2.4vw,28px) 0;scroll-margin-top:calc(var(--stage-h,0px) + 84px)}
 .opt,.sw button,.name input{scroll-margin-top:calc(var(--stage-h,0px) + 96px)}
