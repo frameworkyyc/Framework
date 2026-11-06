@@ -82,7 +82,7 @@ test("client detail structure: header, next step, a single clickable Business Pr
   assert.match(page, /Needs answers: /, "missing sections are named without opening anything");
   assert.match(dash, /h\("details", \{ class: "adm-acc "/, "native details/summary: keyboard and expanded state come from the platform");
   assert.match(dash, /Nothing saved here yet\. The client hasn’t answered this section\./, "a missing section explains itself in one line");
-  assert.equal([...src.matchAll(/\bapi\(/g)].length, 3, "the list, the detail and the Business Profile page reads");
+  assert.equal([...src.matchAll(/\bapi\(/g)].length, 4, "the list, the detail, the Business Profile page and its export text (all reads)");
 });
 
 test("team and invitations: summary chips first, details inside labelled expandable sections, every management control still there", () => {

@@ -15,6 +15,8 @@
  *   POST /clients/:org/discovery/:id/links/:link/revoke
  *   GET  /clients/:org/discovery/:id/files/:file      an inspiration file, as a download
  *   GET  /clients/:org/discovery/:id/export.pdf       the whole submission as a PDF download (Submitted or Reviewed only; nothing stored, no migration)
+ *   GET  /clients/:org/profile-export                 the client's Business Profile as AI-ready Markdown (`profileMarkdown`) and the COMPLETE CLIENT BRIEF (`briefMarkdown`: Business Profile + Brand Discovery, or a plain statement that Discovery is missing or unfinished)
+ *   GET  /clients/:org/profile-export.pdf             the Business Profile as a PDF download
  *   GET  /discovery/content?kind=brand                the questions and options as the recipient sees them, with what Admin has changed
  *   POST /discovery/content                           { kind, item, option?, label?, description?, enabled? } | { ..., add: { label, description? } } | { ..., move: "up"|"down" } | { ..., reset: true }
  *   POST /discovery/content/image                     multipart: file (png, jpg or webp, 5 MB) + meta { kind, item, option, alt? }   a reference picture for one option
@@ -31,8 +33,8 @@ import * as repo from "./repo/discovery.js";
 import { KINDS, KIND_KEYS, SECTIONS } from "./discovery/catalogue.js";
 import { effectiveKind } from "./discovery/model.js";
 import { buildBrief, briefToMarkdown } from "./discovery/brief.js";
-import { buildExport, exportMarkdown, exportFilename } from "./discovery/export.js";
-import { renderExportPdf } from "./discovery/pdf.js";
+import { buildExport, exportMarkdown, exportFilename, exportDate, buildProfileExport, profileMarkdown, briefMarkdown, discoveryStatus } from "./discovery/export.js";
+import { renderExportPdf, renderProfilePdf } from "./discovery/pdf.js";
 import { getProfileAnswers } from "./repo/business-profile.js";
 import { adminDownloadInspiration, adminSetReference, adminClearReference, referenceResponse, REFERENCE_MAX_BYTES } from "./discovery/files.js";
 import { randomToken, sha256b64url } from "./crypto.js";
@@ -61,6 +63,8 @@ function route(seg) {
     return null;
   }
   if (seg[0] === "clients" && seg.length === 3 && seg[2] === "relationship") return { kind: "relationship", methods: ["POST"], org: seg[1] };
+  if (seg[0] === "clients" && seg.length === 3 && seg[2] === "profile-export") return { kind: "profile_export", methods: ["GET"], org: seg[1] };
+  if (seg[0] === "clients" && seg.length === 3 && seg[2] === "profile-export.pdf") return { kind: "profile_export_pdf", methods: ["GET"], org: seg[1] };
   if (seg[0] === "clients" && seg[2] === "discovery") {
     const org = seg[1];
     if (seg.length === 3) return { kind: "org", methods: ["GET", "POST"], org };
@@ -93,6 +97,31 @@ function editorView(kind, rows) {
       }),
     };
   });
+}
+
+/** One organization's Business Profile as the export model, or null when the portal database has no Business Profile table (migration 0002 not applied). Only this organization's rows are read. */
+async function profileExportFor(db, org) {
+  let rows;
+  try { rows = (await db.prepare("SELECT field_id, value, updated_at FROM business_profile_answers WHERE organization_id = ?").bind(org.id).all()).results; } catch { return null; }
+  const profile = {};
+  let lastSaved = null;
+  for (const r of rows) { profile[r.field_id] = r.value; if (!lastSaved || r.updated_at > lastSaved) lastSaved = r.updated_at; }
+  return buildProfileExport({ organization: org, profile, lastSaved });
+}
+
+/** The Brand Discovery assessment the client brief speaks for: the newest Submitted or Reviewed one, else the newest still open. Archived ones are ignored. Null when none was ever assigned. */
+async function briefAssessmentFor(db, org) {
+  const list = (await repo.listAssessments(db, { organizationId: org.id, includeArchived: false })).assessments.filter((a) => a.kind === "brand");
+  const done = list.filter((a) => a.status === "submitted" || a.status === "reviewed").sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)))[0];
+  const open = list.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+  const pick = done || open;
+  return pick ? repo.getAssessment(db, org.id, pick.id) : null;
+}
+
+async function discoveryExportFor(db, org, a) {
+  if (!a) return null;
+  const [uploads, answers, content] = await Promise.all([repo.listUploads(db, org.id, a.id), repo.getAnswers(db, a.id), repo.listContent(db, a.kind)]);
+  return buildExport({ organization: org, assessment: a, eff: effectiveKind(a.kind, content.rows), answers, uploads, profile: {} });
 }
 
 export async function handleDiscoveryApi(request, env, principal, path, deps = {}) {
@@ -136,6 +165,20 @@ export async function handleDiscoveryApi(request, env, principal, path, deps = {
       const done = a.status === "submitted" || a.status === "reviewed";
       const exportText = done ? exportMarkdown(buildExport({ organization: org, assessment: a, eff, answers, uploads, profile: await getProfileAnswers(db, org.id) })) : null;
       return json({ available: true, capabilities: caps, organization: { id: org.id, name: org.name, slug: org.slug }, assessment: a, links, uploads, brief, markdown: briefToMarkdown(brief, { client: org.name, title: a.title }), exportMarkdown: exportText, answered: answers.size });
+    }
+    if (r.kind === "profile_export" || r.kind === "profile_export_pdf") {
+      const org = await getOrganizationById(db, r.org);
+      if (!org) return err(404, "not_found", "No such organization.");
+      const p = await profileExportFor(db, org);
+      if (!p) return err(409, "unavailable", "Business Profile data is not available on this deployment.");
+      if (r.kind === "profile_export_pdf") {
+        return new Response(renderProfilePdf(p, { exportedOn: now }), { status: 200, headers: {
+          "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${exportFilename({ client: p.client, assessment: { submitted: exportDate(now) } }, "pdf").replace(/^brand-discovery-/, "business-profile-")}"`,
+          "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+      }
+      const discovery = await discoveryExportFor(db, org, await briefAssessmentFor(db, org));
+      const st = discoveryStatus(discovery);
+      return json({ available: true, organization: { id: org.id, name: org.name }, profileMarkdown: profileMarkdown(p), briefMarkdown: briefMarkdown(p, discovery), discovery: { state: st.state, complete: st.complete, headline: st.headline }, profile: { answered: p.answered, questions: p.questions, percent: p.percent } });
     }
     if (r.kind === "export_pdf") {
       const org = await getOrganizationById(db, r.org);

@@ -1112,6 +1112,9 @@ details[open] > .rk-fold__sum::after, details[open] > .rk-manage__sum::after { m
 .adm-export { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin: 0; }
 .adm-export[hidden] { display: none; }
 @media (max-width: 640px) { .adm-export { flex-direction: column; } }
+.adm-exportwrap { display: grid; gap: 8px; justify-items: start; max-width: 560px; }
+.adm-exportwrap .adm-field__hint { margin: 0; }
+@media (max-width: 640px) { .adm-exportwrap { justify-items: stretch; width: 100%; max-width: none; } .adm-exportwrap .adm-export .btn { width: 100%; } }
 .adm-settings__item > .rk-linkcard { display: flex; padding: 18px 0; gap: 16px; }
 
 /* Requests (admin/assets/requests.js): the answers, quotes and files of one request. Ruled lines, no boxes or shadows. */
