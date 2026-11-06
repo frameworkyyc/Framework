@@ -40,7 +40,6 @@ import { checkCsrf, csrfFor } from "./sessions.js";
 import { can } from "./policy.js";
 import { buildRequestRoutes } from "./requests/routes.js";
 import * as requestsRepo from "./requests/repo.js";
-import { homeBlock } from "./requests/views.js";
 import { getClientBrand, listClientUploads, uploadUsage, getBrandKit, listServiceRequests, createServiceRequest } from "./repo/brand.js";
 import { loadPricing, listPrices } from "./repo/prices.js";
 import { listClientInvoices, clientInvoiceSummary } from "./repo/invoices.js";
@@ -704,17 +703,21 @@ const SERVICES_ROUTES = [
 /** The request area (Deliverables, SEO, Custom Development, My Requests): routes live in requests/routes.js; everything they need from this file is handed in. */
 const REQUEST_ROUTES = buildRequestRoutes({ pages, who, brandDeps, notFoundPage, errorPage, redirect, fileProblem, withPortalHeaders, logEvent, routeName, readUploads, readForm, UPLOAD_FORM_OVERHEAD, checkCsrf, dispatchNotifications, UUID, can, requestsOn, servicesOn });
 
-/** What sits at the top of Home where the request area is on: what waits for the person and the services as active or available. "" when it cannot be read (no migration yet). */
-async function requestsHomeBlock(ctx, a) {
-  if (!requestsOn(ctx)) return "";
+/** What Home needs from the request area where it is on: what waits for the person, and the open requests per service (null when it cannot be read: no migration yet, or the flag is off). */
+async function requestsHomeData(ctx, a) {
+  if (!requestsOn(ctx)) return null;
   try {
     const org = a.membership.organizationId;
     const summary = await requestsRepo.clientSummary(ctx.db, org, { owner: can(a.membership.role, "requests.accept_quote") });
     const open = (await requestsRepo.listClientRequests(ctx.db, org)).filter((r) => !r.closed);
-    const counts = {}; for (const r of open) counts[r.kind] = (counts[r.kind] || 0) + 1;
-    return homeBlock({ base: `/portal/o/${a.membership.slug}`, now: ctx.now }, summary, { counts, canRequest: can(a.membership.role, "requests.submit") });
+    const counts = {}, needs = {};
+    for (const r of open) counts[r.kind] = (counts[r.kind] || 0) + 1;
+    for (const x of summary.actions) needs[x.kind] = (needs[x.kind] || 0) + 1;
+    let support = null;
+    if (servicesOn(ctx)) { const s = await supportSummary(ctx, a); support = { open: s ? s.open : 0, attention: [...(s && s.unread ? [`${s.unread} new ${s.unread === 1 ? "reply" : "replies"}`] : []), ...(s && s.quoted ? [`${s.quoted} ${s.quoted === 1 ? "quote" : "quotes"} to review`] : [])] }; }
+    return { summary, counts, needs, support };
   } catch (err) {
-    if (err instanceof Unavailable || /no such table/i.test(String(err && err.message))) return "";
+    if (err instanceof Unavailable || /no such table/i.test(String(err && err.message))) return null;
     throw err;
   }
 }
@@ -729,7 +732,7 @@ const ORG_ROUTES = [
       if (servicesOn(ctx)) await dispatchNotifications(ctx.env, ctx); // a client visit is also a chance to retry any email that did not go out (see service-notifications.js)
       const answers = await readAnswers(ctx, a);
       const shown = { ...withDisplayName(a, answers), returning: await returningVisitor(ctx, a) };
-      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }), await brandCard(ctx, a), await servicesAttention(ctx, a), await websiteCard(ctx, a), await requestsHomeBlock(ctx, a));
+      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }), await brandCard(ctx, a), await servicesAttention(ctx, a), await websiteCard(ctx, a), await requestsHomeData(ctx, a));
     },
   },
   { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, { ...a, returning: await returningVisitor(ctx, a) }, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },

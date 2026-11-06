@@ -4,12 +4,23 @@
    No shadows, no rounded corners, and nothing moves on hover: hover only changes colour.
    ========================================================= */
 
-/* ---------- navigation: ten entries ---------- */
-.primary--wide .primary__list { display: flex; flex-wrap: nowrap; gap: clamp(10px, 1.3vw, 22px); }
-.primary--wide .primary__list a { font-size: 14px; min-width: 0; }
+/* ---------- navigation: ten entries ----------
+   Wide screens (1024px and up): row one is the brand and the account controls, row two is the whole navigation on its own ruled line, so nothing can collide with
+   anything else at any width from 1024 up. Below 1024px the list gives way to a Menu button that opens the same ten links in a panel. */
 .primary__menu { display: none; }
-@media (max-width: 1280px) {
-  .primary--wide .primary__list { display: none; }
+.primary__list a { white-space: nowrap; }
+.bar--wide .who__org { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (min-width: 1024px) {
+  .bar--wide .bar__in { flex-wrap: wrap; row-gap: 0; }
+  .bar--wide .brand { order: 1; }
+  .bar--wide .who { order: 2; margin-left: auto; min-height: var(--bar-h); }
+  .bar--wide .primary--wide { order: 3; flex: 1 1 100%; margin: 0 0 0 -2px; border-top: 1px solid var(--hairline); }
+  .bar--wide .primary__list { display: flex; flex-wrap: wrap; gap: 0 clamp(16px, 2vw, 30px); }
+  .bar--wide .primary__list a { min-height: 48px; font-size: 14.5px; }
+}
+@media (max-width: 1023px) {
+  .bar--wide .primary__list { display: none; }
+  .bar--wide .primary--wide { overflow: visible; }
   .primary__menu { display: block; position: relative; }
   .primary__menu summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; font-weight: 600; border: 1px solid var(--ink); }
   .primary__menu summary::-webkit-details-marker { display: none; }
@@ -20,6 +31,7 @@
   .primary__menu > ul a { display: flex; justify-content: flex-start; width: 100%; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--hairline); font-size: 16px; }
   .primary__menu > ul a[aria-current="page"] { background: var(--mist); border-left: 4px solid var(--ink); }
 }
+@media (max-width: 1180px) { .bar--wide .who__user { display: none; } }
 
 /* ---------- section pages ---------- */
 .rq-icon { width: 24px; height: 24px; flex: none; }
@@ -72,18 +84,33 @@
 .rq-tabs a:hover { color: var(--ink); }
 .rq-tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--ink); }
 
-/* ---------- Home ---------- */
-.rq-home { margin-bottom: var(--space-5); display: grid; gap: var(--space-4); }
-.rq-home__need { border-top: 3px solid var(--signal); padding-top: var(--space-2); }
-.rq-home__need > .h3 { color: var(--signal); margin: 0 0 var(--space-2); }
-.rq-home__svc > .h3 { margin: 0 0 var(--space-2); }
-.rq-svcs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--ink); border-left: 1px solid var(--hairline); margin-bottom: var(--space-2); }
-.rq-svc { display: flex; flex-direction: column; gap: 8px; height: 100%; padding: 20px; border-right: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); color: inherit; text-decoration: none; transition: background 0.15s ease; }
-.rq-svc:hover, .rq-svc:focus-visible { background: var(--mist); }
-.rq-svc__icon { width: 28px; height: 28px; }
-.rq-svc__t { font-family: var(--font-display); font-weight: 600; font-size: 18px; }
-.rq-svc__d { color: var(--slate); font-size: 14px; }
-@media (max-width: 880px) { .rq-svcs { grid-template-columns: minmax(0, 1fr); } }
+/* ---------- Home: six equal blocks, what needs you, the Business Profile ---------- */
+.hm-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 1fr; border-top: 1px solid var(--ink); border-left: 1px solid var(--hairline); margin-top: var(--space-4); }
+.hm-grid > li { display: flex; }
+.hm-block { display: flex; flex-direction: column; width: 100%; min-height: 232px; padding: 24px; border-right: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); color: inherit; text-decoration: none; transition: background 0.15s ease; }
+a.hm-block:hover, a.hm-block:focus-visible { background: var(--mist); }
+a.hm-block:hover .hm-block__go, a.hm-block:focus-visible .hm-block__go { color: var(--ink); }
+.hm-block--off { color: var(--slate); }
+.hm-block__top { display: flex; align-items: flex-start; justify-content: space-between; }
+.hm-block__icon { width: 32px; height: 32px; }
+.hm-block__go { font-size: 20px; line-height: 1; color: var(--stone); }
+.hm-block__title { margin-top: var(--space-3); font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.15; }
+.hm-block__desc { margin-top: 8px; color: var(--slate); font-size: 15px; line-height: 1.45; }
+.hm-block__state { margin-top: auto; padding-top: var(--space-3); }
+.hm-block__state .status { white-space: normal; align-items: flex-start; }
+.hm-block__state .status::before { margin-top: 3px; }
+@media (max-width: 1023px) { .hm-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .hm-grid { grid-template-columns: minmax(0, 1fr); } .hm-block { min-height: 0; padding: 20px; } .hm-block__title { margin-top: var(--space-2); } }
+
+.hm-need { margin-top: var(--space-5); border-top: 3px solid var(--signal); padding-top: var(--space-2); }
+.hm-need > .h3 { color: var(--signal); margin: 0 0 var(--space-2); }
+.hm-need__all { margin-top: var(--space-2); }
+
+.hm-profile { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: var(--space-3); align-items: center; margin-top: var(--space-5); padding: var(--space-3) 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--hairline); }
+.hm-profile__t { font-family: var(--font-display); font-weight: 600; font-size: 18px; margin: 0; }
+.hm-profile__pct { margin: 0 0 8px; font-size: 14px; color: var(--slate); } .hm-profile__pct strong { color: var(--ink); }
+.hm-profile__pct--muted { margin: 0; }
+@media (max-width: 720px) { .hm-profile { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); } .hm-profile .btn { justify-self: start; } }
 
 /* ---------- the guided form ---------- */
 .rq-form { max-width: 760px; }
@@ -133,4 +160,4 @@
 .rq-thread { margin-bottom: var(--space-3); }
 .rq-cancel { margin-top: var(--space-3); }
 
-@media (prefers-reduced-motion: reduce) { .rq-row, .rq-tile, .rq-svc { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .rq-row, .rq-tile, .hm-block { transition: none; } }
