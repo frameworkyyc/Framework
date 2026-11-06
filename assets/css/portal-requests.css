@@ -108,6 +108,7 @@
 .rq-next { font-size: 18px; margin: var(--space-2) 0 0; max-width: 40em; }
 .rq-note { margin: var(--space-2) 0; padding-left: 14px; border-left: 3px solid var(--ink); color: var(--slate); }
 .rq-inline { margin-top: var(--space-2); max-width: 560px; }
+.rq-inline > .btn, .rq-inline > button { margin-top: var(--space-3); }
 .rq-decide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin-top: var(--space-3); align-items: start; }
 @media (max-width: 880px) { .rq-decide { grid-template-columns: minmax(0, 1fr); gap: var(--space-2); } }
 .rq-quote { border: 1px solid var(--ink); padding: var(--space-3); margin-bottom: var(--space-2); }
