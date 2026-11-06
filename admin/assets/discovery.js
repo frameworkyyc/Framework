@@ -124,7 +124,19 @@ async function detailPage(orgId, id, ctx) {
   try { data = await api(base); } catch (err) { return { title: "Discovery", node: h("div", { class: "adm-page" }, errorState(err, ctx.retry)) }; }
   const root = h("div", { class: "adm-page adm-dsc" });
   let fresh = null; // a link just created: shown once
-  const s = shell(root, { title: data.assessment.title, sub: h("span", null, h("a", { class: "adm-link", href: orgHref(orgId), "data-link": "" }, data.organization.name), data.assessment.recipientName ? ` · for ${data.assessment.recipientName}` : "", " · ", statusChip(data.assessment.status)), back: h("a", { class: "adm-back", href: "/admin/discovery", "data-link": "" }, "← All assessments") });
+  const exportBar = h("div", { class: "adm-actions adm-export" }); // Copy for AI + Download PDF: filled by drawExport, only for a submitted assessment
+  let copyTimer = 0;
+  function drawExport() {
+    if (!data.exportMarkdown) { exportBar.replaceChildren(); exportBar.hidden = true; return; }
+    exportBar.hidden = false;
+    const copy = h("button", { class: "btn btn--primary", type: "button", onclick: async () => {
+      try { await navigator.clipboard.writeText(data.exportMarkdown); copy.textContent = "Copied to clipboard"; s.say("Copied to clipboard. Paste it into ChatGPT or Claude.", "success"); }
+      catch { s.say("Copying was blocked by the browser. Allow clipboard access for this site and try again.", "error"); return; }
+      clearTimeout(copyTimer); copyTimer = setTimeout(() => { copy.textContent = "Copy for AI"; s.say(""); }, 3000);
+    } }, "Copy for AI");
+    exportBar.replaceChildren(copy, h("a", { class: "btn btn--secondary", href: `/api/admin${base}/export.pdf`, download: "" }, "Download PDF"));
+  }
+  const s = shell(root, { title: data.assessment.title, sub: h("span", null, h("a", { class: "adm-link", href: orgHref(orgId), "data-link": "" }, data.organization.name), data.assessment.recipientName ? ` · for ${data.assessment.recipientName}` : "", " · ", statusChip(data.assessment.status)), back: h("a", { class: "adm-back", href: "/admin/discovery", "data-link": "" }, "← All assessments"), actions: exportBar });
   const writes = () => Boolean(data.capabilities && data.capabilities.writes);
   async function act(path, body, ok) {
     try { const r = await api(base + path, { method: "POST", body: body || {} }); if (r && r.url) fresh = r; data = await api(base); draw(); s.say(ok, "success"); }
@@ -213,6 +225,7 @@ async function detailPage(orgId, id, ctx) {
   function draw() {
     const open = management_open();
     const mg = management(); if (open) mg.open = true;
+    drawExport();
     root.replaceChildren(...[...s.head, !writes() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look, but not change.") : null,
       ...overview(), attention(), selections(), filesPanel(), mg].filter(Boolean));
   }
