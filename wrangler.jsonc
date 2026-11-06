@@ -54,8 +54,8 @@
     // serving anything under /admin), and for /card so its link-preview URLs match the environment. Every other public page is
     // still served straight from static assets. /portal and /portal/* belong to the client portal router (worker/portal/router.js): it
     // answers only where PORTAL_ENABLED is "1" (set in previews.vars for Staging only, never at the top level, so never on Production); everywhere else the Worker returns
-    // an explicit 404 for these paths. Note "/portal/*" does not match "/portal" itself, so both are listed.
-    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/card", "/portal", "/portal/*"]
+    // an explicit 404 for these paths. Note "/portal/*" does not match "/portal" itself, so both are listed. "/d/*" is the opaque demo tracking link (worker/demo-traffic.js): it only redirects to /demos/.
+    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/card", "/d/*", "/portal", "/portal/*"]
   },
   // Private client feedback responses (D1). This binding is used by normal `wrangler deploy` deployments.
   "d1_databases": [

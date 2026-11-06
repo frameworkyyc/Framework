@@ -1,7 +1,7 @@
 /**
- * Tracked keywords and their rank checks (migration 0021, proposed). A client names the searches they care about (a keyword and, optionally, a place); Framework looks each one up and
+ * Tracked keywords and their rank checks (migration 0022, proposed). A client names the searches they care about (a keyword and, optionally, a place); Framework looks each one up and
  * records the result. A rank is only ever a stored check: nothing here estimates, derives or imports a ranking, so a keyword with no check has none. Removing a keyword archives it
- * (its checks stay). Every statement names organization_id and the website id, so another organization's website or keyword is simply "not found". A database without 0021 answers
+ * (its checks stay). Every statement names organization_id and the website id, so another organization's website or keyword is simply "not found". A database without 0022 answers
  * { available: false } / "unavailable".
  */
 import { newId, isoTime, requireOrgId, requireId, ok, fail, validActor } from "./common.js";

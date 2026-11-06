@@ -28,7 +28,7 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm,
 const ADMIN = "owner@frameworkco.ca";
 async function setup({ keywords = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld({ proposed: keywords ? ["0021_seo_keywords.sql"] : [] });
+  const w = await makeWorld({ proposed: keywords ? ["0022_seo_keywords.sql"] : [] });
   const Ao = await w.org("alpha", "Alpha Co"); const Bq = await w.org("beta", "Beta Co"); const A = Ao.id, B = Bq.id;
   await w.invite(Ao, "ann@alpha.test", "owner"); await w.invite(Ao, "mia@alpha.test", "member"); await w.invite(Bq, "bob@beta.test", "owner");
   Object.assign(w.env, { PORTAL_SERVICES: "1", PORTAL_REQUESTS: "1", PORTAL_WEBSITE: "1", PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
@@ -158,7 +158,7 @@ test("keyword validation: bad text, duplicates (case ignored), the cap, other or
   assert.equal(noToken.status, 403); assert.equal(sql("SELECT count(*) n FROM seo_keywords WHERE keyword = 'x y z'")[0].n, 0);
 });
 
-test("without migration 0021 keyword tracking says it is being set up, shows no form, and the rest of SEO still works", async () => {
+test("without migration 0022 keyword tracking says it is being set up, shows no form, and the rest of SEO still works", async () => {
   const { ann, A, siteA, publish, page } = await setup({ keywords: false });
   await publish(siteA, A, [P1, P2]);
   const html = await page(ann);
@@ -188,7 +188,7 @@ test("Admin keyword API: list, add, record, delete a check and archive; validate
 test("the new files stay safe: the dashboard builds no inline style or script and the migration only adds", () => {
   const view = strip(read("worker/portal/requests/seo-view.js"));
   assert.ok(!/innerHTML|\bstyle=|<script|eval\(/.test(view));
-  const sqlText = read("migrations/portal-proposed/0021_seo_keywords.sql").replace(/--.*$/gm, "");
+  const sqlText = read("migrations/portal-proposed/0022_seo_keywords.sql").replace(/--.*$/gm, "");
   assert.ok(!/\b(DROP|ALTER|UPDATE|DELETE FROM)\b/i.test(sqlText), "additive only"); assert.equal((sqlText.match(/CREATE TABLE IF NOT EXISTS/g) || []).length, 2);
   assert.match(read("admin/assets/website-seo.js"), /Keyword rankings/);
 });

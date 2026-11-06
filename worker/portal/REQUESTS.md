@@ -33,7 +33,7 @@ Status: **Phase 1 is live on Staging only: migration `0020_requests.sql` is appl
 
 ## SEO
 
-`/seo` opens with a search performance dashboard and tracked keywords; see `worker/portal/SEO-MONITORING.md` for how it works, the Search Console and rank-tracking architecture, and the dependencies and costs. Migration `0021_seo_keywords.sql` is proposed, not applied.
+`/seo` opens with a search performance dashboard and tracked keywords; see `worker/portal/SEO-MONITORING.md` for how it works, the Search Console and rank-tracking architecture, and the dependencies and costs. Migration `0022_seo_keywords.sql` is proposed, not applied.
 
 ## Safety properties (all tested)
 

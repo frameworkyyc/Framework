@@ -1,4 +1,4 @@
--- 0021: tracked keywords and their rank checks (SEO monitoring).
+-- 0022: tracked keywords and their rank checks (SEO monitoring).
 -- PROPOSED. Not applied anywhere. Show for review and wait for approval before applying it to Staging; Production only through the manual
 -- "Portal Production D1 migration" workflow, after its own approval.
 --

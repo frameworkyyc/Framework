@@ -94,8 +94,8 @@ test("the Staging portal base URL is the Staging host, not the live site", () =>
   assert.notEqual(new URL(config.vars.PORTAL_BASE_URL).hostname, new URL(config.previews.vars.PORTAL_BASE_URL).hostname);
 });
 
-test("shared routes: the existing worker routes are unchanged and /portal + /portal/* were added in place of the three probe paths", () => {
-  assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/admin", "/admin/*", "/card", "/portal", "/portal/*"]);
+test("shared routes: the existing worker routes are unchanged, /d/* (the opaque demo tracking link) was added, and /portal + /portal/* were added in place of the three probe paths", () => {
+  assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/admin", "/admin/*", "/card", "/d/*", "/portal", "/portal/*"]);
   assert.ok(!config.assets.run_worker_first.some((p) => p === "/*" || p === "/portal/login"), "no catch-all, no leftover probe paths");
 });
 
