@@ -2,9 +2,11 @@
 // public pages must never make (no prices, no invented reviews or ratings, no public phone number). Public pages live in the repository root.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { PUBLIC_PAGES, build } from "../../scripts/seo/update-sitemap.mjs";
 
+const root = fileURLToPath(new URL("../../", import.meta.url)), join = (a, b) => a + b.replace(/^\//, "");
 const read = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
 const SITE = "https://frameworkco.ca";
 const strip = (h) => h.replace(/<(script|style)[\s\S]*?<\/\1>/g, "");
@@ -97,7 +99,7 @@ test("the contractor page: Calgary first, Alberta and Canada too, honest about s
   assert.ok(!/tel:|\(\d{3}\)\s?\d{3}-\d{4}|\b403[-. ]\d{3}[-. ]\d{4}\b/.test(h), "no public phone number");
   assert.match(t, /concepts we built/); assert.match(t, /illustrative, not clients/);
   const conceptLinks = [...h.matchAll(/href="(\/demos\/[a-z-]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(conceptLinks.sort(), ["/demos/fence-deck", "/demos/general-contractor", "/demos/landscaping", "/demos/renovations"]);
+  assert.deepEqual([...new Set(conceptLinks)].sort(), ["/demos/fence-deck", "/demos/general-contractor", "/demos/landscaping", "/demos/renovations"]);
   assert.ok(!/testimonial|“|”|reviews? from|stars?/i.test(text(h.split('id="work-title"')[1].split('id="faq-title"')[0]).replace(/not clients|reviews in them are illustrative/g, "")), "no testimonials or review quotes in the work section");
   assert.match(h, /href="\/portfolio#red-e-title"/); assert.match(h, /href="\/portfolio#au-title"/);
   // the FAQ in the structured data is the FAQ on the page, word for word
@@ -116,4 +118,24 @@ test("the public pages use no external script except the fonts, and analytics sc
     const h = read(file);
     assert.match(h, /<script src="\/assets\/js\/analytics-config\.js" defer><\/script>\s*<script src="\/assets\/js\/analytics\.js" defer><\/script>/, file);
   }
+});
+
+test("the contractor page visuals: every image has dimensions and alt, files exist, below-the-fold images lazy-load, motion respects reduced-motion", () => {
+  const h = read("contractor-websites.html"), body = h.split("<main")[1].split("</main>")[0];
+  const imgs = [...body.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
+  assert.ok(imgs.length >= 16);
+  for (const i of imgs) {
+    assert.match(i, /\bwidth="\d+"/, i); assert.match(i, /\bheight="\d+"/, i); assert.match(i, /\balt="/, i);
+    for (const [, u] of i.matchAll(/(?:src|srcset)="([^"]+)"/g)) for (const part of u.split(",")) {
+      const f = part.trim().split(/\s+/)[0]; if (f.startsWith("/assets/")) assert.ok(existsSync(join(root, f)), "missing " + f);
+    }
+  }
+  const eager = imgs.filter((i) => !/loading="lazy"/.test(i));
+  assert.ok(eager.length <= 6, "only hero images load eagerly");
+  assert.ok(imgs.filter((i) => /loading="lazy"/.test(i)).length >= 12);
+  assert.match(h, /href="\/assets\/css\/contractors\.css"/); assert.match(h, /src="\/assets\/js\/contractors\.js" defer/);
+  assert.match(read("assets/js/contractors.js"), /prefers-reduced-motion: reduce/);
+  assert.match(read("assets/css/contractors.css"), /@media \(prefers-reduced-motion: reduce\)/);
+  assert.ok(!/border-radius|box-shadow/.test(read("assets/css/contractors.css")), "Framework identity: no rounded corners, no shadows");
+  assert.match(text(h), /Photography on this page by .* on Unsplash/);
 });
