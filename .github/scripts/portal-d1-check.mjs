@@ -38,6 +38,7 @@ export const STAGES = Object.freeze([
   { file: "0016_service_catalogue.sql", tables: ["client_service_state", "portal_service_media"], indexes: ["idx_portal_service_media_service"] }, // two tables, eight nullable columns (portal_services)
   { file: "0017_service_client_settings.sql", tables: ["client_service_settings"], indexes: [] }, // one table, one nullable column (portal_services.category), one seed row (Nexus Fleet Tracker, no price)
   { file: "0018_discovery.sql", tables: ["discovery_answers", "discovery_assessments", "discovery_content", "discovery_links", "discovery_uploads"], indexes: ["idx_discovery_assessments_org", "idx_discovery_links_assessment", "idx_discovery_uploads_assessment"] }, // five additive tables (Brand Discovery assessments, links, answers, Admin content edits, inspiration files); nothing existing is touched
+  { file: "0020_requests.sql", tables: ["request_events", "request_files", "request_quotes", "request_type_settings", "requests"], indexes: ["idx_invoices_request", "idx_request_events_request", "idx_request_files_request", "idx_request_quotes_request", "idx_requests_org", "idx_requests_status"] }, // five additive tables (the unified request engine) and one nullable column on invoices; nothing existing is touched
 ]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",

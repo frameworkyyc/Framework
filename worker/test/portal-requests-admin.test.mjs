@@ -24,7 +24,7 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm,
 
 async function setup({ migrated = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld({ proposed: migrated ? ["0020_requests.sql"] : [] });
+  const w = await makeWorld({ skip: migrated ? [] : ["0020_requests.sql"] });
   const bucket = fakeR2();
   const Ao = await w.org("alpha", "Alpha Co"); const Bq = await w.org("beta", "Beta Co"); const A = Ao.id, Bo = Bq.id;
   await w.invite(Ao, "ann@alpha.test", "owner"); await w.invite(Bq, "bob@beta.test", "owner");
