@@ -21,19 +21,19 @@ const policyText = text(policy);
 const portalExpected = portalPolicyAssertionsApply(policy);
 
 test("every public page has a Privacy Policy link in its footer", () => {
-  assert.deepEqual(PAGES.sort(), ["404.html", "about.html", "assessment.html", "card.html", "client-feedback.html", "contact.html", "index.html", "method.html", "portfolio.html", "privacy.html", "services.html"]);
+  assert.deepEqual(PAGES.sort(), ["404.html", "about.html", "assessment.html", "card.html", "client-feedback.html", "contact.html", "contractor-websites.html", "index.html", "method.html", "portfolio.html", "privacy.html", "services.html"]);
   for (const page of PAGES) {
     // the business card has no site footer: it carries a single compact privacy link instead
     const footer = read(page).split(page === "card.html" ? '<footer class="card__foot">' : '<footer class="site-footer">')[1] || "";
-    assert.match(footer, /<a href="\/?privacy\.html">Privacy Policy<\/a>/, page + " footer link");
+    assert.match(footer, /<a href="\/?privacy(\.html)?">Privacy Policy<\/a>/, page + " footer link");
   }
 });
 
 test("the privacy link is a plain footer list item (no layout or navigation changes)", () => {
   for (const page of PAGES.filter((p) => !["assessment.html", "privacy.html", "card.html"].includes(p))) {
     const html = read(page);
-    assert.equal((html.match(/privacy\.html/g) || []).length, 1, page + ": exactly one privacy link");
-    assert.ok(html.includes('<li><a href="contact.html">Contact</a></li>\n          <li><a href="privacy.html">Privacy Policy</a></li>'), page);
+    assert.equal((html.match(/href="\/privacy"/g) || []).length, 1, page + ": exactly one privacy link");
+    assert.ok(html.includes('<li><a href="/contact">Contact</a></li>\n          <li><a href="/privacy">Privacy Policy</a></li>'), page);
     assert.ok(!/<nav[^>]*>[\s\S]*?privacy[\s\S]*?<\/nav>/.test(html), page + ": not added to the main navigation");
   }
 });
@@ -68,14 +68,18 @@ test("policy: contains none of the claims the business ruled out or the code can
     /deleted automatically/i, /automatic(ally)? (deletion|delete)/i, /we (automatically|will automatically) delete/i,
     /stored only in canada/i, /(only|solely) (stored|processed) in canada/i, /data (stays|remains) in canada(?! \.)/i,
     /100% secure/i, /completely secure(?!,)/i, /absolutely secure/i, /fully compliant/i, /complies with all/i, /guarantee[sd]? compliance/i,
-    /google analytics/i, /gtag/i, /cookie banner/i, /we never share/i, /we will never/i,
+    /gtag/i, /cookie banner/i, /we never share/i, /we will never/i,
     /\d{2,5} [A-Z][a-z]+ (Street|St\.|Avenue|Ave\.|Road|Rd\.|Boulevard|Blvd)/, /\bLtd\.?\b|\bInc\.?\b|\bCorp\.?\b/,
   ];
   for (const re of forbidden) assert.ok(!re.test(policyText), "policy must not contain: " + re);
   // what it MUST say instead
   assert.match(policyText, /review and delete records manually, not automatically/);
   assert.match(policyText, /cannot guarantee absolute security/);
-  assert.match(policyText, /we do not currently use website analytics/i);
+  // Google Analytics is disclosed, off by default and consent-gated (SEO phase 1); it is never described as always on.
+  assert.match(policyText, /Website analytics \(Google Analytics\)/);
+  assert.match(policyText, /switched off by default/i);
+  assert.match(policyText, /loads only after you click Allow/i);
+  assert.match(policyText, /Global Privacy Control or Do Not Track signal, it does not load at all/i);
   assert.match(policyText, /we do not set cookies on the public pages of this website ourselves/i);
 });
 
@@ -97,7 +101,7 @@ test("no cookies are set by site code, and localStorage is touched only by the c
   for (const f of readdirSync(new URL("assets/js/", root)).filter((n) => n.endsWith(".js"))) {
     const js = read("assets/js/" + f);
     assert.ok(!/document\.cookie/.test(js), f + " must not set cookies");
-    if (f !== "consent.js") assert.ok(!/localStorage/.test(js), f + " must not use localStorage");
+    if (!["consent.js", "analytics.js"].includes(f)) assert.ok(!/localStorage/.test(js), f + " must not use localStorage");
   }
   const w = read("worker/index.js") + read("worker/assessment.js") + read("worker/shared.js");
   assert.ok(!/Set-Cookie/i.test(w), "the Worker sets no cookies");
@@ -215,4 +219,16 @@ test("policy: every portal data category it lists exists in the portal's schema,
   assert.ok(policyText.includes("expires after 10 minutes"));
   const fields = read("worker/portal/profile-schema.js");
   for (const label of ["Legal business name", "Operating name", "Industry", "What does your business do?", "Who are your target customers?", "Who are your main competitors?", "Existing website", "Social platforms you use"]) assert.ok(fields.includes(label), label);
+});
+
+test("Google Analytics: ships OFF (empty ID), loads nothing before consent, honours privacy signals and sends no form contents", () => {
+  assert.match(read("assets/js/analytics-config.js"), /ga4: ""/, "the committed configuration has no Measurement ID, so analytics is off");
+  const js = read("assets/js/analytics.js");
+  assert.match(js, /if \(!id\) return;/, "no ID: the script does nothing");
+  assert.match(js, /state\(\) !== "granted"/, "events are dropped without consent");
+  assert.match(js, /navigator\.globalPrivacyControl === true \|\| navigator\.doNotTrack === "1"/, "GPC and DNT count as denied");
+  assert.match(js, /allow_google_signals: false, allow_ad_personalization_signals: false/);
+  assert.deepEqual(readdirSync(new URL("assets/js/", root)).filter((f) => f.endsWith(".js") && /googletagmanager\.com\/gtag/.test(read("assets/js/" + f))), ["analytics.js"], "the Google URL exists in exactly one script");
+  assert.ok(!/document\.cookie/.test(js), "no cookie of ours");
+  for (const field of ["email", "name", "message", "business"]) assert.ok(!new RegExp('fwTrack\\([^)]*' + field).test(read("assets/js/main.js") + read("assets/js/assessment.js")), "no form field is passed to analytics: " + field);
 });
