@@ -139,6 +139,9 @@ export async function purgeOld(db, now = new Date()) {
 /* ---------- GET /d/<token> ---------- */
 
 const noStore = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow" };
+/** Do Not Track (DNT: 1) or Global Privacy Control (Sec-GPC: 1) on the request: nothing is recorded, on the server as well as in the page. */
+export const optedOut = (request) => request.headers.get("DNT") === "1" || request.headers.get("Sec-GPC") === "1";
+
 const redirect = (url, fragment = "") => new Response(null, { status: 302, headers: { Location: new URL("/demos/", url).href + fragment, ...noStore } });
 
 export async function handleDemoLink(request, env, deps = {}) {
@@ -146,7 +149,7 @@ export async function handleDemoLink(request, env, deps = {}) {
   if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 405, headers: { Allow: "GET, HEAD", ...noStore } });
   try {
     const match = url.pathname.match(/^\/d\/([^/]+)\/*$/);
-    if (request.method === "GET" && match) {
+    if (request.method === "GET" && match && !optedOut(request)) { // an opted-out visitor is still sent to /demos/, but no journey or event is created
       const linkId = await verifyToken(signingKey(env), match[1]); // before any database access
       if (linkId && (await tablesReady(env.PORTAL_DB))) {
         const link = await env.PORTAL_DB.prepare("SELECT id FROM demo_links WHERE id = ? AND revoked_at IS NULL").bind(linkId).first();
@@ -199,6 +202,7 @@ const err = (status, error, extra = {}) => new Response(JSON.stringify({ error }
 /** @param deps { now: () => Date, random: () => number, waitUntil } injectable for tests */
 export async function handleDemoEvents(request, env, deps = {}) {
   if (request.method !== "POST") return err(405, "method_not_allowed", { Allow: "POST" });
+  if (optedOut(request)) return noContent(); // the page already sends nothing; this covers any other client
   const origin = request.headers.get("Origin");
   if (origin && origin !== new URL(request.url).origin) return err(403, "forbidden");
   if (!(request.headers.get("Content-Type") || "").toLowerCase().includes("application/json")) return err(415, "unsupported_media_type");
