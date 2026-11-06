@@ -21,6 +21,8 @@ import { checkRecipient } from "./invite-recipients.js";
 import { loadApproved } from "./repo/approved-emails.js";
 import { isoTime } from "./repo/common.js";
 import { CATEGORY_LABEL } from "./repo/support.js";
+import { typeLabel } from "./requests/registry.js";
+import { quoteAcceptanceOpen } from "./requests/quote-gate.js";
 
 export const MAX_ATTEMPTS = 5;
 /** A conversation emails each side at most once in this window: a burst of quick replies is one email, and the portal (and the Admin badge) show the rest. */
@@ -38,14 +40,24 @@ export function buildEmail(n, d, origin) {
   const admin = (p) => `${origin}/admin${p}`;
   let subject, lines, link, why;
   if (n.audience === "staff") {
-    const who = oneLine(d.org.name, 80), what = d.request ? `${CATEGORY_LABEL[d.request.category] || "Request"}: ${oneLine(d.request.title, 120)}` : "";
-    link = admin(`/support/${d.org.id}/${d.request.id}`);
-    if (n.event === "request_submitted") { subject = `New support request from ${who}`; lines = [`${who} sent a new request.`, what]; }
+    const who = oneLine(d.org.name, 80), what = d.request ? `${d.request.unified ? typeLabel(d.request.category) : CATEGORY_LABEL[d.request.category] || "Request"}: ${oneLine(d.request.title, 120)}` : "";
+    link = admin(`/${d.request.unified ? "requests" : "support"}/${d.org.id}/${d.request.id}`);
+    if (n.event === "request_submitted") { subject = d.request.unified ? `New request from ${who}` : `New support request from ${who}`; lines = [`${who} sent a new request.`, what]; }
+    else if (d.request.unified) { subject = `${who} updated a request`; lines = [`${who} replied to or acted on a request.`, what]; }
     else { subject = `${who} replied to a support request`; lines = [`${who} replied to a request.`, what]; }
     why = "You receive this because you are on Framework's support notifications.";
   } else if (n.event === "invoice_published") {
     subject = "A new invoice is ready in your Framework portal"; lines = ["A new invoice has been added to your Framework client portal."]; link = `${portal}/services/invoices`;
     why = `You receive this because you are an owner of ${oneLine(d.org.name, 80)} in the Framework client portal.`;
+  } else if (d.request && d.request.unified) {
+    link = `${portal}/requests/${d.request.id}`;
+    const st = d.request.status;
+    if (n.event === "request_status" && st === "quoted") { subject = "Framework sent you a quote"; lines = ["Framework has sent a quote for one of your requests.", d.quoteOpen ? "Open it in your portal to review it." : "To go ahead, reply in the request conversation in your portal. No work starts until Framework confirms your approval."]; }
+    else if (n.event === "request_status" && st === "client_review") { subject = "A design is ready for your review"; lines = ["A design is ready for your review in your Framework client portal."]; }
+    else if (n.event === "request_status" && st === "completed") { subject = "Your request is complete"; lines = ["One of your requests is complete. Its final files are in your portal."]; }
+    else if (n.event === "request_status") { subject = "An update on your request"; lines = ["There is an update on one of your requests."]; }
+    else { subject = "Framework replied to your request"; lines = ["There is a new reply on one of your requests."]; }
+    why = `You receive this because you sent, or are an owner of the organization that sent, a request in the Framework client portal (${oneLine(d.org.name, 80)}).`;
   } else if (n.event === "request_status") {
     subject = "Framework sent you a quote"; lines = ["Framework has sent a quote for one of your requests.", "To approve it, reply in the request conversation in your portal. No work starts until Framework confirms your approval."]; link = `${portal}/services/requests/${d.request.id}`;
     why = `You receive this because you sent, or are an owner of the organization that sent, a request in the Framework client portal (${oneLine(d.org.name, 80)}).`;
@@ -66,7 +78,12 @@ async function context(db, n) {
   if (!org) return null;
   if (n.entity_type === "support_request") {
     const r = await db.prepare("SELECT id, title, category, submitted_by FROM support_requests WHERE id = ? AND organization_id = ?").bind(n.entity_id, n.organization_id).first();
-    return r ? { org, request: r } : null;
+    if (r) return { org, request: r };
+    // the unified request engine queues its notices under the same entity type (the id is the request's id); without migration 0020 there is no such table: no entity
+    try {
+      const u = await db.prepare("SELECT id, title, type_key, status, submitted_by FROM requests WHERE id = ? AND organization_id = ?").bind(n.entity_id, n.organization_id).first();
+      return u ? { org, request: { id: u.id, title: u.title, category: u.type_key, status: u.status, submitted_by: u.submitted_by, unified: true } } : null;
+    } catch { return null; }
   }
   const i = await db.prepare("SELECT id FROM invoices WHERE id = ? AND organization_id = ? AND archived_at IS NULL AND published_at IS NOT NULL").bind(n.entity_id, n.organization_id).first();
   return i ? { org, invoice: i } : null;
@@ -115,7 +132,7 @@ export async function processNotifications(env, { db, now = new Date(), fetch: f
       if (ctx.org.status === "archived") { await mark(db, n.id, "skipped", "client_deleted", at); out.skipped++; continue; } // a deleted client is not emailed
       const to = n.audience === "staff" ? [notifyRecipient(env)] : await clientRecipients(env, db, n, ctx);
       if (!to.length) { await mark(db, n.id, "skipped", "no_allowed_recipient", at); out.skipped++; continue; }
-      const mail = buildEmail(n, { org: ctx.org, request: ctx.request, invoice: ctx.invoice }, origin);
+      const mail = buildEmail(n, { org: ctx.org, request: ctx.request, invoice: ctx.invoice, quoteOpen: quoteAcceptanceOpen(env) }, origin);
       let problem = null;
       for (let i = 0; i < to.length && !problem; i++) {
         const r = await sendEmail(env, { to: to[i], subject: mail.subject, text: mail.text, html: mail.html, idempotencyKey: `svc-${n.id}-${i}` }, fetchImpl);

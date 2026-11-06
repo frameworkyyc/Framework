@@ -10,8 +10,8 @@
  */
 import { UUID, newId } from "../repo/common.js";
 
-export const AREAS = Object.freeze(["brand-assets", "brand-uploads", "files", "invoices", "support", "websites", "catalogue", "discovery"]);
-const KEY = /^org\/([0-9a-f-]{36})\/(brand-assets|brand-uploads|files|invoices|support|websites|catalogue|discovery)\/([0-9a-f-]{36})$/;
+export const AREAS = Object.freeze(["brand-assets", "brand-uploads", "files", "invoices", "support", "websites", "catalogue", "discovery", "requests"]);
+const KEY = /^org\/([0-9a-f-]{36})\/(brand-assets|brand-uploads|files|invoices|support|websites|catalogue|discovery|requests)\/([0-9a-f-]{36})$/;
 
 export class StorageError extends Error {
   constructor(code) { super(code); this.name = "StorageError"; this.code = code; }

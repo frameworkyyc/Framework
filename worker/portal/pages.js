@@ -14,7 +14,8 @@ import * as brandingLive from "./branding-live.js";
 import * as servicesLive from "./services-live.js";
 import * as websiteLive from "./website-live.js";
 import { frameSources } from "./website-preview.js";
-import { brandingEnabled, servicesEnabled, websiteEnabled } from "./config.js";
+import { brandingEnabled, servicesEnabled, websiteEnabled, requestsEnabled } from "./config.js";
+import { requestsNav, activeKey } from "./requests/nav.js";
 import { LIVE_AREAS } from "./guided-data.js";
 import { specimenSlots } from "./brand-type.js";
 
@@ -70,8 +71,11 @@ function liveModel(ctx, { session, membership: m, returning }, data = {}) {
 async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, styles = [], ref = null, frameSrc = [] }) {
   const { session, membership: m } = a;
   // Header navigation of the connected portal: Home and Account (and Team for owners). Every other page is reached from Home.
-  const list = [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: active === "account" || active === "team" ? active : "home", list }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}` });
+  // Where the request area is on (PORTAL_REQUESTS) the header carries the full service navigation and the current entry follows the path (requests/nav.js).
+  const wide = requestsEnabled(ctx.env);
+  const list = wide ? requestsNav(ctx.env, m.role) : [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
+  const current = wide ? activeKey(String(ctx.url.pathname).slice(vm.base.length)) : active === "account" || active === "team" ? active : "home";
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}` });
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null }) {
@@ -99,9 +103,9 @@ export async function pickerPage(ctx, session, memberships) {
 }
 
 /** The home of the connected portal: the six workspace blocks. Nothing from the demonstration is shown. */
-export async function homePage(ctx, a, moduleStatus = {}, nextAction = {}, brand = null, servicesAttention = [], website = null) {
+export async function homePage(ctx, a, moduleStatus = {}, nextAction = {}, brand = null, servicesAttention = [], website = null, top = "") {
   const vm = { ...liveModel(ctx, a, {}), moduleStatus, nextAction, brand, servicesAttention, website };
-  return shell(ctx, a, { title: "Home", active: "home", body: guided.home(vm), vm, ref: "home" });
+  return shell(ctx, a, { title: "Home", active: "home", body: `${top}${guided.home(vm)}`, vm, ref: "home" });
 }
 export async function overviewPage(ctx, a, data) {
   const vm = liveModel(ctx, a, data);
@@ -143,8 +147,17 @@ export async function accountPage(ctx, a, o = {}) {
   // `derived`: the shown name came from the Business Profile contact (same verified email), not from the account; it is saved only if the person confirms it.
   const value = o.value !== undefined ? o.value : a.session.name || "";
   const nameForm = { action: `${vm.base}/account`, csrf, value, error: o.error || "", saved: Boolean(o.saved), suggested: Boolean(o.derived) && o.value === undefined };
-  return shell(ctx, a, { title: "Account", active: "account", body: views.account(vm, { signOut: await signOutForm(ctx, a.session), nameForm }), vm, ref: "account", status: o.status, script: o.error ? FOCUS_SCRIPT : null });
+  const wide = requestsEnabled(ctx.env);
+  return shell(ctx, a, { title: wide ? "Settings" : "Account", active: "account", body: views.account(vm, { signOut: await signOutForm(ctx, a.session), nameForm, heading: wide ? "Settings" : "Account", teamHref: wide && permissionsFor(a.membership.role).includes("members.view") ? `${vm.base}/members` : "" }), vm, ref: "account", status: o.status, script: o.error ? FOCUS_SCRIPT : null });
 }
+/** A page of the request area: the same shell, with the model the views need (base path and time). */
+export async function requestsShellPage(ctx, a, { title, body, status = 200, ref = "requests" }) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title, active: "home", body, vm, status, ref });
+}
+export const csrfOf = (ctx, a) => csrfFor(ctx.cfg, a.session);
+export const requestsViewModel = (ctx, a) => ({ base: `/portal/o/${a.membership.slug}`, now: ctx.now });
+
 export async function membersPage(ctx, a, members) {
   const vm = liveModel(ctx, a, { team: members.map((u) => ({ name: u.name, email: u.email, role: u.role })) });
   return shell(ctx, a, { title: "Team", active: "team", body: views.team(vm), vm, ref: "team" });

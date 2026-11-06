@@ -237,12 +237,12 @@ function nameFormHtml(f) {
   const note = f.saved ? `<p class="muted small" role="status">Name saved.</p>` : "";
   return `<form method="post" action="${e(f.action)}" class="form name-form" novalidate>${summary}<input type="hidden" name="csrf" value="${e(f.csrf)}"><div class="field"><label for="an">Your name</label>${hint}<input id="an" name="name" type="text" value="${e(f.value)}" maxlength="120" autocomplete="name"${f.error ? ' aria-invalid="true" aria-describedby="an-e"' : f.suggested ? ' aria-describedby="an-h"' : ""}>${err}</div><button class="btn" type="submit">Save name</button>${note}</form>`;
 }
-export function account(vm, { signOut = "", nameForm = null } = {}) {
+export function account(vm, { signOut = "", nameForm = null, heading = "Account", teamHref = "" } = {}) {
   const site = safeHttps(vm.org.website);
   const settings = vm.has.settings
     ? `<ul class="prefs"><li><label for="p1">Weekly project summary<span class="small">One email every Monday with what changed.</span></label><input class="switch" id="p1" type="checkbox" checked disabled></li><li><label for="p2">Review requests<span class="small">An email when something needs your feedback.</span></label><input class="switch" id="p2" type="checkbox" checked disabled></li><li><label for="p3">New documents<span class="small">An email when a file is shared with you.</span></label><input class="switch" id="p3" type="checkbox" disabled></li></ul><p class="muted small">Preview only: these switches are not connected to anything.</p>`
     : notConnected("Notifications", "Email preferences aren’t editable yet. Framework will contact you directly for now.");
-  return `<header class="page-head"><span class="eyebrow">${e(vm.org.name)}</span><h1 class="h1">Account</h1><p class="lead">Your details and your organization’s.</p></header>
+  return `<header class="page-head"><span class="eyebrow">${e(vm.org.name)}</span><h1 class="h1">${e(heading)}</h1><p class="lead">Your details and your organization’s.</p>${teamHref ? `<p><a class="text-link" href="${e(teamHref)}">Manage your team</a></p>` : ""}</header>
 <div class="cols cols--even">
 <section class="section" aria-labelledby="h-org">${sectionHead("Organization", "", "h-org")}<dl class="kv"><dt>Name</dt><dd>${e(vm.org.name)}</dd>${site ? `<dt>Website</dt><dd><a class="text-link" href="${e(site)}" rel="noopener noreferrer">${e(site.replace(/^https:\/\//, ""))}</a></dd>` : ""}<dt>Your role</dt><dd>${e(humanize(vm.org.role))}</dd>${vm.org.people ? `<dt>People</dt><dd>${e(String(vm.org.people))}</dd>` : ""}</dl></section>
 <section class="section" aria-labelledby="h-you">${sectionHead("You", "", "h-you")}<dl class="kv"><dt>Name</dt><dd>${e(vm.user.name || "Not set")}</dd><dt>Email</dt><dd>${e(vm.user.email)}</dd><dt>Sign-in</dt><dd>One-time code sent to your email</dd><dt>Session</dt><dd>Ends after 12 hours of inactivity</dd></dl>${nameForm ? nameFormHtml(nameForm) : ""}</section>
