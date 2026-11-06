@@ -12,8 +12,10 @@ h1,h2,p{margin:0}
 .btn:hover{transform:translateY(-1px)}.btn--dark{background:#0A0A0A;color:#fff}
 .hello{padding:clamp(40px,6vw,88px) 0 clamp(28px,4vw,48px);display:grid;gap:18px;max-width:980px;margin-left:max(clamp(16px,3vw,48px),calc((100% - 1240px) / 2))}
 .hello h1{font:700 clamp(40px,6.6vw,92px)/.98 Switzer,"General Sans",sans-serif;letter-spacing:-.03em}
-.hello p{color:#5C5C5C;font-size:clamp(17px,1.5vw,20px);max-width:60ch}
-.hello .hello__lead{color:#0A0A0A;font:600 clamp(20px,2vw,26px)/1.2 Switzer,"General Sans",sans-serif;letter-spacing:-.01em;max-width:none;margin-top:6px}
+/* ---- Pitch band: one strong statement, full-bleed black, sharp corners ---- */
+.pitch{background:#0A0A0A;color:#fff;padding:clamp(48px,6.5vw,92px) 0;margin-bottom:clamp(36px,5vw,64px)}
+.pitch__h{font:700 clamp(36px,6vw,84px)/1.02 Switzer,"General Sans",sans-serif;letter-spacing:-.03em;max-width:15ch}
+.pitch__p{margin-top:clamp(22px,2.6vw,36px);max-width:58ch;color:#E4E4E4;font-size:clamp(18px,1.7vw,22px);line-height:1.6}
 
 /* ---- Flow ---- */
 .flow{display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(24px,4vw,64px);padding-bottom:clamp(56px,8vw,112px);align-items:start}
@@ -124,5 +126,6 @@ h1,h2,p{margin:0}
   .step__s{width:100%;margin-left:48px}
   .sw button{width:44px;height:44px}.sw button[aria-checked=true]::after{left:15px;top:9px}
   .hello h1{font-size:clamp(36px,10.4vw,48px)}
+  .pitch__h{font-size:clamp(34px,10.4vw,46px)}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
