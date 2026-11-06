@@ -1094,3 +1094,20 @@ li.req { grid-template-columns: 22px minmax(0, 1fr); border-top: 1px solid var(-
 .svc-concept { display: inline-block; padding: 1px 8px; margin-right: 6px; border: 1px solid var(--stone); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--slate); }
 .svc-concept--real { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .svc-fig__img[height] { height: auto; } /* width and height attributes reserve the space; the 16:10 ratio sets the shape */
+
+/* Digital business card: Framework's example in one phone-shaped frame (true proportions, never cropped), and the client's own card as a prominent black panel */
+.svc-phone { margin: 0 auto; width: 100%; max-width: 300px; display: grid; gap: 12px; justify-items: center; }
+.svc-phone__frame { width: 100%; border: 2px solid var(--ink); background: var(--paper); padding: 10px 8px 14px; }
+.svc-phone__frame::before { content: ""; display: block; width: 36px; height: 3px; margin: 0 auto 8px; background: var(--ink); }
+.svc-phone__img { display: block; width: 100%; height: auto; background: var(--paper); }
+.svc-phone__cap { margin: 0; font-size: 13px; color: var(--slate); text-align: center; }
+.svc-phone__btn { width: 100%; }
+.svc-own { display: grid; gap: 6px; align-content: start; padding: var(--space-3); background: var(--ink); color: var(--paper); }
+.svc-own__k { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--stone); }
+.svc-own__t { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(24px, 3.4vw, 32px); line-height: 1.1; letter-spacing: -0.02em; }
+.svc-own__h { margin: 0; font-size: 15px; color: var(--stone); overflow-wrap: anywhere; }
+.svc-own__n { margin: 4px 0 var(--space-2); font-size: 15px; }
+.svc-own__btn { min-height: 56px; font-size: 16px; background: var(--paper); color: var(--ink); border-color: var(--paper); text-align: center; }
+.svc-own__btn:hover, .svc-own__btn:focus-visible { background: transparent; color: var(--paper); }
+.svc-own__btn:focus-visible { outline-color: var(--paper); }
+.svc-tag--live { background: var(--ink); border-color: var(--ink); color: var(--paper); }

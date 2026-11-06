@@ -22,9 +22,9 @@ const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8")
 const rowsOf = (w, q, ...p) => w.db.raw.prepare(q).all(...p).map((r) => ({ ...r }));
 const UUID0 = "00000000-0000-4000-8000-000000000000";
 
-async function setup({ migrated = true, branding = false, m17 = true } = {}) {
+async function setup({ migrated = true, branding = false, m17 = true, skipLinks = false } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld(!migrated ? { skip: ["0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql"] } : !m17 ? { skip: ["0017_service_client_settings.sql"] } : {});
+  const w = await makeWorld(skipLinks ? { skip: ["0023_client_service_links.sql"] } : !migrated ? { skip: ["0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql"] } : !m17 ? { skip: ["0017_service_client_settings.sql"] } : {});
   const bucket = fakeR2();
   Object.assign(w.env, { PORTAL_FILES: bucket, PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   w.env.PORTAL_WEBSITE = "1"; if (branding) w.env.PORTAL_BRANDING = "1";
@@ -32,12 +32,12 @@ async function setup({ migrated = true, branding = false, m17 = true } = {}) {
   await w.invite(A, "ann@alpha.test", "owner"); await w.invite(A, "mia@alpha.test", "member"); await w.invite(Bo, "bob@beta.test", "owner");
   const ann = w.browser(), mia = w.browser(), bob = w.browser(), anon = w.browser();
   await ann.signIn(w.user(1, "ann@alpha.test")); await mia.signIn(w.user(2, "mia@alpha.test")); await bob.signIn(w.user(3, "bob@beta.test"));
-  const call = async (path, { method = "GET", json, form } = {}) => {
-    const h = { Origin: ADMIN_ORIGIN, "Cf-Access-Jwt-Assertion": sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, iat: nowS(), exp: nowS() + 600 }), ...(method !== "GET" ? { "X-Framework-Admin": "1" } : {}) };
+  const call = async (path, { method = "GET", json, form, token, origin = ADMIN_ORIGIN, writes = true } = {}) => {
+    const h = { Origin: origin, ...(token === null ? {} : { "Cf-Access-Jwt-Assertion": token || sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, iat: nowS(), exp: nowS() + 600 }) }), ...(method !== "GET" ? { "X-Framework-Admin": "1" } : {}) };
     let body;
     if (form) { const packed = new Response(form); const buf = new Uint8Array(await packed.arrayBuffer()); h["Content-Type"] = packed.headers.get("Content-Type"); h["Content-Length"] = String(buf.length); body = buf; }
     else if (json !== undefined) { h["Content-Type"] = "application/json"; body = JSON.stringify(json); }
-    const res = await handleAdmin(new Request(ADMIN_ORIGIN + "/api/admin" + path, { method, headers: h, body }), w.env, {});
+    const res = await handleAdmin(new Request(ADMIN_ORIGIN + "/api/admin" + path, { method, headers: h, body }), writes ? w.env : { ...w.env, PORTAL_ADMIN_WRITES: undefined }, {});
     const type = res.headers.get("Content-Type") || "";
     return { status: res.status, headers: res.headers, json: type.includes("json") ? await res.json() : null };
   };
@@ -205,14 +205,108 @@ test("per-client settings are validated, audited internally, scoped to one organ
   assert.deepEqual(await titles(bare.ann), ["SEO & Visibility", "Client Admin Portal", "Digital Business Cards"], "the global order, Invoice Sender hidden; no Nexus until its row is seeded");
 });
 
-test("Additional services show what each service looks like before it is requested: labelled concept pictures, a thumbnail beside each name, and Framework's own live card as the real example", async () => {
+const CARD_URL = "https://jjbrick.example.ca/card";
+const card = (sec) => { const i = sec.indexOf("Digital Business Cards</span>"); return sec.slice(sec.lastIndexOf("<li><details", i), sec.indexOf("</details></li>", i)); };
+
+test("Additional services show what each service looks like before it is requested: labelled concept pictures and a thumbnail beside each name; Digital Business Cards shows ONE real screenshot", async () => {
   const s = await setup();
   await s.site(s.A);
   const sec = await svcSec(s.ann);
-  for (const art of ["portal", "invoice", "digital-card", "seo"]) assert.ok(sec.includes(`/assets/img/portal/${art}.svg`), art + " has a picture");
-  assert.equal((sec.match(/class="svc-concept">Concept<\/span> An illustration of the idea, not a client project/g) || []).length, 4, "every concept picture says what it is");
-  assert.equal((sec.match(/class="svc-card__thumb"/g) || []).length, 4, "a thumbnail beside each service that has a picture (Nexus has none yet)");
-  assert.match(sec, /svc-concept svc-concept--real">Real example<\/span> <a class="text-link" href="https:\/\/frameworkco\.ca\/card" target="_blank" rel="noopener noreferrer">Framework&#39;s own digital business card/);
-  assert.ok(!/<img[^>]*src="[^"]*assets\/img\/portal[^>]*alt="[^"]*client[^"]*project/i.test(sec), "nothing pretends to be client work");
-  for (const f of ["portal", "invoice", "digital-card", "seo"]) assert.ok(read(`assets/img/portal/${f}.svg`).startsWith("<svg"), f + " exists on disk");
+  for (const art of ["portal", "invoice", "seo"]) assert.ok(sec.includes(`/assets/img/portal/${art}.svg`), art + " has a picture");
+  assert.ok(!sec.includes("digital-card.svg"), "the generic digital card illustration is gone");
+  assert.equal((sec.match(/class="svc-concept">Concept<\/span> An illustration of the idea, not a client project/g) || []).length, 3, "every concept picture says what it is; the card has none");
+  assert.equal((sec.match(/class="svc-card__thumb"/g) || []).length, 3, "thumbnails for the three illustrated services (the card shows its screenshot once, in the open card)");
+  for (const f of ["portal", "invoice", "seo"]) assert.ok(read(`assets/img/portal/${f}.svg`).startsWith("<svg"), f + " exists on disk");
+});
+
+test("Digital Business Cards without an address: the real screenshot once, in a phone-shaped frame at its true proportions, and a View live example link plus the option to request one", async () => {
+  const s = await setup();
+  await s.site(s.A);
+  const c = card(await svcSec(s.ann));
+  assert.equal((c.match(/<img /g) || []).length, 1, "one screenshot, no duplicate preview");
+  assert.match(c, /<img class="svc-phone__img" src="\/assets\/img\/portal\/framework-card\.png" width="780" height="1878"/);
+  assert.match(c, /Real example<\/span> Framework's own digital business card/);
+  assert.match(c, /<a class="btn svc-phone__btn" href="https:\/\/frameworkco\.ca\/card" target="_blank" rel="noopener noreferrer">View live example/);
+  assert.ok(!/og-card\.png|Concept|View Your Digital Business Card|Your own card/.test(c), "no concept label, no second preview, nothing that looks like the client's own card");
+  assert.match(c, /Ask about Digital Business Cards/, "and the option to request one");
+  // the picture is the real screenshot at its real size, and the CSS never crops or stretches it
+  const png = readFileSync(new URL("../../assets/img/portal/framework-card.png", import.meta.url));
+  assert.equal(png.readUInt32BE(16), 780); assert.equal(png.readUInt32BE(20), 1878); assert.equal(png.subarray(1, 4).toString(), "PNG");
+  const css = read("assets/css/portal.css"), rule = /\.svc-phone__img \{([^}]*)\}/.exec(css)[1];
+  assert.match(rule, /width: 100%/); assert.match(rule, /height: auto/); assert.ok(!/object-fit|aspect-ratio/.test(rule), "no cropping rule on the screenshot");
+  assert.match(css, /\.svc-phone \{[^}]*max-width: 300px/); assert.ok(!/border-radius/.test(/\.svc-phone[^{]*\{[^}]*\}/g.exec(css).join("")), "sharp corners");
+});
+
+test("a client with a digital business card address: a prominent View Your Digital Business Card button to THEIR card, clearly their own, and none of Framework's example", async () => {
+  const s = await setup();
+  await s.site(s.A);
+  assert.equal((await s.call(`/clients/${s.A.id}/additional-services`, { method: "POST", json: { key: "digital-business-cards", link: CARD_URL } })).status, 200);
+  const c = card(await svcSec(s.ann));
+  assert.match(c, new RegExp(`<a class="btn svc-own__btn" href="${CARD_URL.replace(/[.]/g, "\\.")}" target="_blank" rel="noopener noreferrer">View Your Digital Business Card`));
+  assert.match(c, /This is the card Framework made for you\. It is your card, not Framework's example\./); assert.match(c, /Active · Your card is live/); assert.match(c, /jjbrick\.example\.ca/);
+  assert.match(c, /<details class="svc-card svc-card--lead" open>/, "open without a click");
+  assert.ok(!/framework-card\.png|frameworkco\.ca\/card|View live example|svc-phone/.test(c), "Framework's example never stands in for their card");
+  assert.match(c, /Ask for a change/); assert.ok(!/Ask about Digital Business Cards|The problem|What you get/.test(c), "no sales copy for a service they already have");
+  // a member sees it too; the address is a plain https link (no script, no inline style)
+  assert.match(card(await svcSec(s.mia)), /View Your Digital Business Card/); assert.ok(!/style=|<script|javascript:/.test(c));
+  // changing and removing it
+  await s.call(`/clients/${s.A.id}/additional-services`, { method: "POST", json: { key: "digital-business-cards", link: "https://other.example.ca/me" } });
+  assert.match(card(await svcSec(s.ann)), /href="https:\/\/other\.example\.ca\/me"/);
+  assert.equal((await s.call(`/clients/${s.A.id}/additional-services`, { method: "POST", json: { key: "digital-business-cards", link: null } })).json.services.find((x) => x.key === "digital-business-cards").link, null);
+  const back = card(await svcSec(s.ann)); assert.match(back, /svc-phone__img/); assert.ok(!/View Your Digital Business Card|other\.example/.test(back), "removed: back to the example and the request option");
+  assert.equal(rowsOf(s.w, "SELECT count(*) n FROM client_service_links")[0].n, 0);
+  assert.deepEqual(rowsOf(s.w, "SELECT action FROM activity_log WHERE entity_type = 'service_link' ORDER BY created_at, rowid").map((r) => r.action), ["service.link.set", "service.link.set", "service.link.removed"], "audited");
+});
+
+test("organization isolation: another client never sees or receives this client's card address", async () => {
+  const s = await setup();
+  await s.site(s.A); await s.site(s.Bo, { name: "Beta site", url: "https://beta.example.ca" });
+  await s.call(`/clients/${s.A.id}/additional-services`, { method: "POST", json: { key: "digital-business-cards", link: CARD_URL } });
+  const theirs = await page(s.bob, "/website", "beta");
+  assert.ok(!theirs.includes("jjbrick") && !theirs.includes("View Your Digital Business Card"), "the other organization sees no trace of it");
+  assert.match(card(secOf(theirs, "additional-services")), /svc-phone__img/); assert.match(card(secOf(theirs, "additional-services")), /View live example/);
+  // and they cannot read it through the portal under their own slug or A's slug
+  assert.notEqual((await s.bob.get("/portal/o/alpha/website")).status, 200);
+  assert.deepEqual(rowsOf(s.w, "SELECT organization_id FROM client_service_links"), [{ organization_id: s.A.id }], "stored against the right organization only");
+  // Admin: B's list shows no address; setting B's does not touch A's
+  assert.equal((await s.call(`/clients/${s.Bo.id}/additional-services`)).json.services.find((x) => x.key === "digital-business-cards").link, null);
+  await s.call(`/clients/${s.Bo.id}/additional-services`, { method: "POST", json: { key: "digital-business-cards", link: "https://beta.example.ca/card" } });
+  assert.match(card(await svcSec(s.ann)), /jjbrick\.example\.ca/); assert.ok(!(await svcSec(s.ann)).includes("beta.example.ca/card"));
+  assert.match(card(secOf(await page(s.bob, "/website", "beta"), "additional-services")), /href="https:\/\/beta\.example\.ca\/card"/);
+});
+
+test("the address is validated: https only, a real website name, no login details, no port, no spaces or markup, and only services that take an address", async () => {
+  const s = await setup();
+  const url = `/clients/${s.A.id}/additional-services`, set = (link, key = "digital-business-cards") => s.call(url, { method: "POST", json: { key, link } });
+  for (const bad of ["http://jjbrick.ca/card", "ftp://x.ca/a", "javascript:alert(1)", "https://user:pw@jjbrick.ca/", "https://jjbrick.ca:8443/", "https://10.0.0.5/card", "https://localhost/card", "https://internal/card", "https://exa mple.ca/", "https://jjbrick.ca/<b>", "https://-bad.ca/", "jjbrick.ca/card", "https://" + "a".repeat(300) + ".ca/", 42]) { const r = await set(bad); assert.equal(r.status, 422, JSON.stringify(bad)); assert.equal(r.json.error, "invalid_link"); }
+  assert.equal((await set(CARD_URL, "seo-visibility")).json.error, "invalid_service", "a service that takes no address");
+  assert.equal((await set(CARD_URL, "nope")).json.error, "invalid_service");
+  assert.equal(rowsOf(s.w, "SELECT count(*) n FROM client_service_links")[0].n, 0, "nothing stored for any refused address");
+  assert.equal((await set("  https://JJBrick.Example.ca/card  ")).status, 200, "surrounding spaces are trimmed and the host is normalised");
+  assert.equal(rowsOf(s.w, "SELECT url FROM client_service_links")[0].url, "https://jjbrick.example.ca/card");
+});
+
+test("permissions: only Framework Admin sets an address (token, same origin and writes enabled); clients cannot reach it; without migration 0023 everything else still works", async () => {
+  const s = await setup();
+  const url = `/clients/${s.A.id}/additional-services`;
+  assert.notEqual((await s.call(url, { method: "POST", json: { key: "digital-business-cards", link: CARD_URL }, token: null })).status, 200);
+  assert.equal((await s.call(url, { method: "POST", json: { key: "digital-business-cards", link: CARD_URL }, origin: "https://evil.example" })).status, 403);
+  assert.equal((await s.call(url, { method: "POST", json: { key: "digital-business-cards", link: CARD_URL }, writes: false })).status === 200, false);
+  assert.equal(rowsOf(s.w, "SELECT count(*) n FROM client_service_links")[0].n, 0);
+  const post = await s.ann.send(`/portal/o/alpha/website/services/request`, { method: "POST", body: new URLSearchParams({ service: "digital-business-cards", link: CARD_URL, csrf: await s.csrf(s.ann, "alpha", "/website") }), headers: { "Sec-Fetch-Site": "same-origin", Origin: PORTAL_ORIGIN, "Content-Type": "application/x-www-form-urlencoded" } });
+  assert.equal(rowsOf(s.w, "SELECT count(*) n FROM client_service_links")[0].n, 0, "a client cannot set their own address: " + post.status);
+  const old = await setup({ skipLinks: true });
+  await old.site(old.A);
+  const r = await old.call(`/clients/${old.A.id}/additional-services`, { method: "POST", json: { key: "digital-business-cards", link: CARD_URL } });
+  assert.equal(r.status, 409); assert.equal(r.json.error, "unavailable");
+  assert.equal((await old.call(`/clients/${old.A.id}/additional-services`)).json.linksAvailable, false);
+  assert.match(card(await svcSec(old.ann)), /svc-phone__img/, "the portal falls back to the example");
+});
+
+test("the Admin controls: a labelled address field for the digital business card only, with Save and Remove, and no HTML insertion", () => {
+  const ui = read("admin/assets/client-services.js").replace(/\/\*[\s\S]*?\*\//g, "");
+  assert.match(ui, /sv\.linkLabel/); assert.match(ui, /Save address/); assert.match(ui, /Remove address/); assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML/.test(ui));
+  assert.match(read("worker/portal/repo/client-service-links.js"), /LINKABLE = Object\.freeze\(\{ "digital-business-cards"/);
+  const sqlText = read("migrations/portal/0023_client_service_links.sql").replace(/--.*$/gm, "");
+  assert.ok(!/\b(DROP|ALTER|UPDATE|DELETE FROM|INSERT)\b/i.test(sqlText), "additive only"); assert.equal((sqlText.match(/CREATE TABLE IF NOT EXISTS/g) || []).length, 1);
 });
