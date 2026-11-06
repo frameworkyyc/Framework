@@ -56,17 +56,6 @@ a:hover > .cx-arrow::after, .cx-arrow:hover::after { transform: translateX(5px);
 .cx-hero .eyebrow { color: var(--stone); }
 .cx-hero .cx-lead { color: #D4D4D4; }
 
-.cx-hero__stage { position: relative; aspect-ratio: 7 / 5.2; }
-.cx-frame { position: absolute; display: block; margin: 0; background: #111; border: 1px solid rgba(255,255,255,0.22); text-decoration: none; color: inherit; overflow: hidden; }
-.cx-frame img { width: 100%; height: auto; }
-.cx-frame__bar { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: #111; color: #A3A3A3; font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.14); white-space: nowrap; overflow: hidden; }
-.cx-frame__bar i { width: 8px; height: 8px; border: 1px solid #5C5C5C; flex: none; }
-.cx-frame__bar span { margin-left: 8px; overflow: hidden; text-overflow: ellipsis; }
-.cx-frame--main { right: 0; bottom: 4%; width: 82%; transform: translate3d(0, calc(var(--sy, 0) * var(--depth, 0) * 1px), 0); }
-.cx-frame--back { left: 0; top: 0; width: 56%; opacity: 0.92; transform: translate3d(0, calc(var(--sy, 0) * var(--depth, 0) * 1px), 0); }
-.cx-phone { position: absolute; margin: 0; background: #0A0A0A; border: 5px solid #0A0A0A; outline: 1px solid rgba(255,255,255,0.35); }
-.cx-hero .cx-phone { left: 4%; bottom: 0; width: 20%; transform: translate3d(0, calc(var(--sy, 0) * var(--depth, 0) * 1px), 0); }
-.cx-phone img { width: 100%; height: auto; }
 
 .cx-hero__trades { display: grid; margin-left: auto; margin-right: auto; grid-template-columns: repeat(4, 1fr); border-top: 1px solid rgba(255,255,255,0.2); padding: 0; }
 .cx-hero__trades li + li { border-left: 1px solid rgba(255,255,255,0.2); }
@@ -74,6 +63,10 @@ a:hover > .cx-arrow::after, .cx-arrow:hover::after { transform: translateX(5px);
 .cx-hero__trades a span { color: var(--stone); font-size: 13px; letter-spacing: 1.6px; }
 .cx-hero__trades a:hover, .cx-hero__trades a:focus-visible { background: var(--paper); color: var(--ink); }
 .cx-hero__trades a:hover span { color: var(--slate); }
+
+/* Device mockups are the Portfolio's (.device-stage in styles.css, behaviour in main.js); only placement is set here */
+.cx-hero__stage { min-width: 0; transform: translate3d(0, calc(var(--sy, 0) * var(--depth, 0) * 1px), 0); }
+.cx-hero__stage .device-stage { margin: 0; }
 
 /* ---------- Who we build for ---------- */
 
@@ -88,36 +81,28 @@ a:hover > .cx-arrow::after, .cx-arrow:hover::after { transform: translateX(5px);
 /* ---------- Four jobs ---------- */
 
 .cx-jobs__grid { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: clamp(32px, 5vw, 56px); border-top: 1px solid var(--ink); }
-.cx-jobs__grid li { padding: 32px 28px 40px 0; display: flex; flex-direction: column; gap: 0; transition: background 0.25s ease, color 0.25s ease, padding 0.25s ease; }
+.cx-jobs__grid li { position: relative; padding: 32px 28px 40px 0; display: flex; flex-direction: column; }
 .cx-jobs__grid li + li { border-left: 1px solid var(--hairline); padding-left: 28px; }
 .cx-jobs__grid svg { width: 48px; height: 48px; margin-bottom: 36px; }
-.cx-jobs__grid p { color: var(--slate); margin: 10px 0 0; max-width: 18em; }
-.cx-jobs__grid li:hover { background: var(--ink); color: var(--paper); }
-.cx-jobs__grid li:hover p { color: #D4D4D4; }
-.cx-jobs__grid li:hover .cx-index { color: var(--stone); }
-.cx-jobs__grid li:first-child:hover { padding-left: 20px; }
+.cx-jobs__grid p { color: var(--slate); margin: 10px 0 0; max-width: 18em; transition: color 0.25s ease; }
+/* Hover only draws an ink rule along the top and darkens the line of text: nothing moves, nothing changes size. */
+.cx-jobs__grid li::before { content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 3px; background: var(--ink); transform: scaleX(0); transform-origin: 0 50%; transition: transform 0.4s cubic-bezier(.2,.7,.2,1); }
+.cx-jobs__grid li:hover::before, .cx-jobs__grid li:focus-within::before { transform: scaleX(1); }
+.cx-jobs__grid li:hover p { color: var(--ink); }
 
 /* ---------- Showcase ---------- */
 
 .cx-work { padding-bottom: 0; }
 .cx-stage { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: clamp(28px, 5vw, 80px); align-items: center; padding-top: clamp(56px, 8vw, 112px); padding-bottom: clamp(56px, 8vw, 112px); border-bottom: 1px solid var(--hairline); }
-.cx-work > .cx-stage:first-of-type { margin-top: clamp(40px, 6vw, 72px); border-top: 1px solid var(--ink); }
 .cx-stage--flip { grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); }
 .cx-stage--flip .cx-stage__info { order: 2; }
 .cx-stage__info p { color: var(--slate); margin: 18px 0 0; max-width: 24em; }
 .cx-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 32px; }
 .cx-tags li { border: 1px solid var(--ink); padding: 6px 12px; font-size: 13px; font-weight: 600; }
-.cx-stage__visual { position: relative; padding-bottom: 8%; }
-.cx-stage__visual .cx-frame { position: relative; border-color: var(--ink); background: var(--paper); }
-.cx-stage__visual::before { content: ""; position: absolute; inset: 20px -20px -20px 20px; border: 1px solid var(--hairline); pointer-events: none; }
-.cx-stage--flip .cx-stage__visual::before { inset: 20px 20px -20px -20px; }
-.cx-stage__visual .cx-frame__bar { background: var(--ink); border-bottom-color: var(--ink); }
-.cx-frame__view { display: block; position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: var(--mist); }
-.cx-frame__page { position: absolute; left: 0; top: 0; width: 100%; height: auto; transform: translate3d(0, calc(var(--p, 0) * var(--shift, 0px) * -1), 0); will-change: transform; }
-.cx-frame__open { position: absolute; left: 0; bottom: 0; z-index: 2; background: var(--ink); color: var(--paper); padding: 10px 16px; font-size: 13px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; transform: translateY(101%); transition: transform 0.3s ease; }
-.cx-frame--scroll:hover .cx-frame__open { transform: none; }
-.cx-phone--stage { right: -2%; bottom: 0; width: 20%; transform: translate3d(0, calc(var(--p, 0) * -60px), 0); z-index: 3; }
-.cx-stage--flip .cx-phone--stage { right: auto; left: -2%; }
+
+/* The first showcase stage sits under the section intro on an ink rule */
+.cx-work > .cx-stage:first-of-type { margin-top: clamp(40px, 6vw, 72px); border-top: 1px solid var(--ink); }
+.cx-stage__visual { min-width: 0; }
 
 /* ---------- Photo statement ---------- */
 
@@ -149,16 +134,13 @@ a:hover > .cx-arrow::after, .cx-arrow:hover::after { transform: translateX(5px);
 
 .cx-where__grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(32px, 6vw, 96px); align-items: center; }
 .cx-where .eyebrow { color: var(--stone); }
+/* The homepage logo drawing, unchanged (markup and .dw-* styles are the homepage's); it only waits until it is on screen to begin */
+.cx-where__drawing { width: 100%; max-width: 520px; margin: 0; justify-self: center; }
+.cx-js .cx-where__drawing:not(.is-in) * { animation-play-state: paused; }
 .cx-places { margin-top: clamp(28px, 4vw, 48px); border-top: 1px solid rgba(255,255,255,0.25); }
 .cx-places li { display: grid; grid-template-columns: minmax(0, 9em) 1fr; gap: 20px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,0.25); }
 .cx-places strong { font-family: var(--font-display); font-size: clamp(24px, 3vw, 38px); letter-spacing: -0.02em; }
 .cx-places span { color: #D4D4D4; }
-.cx-nest { width: 100%; max-width: 420px; justify-self: center; color: var(--paper); }
-.cx-nest rect { transform-box: fill-box; transform-origin: center; }
-.cx-js .cx-nest rect { opacity: 0; transform: scale(0.6); transition: opacity 0.8s ease, transform 1.1s cubic-bezier(.2,.7,.2,1); }
-.cx-js .cx-nest.is-in rect { opacity: 1; transform: none; }
-.cx-js .cx-nest.is-in .cx-nest__r2 { transition-delay: 0.25s; }
-.cx-js .cx-nest.is-in .cx-nest__r1 { transition-delay: 0.5s; }
 
 /* ---------- FAQ ---------- */
 
@@ -189,19 +171,12 @@ a:hover > .cx-arrow::after, .cx-arrow:hover::after { transform: translateX(5px);
   .cx-hero__grid, .cx-where__grid, .cx-stage, .cx-stage--flip { grid-template-columns: 1fr; }
   .cx-stage--flip .cx-stage__info { order: 0; }
   .cx-hero__veil { background: linear-gradient(180deg, rgba(10,10,10,0.9), rgba(10,10,10,0.55)); }
-  .cx-hero__stage { aspect-ratio: 1 / 0.9; }
-  .cx-frame--back { display: none; }
-  .cx-frame--main { width: 94%; bottom: auto; top: 0; }
-  .cx-hero .cx-phone { left: 0; width: 26%; }
   .cx-hero__trades { grid-template-columns: 1fr 1fr; }
   .cx-hero__trades li:nth-child(3) { border-left: 0; }
   .cx-hero__trades li:nth-child(n+3) { border-top: 1px solid rgba(255,255,255,0.2); }
   .cx-jobs__grid { grid-template-columns: 1fr 1fr; }
   .cx-jobs__grid li:nth-child(3) { border-left: 0; padding-left: 0; }
   .cx-jobs__grid li:nth-child(n+3) { border-top: 1px solid var(--hairline); }
-  .cx-stage__visual::before { inset: 12px -8px -12px 12px; }
-  .cx-stage--flip .cx-stage__visual::before { inset: 12px 12px -12px -12px; }
-  .cx-nest { max-width: 260px; justify-self: start; }
 }
 @media (max-width: 640px) {
   .cx-clients__grid, .cx-steps { grid-template-columns: 1fr; }
@@ -209,14 +184,11 @@ a:hover > .cx-arrow::after, .cx-arrow:hover::after { transform: translateX(5px);
   .cx-jobs__grid li, .cx-jobs__grid li + li, .cx-jobs__grid li:nth-child(3) { border-left: 0; padding-left: 0; }
   .cx-jobs__grid li + li { border-top: 1px solid var(--hairline); }
   .cx-places li { grid-template-columns: 1fr; gap: 4px; }
-  .cx-phone--stage { right: 0; width: 24%; }
-  .cx-stage--flip .cx-phone--stage { left: 0; }
-  .cx-frame__bar { padding: 7px 10px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .cx-ticker { overflow-x: auto; }
   .cx-ticker__row { animation: none; }
   .cx-ticker__row[aria-hidden="true"] { display: none; }
-  .cx-hero__photo, .cx-band__photo, .cx-frame--main, .cx-frame--back, .cx-hero .cx-phone, .cx-phone--stage, .cx-frame__page { transform: none; }
-  .cx-client__img img, .cx-arrow::after, .cx-frame__open { transition: none; }
+  .cx-hero__stage, .cx-hero__photo, .cx-band__photo { transform: none; }
+  .cx-client__img img, .cx-arrow::after { transition: none; }
 }

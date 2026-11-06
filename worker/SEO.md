@@ -39,9 +39,9 @@ Claim or create the profile (category "Website designer" or "Web designer"; mark
 
 ## The contractor page visuals
 
-`/contractor-websites` is image-led: hero photo and concept-site frames, scroll-linked previews of each concept, a photo statement, client projects, and a drawn process line. Styles are in `assets/css/contractors.css` (sharp corners, no shadows) and motion in `assets/js/contractors.js`. Motion is decorative and switches off under `prefers-reduced-motion`; without the script everything is visible.
+`/contractor-websites` is image-led: hero photo, a MacBook and iPhone for each concept website, a photo statement, client projects, a drawn process line and the homepage logo drawing. The devices are the Portfolio's (`.device-stage` in `styles.css`, frames `assets/img/device-macbook.png` and `device-iphone.png`, behaviour in `main.js`), so they carousel and scroll the same way. The logo drawing is the homepage's own markup and `.dw-*` styles, held back until it is on screen. Page styles are in `assets/css/contractors.css` (sharp corners, no shadows) and motion in `assets/js/contractors.js`. Motion is decorative and switches off under `prefers-reduced-motion`; without the script everything is visible.
 
-- Concept previews in `assets/img/contractors/*-page.webp`, `*-top*.webp` and `*-phone.webp` are screenshots of the four `/demos` sites. If a demo changes, recapture it (1440px wide for the page, 390px at 2x for the phone) and convert to WebP at the same sizes.
+- Concept screenshots in `assets/img/contractors/*-laptop-1..4.webp` (1440px wide captures: home, services, projects, build) and `*-phone-scroll.webp` (390px at 2x, fixed bars hidden) are of the four `/demos` sites. If a demo changes, recapture them at the same sizes.
 - Photography (`hero-frame`, `photo-framing`, `photo-rebar`, `photo-scaffold`) is from Unsplash (Troy Mortier, Nate Johnston, Toni Reed, Marc Wieland) and credited on the page. It is atmosphere, not Framework clients, and the credit line says so. Swap in real project photography when available.
 - Do not add testimonials, ratings or prices to the work section; `seo.test.mjs` guards that, and the image rules (dimensions, alt text, lazy-loading).
 
