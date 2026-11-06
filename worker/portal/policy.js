@@ -36,6 +36,14 @@ const GRANTS = Object.freeze({
   "support.view": Object.freeze(["owner", "member"]),
   "support.submit": Object.freeze(["owner", "member"]),
   "invoices.view": Object.freeze(["owner"]),
+  // Requests (Deliverables, SEO, Custom Development, My Requests; only where PORTAL_REQUESTS is on). Anyone in the organization may follow requests, ask for work,
+  // reply, upload references and review a design proof (approve it or ask for a revision round). Accepting a quote authorizes paid work, so it is owners only,
+  // and it additionally stays closed until Framework's terms exist (requests/quote-gate.js). Only the owner may cancel someone else's request; the repository
+  // lets a member cancel their own.
+  "requests.view": Object.freeze(["owner", "member"]),
+  "requests.submit": Object.freeze(["owner", "member"]),
+  "requests.approve_proof": Object.freeze(["owner", "member"]),
+  "requests.accept_quote": Object.freeze(["owner"]),
 });
 
 export const ACTIONS = Object.freeze(Object.keys(GRANTS));

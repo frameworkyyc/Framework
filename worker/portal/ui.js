@@ -127,7 +127,7 @@ export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions
 <html lang="en-CA"><head>${head(title, { script, styles })}</head>
 <body><a class="skip-link" href="#main">Skip to content</a>${banner}
 <header class="bar"><div class="wrap bar__in"><a class="brand" href="${e(nav.base)}" aria-label="Framework client portal home">${MARK}<span class="brand__word">Framework</span></a>
-<nav class="primary" aria-label="Portal"><ul>${links}</ul></nav>
+${nav.menu ? `<nav class="primary primary--wide" aria-label="Portal"><ul class="primary__list">${links}</ul><details class="primary__menu"><summary>Menu</summary><ul>${links}</ul></details></nav>` : `<nav class="primary" aria-label="Portal"><ul>${links}</ul></nav>`}
 <div class="who"><span class="who__org">${e(who.org)}</span><span class="who__user">${e(who.user)}</span><div class="who__act">${actions}</div></div></div></header>
 <main id="main" class="wrap page" tabindex="-1">${bodyHtml}</main>${feedbackHref ? footerWithFeedback(feedbackHref) : footer}</body></html>`;
   return new Response(html, { status: code, headers: securityHeaders({ ...headers, "Content-Type": "text/html; charset=utf-8", "Set-Cookie": cookies }, { scripts: !!script, frameSrc }) });

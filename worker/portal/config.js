@@ -84,6 +84,11 @@ export function discoveryEnabled(env) {
   return !!env && text(env.PORTAL_DISCOVERY) === "1";
 }
 
+/** The unified request area (Deliverables, SEO, Custom Development, My Requests and the new navigation) is live only where PORTAL_REQUESTS is exactly "1" (Staging). Needs migration 0020. Independent of PORTAL_SERVICES. */
+export function requestsEnabled(env) {
+  return !!env && text(env.PORTAL_REQUESTS) === "1";
+}
+
 /** The Client Services area (hub, contact, and later invoices and support requests) is live only where PORTAL_SERVICES is exactly "1" (Staging). */
 export function servicesEnabled(env) {
   return !!env && text(env.PORTAL_SERVICES) === "1";
