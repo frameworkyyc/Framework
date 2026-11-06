@@ -77,6 +77,7 @@ export async function render(id, ctx) {
 
     if (l.status === "new") {
       btn("Approve", "btn--primary", async () => { await post("/approve"); await reload(); });
+      if (l.website && ["broken", "unverified", "offline", "online"].includes(l.site_status)) btn("Check website again", "btn--secondary", async () => { await api("/leads/recheck-sites", { method: "POST", body: { ids: [id] } }); await reload(); });
       dismiss();
     } else if (l.status === "approved") {
       const b = btn("Approve email", "btn--primary", async () => { if (ctl.pitch && ctl.pitch.dirty()) await ctl.pitch.save(); await post("/message/approve"); await reload(); });
@@ -121,7 +122,7 @@ export async function render(id, ctx) {
     return card("Why they’re a prospect", h("div", null,
       h("p", { class: "ld-reason", text: l.reason }),
       h("dl", { class: "adm-spec ld-facts" },
-        [["Website", SITE_WORDS[l.site_status] || "Unknown"], issues.length ? ["Website issues", issues.join("; ")] : null, rating ? ["Reviews", rating + (l.last_review_at ? ` (latest ${fmtDate(l.last_review_at)})` : "")] : null, l.address ? ["Address", l.address] : null]
+        [["Website", SITE_WORDS[l.site_status] || "Unknown"], issues.length ? [["online", "offline", "unverified"].includes(l.site_status) ? "Website check" : "Website issues", issues.join("; ")] : null, rating ? ["Reviews", rating + (l.last_review_at ? ` (latest ${fmtDate(l.last_review_at)})` : "")] : null, l.address ? ["Address", l.address] : null]
           .filter(Boolean).map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", { text: v })))),
       srcs.length ? h("div", null, h("p", { class: "rk-sub", text: "Sources" }), h("ul", { class: "ld-sources" }, srcs)) : null), { id: "ld-why" });
   }

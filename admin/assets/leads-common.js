@@ -11,7 +11,9 @@ export const statusChip = (lead) => badge(lead.opted_out ? "Opted out" : statusW
 /** The list filter the person last chose, so Back from a lead returns to the same list. */
 export const view = { status: null, q: "" };
 
-export const SITE_WORDS = { none: "No website", social_only: "Facebook page only", broken: "Website doesn’t load", outdated: "Outdated website", ok: "Website looks fine" };
+export const SITE_WORDS = { none: "No website", social_only: "Facebook page only", offline: "Website is offline", broken: "Reported offline, not confirmed", unverified: "Not verified (may be protected)", online: "Website is online", outdated: "Outdated website", ok: "Website looks fine" };
+/** Chip tone per website status: only a confirmed offline site is a warning; "not verified" and "not confirmed" are neutral, never alarming. */
+export const SITE_TONE = { none: "warn", offline: "warn", broken: "pending", unverified: "pending", online: "ok" };
 
 /** Only http(s) addresses are ever made into links. */
 export const safeUrl = (u) => (typeof u === "string" && /^https?:\/\/[^\s]+$/i.test(u) ? u : null);

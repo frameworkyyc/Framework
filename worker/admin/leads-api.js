@@ -10,7 +10,7 @@ import { readTextLimited } from "../assessment.js";
 import { signingKey, tokenForLinkId, tablesReady } from "../demo-traffic.js";
 import {
   MIGRATION, STATUSES, APPROACHES, LEAD_ID, MAX_SEND, FOLLOWUP_DAYS,
-  leadsReady, forgetLeadsReady, nowOf, clean, cleanMultiline, maskEmail, sendingMode, mailingAddress, senderName, finderBound, finderWaiting, syncFinder,
+  leadsReady, forgetLeadsReady, nowOf, clean, cleanMultiline, maskEmail, sendingMode, mailingAddress, senderName, finderBound, finderWaiting, syncFinder, recheckSites, RECHECK_BATCH,
   messageView, currentMessage, nextAction, isOptedOut, getLead, followupState, webhookConfigured, OLD_FINDER_NOTE,
   approveLead, dismissLead, reopenLead, markLead, addContact, confirmContact, draftMessage, draftFollowup, editMessage, approveMessage, unapproveMessage, previewSend, sendMessages,
 } from "../leads.js";
@@ -279,6 +279,16 @@ async function send(body, env, ctx) {
  * @param path pathname with the "/api/admin" prefix removed, e.g. "/leads/list"
  * @returns Response, or null if the path is not a leads route
  */
+/** POST /recheck-sites { ids?: [leadId, ...up to RECHECK_BATCH] }: checks those leads' websites (or, without ids, the next leads still carrying the finder's unconfirmed "doesn't load" claim). */
+async function recheckBody(body, env, now, ctx) {
+  let ids = null;
+  if (body.ids !== undefined) {
+    if (!Array.isArray(body.ids) || !body.ids.length || body.ids.length > RECHECK_BATCH || !body.ids.every((i) => typeof i === "string" && LEAD_ID.test(i))) return bad("ids");
+    ids = [...new Set(body.ids)];
+  }
+  return json(await recheckSites(env, { ids }, { now, fetch: ctx.siteFetch }));
+}
+
 export async function handleLeadsApi(request, env, principal, path, deps = {}) {
   const m = path.match(/^\/leads(\/.*)?$/);
   if (!m) return null;
@@ -288,10 +298,10 @@ export async function handleLeadsApi(request, env, principal, path, deps = {}) {
   try {
     if (sub === "/status") return method === "GET" ? await status(env, now) : notAllowed("GET");
     const lead = sub.match(/^\/([^/]+)(?:\/(approve|dismiss|reopen|draft|followup|status|contacts|message)(?:\/(\d+|approve|unapprove))?)?$/);
-    const fixed = sub.match(/^\/(sync|list|bulk|send\/preview|send)$/);
+    const fixed = sub.match(/^\/(sync|list|bulk|recheck-sites|send\/preview|send)$/);
     if (!fixed && !(lead && LEAD_ID.test(lead[1]))) return json({ error: "not_found" }, 404);
     if (!(await leadsReady(env.PORTAL_DB, now.getTime()))) return json({ error: "not_set_up", migration: MIGRATION }, 409);
-    const ctx = { at: now.toISOString(), origin: url.origin, fetch: deps.fetch };
+    const ctx = { at: now.toISOString(), origin: url.origin, fetch: deps.fetch, siteFetch: deps.siteFetch };
 
     if (fixed) {
       const name = fixed[1];
@@ -302,6 +312,7 @@ export async function handleLeadsApi(request, env, principal, path, deps = {}) {
       const { body, response } = await readBody(request);
       if (response) return response;
       if (name === "bulk") return await bulk(body, env, principal, ctx);
+      if (name === "recheck-sites") return await recheckBody(body, env, now, ctx);
       if (name === "send/preview") return await sendPreview(body, env, ctx);
       return await send(body, env, ctx);
     }

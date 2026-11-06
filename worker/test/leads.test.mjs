@@ -103,7 +103,11 @@ const sendLead = async (w, id) => { const p = await previewHash(w, id); return (
 test("reason strings are specific, built only from the data", () => {
   const d28 = new Date(NOW.getTime() - 28 * DAY).toISOString();
   assert.equal(buildReason({ site_status: "none", rating: 4.6, review_count: 77, last_review_at: d28 }, NOW), "No website; 4.6★ from 77 reviews, latest review 28 days ago.");
-  assert.equal(buildReason({ site_status: "broken", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Website doesn't load (totalfencinginc.com); 4.9★ from 58 reviews.");
+  // "doesn't load" is only ever said of a site a check confirmed offline; the finder's own claim ("broken") is unconfirmed, and online/unverified say what they are
+  assert.equal(buildReason({ site_status: "offline", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Website doesn't load (totalfencinginc.com); 4.9★ from 58 reviews.");
+  assert.equal(buildReason({ site_status: "broken", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Finder reported the website as not loading (totalfencinginc.com); not confirmed yet; 4.9★ from 58 reviews.");
+  assert.equal(buildReason({ site_status: "unverified", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Website couldn't be checked automatically (totalfencinginc.com); it may be protected, not offline; 4.9★ from 58 reviews.");
+  assert.equal(buildReason({ site_status: "online", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Website is online (totalfencinginc.com); 4.9★ from 58 reviews.");
   assert.equal(buildReason({ site_status: "social_only", website: "https://facebook.com/x", rating: 5, review_count: 17 }, NOW), "Only a Facebook page; 5.0★ from 17 reviews.");
   assert.equal(buildReason({ site_status: "outdated", website: "https://a.ca", site_issues: '["No HTTPS","Not mobile-friendly"]', rating: 4.4, review_count: 31 }, NOW), "Outdated site: no HTTPS, not mobile-friendly; 4.4★ from 31 reviews.");
   assert.equal(buildReason({ site_status: "none" }, NOW), "No website.");
@@ -136,7 +140,7 @@ test("drafting: three approaches differ, carry the demo link and the owner's bac
   const variants = [
     { name: "Summit Fencing", trade: "fence", city: "Calgary", site_status: "none", rating: 4.6, review_count: 77 },
     { name: "Summit Fencing", trade: "Fence & Deck", city: "Calgary", site_status: "social_only", website: "https://facebook.com/summit", rating: 5, review_count: 17 },
-    { name: "Total Fencing", trade: "fence", city: "Airdrie", site_status: "broken", website: "https://totalfencinginc.com", rating: 4.9, review_count: 58 },
+    { name: "Total Fencing", trade: "fence", city: "Airdrie", site_status: "offline", website: "https://totalfencinginc.com", rating: 4.9, review_count: 58 },
     { name: "Peak Decks", trade: "deck builder", city: "Calgary", site_status: "outdated", website: "https://peakdecks.ca", site_issues: '["No HTTPS","Not mobile-friendly","Slow to load"]', rating: 4.4, review_count: 31 },
     { name: "No Rating Co", trade: "renovation", city: "", site_status: "none" },
   ];
@@ -186,7 +190,8 @@ test("sync imports only qualified or approved, not do-not-solicit, not-ok-site f
   assert.deepEqual(w.q("SELECT name FROM outreach_leads ORDER BY name").map((x) => x.name), ["FB Co", "No Site Co", "Old Dash Co", "Summit Fencing"]);
   const by = (n) => lead(w, leadId(w, n));
   assert.equal(by("No Site Co").reason, "No website; 4.6★ from 77 reviews, latest review 28 days ago.");
-  assert.equal(by("Old Dash Co").reason, "Website doesn't load (totalfencinginc.com); 4.9★ from 58 reviews. Approved in the old finder dashboard.");
+  assert.equal(by("Old Dash Co").reason, "Finder reported the website as not loading (totalfencinginc.com); not confirmed yet; 4.9★ from 58 reviews. Approved in the old finder dashboard.");
+  assert.equal(by("Old Dash Co").site_status, "broken", "the finder's claim is stored as it was, and stays unconfirmed until a check runs");
   assert.equal(by("FB Co").reason, "Only a Facebook page; 5.0★ from 17 reviews.");
   assert.equal(by("Summit Fencing").reason, "Outdated site: no HTTPS, not mobile-friendly; 4.4★ from 31 reviews.");
   const s = by("Summit Fencing");
@@ -1069,3 +1074,131 @@ test("the public routes work through the Worker entry point (unsubscribe page an
 function createHash(s) { return require_crypto().createHash("sha256").update(s).digest("base64"); }
 import * as nodeCrypto from "node:crypto";
 function require_crypto() { return nodeCrypto; }
+
+/* ---------------- website check: Online / Offline / Unverified ---------------- */
+
+const SR = (status, headers = {}, body = "") => new Response(body === "" ? null : body, { status, headers });
+const DNS_OK = SR(200, { "content-type": "application/json" }, JSON.stringify({ Status: 0 }));
+/** A scripted site fetch: exact URL, then host, then "*"; an Error is thrown. Returns the calls too. */
+const siteFetch = (map) => { const calls = []; const f = async (url) => { const u = new URL(url); calls.push(u.href); const v = map[u.href] ?? map[u.host] ?? map["*"]; if (v instanceof Error) throw v; if (!v) throw new TypeError("fetch failed"); return v.clone(); }; f.calls = calls; return f; };
+const withSite = (w, map) => { w.deps.siteFetch = siteFetch(map); return w.deps.siteFetch; };
+/** Imports finder leads that carry the finder's "doesn't load" claim; returns their ids by name. */
+async function brokenLeads(w, names) {
+  for (const n of names) w.f.add({ name: n, website: `https://${n.toLowerCase().replace(/\W+/g, "")}.ca/?utm_source=google`, site_status: "broken", site_score: 85, site_issues: '["Website doesn\'t load"]', contacts: [] });
+  assert.equal((await w.api("POST", "/leads/sync")).status, 200);
+  return Object.fromEntries(names.map((n) => [n, leadId(w, n)]));
+}
+const apiWith = (w, method, path, body) => w.api(method, path, body);
+
+test("recheck: a working site flagged 'doesn't load' becomes Online and is no longer scored or worded as a broken-site prospect", async () => {
+  const w = world(); const ids = await brokenLeads(w, ["Working Co"]);
+  assert.equal(lead(w, ids["Working Co"]).site_status, "broken");
+  assert.match(lead(w, ids["Working Co"]).reason, /not confirmed yet/, "the finder's claim is shown as unconfirmed, not as fact");
+  withSite(w, { "https://workingco.ca/": SR(301, { location: "https://www.workingco.ca/" }), "https://www.workingco.ca/": SR(200, {}, "<html>hello</html>") });
+  const r = await w.api("POST", "/leads/recheck-sites", {});
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual([r.body.checked, r.body.remaining, r.body.results[0].state, r.body.results[0].changed, r.body.results[0].was], [1, 0, "online", true, "broken"]);
+  const l = lead(w, ids["Working Co"]);
+  assert.deepEqual([l.site_status, l.site_score], ["online", null], "an online site is not scored as a broken-site prospect");
+  assert.match(l.reason, /^Website is online \(workingco\.ca\); 4\.6★ from 77 reviews\.$/);
+  assert.deepEqual(JSON.parse(l.site_issues), ["Checked 2026-11-06: online, ok", "HTTP status 200 after 1 redirect"]);
+  const note = w.q("SELECT type, detail FROM outreach_events WHERE lead_id = ? AND type = 'note'", l.id);
+  assert.equal(note.length, 1); assert.match(note[0].detail, /^Website check: Online: ok \(HTTP 200, 1 redirect\) at www\.workingco\.ca\.$/);
+  assert.equal(w.q("SELECT website FROM outreach_leads WHERE id = ?", l.id)[0].website, "https://workingco.ca/?utm_source=google", "the stored address is kept as it was");
+});
+
+test("recheck: a site that blocks automated requests is Unverified, never Offline, and says why", async () => {
+  const w = world(); const ids = await brokenLeads(w, ["Guarded Co", "Limited Co"]);
+  withSite(w, { "guardedco.ca": SR(403, { server: "cloudflare", "cf-ray": "1", "cf-mitigated": "challenge" }, "Just a moment..."), "www.guardedco.ca": SR(403, { server: "cloudflare", "cf-mitigated": "challenge" }), "limitedco.ca": SR(429, { "retry-after": "30" }), "www.limitedco.ca": SR(429) });
+  const r = await w.api("POST", "/leads/recheck-sites", {});
+  assert.deepEqual(r.body.results.map((x) => x.state).sort(), ["unverified", "unverified"]);
+  for (const id of Object.values(ids)) {
+    const l = lead(w, id);
+    assert.equal(l.site_status, "unverified"); assert.equal(l.site_score, null);
+    assert.match(l.reason, /couldn't be checked automatically .*; it may be protected, not offline/);
+    assert.ok(!/doesn't load/.test(l.reason));
+  }
+  assert.match(JSON.parse(lead(w, ids["Guarded Co"]).site_issues).join(" | "), /HTTP status 403 \| Bot protection seen: Cloudflare challenge/);
+  assert.match(w.q("SELECT detail FROM outreach_events WHERE lead_id = ? AND type = 'note'", ids["Limited Co"])[0].detail, /Unverified: blocked or protected \(HTTP 429\) at limitedco\.ca\. Not treated as offline\./);
+});
+
+test("recheck: a verified offline site keeps its score and the plain 'doesn't load' wording; the diagnostics record the HTTP status", async () => {
+  const w = world(); const ids = await brokenLeads(w, ["Gone Co", "Missing Co"]);
+  const scoreBefore = lead(w, ids["Gone Co"]).site_score;
+  assert.ok(Number.isFinite(scoreBefore), "the finder's score was imported");
+  withSite(w, { "goneco.ca": SR(404), "www.goneco.ca": SR(404), "missingco.ca": SR(521, { server: "cloudflare" }), "www.missingco.ca": SR(521, { server: "cloudflare" }) });
+  const r = await w.api("POST", "/leads/recheck-sites", {});
+  assert.deepEqual(r.body.results.map((x) => [x.state, x.httpStatus]).sort(), [["offline", 404], ["offline", 521]]);
+  const l = lead(w, ids["Gone Co"]);
+  assert.deepEqual([l.site_status, l.site_score], ["offline", scoreBefore]);
+  assert.equal(l.reason, "Website doesn't load (goneco.ca); 4.6★ from 77 reviews.");
+  assert.match(JSON.parse(l.site_issues)[0], /^Checked 2026-11-06: offline, home page not found \(HTTP 404\)$/);
+});
+
+test("recheck: only leads nobody has started on are touched; the drafts of started leads are never made untrue", async () => {
+  const w = world(); const ids = await brokenLeads(w, ["Started Co", "Fresh Co"]);
+  assert.equal((await w.api("POST", `/leads/${ids["Started Co"]}/approve`, {})).status, 200);
+  const draftBefore = JSON.stringify(msgs(w, ids["Started Co"]));
+  assert.match(msgs(w, ids["Started Co"])[0].body, /came across Started Co online/, "a draft made from an unconfirmed claim never says the site doesn't load");
+  assert.ok(!/doesn't load|isn't loading/.test(JSON.stringify(msgs(w, ids["Started Co"]).map((m) => [m.subject, m.body]))));
+  const f = withSite(w, { "*": SR(200, {}, "ok") });
+  const r = await w.api("POST", "/leads/recheck-sites", { ids: [ids["Started Co"], ids["Fresh Co"]] });
+  assert.deepEqual(r.body.results.map((x) => x.skipped || x.state), ["already_started", "online"]);
+  assert.equal(lead(w, ids["Started Co"]).site_status, "broken"); assert.equal(JSON.stringify(msgs(w, ids["Started Co"])), draftBefore);
+  assert.ok(f.calls.every((u) => /freshco/.test(u)), "no request was made for the started lead");
+});
+
+test("recheck: batches of five, remaining reported, repeatable until none are left; a site is never fetched twice for one check", async () => {
+  const w = world(); const names = Array.from({ length: 7 }, (_, i) => `Batch ${String.fromCharCode(97 + i)} Co`);
+  await brokenLeads(w, names);
+  const f = withSite(w, { "*": SR(200, {}, "ok") });
+  let r = (await w.api("POST", "/leads/recheck-sites", {})).body;
+  assert.deepEqual([r.checked, r.remaining], [5, 2]);
+  r = (await w.api("POST", "/leads/recheck-sites", {})).body;
+  assert.deepEqual([r.checked, r.remaining], [2, 0]);
+  r = (await w.api("POST", "/leads/recheck-sites", {})).body;
+  assert.deepEqual([r.checked, r.remaining], [0, 0], "nothing left to check");
+  assert.equal(f.calls.length, 7, "one request per site: the first address that proves the site online ends the check");
+  assert.equal(w.q("SELECT COUNT(*) AS n FROM outreach_leads WHERE site_status = 'online'")[0].n, 7);
+});
+
+test("recheck: an explicit 'check again' works on any website status, input is validated, writes need the same origin", async () => {
+  const w = world(); const ids = await brokenLeads(w, ["Again Co"]);
+  withSite(w, { "*": SR(403) });
+  assert.equal((await w.api("POST", "/leads/recheck-sites", { ids: [ids["Again Co"]] })).body.results[0].state, "unverified");
+  withSite(w, { "*": SR(200, {}, "ok") });
+  assert.equal((await w.api("POST", "/leads/recheck-sites", {})).body.checked, 0, "an Unverified lead is not re-queued on its own");
+  assert.equal((await w.api("POST", "/leads/recheck-sites", { ids: [ids["Again Co"]] })).body.results[0].state, "online", "but can be checked again by hand");
+  assert.equal(lead(w, ids["Again Co"]).site_status, "online");
+  for (const bad of [{ ids: [] }, { ids: "x" }, { ids: ["nope"] }, { ids: Array.from({ length: 6 }, () => ids["Again Co"].replace(/.$/, "0")) }]) assert.equal((await w.api("POST", "/leads/recheck-sites", bad)).status, 422, JSON.stringify(bad));
+  assert.equal((await w.api("POST", "/leads/recheck-sites", {}, undefined)).status, 200);
+  assert.equal((await w.api("POST", "/leads/recheck-sites", {}, { write: false })).status ?? 403, 403);
+  assert.equal((await w.api("GET", "/leads/recheck-sites")).status, 405);
+});
+
+test("recheck: leads whose status is about something else (no website, social page, outdated) are not touched", async () => {
+  const w = world();
+  w.f.add({ name: "Nothing Co", site_status: "none", contacts: [] }); w.f.add({ name: "Social Co", website: "https://facebook.com/social", site_status: "social_only", contacts: [] }); w.f.add({ name: "Old Co", website: "https://oldco.ca", site_status: "outdated", site_issues: '["No HTTPS"]', contacts: [] });
+  await w.api("POST", "/leads/sync");
+  const f = withSite(w, { "*": SR(200, {}, "ok") });
+  const r = await w.api("POST", "/leads/recheck-sites", { ids: ["Nothing Co", "Social Co", "Old Co"].map((n) => leadId(w, n)) });
+  assert.deepEqual(r.body.results.map((x) => x.skipped), ["no_website_claim", "no_website_claim", "no_website_claim"]);
+  assert.equal(f.calls.length, 0);
+});
+
+test("recheck: drafts and reasons never claim a site is offline unless a check confirmed it", async () => {
+  const w = world();
+  for (const [status, name] of [["broken", "Claim Co"], ["unverified", "Guarded2 Co"], ["online", "Fine Co"], ["offline", "Down Co"]]) {
+    w.f.add({ name, trade: "fence", city: "Calgary", website: `https://${name.toLowerCase().replace(/\W+/g, "")}.ca`, site_status: "outdated", contacts: [] });
+  }
+  await w.api("POST", "/leads/sync");
+  for (const [status, name] of [["broken", "Claim Co"], ["unverified", "Guarded2 Co"], ["online", "Fine Co"], ["offline", "Down Co"]]) w.raw.prepare("UPDATE outreach_leads SET site_status = ? WHERE name = ?").run(status, name);
+  for (const [status, name, says] of [["broken", "Claim Co", false], ["unverified", "Guarded2 Co", false], ["online", "Fine Co", false], ["offline", "Down Co", true]]) {
+    const l = w.q("SELECT * FROM outreach_leads WHERE name = ?", name)[0];
+    for (const approach of ["observation", "demo", "reputation"]) {
+      const d = composeDraft({ ...l, rating: 4.8, review_count: 40 }, { demoUrl: "https://staging.frameworkco.ca/d/x", approach });
+      assert.equal(/doesn't load|isn't loading|doesn't open/.test(d.subject + d.body), says, `${status} ${approach}`);
+      assert.ok(!/looks dated/.test(d.body), `${status}: no claim about the look of a site nobody has assessed`);
+    }
+  }
+});

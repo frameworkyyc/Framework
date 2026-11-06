@@ -3,7 +3,7 @@
 
 import { h, api, errorState, stateBlock, confirmDialog } from "./ui.js";
 import { badge, emptyState, fold } from "./kit.js";
-import { STATUSES, statusWord, view, SITE_WORDS, stars, leadsTabs, errText } from "./leads-common.js";
+import { STATUSES, statusWord, view, SITE_WORDS, SITE_TONE, stars, leadsTabs, errText } from "./leads-common.js";
 import { reviewScreen } from "./lead-review.js";
 
 export async function render(ctx) {
@@ -53,7 +53,7 @@ function setupStrip(st) {
 function rowChips(l) {
   const out = [];
   if (l.opted_out) out.push(badge("Opted out", "bad"));
-  out.push(badge(SITE_WORDS[l.site_status] || "Website unknown", l.site_status === "none" || l.site_status === "broken" ? "warn" : ""));
+  out.push(badge(SITE_WORDS[l.site_status] || "Website unknown", SITE_TONE[l.site_status] || ""));
   const r = stars(l.rating, l.review_count);
   if (r) out.push(badge(r, ""));
   out.push(l.has_eligible_email ? badge("Email found", "ok") : l.has_email ? badge("Email needs a check", "warn") : l.phone ? badge("Phone only", "pending") : badge("No contact yet", "warn"));
@@ -102,9 +102,10 @@ function renderList(ctx) {
   const sub = h("p", { class: "adm-sub", text: "Businesses worth a call, found for you. Approve the good ones, then review and send." });
   const syncNote = h("p", { class: "ld-note", role: "status", hidden: true });
   const syncBtn = h("button", { class: "btn btn--secondary", type: "button" }, "Check for new candidates");
+  const checkBtn = h("button", { class: "btn btn--secondary", type: "button", hidden: true }, "Check websites");
 
   const node = h("div", { class: "adm-page ld-page" },
-    h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Leads"), sub), h("div", { class: "adm-actions" }, syncBtn)),
+    h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Leads"), sub), h("div", { class: "adm-actions" }, checkBtn, syncBtn)),
     leadsTabs("leads"), syncNote, main, reviewBox, barBox);
 
   const say = (t) => { syncNote.textContent = t; syncNote.hidden = !t; };
@@ -120,6 +121,27 @@ function renderList(ctx) {
     syncBtn.disabled = false;
   }
   syncBtn.addEventListener("click", () => sync(false));
+
+  /* Website check: leads still carrying the finder's unconfirmed "doesn't load" claim are checked here, five at a time, so a site that merely blocks robots is never called offline. */
+  const unconfirmed = () => ((data && data.leads) || []).filter((l) => l.site_status === "broken" && l.status === "new").length;
+  let verifying = false;
+  async function verify(quiet) {
+    if (verifying || !unconfirmed()) return;
+    verifying = true; checkBtn.disabled = true;
+    try {
+      let left = unconfirmed();
+      while (left > 0) {
+        say(`Checking ${plural(left, "website")}…`);
+        const r = await api("/leads/recheck-sites", { method: "POST", body: {} });
+        if (!r.checked) break;
+        left = r.remaining;
+        await loadList();
+      }
+      say("");
+    } catch (err) { say(quiet ? "" : errText(err)); }
+    verifying = false; checkBtn.disabled = false;
+  }
+  checkBtn.addEventListener("click", () => verify(false));
 
   /* filter */
   function drawFilter() {
@@ -147,6 +169,7 @@ function renderList(ctx) {
         if (pick !== "new") { r = await api("/leads/list?status=" + pick + (q ? `&q=${encodeURIComponent(q)}` : "")); if (token !== loadToken) return; }
       }
       data = r;
+      checkBtn.hidden = !unconfirmed();
       drawFilter(); drawList(); drawBar();
     } catch (err) { if (token === loadToken) listBox.replaceChildren(errorState(err, loadList)); }
   }
@@ -225,6 +248,7 @@ function renderList(ctx) {
     const strip = setupStrip(st);
     if (strip) setup.replaceChildren(strip);
     await loadList();
+    verify(true); // once on load: unconfirmed "doesn't load" claims are checked without a click
     sync(true); // once on load: new candidates appear without a click
   })();
 
