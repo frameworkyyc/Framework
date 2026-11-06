@@ -52,7 +52,7 @@ Every email carries an automatic, non-editable footer: who is writing ("Framewor
 
 `GET /api/admin/leads/status` reports each of these accurately.
 
-1. **Approve migration 0024** (`migrations/portal-proposed/0024_leads.sql`) for Staging; it needs 0021 (already on Staging). Until then Admin -> Leads says "not set up: migration 0024", and `/u/<token>` and the webhook do nothing. (The other proposed file `0022_seo_keywords.sql` has the same number; the names differ, so both can wait side by side.)
+1. **Approve migration 0024** (`migrations/portal-proposed/0024_leads.sql`) for Staging; it needs 0021 (already on Staging). Until then Admin -> Leads says "not set up: migration 0024", and `/u/<token>` and the webhook do nothing.
 2. **`LEADGEN_DB` binding**: in `wrangler.jsonc` under `previews.d1_databases` (`framework-leadgen`, Staging only). Cloudflare cannot make a D1 binding read-only; the code only ever reads.
 3. **`DEMO_LINK_SECRET`** (secret; the portal session pepper is the fallback): signs tracking links and unsubscribe tokens. Without it approve fails with `secret_missing` and nothing can be sent.
 4. **`LEADS_MAILING_ADDRESS`**: the postal address in every footer. Live sending is blocked without it. Store it as a Cloudflare secret or add it to `wrangler.jsonc` in a reviewed change: a plain variable that exists only in the dashboard is deleted on the next deploy. It is not needed in Staging test mode.
