@@ -13,6 +13,7 @@ import { bytesToB64url, b64urlToBytes, hmacHex, timingSafeEqualStrings } from ".
 import { signingKey, tokenForLinkId, newLinkId, tablesReady } from "./demo-traffic.js";
 import { sendEmail, emailConfigured, notifyRecipient, readTextLimited, oneLine } from "./assessment.js";
 import { json } from "./shared.js";
+import { checkSite, diagnosticLines } from "./site-check.js";
 
 export const MIGRATION = "0024_leads.sql";
 export const STATUSES = ["new", "approved", "ready", "contacted", "replied", "won", "dismissed"];
@@ -143,7 +144,10 @@ export function buildReason(lead, now = new Date(), { oldFinder = false } = {}) 
   switch (lead.site_status) {
     case "none": site = "No website"; break;
     case "social_only": { const s = socialName(lead.website); site = s ? `Only a ${s} page` : "Only a social media page"; break; }
-    case "broken": site = host ? `Website doesn't load (${host})` : "Website doesn't load"; break;
+    case "offline": site = host ? `Website doesn't load (${host})` : "Website doesn't load"; break; // only ever set by a verified check (site-check.js)
+    case "broken": site = host ? `Finder reported the website as not loading (${host}); not confirmed yet` : "Finder reported the website as not loading; not confirmed yet"; break;
+    case "unverified": site = host ? `Website couldn't be checked automatically (${host}); it may be protected, not offline` : "Website couldn't be checked automatically"; break;
+    case "online": site = host ? `Website is online (${host})` : "Website is online"; break;
     case "outdated": site = issues.length ? `Outdated site: ${issues.join(", ")}` : "Outdated website"; break;
     default: site = "Weak web presence";
   }
@@ -278,6 +282,48 @@ export async function syncFinder(env, deps = {}) {
   return { imported, skipped, waiting: Math.max(0, fresh.length - imported) };
 }
 
+/* ---------- Website check (Online / Offline / Unverified) ---------- */
+
+export const RECHECK_BATCH = 5; // sites checked per request (each may make a few fetches; Workers cap subrequests per request)
+const SITE_CLAIMS = ["broken", "unverified", "offline", "online"];
+
+/**
+ * Checks one lead's website and records the answer: site_status becomes online, offline or unverified; site_issues lists what was seen (HTTP status, redirects,
+ * protection, failure reason); the one-sentence reason is rebuilt from it; the finder's score is kept only for a verified offline site (an online or unverified one
+ * is not a prospect because of its website, so it is no longer scored as one); and one timeline note says what happened. Only a lead nobody has started on
+ * (status `new`) is touched, so an email already drafted or sent is never made untrue behind someone's back. Writes nothing to the finder.
+ * @returns { id, name, ok, state?, reason?, httpStatus?, protection?, changed?, summary? } or { id, ok: false, skipped | error }
+ */
+export async function recheckLeadSite(env, leadId, deps = {}) {
+  const db = env.PORTAL_DB, now = nowOf(deps), at = now.toISOString();
+  const lead = await getLead(db, leadId);
+  if (!lead) return { id: leadId, ok: false, error: "not_found" };
+  const base = { id: lead.id, name: lead.name };
+  if (!lead.website || !SITE_CLAIMS.includes(lead.site_status)) return { ...base, ok: false, skipped: "no_website_claim" };
+  if (lead.status !== "new") return { ...base, ok: false, skipped: "already_started" };
+  const result = await (deps.checkSite || checkSite)(lead.website, { fetchImpl: deps.fetch || undefined, at: now });
+  const state = result.state;
+  const issues = JSON.stringify(diagnosticLines(result));
+  const score = state === "offline" ? (Number.isFinite(Number(lead.site_score)) && lead.site_score !== null ? Number(lead.site_score) : null) : null;
+  const reason = buildReason({ ...lead, site_status: state, site_issues: issues }, now, { oldFinder: String(lead.reason || "").includes(OLD_FINDER_NOTE) });
+  const res = await db.prepare("UPDATE outreach_leads SET site_status = ?, site_score = ?, site_issues = ?, reason = ?, updated_at = ? WHERE id = ? AND status = 'new'").bind(state, score, issues, reason, at, lead.id).run();
+  if (!res.meta.changes) return { ...base, ok: false, skipped: "already_started" };
+  await eventStmt(db, lead.id, at, "note", `Website check: ${result.summary}`).run();
+  return { ...base, ok: true, state, reason: result.reason, httpStatus: result.httpStatus, protection: result.protection, changed: lead.site_status !== state, summary: result.summary, was: lead.site_status };
+}
+
+/**
+ * Checks up to RECHECK_BATCH leads at once. With `ids`, exactly those (any website status: "check again"); without, the next leads whose website status is still the
+ * finder's unconfirmed "doesn't load" claim. `remaining` is how many such leads are still waiting, so the page can keep going until it reaches 0.
+ */
+export async function recheckSites(env, { ids = null } = {}, deps = {}) {
+  const db = env.PORTAL_DB;
+  const pick = ids ? ids.slice(0, RECHECK_BATCH) : (await many(db, "SELECT id FROM outreach_leads WHERE status = 'new' AND site_status = 'broken' AND website IS NOT NULL ORDER BY updated_at, id LIMIT ?", RECHECK_BATCH)).map((r) => r.id);
+  const results = await Promise.all(pick.map(async (id) => { try { return await recheckLeadSite(env, id, deps); } catch (e) { console.error("leads website check failed:", e && e.message); return { id, ok: false, error: "check_failed" }; } }));
+  const waiting = await one(db, "SELECT COUNT(*) AS n FROM outreach_leads WHERE status = 'new' AND site_status = 'broken' AND website IS NOT NULL");
+  return { checked: results.filter((r) => r.ok).length, results, remaining: Number(waiting && waiting.n) || 0 };
+}
+
 /* ---------- Drafting (templates, deterministic, no pricing) ---------- */
 
 const BIO = "I'm a carpenter in Calgary with about 10,000 hours in the trade, and these days I build websites for trades businesses.";
@@ -288,7 +334,9 @@ const factOf = (lead) => {
   switch (lead.site_status) {
     case "none": return { observe: `I looked for ${lead.name} online and couldn't find a website.`, short: `I couldn't find a website for ${lead.name}`, close: "Right now there's nothing for them to find.", subject: `Finding ${lead.name} online` };
     case "social_only": { const s = socialName(lead.website) || "social media"; return { observe: `I looked for ${lead.name} online and only found a ${s} page, no website.`, short: `I only found a ${s} page for ${lead.name}`, close: `A ${s} page helps, but it isn't something you own or control.`, subject: `${lead.name} and your ${s} page` }; }
-    case "broken": return { observe: `I tried to open the website for ${lead.name}${host ? ` (${host})` : ""} and it doesn't load for me.`, short: `The website I found for ${lead.name}${host ? ` (${host})` : ""} doesn't load`, close: "Right now they'd hit an error instead of your work.", subject: host ? `${host} isn't loading` : `The ${lead.name} website isn't loading` };
+    case "offline": return { observe: `I tried to open the website for ${lead.name}${host ? ` (${host})` : ""} and it doesn't load for me.`, short: `The website I found for ${lead.name}${host ? ` (${host})` : ""} doesn't load`, close: "Right now they'd hit an error instead of your work.", subject: host ? `${host} isn't loading` : `The ${lead.name} website isn't loading` };
+    // Not confirmed offline (still the finder's unchecked claim, protected from automated checks, or loading fine): never say it doesn't load or looks dated.
+    case "broken": case "unverified": case "online": return { observe: `I came across ${lead.name} online.`, short: `I came across ${lead.name}`, close: "Most customers look a business up online before they call.", subject: `A question for ${lead.name}` };
     default: return { observe: `I had a look at the website for ${lead.name}${host ? ` (${host})` : ""} and it looks dated${issues.length ? ` (${issues.join(", ")})` : ""}.`, short: `The website I found for ${lead.name}${host ? ` (${host})` : ""} looks dated`, close: "A dated site can lose you jobs before anyone has called.", subject: `A look at the ${lead.name} website` };
   }
 };
