@@ -11,10 +11,11 @@
 <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=zodiak@400,700&f[]=general-sans@400,500,600&f[]=general-sans@500,600&display=swap">
 <link rel="stylesheet" href="demo.css">
+<link rel="stylesheet" href="signature.css">
 <style>:root{--bg:#FAF7F2;--surface:#FFFFFF;--ink:#221E1A;--muted:#6B635B;--line:#E8E1D6;--accent:#8C6A43;--on-accent:#fff;--ph-a:#5A4632;--ph-b:#D9BF98;--ph-c:#2B241E;--band-bg:#221E1A;--band-ink:#FAF7F2;--radius:2px;--display-font:"Zodiak",Georgia,serif;--body-font:"General Sans",system-ui,sans-serif;--display-weight:400;--display-tracking:-0.025em;--ph-pattern:linear-gradient(rgba(255,255,255,.45) 1px,transparent 1px) 0 0/46px 46px,linear-gradient(90deg,rgba(255,255,255,.45) 1px,transparent 1px) 0 0/46px 46px}</style>
 </head>
-<body>
-<div class="demo-bar"><div class="wrap"><span><strong>Sample website by Framework.</strong> Business and reviews are illustrative.</span><span class="demo-bar__links"><a href="./" data-keep-for>All demos</a><a href="../contact.html">Get a site like this →</a></span></div></div>
+<body data-demo="renovations">
+<div class="demo-bar"><div class="wrap"><span><strong>Sample website by Framework.</strong> Business and reviews are illustrative.</span><span class="demo-bar__links"><a href="./" data-keep-for>All demos</a><a href="../contact.html" data-enquire>Get a site like this →</a></span></div></div>
 <header class="site-head"><div class="wrap">
   <a class="logo" href="#top"><span class="logo__mark" data-biz-initial>H</span><span data-biz>Hearth &amp; Hall Renovations</span></a>
   <nav class="nav" aria-label="Main"><a href="#services">Services</a><a href="#projects">Projects</a><a href="#reviews">Reviews</a><a href="#faq">FAQ</a><a href="#quote">Contact</a></nav>
@@ -49,6 +50,21 @@
   <div class="section-head"><span class="eyebrow">Recent work</span><h2>Projects</h2></div>
   <div class="projects"><div class="ph" role="img" aria-label="Project: white oak kitchen with island, Elbow Park" data-photo="Project: white oak kitchen with island, Elbow Park" data-src="../assets/img/demos/renovations/project-1.jpg"></div><div class="ph" role="img" aria-label="Project: spa bathroom with walk-in shower" data-photo="Project: spa bathroom with walk-in shower" data-src="../assets/img/demos/renovations/project-2.jpg"></div><div class="ph" role="img" aria-label="Project: legal basement suite, Bridgeland" data-photo="Project: legal basement suite, Bridgeland" data-src="../assets/img/demos/renovations/project-3.jpg"></div><div class="ph" role="img" aria-label="Project: open-concept main floor" data-photo="Project: open-concept main floor" data-src="../assets/img/demos/renovations/project-4.jpg"></div><div class="ph" role="img" aria-label="Project: powder room refresh" data-photo="Project: powder room refresh" data-src="../assets/img/demos/renovations/project-5.jpg"></div></div>
 </div></section>
+<!--sig:ba-->
+<section class="section" id="transformations" style="padding-top:0"><div class="wrap">
+  <div class="section-head"><span class="eyebrow">Transformations</span><h2>Before. After. Worth it.</h2><p>Drag to see the difference. Your real before-and-after photos would go right here.</p></div>
+  <div class="seg ba__tabs" role="tablist" aria-label="Project"><button type="button" role="tab" aria-selected="true" data-ba="kitchen">Kitchen</button><button type="button" role="tab" aria-selected="false" data-ba="bathroom">Bathroom</button><button type="button" role="tab" aria-selected="false" data-ba="basement">Basement</button><button type="button" role="tab" aria-selected="false" data-ba="powder">Powder room</button></div>
+  <div class="ba__stage">
+    <img src="../assets/img/demos/renovations/project-1.jpg" alt="Finished renovation" decoding="async">
+    <div class="ba__before" aria-hidden="true"><img src="../assets/img/demos/renovations/project-1.jpg" alt="" decoding="async"></div>
+    <span class="ba__tag ba__tag--b">Before</span><span class="ba__tag ba__tag--a">After</span>
+    <input class="ba__range" type="range" min="0" max="100" value="50" step="0.5" aria-label="Reveal before and after">
+    <div class="ba__handle" aria-hidden="true"></div>
+  </div>
+  <ul class="ba__facts"><li><b>6 weeks</b><span>Timeline</span></li><li><b>Full gut, new layout</b><span>Scope</span></li><li><b>Custom white oak</b><span>Signature</span></li></ul>
+  <p class="sig-note">Sample comparison. The "before" view is illustrative.</p>
+</div></section>
+<!--/sig:ba-->
 
 <section class="section" id="reviews" style="padding-top:0"><div class="wrap">
   <div class="section-head"><span class="eyebrow">Reviews</span><h2>What homeowners say.</h2></div>
@@ -85,5 +101,7 @@
 <div class="mobile-bar"><a class="btn btn--ghost" href="tel:4035550119">Call</a><a class="btn btn--primary" href="#quote">Free quote</a></div>
 <script src="demo.js" defer></script>
 <script src="motion.js" defer></script>
+<script src="signature.js" defer></script>
+<script src="yours.js" defer></script>
 </body>
 </html>
