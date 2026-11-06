@@ -44,6 +44,7 @@ const GRANTS = Object.freeze({
   "requests.submit": Object.freeze(["owner", "member"]),
   "requests.approve_proof": Object.freeze(["owner", "member"]),
   "requests.accept_quote": Object.freeze(["owner"]),
+  "seo.keywords": Object.freeze(["owner"]),
 });
 
 export const ACTIONS = Object.freeze(Object.keys(GRANTS));
