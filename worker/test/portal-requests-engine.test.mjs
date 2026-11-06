@@ -1,4 +1,4 @@
-/* The unified request engine (migration 0020, proposed): the registry, the lifecycle rulebook, the data layer on a real SQLite database with the real migrations, the service layer
+/* The unified request engine (migration 0020): the registry, the lifecycle rulebook, the data layer on a real SQLite database with the real migrations, the service layer
    with fake storage, and everything a stranger, another organization, a member without the right, or a private note or draft file must NOT reach. */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -20,7 +20,7 @@ let tick = 0;
 const at = () => new Date(T0.getTime() + (tick++) * 1000);
 
 function world() {
-  const db = openPortalDb({ proposed: ["0020_requests.sql"] });
+  const db = openPortalDb({});
   const r = db.raw;
   for (const [id, slug] of [[ORG_A, "alpha"], [ORG_B, "beta"]]) r.prepare("INSERT INTO organizations (id, slug, name) VALUES (?, ?, ?)").run(id, slug, slug.toUpperCase());
   [[OWNER, "owner@a.test"], [MEMBER, "member@a.test"], [OTHER, "other@b.test"]].forEach(([id, email], i) => r.prepare("INSERT INTO portal_users (id, workos_user_id, email, name) VALUES (?, ?, ?, ?)").run(id, `user_01TEST00000${i}`, email, i === 0 ? "Olive Owner" : i === 1 ? "Max Member" : "Otto Other"));
@@ -108,7 +108,7 @@ test("the quote gate is closed until Framework's terms exist AND the flag is on;
 /* ------------------------------------------------------------------ migration */
 
 test("migration 0020 is additive, applies on top of everything shipped, and its constraints hold", () => {
-  const sql = readFileSync(new URL("0020_requests.sql", PROPOSED_DIR), "utf8");
+  const sql = readFileSync(new URL("../../migrations/portal/0020_requests.sql", import.meta.url), "utf8");
   assert.ok(!/DROP\s|DELETE\s+FROM|UPDATE\s+\w+\s+SET|RENAME/i.test(sql.replace(/--.*$/gm, "")), "additive only");
   assert.equal([...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).join(), "requests,request_events,request_files,request_quotes,request_type_settings");
   const w = world(), r = w.r;

@@ -39,6 +39,12 @@ export const EXCLUDED = {
   discovery_answers: "client answers; not part of this refresh",
   discovery_content: "Admin edits to questions, per environment",
   discovery_uploads: "client inspiration files; not part of this refresh",
+  // Requests (migration 0020; not in Production yet): client requests, files, quotes and private notes are client material; per-service settings belong to each environment.
+  requests: "client requests; not part of this refresh",
+  request_events: "request conversations and private staff notes; not part of this refresh",
+  request_files: "client reference files and designs; not part of this refresh",
+  request_quotes: "quotes and agreements; not part of this refresh",
+  request_type_settings: "per-environment service settings",
 };
 
 /** Tables SQLite/D1 manage themselves. */

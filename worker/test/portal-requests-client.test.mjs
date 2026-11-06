@@ -12,7 +12,7 @@ import { rows, count } from "./helpers/portal-db.mjs";
 
 const STAFF = "Framework Staff";
 async function setup({ requests = true, services = true } = {}) {
-  const w = await makeWorld({ proposed: ["0020_requests.sql"] });
+  const w = await makeWorld({});
   const bucket = fakeR2();
   Object.assign(w.env, { PORTAL_FILES: bucket, ...(requests ? { PORTAL_REQUESTS: "1" } : {}), ...(services ? { PORTAL_SERVICES: "1" } : {}), PORTAL_BRANDING: "1", PORTAL_WEBSITE: "1" });
   const A = await w.org("alpha", "Alpha Co"); await w.invite(A, "ann@alpha.test", "owner"); await w.invite(A, "mia@alpha.test", "member");

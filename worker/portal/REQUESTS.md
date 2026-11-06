@@ -1,6 +1,6 @@
 # Requests: the unified request engine and the expanded Client Portal
 
-Status: **Phase 1 built on Staging, behind `PORTAL_REQUESTS`. Migration `0020_requests.sql` is proposed, not applied anywhere. Nothing here is live in Production.**
+Status: **Phase 1 is live on Staging only: migration `0020_requests.sql` is applied there and `PORTAL_REQUESTS=1` is set in the Staging (previews) vars. Production has neither the table set nor the flag.**
 
 ## Decisions this follows (owner-approved)
 
@@ -34,11 +34,10 @@ Status: **Phase 1 built on Staging, behind `PORTAL_REQUESTS`. Migration `0020_re
 - Status moves are compare-and-swap batches that write the timeline event, audit entry and at most one notification together.
 - Emails carry no request text or amounts.
 
-## Applying 0020 (needs owner approval each time)
+## Migration 0020
 
-1. Review `migrations/portal-proposed/0020_requests.sql` (additive only).
-2. Staging: move the file into `migrations/portal/`, apply with the Staging migration config (`wrangler.migrate.staging.jsonc`), then set `PORTAL_REQUESTS=1` on Staging.
-3. Production: only through the manual "Portal Production D1 migration" workflow, after a restore bookmark and before-snapshot, each run approved. `PORTAL_REQUESTS` stays off until the Production release is approved.
+1. Staging: applied (owner-approved). The file is `migrations/portal/0020_requests.sql`.
+2. Production: only through the manual "Portal Production D1 migration" workflow, after a restore bookmark and before-snapshot, each run approved. `PORTAL_REQUESTS` stays off until the Production release is approved.
 
 ## Phases
 
