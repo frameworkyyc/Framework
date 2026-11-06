@@ -84,7 +84,7 @@
     img.src = url; if (alt) img.alt = alt;
     img.removeAttribute("width"); img.removeAttribute("height");
     box.classList.add("ph--photo"); box.removeAttribute("role"); box.removeAttribute("aria-label");
-    box.setAttribute("data-yours", "1");
+    box.setAttribute("data-yours", "1"); box.setAttribute("data-cap", "Your project");
   }
   function slots() { return [].slice.call(document.querySelectorAll(".hero .ph, .projects .ph")); }
   function setPhotos(files) {
@@ -145,6 +145,7 @@
       img.src = probe.src; img.alt = box.getAttribute("aria-label") || ""; img.width = probe.naturalWidth; img.height = probe.naturalHeight;
       img.decoding = "async";
       box.appendChild(img); box.classList.add("ph--photo"); box.removeAttribute("role"); box.removeAttribute("aria-label");
+      var cap = (box.getAttribute("data-photo") || "").replace(/^(Project|Hero photo):\s*/, "").replace(/,\s*([^,]+)$/, " · $1"); box.setAttribute("data-cap", cap.charAt(0).toUpperCase() + cap.slice(1));
       box.__loading = false;
     };
     probe.onerror = function () { box.__loading = false; };
@@ -153,7 +154,7 @@
   var boxes = [].slice.call(document.querySelectorAll(".ph[data-src]"));
   if ("IntersectionObserver" in window) {
     var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); load(e.target); } }); }, { rootMargin: "900px 0px" });
-    boxes.forEach(function (b) { if (b.closest(".hero")) load(b); else io.observe(b); });
+    boxes.forEach(function (b) { if (b === boxes[0] && b.closest(".hero")) load(b); else io.observe(b); });
   } else boxes.forEach(function (b) { load(b); });
 
   // Lightbox for project photos

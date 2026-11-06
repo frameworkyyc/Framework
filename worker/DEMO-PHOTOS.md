@@ -87,3 +87,12 @@ All 24 photos are from Unsplash and are used under the [Unsplash licence](https:
 ## Derived images and personalisation
 - `assets/img/demos/<demo>/thumb.jpg` (900 x 560) and `tab.jpg` (240 x 150) are small crops used by the showroom at `/demos/` (cards and tabs). They are cut from existing photos (Fence & Decks project-2, Landscaping hero, Renovations hero, General Contractor project-1). If you replace one of those, regenerate the crop so the showroom stays in step. The credits for those photos already cover the crops.
 - Visitors can try their own business name, colour and photos on any demo ("Make it yours"). Photos they choose stay in their browser as temporary object URLs; nothing is uploaded or stored.
+
+## Current usage and image-dependent work for later
+Opening screens now use the best existing photos: Fence & Decks leads with project-2 (deck) plus project-1 and hero (collage); Landscaping keeps hero.jpg full-bleed with project-2/4/5 thumbnails; Renovations uses the kitchen hero in an arch with project-2 inset; General Contractor leads with project-1 (modern house) plus project-3 (framing) and project-4 (fit-out). `general-contractor/hero.jpg` (roof trusses) is no longer shown but stays in the repo.
+
+Waiting on new imagery (not built yet, by design):
+- Fence & Decks and General Contractor heroes: replace with finished-work hero shots (the current leads are the best existing frames, not purpose-made heroes).
+- Renovations: a real same-room before/after (the interactive hotspot tour is the stand-in, with no fake "before").
+- General Contractor: a construction-to-completion sequence of one building (the project tracker is the stand-in).
+- Landscaping: the same yard across four seasons (the afternoon-to-dusk lighting scene on the real patio photo is the stand-in, with year-round care cards).

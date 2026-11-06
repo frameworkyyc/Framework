@@ -123,53 +123,6 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 2px var(-
 .est__fine{font-size:12.5px;opacity:.6}
 @media (max-width:960px){.est__grid{grid-template-columns:1fr}}
 
-/* ---------- Landscaping: four seasons ---------- */
-.seasons__stage{position:relative;aspect-ratio:16/9;border-radius:var(--radius);overflow:hidden;background:#13200f;isolation:isolate}
-.seasons__stage .ph{position:absolute;inset:0;min-height:0;border-radius:0}
-.seasons__stage .ph img{transition:filter 1.2s ease,transform 6s ease}
-.seasons__stage canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
-.seasons__stage::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;transition:background 1.2s ease,opacity 1.2s ease;opacity:1}
-.seasons__stage[data-season=spring] .ph img{filter:saturate(1.15) brightness(1.06) hue-rotate(-6deg)}
-.seasons__stage[data-season=spring]::after{background:linear-gradient(180deg,rgba(255,214,230,.22),rgba(190,230,170,.1))}
-.seasons__stage[data-season=summer] .ph img{filter:saturate(1.08) contrast(1.03)}
-.seasons__stage[data-season=summer]::after{background:linear-gradient(180deg,rgba(255,226,150,.18),rgba(255,190,90,.06) 60%,transparent)}
-.seasons__stage[data-season=autumn] .ph img{filter:sepia(.55) saturate(1.7) hue-rotate(-16deg) contrast(1.05)}
-.seasons__stage[data-season=autumn]::after{background:linear-gradient(180deg,rgba(214,110,30,.22),rgba(120,50,10,.28))}
-.seasons__stage[data-season=winter] .ph img{filter:grayscale(.7) brightness(1.18) contrast(.92) saturate(.7)}
-.seasons__stage[data-season=winter]::after{background:linear-gradient(180deg,rgba(190,215,255,.34),rgba(235,244,255,.18) 60%,rgba(255,255,255,.3))}
-.seasons__tag{position:absolute;left:clamp(16px,3vw,32px);bottom:clamp(16px,3vw,32px);z-index:3;max-width:min(440px,calc(100% - 32px));padding:18px 22px;background:rgba(10,18,12,.55);backdrop-filter:blur(10px);color:#fff;border-radius:calc(var(--radius) * .7)}
-.seasons__tag b{display:block;font:var(--display-weight,500) 26px/1.1 var(--display-font);margin-bottom:6px}
-.seasons__tag span{font-size:15px;opacity:.85;display:block}
-.seasons__tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}
-.seasons__tabs button{position:relative;text-align:left;padding:16px 18px 18px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:calc(var(--radius) * .7);cursor:pointer;font:600 17px/1.2 var(--display-font);overflow:hidden;transition:border-color .2s,transform .2s}
-.seasons__tabs button small{display:block;font:400 13px/1.4 var(--body-font);color:var(--muted);margin-top:6px}
-.seasons__tabs button:hover{transform:translateY(-2px)}
-.seasons__tabs button[aria-selected=true]{border-color:var(--accent);box-shadow:inset 0 -4px 0 var(--accent)}
-.seasons__tabs button i{position:absolute;left:0;bottom:0;height:4px;width:100%;background:var(--accent);transform:scaleX(0);transform-origin:0 50%}
-.seasons__tabs button[aria-selected=true].is-auto i{animation:seasonbar 6s linear forwards}
-@keyframes seasonbar{to{transform:scaleX(1)}}
-@media (max-width:760px){.seasons__stage{aspect-ratio:4/5}.seasons__tabs{grid-template-columns:1fr 1fr}.seasons__tag{padding:14px 16px}.seasons__tag b{font-size:21px}}
-
-/* ---------- Renovations: before / after ---------- */
-.ba__tabs{margin-bottom:22px}
-.ba__tabs.seg button{border-radius:0}
-.ba__stage{position:relative;aspect-ratio:16/9;overflow:hidden;background:#1a1613;--pos:50%;user-select:none;touch-action:pan-y}
-.ba__stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
-.ba__before{position:absolute;inset:0;clip-path:inset(0 calc(100% - var(--pos)) 0 0)}
-.ba__before img{filter:grayscale(.92) contrast(.62) brightness(.58) blur(1.4px) sepia(.18)}
-.ba__before::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 2px,transparent 2px 64px),repeating-linear-gradient(0deg,rgba(255,255,255,.06) 0 2px,transparent 2px 64px),radial-gradient(120% 100% at 50% 100%,rgba(40,30,20,.55),transparent 70%)}
-.ba__tag{position:absolute;top:18px;z-index:3;padding:8px 14px;font:600 12px/1 "General Sans",system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.6)}
-.ba__tag--b{left:18px}.ba__tag--a{right:18px}
-.ba__handle{position:absolute;top:0;bottom:0;left:var(--pos);width:2px;background:#fff;z-index:4;transform:translateX(-1px);pointer-events:none}
-.ba__handle::after{content:"⟷";position:absolute;top:50%;left:50%;width:56px;height:56px;margin:-28px;border-radius:50%;background:#fff;color:#111;display:grid;place-items:center;font:600 22px/1 system-ui;box-shadow:0 6px 24px rgba(0,0,0,.35)}
-.ba__range{position:absolute;inset:0;width:100%;height:100%;opacity:0;z-index:5;cursor:ew-resize;margin:0}
-.ba__range:focus-visible~.ba__handle::after{outline:3px solid var(--accent);outline-offset:3px}
-.ba__facts{list-style:none;margin:22px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
-.ba__facts li{background:var(--surface);padding:20px 24px;display:grid;gap:4px}
-.ba__facts b{font:var(--display-weight,400) 26px/1.1 var(--display-font)}
-.ba__facts span{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-@media (max-width:760px){.ba__stage{aspect-ratio:4/5}.ba__facts{grid-template-columns:1fr}.ba__handle::after{width:46px;height:46px;margin:-23px}}
-
 /* ---------- General Contractor: live project tracker ---------- */
 .trk{display:grid;gap:22px}
 .trk__pick button{border-radius:var(--radius)}
