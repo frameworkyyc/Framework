@@ -14,7 +14,7 @@ These apply to every session in this repository. Where a development principle b
 - Run `node --test worker/test/*.test.mjs` before every push. Pinned tests are guards: change one deliberately, not to get green.
 - A Production release is a branch from `origin/main` carrying only approved Staging work, then a sync of `main` back into Staging.
 - Admin UI: every Admin screen follows `worker/admin/DESIGN-SYSTEM.md`: Framework's own identity (sharp corners, ruled lines, display type, black and white; no rounded cards, pill buttons, shadows or generic SaaS styling) and its usability standards (answer first, scannable, visual over text, simple, consistent). Use the shared kit (`admin/assets/kit.js`), the tokens in `admin/assets/admin.css` and the page patterns there before writing new markup or styles; no inline styles or HTML insertion. Update that document when a pattern is added.
-- Project map: `README.md`, `worker/admin/DESIGN-SYSTEM.md`, `worker/portal/README.md` and its topic notes, `migrations/portal/README.md`.
+- Project map: `README.md`, `worker/admin/DESIGN-SYSTEM.md`, `worker/SEO.md`, `worker/portal/README.md` and its topic notes, `migrations/portal/README.md`.
 
 ## Development principles
 Adapted from [multica-ai/andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills/blob/main/CLAUDE.md). They bias toward caution over speed; for trivial tasks use judgment.

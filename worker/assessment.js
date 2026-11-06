@@ -356,7 +356,7 @@ export const turnstileState = (env) => {
 };
 export const notifyRecipient = (env) => String(env.ASSESSMENT_NOTIFY_TO || "").trim() || DEFAULT_NOTIFY_TO;
 
-const oneLine = (v, max = 200) => String(v == null ? "" : v).replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+export const oneLine = (v, max = 200) => String(v == null ? "" : v).replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 
 /**
  * Send one email through Resend. Never throws. Resolves { ok: true } or { ok: false, error } where `error` is a short,
@@ -417,7 +417,7 @@ export async function sendTestEmail(env, deps = {}) {
 }
 
 /** @returns "ok" | "failed" | "unavailable" */
-async function verifyTurnstile(token, ip, env, fetchImpl) {
+export async function verifyTurnstile(token, ip, env, fetchImpl) {
   try {
     const form = new FormData();
     form.append("secret", env.TURNSTILE_SECRET);
@@ -581,7 +581,7 @@ async function hashIp(ip, env) {
 }
 
 /** Read a request body as text, giving up as soon as it exceeds `max` bytes. Returns null when too large. */
-async function readTextLimited(request, max) {
+export async function readTextLimited(request, max) {
   if (!request.body) return "";
   const reader = request.body.getReader();
   const chunks = [];

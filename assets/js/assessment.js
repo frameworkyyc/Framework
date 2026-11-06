@@ -339,6 +339,7 @@
           successBox.focus();
           if (successBox.scrollIntoView) successBox.scrollIntoView({ block: "center", behavior: "smooth" });
           trackLead(sentId); // only after the server confirmed the request
+          if (window.fwTrack) window.fwTrack("generate_lead", { form: "assessment" }); // Google Analytics, only if the visitor allowed it
           submissionId = uuid();
           return;
         }

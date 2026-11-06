@@ -8,6 +8,7 @@
  *   POST /api/feedback          store one submission in D1 (the /client-feedback form)
  *   POST /api/assessment        Free Online Presence Assessment request (stores in D1, emails Framework)
  *   GET  /api/assessment/config public IDs the page needs (Turnstile site key, Meta Pixel ID)
+ *   POST /api/contact           Website contact form (emails Framework; stores nothing)
  *   GET  /api/client-revenue    the combined client revenue total for the homepage (no per-client data)
  *   GET  /api/feedback/export   CSV / JSON export, requires  Authorization: Bearer <FEEDBACK_EXPORT_TOKEN>
  *
@@ -22,6 +23,7 @@ import { RATING_KEYS, COLUMNS, ensureSchema, SECURITY_HEADERS, json, csvCell, ti
 import { handleAdmin } from "./admin/router.js";
 import { combinedRevenue } from "./revenue.js";
 import { handleAssessmentSubmit, handleAssessmentConfig } from "./assessment.js";
+import { handleContactSubmit } from "./contact.js";
 import { handleCardPage } from "./card.js";
 import { handlePortal, portalNotFound } from "./portal/router.js";
 import { runScheduled } from "./portal/scheduled.js";
@@ -329,6 +331,17 @@ export default {
     } catch (err) {
       console.error("assessment error", err && err.message);
       return json({ error: "server_error" }, 500);
+    }
+
+    // Public: website contact form (see worker/contact.js).
+    if (path === "/api/contact") {
+      try {
+        if (request.method === "POST") return await handleContactSubmit(request, env);
+        return json({ error: "method_not_allowed" }, 405, { Allow: "POST" });
+      } catch (err) {
+        console.error("contact error", err && err.message);
+        return json({ error: "server_error" }, 500);
+      }
     }
 
     try {
