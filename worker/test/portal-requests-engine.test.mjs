@@ -46,7 +46,7 @@ test("registry: every type is complete, unique and has a section; the questions 
     for (const f of t.fields) if (f.type === "select" || f.type === "checks") assert.ok(f.options.length > 1, `${t.key}.${f.key}`);
   }
   for (const k of ["business_card", "digital_business_card", "poster", "flyer", "brochure", "social_graphics", "letterhead", "email_signature", "custom_branded"]) assert.equal(getType(k).kind, "deliverable", k);
-  assert.equal(typesOfKind("development").length, 7);
+  assert.equal(typesOfKind("development").length, 8); assert.equal(typesOfKind("deliverable").filter((t) => !t.hidden).length, 8); assert.equal(getType("brochure").hidden, true, "kept so earlier requests still open"); assert.equal(effectiveSettings(getType("brochure")).enabled, false);
   assert.ok(typesOfKind("seo").length >= 4);
   assert.equal(getType("nope"), null); assert.equal(getType("__proto__"), null);
   const t = getType("business_card");

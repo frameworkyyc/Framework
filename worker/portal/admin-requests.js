@@ -54,7 +54,7 @@ const publicThread = (t, env) => ({
 const SCOPES = ["attention", "open", "closed", "all"];
 const settingsRows = async (db) => {
   const saved = await repo.listTypeSettings(db).catch(() => new Map());
-  return TYPES.map((t) => { const e = effectiveSettings(t, saved.get(t.key)); return { typeKey: t.key, kind: t.kind, kindLabel: KINDS[t.kind].label, label: t.label, proofs: t.proofs, enabled: e.enabled, revisionsIncluded: e.revisionsIncluded, pricingMode: e.pricing.mode, price: e.pricing.fixedPriceCents == null ? "" : (e.pricing.fixedPriceCents / 100).toFixed(2), turnaroundNote: e.turnaroundNote, customised: saved.has(t.key) }; });
+  return TYPES.filter((t) => !t.hidden).map((t) => { const e = effectiveSettings(t, saved.get(t.key)); return { typeKey: t.key, kind: t.kind, kindLabel: KINDS[t.kind].label, label: t.label, proofs: t.proofs, enabled: e.enabled, revisionsIncluded: e.revisionsIncluded, pricingMode: e.pricing.mode, price: e.pricing.fixedPriceCents == null ? "" : (e.pricing.fixedPriceCents / 100).toFixed(2), turnaroundNote: e.turnaroundNote, customised: saved.has(t.key) }; });
 };
 
 async function globalApi(request, env, kind, deps, principal) {

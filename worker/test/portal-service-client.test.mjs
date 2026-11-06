@@ -113,7 +113,7 @@ test("Admin manages Nexus like any service: several real screenshots, descriptio
   assert.equal((await editSvc(s, { key: "nexus-fleet-tracker", description: "Fleet software from Nexus.", benefits: ["Vehicle life expectancy", "Odometer tracking", "Oil change reminders", "Damage reporting", "Maintenance requests", "Service scheduling", "Seventh item", "Eighth item"], demo_url: "https://nexus.example.com/demo", demo_label: "See Nexus in action", category: "Fleet Management Software" })).status, 200);
   assert.equal((await editSvc(s, { key: "nexus-fleet-tracker", benefits: Array.from({ length: 9 }, (_, i) => "x" + i) })).status, 422, "up to eight");
   const sec = await svcSec(s.ann);
-  assert.equal((sec.match(/class="svc-fig__img"/g) || []).length, 3); assert.match(sec, /Fleet software from Nexus\./); assert.match(sec, /<li>Eighth item<\/li>/); assert.match(sec, /href="https:\/\/nexus\.example\.com\/demo"[^>]*>See Nexus in action/);
+  assert.equal((sec.match(/class="svc-fig__img" src="[^"]*services\/media\//g) || []).length, 3, "the three uploaded pictures (built-in concept illustrations of other services are separate)"); assert.match(sec, /Fleet software from Nexus\./); assert.match(sec, /<li>Eighth item<\/li>/); assert.match(sec, /href="https:\/\/nexus\.example\.com\/demo"[^>]*>See Nexus in action/);
   assert.doesNotMatch(sec, /Starting at|Custom quote/);
   const price = await s.call("/service-pricing", { method: "POST", json: { prices: [{ key: "nexus-fleet-tracker", type: "starting_at", priceCad: 99 }] } });
   assert.equal(price.status, 200, JSON.stringify(price.json));
@@ -203,4 +203,16 @@ test("per-client settings are validated, audited internally, scoped to one organ
   for (const body of [{ key: "invoice-sender", recommended: true }, { key: "invoice-sender", move: "up" }]) assert.equal((await st(bare, bare.A, body)).status, 409, "plainly unavailable, nothing changed");
   assert.equal((await st(bare, bare.A, { key: "invoice-sender", state: "hidden" })).status, 200, "Show/Hide uses migration 0016 and still works");
   assert.deepEqual(await titles(bare.ann), ["SEO & Visibility", "Client Admin Portal", "Digital Business Cards"], "the global order, Invoice Sender hidden; no Nexus until its row is seeded");
+});
+
+test("Additional services show what each service looks like before it is requested: labelled concept pictures, a thumbnail beside each name, and Framework's own live card as the real example", async () => {
+  const s = await setup();
+  await s.site(s.A);
+  const sec = await svcSec(s.ann);
+  for (const art of ["portal", "invoice", "digital-card", "seo"]) assert.ok(sec.includes(`/assets/img/portal/${art}.svg`), art + " has a picture");
+  assert.equal((sec.match(/class="svc-concept">Concept<\/span> An illustration of the idea, not a client project/g) || []).length, 4, "every concept picture says what it is");
+  assert.equal((sec.match(/class="svc-card__thumb"/g) || []).length, 4, "a thumbnail beside each service that has a picture (Nexus has none yet)");
+  assert.match(sec, /svc-concept svc-concept--real">Real example<\/span> <a class="text-link" href="https:\/\/frameworkco\.ca\/card" target="_blank" rel="noopener noreferrer">Framework&#39;s own digital business card/);
+  assert.ok(!/<img[^>]*src="[^"]*assets\/img\/portal[^>]*alt="[^"]*client[^"]*project/i.test(sec), "nothing pretends to be client work");
+  for (const f of ["portal", "invoice", "digital-card", "seo"]) assert.ok(read(`assets/img/portal/${f}.svg`).startsWith("<svg"), f + " exists on disk");
 });

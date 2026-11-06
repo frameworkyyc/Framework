@@ -292,7 +292,7 @@ test("Admin edits a service's sales content and picture; the client sees it, fea
   sec = await svcSec(s.ann);
   assert.match(sec, /Printed cards go out of date/); assert.match(sec, /Ask about Digital Business Cards/); assert.doesNotMatch(sec, /Featured<\/span>|cards\.example\.com/);
   assert.equal((await s.call(`/additional-services/media/${pic.json.id}/delete`, { method: "POST", json: {} })).status, 200);
-  assert.doesNotMatch(await svcSec(s.ann), /svc-fig/); assert.equal(s.bucket.size === undefined || true, true);
+  assert.doesNotMatch(await svcSec(s.ann), /website\/services\/media\//, "no uploaded picture left (a labelled concept illustration may remain)"); assert.equal(s.bucket.size === undefined || true, true);
 });
 
 test("Additional Services content is validated; pictures must be real images with alternative text; Admin-only", async () => {

@@ -52,7 +52,26 @@ export async function loadServiceCatalogue(ctx, o) {
 
 const isHttps = (u) => typeof u === "string" && /^https:\/\/[^\s"'<>]+$/.test(u);
 
+/**
+ * Pictures for services Admin has not uploaded any for: concept illustrations drawn by Framework (assets/img/portal), always labelled as concepts, and for digital business
+ * cards Framework's own live card as a real example. Never client work. A service with uploaded pictures shows those instead.
+ */
+const PREVIEWS = Object.freeze({
+  "client-admin-portal": { art: "portal", alt: "Concept illustration of a client admin portal" },
+  "invoice-sender": { art: "invoice", alt: "Concept illustration of an invoice" },
+  "digital-business-cards": { art: "digital-card", alt: "Concept illustration of a digital business card on a phone", example: { href: "https://frameworkco.ca/card", img: "/assets/img/og-card.png", w: 1200, h: 630, alt: "Preview of Framework's own digital business card", label: "Framework's own digital business card" } },
+  "seo-visibility": { art: "seo", alt: "Concept illustration of a search results page" },
+});
+const previewOf = (s) => (!s.media.length && Object.prototype.hasOwnProperty.call(PREVIEWS, s.key) ? PREVIEWS[s.key] : null);
+const thumbOf = (cat, s) => (s.media.length ? { src: `${cat.mediaBase}/${s.media[0].id}`, alt: s.media[0].alt || "" } : previewOf(s) ? { src: `/assets/img/portal/${previewOf(s).art}.svg`, alt: "" } : null);
+
 function gallery(cat, s) {
+  const pv = previewOf(s);
+  if (pv) {
+    const concept = `<figure class="svc-fig"><img class="svc-fig__img" src="/assets/img/portal/${e(pv.art)}.svg" width="640" height="400" alt="${e(pv.alt)}" loading="lazy" decoding="async"><figcaption class="svc-fig__cap muted small"><span class="svc-concept">Concept</span> An illustration of the idea, not a client project.</figcaption></figure>`;
+    const real = pv.example ? `<figure class="svc-fig"><a href="${e(pv.example.href)}" target="_blank" rel="noopener noreferrer"><img class="svc-fig__img" src="${e(pv.example.img)}" width="${pv.example.w}" height="${pv.example.h}" alt="${e(pv.example.alt)}" loading="lazy" decoding="async"></a><figcaption class="svc-fig__cap muted small"><span class="svc-concept svc-concept--real">Real example</span> <a class="text-link" href="${e(pv.example.href)}" target="_blank" rel="noopener noreferrer">${e(pv.example.label)}<span class="visually-hidden"> (opens in a new tab)</span></a></figcaption></figure>` : "";
+    return `<div class="svc-gallery${pv.example ? "" : " svc-gallery--one"}">${concept}${real}</div>`;
+  }
   if (!s.media.length) return "";
   return `<div class="svc-gallery${s.media.length === 1 ? " svc-gallery--one" : ""}">${s.media.map((m) => `<figure class="svc-fig"><img class="svc-fig__img" src="${e(`${cat.mediaBase}/${m.id}`)}" alt="${e(m.alt)}" loading="lazy" decoding="async">${m.caption ? `<figcaption class="svc-fig__cap muted small">${e(m.caption)}</figcaption>` : ""}</figure>`).join("")}</div>`;
 }
@@ -67,7 +86,7 @@ function card(cat, s, open) {
   const benefits = s.benefits && s.benefits.length ? `<h4 class="svc-h">What you get</h4><ul class="svc-benefits">${s.benefits.map((b) => `<li>${e(b)}</li>`).join("")}</ul>` : "";
   const demo = isHttps(s.demoUrl) ? `<p class="svc-demo"><a class="text-link" href="${e(s.demoUrl)}" target="_blank" rel="noopener noreferrer">${e(s.demoLabel || "See an example")}<span class="visually-hidden"> (opens in a new tab)</span></a></p>` : "";
   const priceLine = s.price ? `<p class="svc-price">${e(s.price)}</p>` : "";
-  return `<li><details class="svc-card${s.recommended || s.featured || s.suggested ? " svc-card--lead" : ""}"${open ? " open" : ""}><summary class="svc-card__sum"><span class="svc-card__tags">${tags}</span><span class="svc-card__title">${e(s.name)}</span>${(s.tagline || s.description) ? `<span class="svc-card__tagline">${e(s.tagline || s.description)}</span>` : ""}<span class="svc-card__more" aria-hidden="true"></span></summary><div class="svc-card__body">${gallery(cat, s)}<div class="svc-card__text">${s.tagline && s.description ? `<p class="svc-card__lead">${e(s.description)}</p>` : ""}${s.problem ? `<h4 class="svc-h">The problem</h4><p>${e(s.problem)}</p>` : ""}${benefits}${s.why ? `<h4 class="svc-h">Why you might need it</h4><p>${e(s.why)}</p>` : ""}${demo}</div><div class="svc-card__cta">${priceLine}${control}</div></div></details></li>`;
+  return `<li><details class="svc-card${s.recommended || s.featured || s.suggested ? " svc-card--lead" : ""}"${open ? " open" : ""}><summary class="svc-card__sum${thumbOf(cat, s) ? " svc-card__sum--thumb" : ""}">${thumbOf(cat, s) ? `<img class="svc-card__thumb" src="${e(thumbOf(cat, s).src)}" width="640" height="400" alt="" loading="lazy" decoding="async">` : ""}<span class="svc-card__tags">${tags}</span><span class="svc-card__title">${e(s.name)}</span>${(s.tagline || s.description) ? `<span class="svc-card__tagline">${e(s.tagline || s.description)}</span>` : ""}<span class="svc-card__more" aria-hidden="true"></span></summary><div class="svc-card__body">${gallery(cat, s)}<div class="svc-card__text">${s.tagline && s.description ? `<p class="svc-card__lead">${e(s.description)}</p>` : ""}${s.problem ? `<h4 class="svc-h">The problem</h4><p>${e(s.problem)}</p>` : ""}${benefits}${s.why ? `<h4 class="svc-h">Why you might need it</h4><p>${e(s.why)}</p>` : ""}${demo}</div><div class="svc-card__cta">${priceLine}${control}</div></div></details></li>`;
 }
 
 /** The section: a short lead, then one expandable card per service. The first highlighted (featured or suggested) card starts open; the rest are one tidy line each. */
