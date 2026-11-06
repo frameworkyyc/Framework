@@ -103,9 +103,11 @@ export async function pickerPage(ctx, session, memberships) {
 }
 
 /** The home of the connected portal: the six workspace blocks. Nothing from the demonstration is shown. */
+/** The needs-your-action block goes right under the greeting, not above it. */
+const placeAfterGreeting = (home, top) => { if (!top) return home; const i = home.indexOf("</header>"); return i < 0 ? top + home : home.slice(0, i + 9) + top + home.slice(i + 9); };
 export async function homePage(ctx, a, moduleStatus = {}, nextAction = {}, brand = null, servicesAttention = [], website = null, top = "") {
   const vm = { ...liveModel(ctx, a, {}), moduleStatus, nextAction, brand, servicesAttention, website };
-  return shell(ctx, a, { title: "Home", active: "home", body: `${top}${guided.home(vm)}`, vm, ref: "home" });
+  return shell(ctx, a, { title: "Home", active: "home", body: placeAfterGreeting(guided.home(vm), top), vm, ref: "home" });
 }
 export async function overviewPage(ctx, a, data) {
   const vm = liveModel(ctx, a, data);

@@ -1110,3 +1110,21 @@ details[open] > .rk-fold__sum::after, details[open] > .rk-manage__sum::after { m
 .adm-nav__link, .adm-nav__link:has(.adm-nav__badge) { gap: 12px; }
 .adm-idhead__actions .btn { white-space: nowrap; }
 .adm-settings__item > .rk-linkcard { display: flex; padding: 18px 0; gap: 16px; }
+
+/* Requests (admin/assets/requests.js): the answers, quotes and files of one request. Ruled lines, no boxes or shadows. */
+.adm-rqpage { max-width: 900px; }
+.adm-h2 { font-size: 24px; font-weight: 700; letter-spacing: -.01em; margin: 40px 0 14px; padding-top: 18px; border-top: 1px solid var(--ink); }
+.adm-h3 { font-size: 17px; font-weight: 600; margin: 22px 0 8px; }
+.adm-rq-dl { margin: 0; border-top: 1px solid var(--hairline); }
+.adm-rq-dl__r { display: grid; gap: 4px 24px; padding: 12px 0; border-bottom: 1px solid var(--hairline); }
+.adm-rq-dl dt { font-size: 14px; font-weight: 600; color: var(--slate); }
+.adm-rq-dl dd { margin: 0; overflow-wrap: anywhere; }
+@media (min-width: 760px) { .adm-rq-dl__r { grid-template-columns: 220px minmax(0, 1fr); } }
+.adm-rq-pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.adm-rq-quotes, .adm-rq-files { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hairline); }
+.adm-rq-quote { padding: 14px 0; border-bottom: 1px solid var(--hairline); display: grid; gap: 6px; }
+.adm-rq-quote p { margin: 0; }
+.adm-rq-file { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--hairline); }
+.adm-rq-file__main { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.adm-rq-thumb { display: block; width: 120px; height: 80px; object-fit: cover; border: 1px solid var(--hairline); }
+.adm-tablewrap { overflow-x: auto; }
