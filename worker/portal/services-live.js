@@ -7,6 +7,7 @@ import { e } from "./ui.js";
 import { crumb } from "./guided.js";
 import { can } from "./policy.js";
 import { formatMoney } from "./repo/invoices.js";
+import { icon as rqIcon } from "./requests/views.js";
 import { CATEGORIES, CATEGORY_LABEL, STATUS_LABEL, SUBMISSION_NOTICE, MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, MAX_BODY, scopeOf } from "./repo/support.js";
 import { UPLOAD_ERRORS } from "./branding-live.js";
 
@@ -108,17 +109,25 @@ export function requestsList(vm, items) {
   return `${head}${cta}${list}${notice()}`;
 }
 
+/** How urgent a request is. Recorded as the first line of the message (no schema change), so Framework reads it first and the thread keeps it. "none" adds nothing. */
+export const URGENCY = Object.freeze({ none: "Not urgent", soon: "Soon", urgent: "Urgent" });
+const URGENCY_HELP = Object.freeze({ none: "Whenever you can", soon: "Within a few days", urgent: "It is stopping us working" });
+const CATEGORY_GLYPH = Object.freeze({ website_change: "website", design_revision: "branding", technical_issue: "wrench", general: "support" });
+
 /** @param o { values, error, csrf } */
 export function requestForm(vm, { values = {}, error = "", csrf = "" } = {}) {
-  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Client Services", "/services"], ["Support & Change Requests", "/services/requests"], ["New request"]])}<h1 class="h1 h1--section">New request</h1></header>`;
+  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Client Services", "/services"], ["Support & Change Requests", "/services/requests"], ["New request"]])}<h1 class="h1 h1--section">New request</h1><p class="lead">Tell us what you need. We’ll reply here.</p></header>`;
   const banner = error ? `<p class="form-banner form-banner--error" role="alert" tabindex="-1" data-error-summary>${e(SUPPORT_ERRORS[error] || "That request couldn’t be sent. Please check it and try again.")}</p>` : "";
-  const cats = CATEGORIES.map((c) => `<label class="choice__opt"><input type="radio" name="category" value="${c}"${values.category === c ? " checked" : ""} required><span><strong>${e(CATEGORY_LABEL[c])}</strong><br><span class="muted small">${e(CATEGORY_HELP[c])}</span></span></label>`).join("");
-  return `${head}${notice()}${banner}<form class="req-form" method="post" action="${e(href(vm, "/services/requests"))}" enctype="multipart/form-data" novalidate><input type="hidden" name="csrf" value="${e(csrf)}">
-<div class="questions"><fieldset class="field choice"><legend>What kind of request is this?</legend>${cats}</fieldset>
-<div class="field"><label for="rq-title">Title</label><input id="rq-title" name="title" type="text" maxlength="120" value="${e(values.title || "")}" required></div>
-<div class="field"><label for="rq-desc">What do you need?</label><span class="field__hint" id="rq-desc-h">Describe it in as much detail as helps: where it is, what you see, what you would like instead.</span><textarea id="rq-desc" name="description" rows="7" maxlength="${MAX_BODY}" aria-describedby="rq-desc-h" required>${e(values.description || "")}</textarea></div>
-<div class="field"><label for="rq-files">Attachments <span class="field__opt">Optional</span></label><span class="field__hint" id="rq-files-h">Up to ${MAX_ATTACHMENTS} files, ${MAX_ATTACHMENT_BYTES / 1048576} MB each: images, PDF, text, Word, Excel, PowerPoint or ZIP.</span><input id="rq-files" name="file" type="file" multiple aria-describedby="rq-files-h"></div></div>
-<p class="step-nav"><button class="btn btn--primary" type="submit">Send request</button> <a class="btn" href="${e(href(vm, "/services/requests"))}">Cancel</a></p></form>`;
+  const cats = CATEGORIES.map((c) => `<label class="sp-cat"><input class="sp-cat__in" type="radio" name="category" value="${c}"${values.category === c ? " checked" : ""} required><span class="sp-cat__box">${rqIcon(CATEGORY_GLYPH[c] || "support", "sp-cat__icon")}<strong class="sp-cat__t">${e(CATEGORY_LABEL[c])}</strong><span class="sp-cat__h">${e(CATEGORY_HELP[c])}</span></span></label>`).join("");
+  const urg = Object.keys(URGENCY).map((k) => `<label class="sp-urg"><input class="sp-urg__in" type="radio" name="urgency" value="${k}"${(values.urgency || "none") === k ? " checked" : ""}><span class="sp-urg__box"><strong>${e(URGENCY[k])}</strong><span>${e(URGENCY_HELP[k])}</span></span></label>`).join("");
+  return `${head}${banner}<form class="sp-form" method="post" action="${e(href(vm, "/services/requests"))}" enctype="multipart/form-data" novalidate><input type="hidden" name="csrf" value="${e(csrf)}">
+<fieldset class="sp-step"><legend class="sp-step__l"><span class="sp-step__n" aria-hidden="true">1</span>What is it about?</legend><div class="sp-cats">${cats}</div></fieldset>
+<div class="sp-step"><label class="sp-step__l" for="rq-desc"><span class="sp-step__n" aria-hidden="true">2</span>What do you need?</label><span class="field__hint" id="rq-desc-h">Where it is, what you see, and what you would like instead.</span><textarea id="rq-desc" name="description" rows="6" maxlength="${MAX_BODY}" aria-describedby="rq-desc-h" required>${e(values.description || "")}</textarea>
+<details class="sp-title"${values.title ? " open" : ""}><summary>Add a title <span class="field__opt">Optional</span></summary><input id="rq-title" name="title" type="text" maxlength="120" value="${e(values.title || "")}" aria-label="Title" placeholder="Left blank, we use the start of your message"></details></div>
+<fieldset class="sp-step"><legend class="sp-step__l"><span class="sp-step__n" aria-hidden="true">3</span>How urgent is it?</legend><div class="sp-urgs">${urg}</div></fieldset>
+<div class="sp-step"><label class="sp-step__l" for="rq-files"><span class="sp-step__n" aria-hidden="true">4</span>Add files <span class="field__opt">Optional</span></label><span class="field__hint" id="rq-files-h">Screenshots, documents or anything that helps. Up to ${MAX_ATTACHMENTS} files, ${MAX_ATTACHMENT_BYTES / 1048576} MB each.</span><input id="rq-files" name="file" type="file" multiple aria-describedby="rq-files-h"></div>
+<p class="sp-send"><button class="btn btn--primary sp-send__btn" type="submit">Submit request</button> <a class="text-link" href="${e(href(vm, "/services/requests"))}">Cancel</a></p>
+<p class="sp-fine">${e(SUBMISSION_NOTICE)}</p></form>`;
 }
 
 function messageHtml(vm, thread, m, root) {
@@ -133,7 +142,7 @@ export function requestThread(vm, thread, { csrf = "", error = "", flash = "", r
   const r = thread.request;
   const head = `<header class="page-head page-head--compact">${crumb(vm, [...trail, [r.title]])}<h1 class="h1 h1--section">${e(r.title)}</h1><p class="req-meta">${statusTag(r.status)} <span class="muted small">${e(CATEGORY_LABEL[r.category] || "")}${about ? ` · ${e(about)}` : ""} · Sent ${e(when(r.createdAt))}</span></p><p class="lead">${e(STATUS_HELP[r.status] || "")}</p></header>`;
   const banner = error ? `<p class="form-banner form-banner--error" role="alert" tabindex="-1" data-error-summary>${e(SUPPORT_ERRORS[error] || "That couldn’t be sent. Please try again.")}</p>`
-    : flash === "sent" ? `<p class="form-banner" role="status">Your request was sent. We’ll reply here.</p>` : flash === "replied" ? `<p class="form-banner" role="status">Your message was sent.</p>` : flash === "partial" ? `<p class="form-banner form-banner--error" role="alert">Your message was sent, but an attachment couldn’t be stored. You can send it again as a new message.</p>` : "";
+    : flash === "sent" ? `<section class="sp-done" role="status" aria-labelledby="sp-done-h"><h2 class="sp-done__t" id="sp-done-h">Request sent</h2><p class="sp-done__lead">Your request was sent. Thank you.</p><ol class="sp-done__steps"><li>Framework reads your request.</li><li>We reply here, in this conversation.</li><li>If it needs extra work, we send a quote for you to approve before anything starts.</li></ol></section>` : flash === "replied" ? `<p class="form-banner" role="status">Your message was sent.</p>` : flash === "partial" ? `<p class="form-banner form-banner--error" role="alert">Your message was sent, but an attachment couldn’t be stored. You can send it again as a new message.</p>` : "";
   const warn = scopeOf(r.category) === "change" ? notice() : "";
   const conv = `<ol class="thread" aria-label="Conversation">${thread.messages.map((m) => messageHtml(vm, thread, m, root)).join("")}</ol>`;
   const left = MAX_ATTACHMENTS - thread.attachments.length;

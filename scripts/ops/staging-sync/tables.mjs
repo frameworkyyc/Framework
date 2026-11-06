@@ -39,6 +39,17 @@ export const EXCLUDED = {
   discovery_answers: "client answers; not part of this refresh",
   discovery_content: "Admin edits to questions, per environment",
   discovery_uploads: "client inspiration files; not part of this refresh",
+  // Requests (migration 0020; not in Production yet): client requests, files, quotes and private notes are client material; per-service settings belong to each environment.
+  requests: "client requests; not part of this refresh",
+  request_events: "request conversations and private staff notes; not part of this refresh",
+  request_files: "client reference files and designs; not part of this refresh",
+  request_quotes: "quotes and agreements; not part of this refresh",
+  request_type_settings: "per-environment service settings",
+  // SEO keywords (migration 0022): what a client tracks and the results Framework recorded; per environment.
+  seo_keywords: "tracked keywords entered per environment; not part of this refresh",
+  seo_rank_checks: "recorded rank checks; not part of this refresh",
+  // Service links (migration 0023): the address of a client's own digital business card, entered by Admin per environment.
+  client_service_links: "per-client addresses entered in Admin; not part of this refresh",
 };
 
 /** Tables SQLite/D1 manage themselves. */

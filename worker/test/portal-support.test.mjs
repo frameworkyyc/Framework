@@ -124,7 +124,7 @@ test("validation and refused files keep the person on the form with their text a
   const { w, bucket, ann, send } = await setup();
   const base = { category: "website_change", title: "T", description: "D" };
   for (const [over, files, status, text] of [
-    [{ category: "billing" }, [], 422, /Choose what kind of request/], [{ title: "" }, [], 422, /short title/], [{ description: "" }, [], 422, /Tell us what you need/], [{ description: "x".repeat(4001) }, [], 422, /too long/],
+    [{ category: "billing" }, [], 422, /Choose what kind of request/], [{ title: "x".repeat(121) }, [], 422, /short title/], [{ description: "" }, [], 422, /Tell us what you need/], [{ description: "x".repeat(4001) }, [], 422, /too long/],
     [{}, [["run.exe", S.text("MZ")]], 422, /can’t be uploaded/], [{}, [["fake.png", S.text("not an image")]], 422, /doesn’t look like/], [{}, [["x.pdf", S.pdf("/JavaScript (a) ")]], 422, /scripts or embedded content/],
   ]) {
     const r = await send(ann, "/services/requests", { ...base, ...over, title: over.title === undefined ? "T" : over.title }, files);
@@ -135,6 +135,23 @@ test("validation and refused files keep the person on the form with their text a
   assert.equal(sql(w.db, "SELECT * FROM support_requests").length, 0); assert.equal(bucket.store.size, 0);
   assert.equal((await send(ann, "/services/requests", base, [["1.png", PNG()], ["2.png", PNG()], ["3.png", PNG()], ["4.png", PNG()]])).status, 400, "a fourth file is refused");
   assert.equal(sql(w.db, "SELECT * FROM support_requests").length, 0);
+});
+
+test("the new-request form: tile categories and urgency, an optional title taken from the message, urgency recorded as the first line, and a helpful confirmation", async () => {
+  const { w, ann, send } = await setup();
+  const form = await (await ann.get("/portal/o/alpha/services/requests/new")).text();
+  assert.equal((form.match(/class="sp-cat__in" type="radio" name="category"/g) || []).length, 4); assert.equal((form.match(/name="urgency"/g) || []).length, 3);
+  assert.match(form, /value="none" checked/); assert.match(form, /Submit request/); assert.match(form, /Add a title/);
+  const r = await send(ann, "/services/requests", { category: "technical_issue", title: "", description: "The contact form on our site stopped sending emails since Monday and we are losing enquiries every day", urgency: "urgent" }, []);
+  assert.equal(r.status, 303);
+  const row = sql(w.db, "SELECT r.title, m.body FROM support_requests r JOIN support_messages m ON m.request_id = r.id WHERE m.kind = 'message'")[0];
+  assert.match(row.title, /^The contact form on our site stopped sending emails since Monday and we are/); assert.ok(row.title.length <= 81);
+  assert.ok(row.body.startsWith("Urgency: Urgent\n\nThe contact form"), "urgency is the first line of the message");
+  const page = await (await ann.get(r.headers.get("Location"))).text();
+  assert.match(page, /Request sent/); assert.match(page, /We reply here/); assert.match(page, /Urgency: Urgent/);
+  const calm = await send(ann, "/services/requests", { category: "general", title: "Hours", description: "Please update our hours", urgency: "none" }, []);
+  assert.equal(sql(w.db, "SELECT m.body FROM support_requests r JOIN support_messages m ON m.request_id = r.id WHERE r.title = 'Hours'")[0].body, "Please update our hours", "Not urgent adds nothing"); void calm;
+  assert.equal((await send(ann, "/services/requests", { category: "general", title: "", description: "", urgency: "none" }, [])).status, 422, "an empty message is still refused");
 });
 
 test("CSRF, same-site and form type: a bad token, a cross-site request or a non-multipart post stores nothing", async () => {

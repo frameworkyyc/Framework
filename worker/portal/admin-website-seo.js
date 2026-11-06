@@ -8,18 +8,24 @@
  *   POST /clients/:org/websites/:id/seo/items/:item/update | delete
  *   POST /clients/:org/websites/:id/seo/reports                  { title, period?, summary?, link? (https), published? }       (+ /:report/update | delete)
  *   POST /clients/:org/websites/:id/seo/metrics                  { period_start, period_end, impressions?, clicks?, position?, indexed_pages?, note?, published? }   (+ /:metric/update | delete)
+ *   GET  /clients/:org/websites/:id/seo/keywords                  tracked keywords of this website with every rank check: { available, keywords }
+ *   POST /clients/:org/websites/:id/seo/keywords                  { keyword, location? }    (on the client's behalf)
+ *   POST /clients/:org/websites/:id/seo/keywords/:kw/archive
+ *   POST /clients/:org/websites/:id/seo/keywords/:kw/checks       { checked_on, position? (1 to 200; empty = not found in the results checked), url?, note? }   (+ /:check/delete)
  * Figures are typed here. A future Google Search Console import is NOT part of this: the table has a `source` column so one can be added without a schema change.
  * A database without migration 0015 answers { available: false }.
  */
 import { UUID } from "./repo/common.js";
 import { getOrganizationById } from "./repo/orgs.js";
 import * as seo from "./repo/website-seo.js";
+import * as kw from "./repo/seo-keywords.js";
 import { getWebsiteAdmin } from "./repo/websites.js";
 import { json, err, sameOriginWrite, readJson } from "./admin-branding.js";
 
 const STATUS = {
   not_found: 404, too_many: 409, duplicate_period: 409, unavailable: 409,
   invalid_input: 422, invalid_status: 422, invalid_summary: 422, invalid_published: 422, invalid_kind: 422, invalid_title: 422, invalid_detail: 422, invalid_priority: 422,
+  invalid_keyword: 422, invalid_location: 422, invalid_position: 422, invalid_url: 422, duplicate: 409,
   invalid_period: 422, invalid_link: 422, invalid_date: 422, invalid_number: 422, invalid_note: 422, invalid_actor: 422,
 };
 const fromFailure = (r) => (STATUS[r.error] ? err(STATUS[r.error], r.error, "The change was not made.") : err(500, "server_error", "Something went wrong. Nothing was changed."));
@@ -38,9 +44,15 @@ export async function handleWebsiteSeoApi(request, env, principal, path, deps = 
   if (rest.length === 0) route = request.method === "GET" ? { kind: "view", method: "GET" } : { kind: "head", method: "POST" };
   else if (rest.length === 1 && Object.hasOwn(COLLECTIONS, rest[0])) route = { kind: "create", method: "POST", col: rest[0] };
   else if (rest.length === 3 && Object.hasOwn(COLLECTIONS, rest[0]) && (rest[2] === "update" || rest[2] === "delete")) route = { kind: rest[2] === "delete" ? "remove" : "update", method: "POST", col: rest[0], item: rest[1] };
+  if (rest[0] === "keywords") {
+    if (rest.length === 1) route = request.method === "GET" ? { kind: "kw-list", method: "GET" } : { kind: "kw-add", method: "POST" };
+    else if (rest.length === 3 && rest[2] === "archive") route = { kind: "kw-archive", method: "POST", item: rest[1] };
+    else if (rest.length === 3 && rest[2] === "checks") route = { kind: "kw-check", method: "POST", item: rest[1] };
+    else if (rest.length === 5 && rest[2] === "checks" && rest[4] === "delete") route = { kind: "kw-uncheck", method: "POST", item: rest[1], sub: rest[3] };
+  }
   if (!route) return null;
   if (request.method !== route.method) return json({ error: "method_not_allowed", message: "That method is not allowed here." }, 405, { Allow: route.method });
-  if (!UUID.test(orgId) || !UUID.test(websiteId) || (route.item !== undefined && !UUID.test(route.item))) return err(404, "not_found", "Not found.");
+  if (!UUID.test(orgId) || !UUID.test(websiteId) || (route.item !== undefined && !UUID.test(route.item)) || (route.sub !== undefined && !UUID.test(route.sub))) return err(404, "not_found", "Not found.");
   if (route.method !== "GET") {
     if (env.PORTAL_ADMIN_WRITES !== "1") return err(403, "writes_disabled", "Changes are not enabled on this deployment.");
     if (!sameOriginWrite(request)) return err(403, "forbidden", "This request was not accepted.");
@@ -60,6 +72,21 @@ export async function handleWebsiteSeoApi(request, env, principal, path, deps = 
       const r = await seo.saveSeoHead(db, org.id, websiteId, read.body, actor, { now });
       return r.ok ? json({ ok: true }) : fromFailure(r);
     }
+    if (route.kind === "kw-list") { const d = await kw.listKeywords(db, org.id, { websiteId, client: false }); return json({ ...d, website: { id: site.id, name: site.name }, capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1" } }); }
+    if (route.kind === "kw-add") {
+      const read = await readJson(request, ["keyword", "location"]);
+      if (read.response) return read.response;
+      const r = await kw.addKeyword(db, org.id, websiteId, read.body, actor, { now, asStaff: true });
+      return r.ok ? json({ ok: true, id: r.id }, 201) : fromFailure(r);
+    }
+    if (route.kind === "kw-archive") { const r = await kw.archiveKeyword(db, org.id, route.item, actor, { now, asStaff: true }); return r.ok ? json({ ok: true }) : fromFailure(r); }
+    if (route.kind === "kw-check") {
+      const read = await readJson(request, ["checked_on", "position", "url", "note"]);
+      if (read.response) return read.response;
+      const r = await kw.recordCheck(db, org.id, route.item, read.body, actor, { now });
+      return r.ok ? json({ ok: true, id: r.id }, 201) : fromFailure(r);
+    }
+    if (route.kind === "kw-uncheck") { const r = await kw.deleteCheck(db, org.id, route.item, route.sub, actor, { now }); return r.ok ? json({ ok: true }) : fromFailure(r); }
     const col = COLLECTIONS[route.col];
     if (route.kind === "create") {
       const read = await readJson(request, col.fields);

@@ -7,6 +7,7 @@ import { fold, badge } from "./kit.js";
 const STATE = { automatic: "Shown", hidden: "Hidden from this client", owned: "Already has it (not promoted)" };
 const ERROR = {
   invalid_state: "Choose how this service should be treated for this client.", invalid_note: "That note is too long (300 characters at most, one line).", invalid_service: "That isn’t one of the services.", invalid_direction: "Choose up or down.",
+  invalid_link: "Enter a full https:// address with a real website name, no spaces, no port and no login details.", invalid_service: "That service does not take an address.",
   invalid_recommended: "Choose Recommended or not.", invalid_order: "That order isn’t valid.", invalid_input: "Nothing to change.", unavailable: "That isn’t available on this site yet (a database change is waiting), so nothing was changed.",
   writes_disabled: "Changes are switched off on this site, so nothing was changed.", session: "Your admin session has ended. Reload the page to sign in again.", denied: "This account isn’t allowed to make that change.", network: "Can’t reach the server. Check your connection and try again.",
   not_found: "That no longer exists. The page has been refreshed.",
@@ -37,8 +38,15 @@ export async function render(orgId, ctx) {
     const stateSel = h("select", { id: k + "-st", class: "input", disabled: canWrite() ? null : true }, Object.entries(STATE).map(([v, t]) => h("option", { value: v, selected: v === (sv.state || "automatic") ? true : null }, t)));
     const note = h("input", { id: k + "-n", class: "input", type: "text", maxlength: "300", autocomplete: "off", value: sv.note || "", placeholder: "Optional note for the team", disabled: canWrite() ? null : true });
     const rec = h("input", { id: k + "-rec", type: "checkbox", checked: sv.recommended ? true : null, disabled: canWrite() ? null : true });
+    const linkIn = sv.linkLabel ? h("input", { id: k + "-link", class: "input", type: "url", inputmode: "url", maxlength: "300", autocomplete: "off", value: sv.link || "", placeholder: "https://…", disabled: canWrite() && data.linksAvailable !== false ? null : true }) : null;
+    const linkBlock = sv.linkLabel ? h("div", { class: "adm-field" }, h("label", { for: k + "-link", text: sv.linkLabel }),
+      h("p", { class: "adm-field__hint", text: sv.link ? "This client sees a View Your Digital Business Card button that opens this address, labelled as their own card." : "Empty: this client sees Framework’s example card and the option to request their own." }), linkIn,
+      data.linksAvailable === false ? h("p", { class: "adm-field__hint", text: "Can’t be saved on this site yet (a database change is waiting)." }) : null,
+      canWrite() && data.linksAvailable !== false ? h("div", { class: "adm-actions" },
+        h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => act({ key: sv.key, link: linkIn.value.trim() === "" ? null : linkIn.value.trim() }, linkIn.value.trim() === "" ? `${sv.name}: address removed.` : `${sv.name}: address saved. The client sees it now.`) }, "Save address"),
+        sv.link ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => act({ key: sv.key, link: null }, `${sv.name}: address removed.`) }, "Remove address") : null) : null) : null;
     const mv = (dir, label) => h("button", { class: "btn btn--secondary adm-small", type: "button", disabled: canWrite() && !(dir === "up" ? i === 0 : i === all.length - 1) ? null : true, "aria-label": `${label}: ${sv.name}`, onclick: () => act({ key: sv.key, move: dir }, `${sv.name} moved ${dir === "up" ? "up" : "down"} for this client.`) }, label);
-    const flags = [sv.recommended ? "Recommended" : null, sv.state === "hidden" ? "Hidden" : null, sv.state === "owned" ? "Already has it" : null, sv.autoHas && !sv.state ? "Already being done by Framework" : null, !sv.enabled ? "Switched off for everyone" : null].filter(Boolean);
+    const flags = [sv.link ? "Has its own card" : null, sv.recommended ? "Recommended" : null, sv.state === "hidden" ? "Hidden" : null, sv.state === "owned" ? "Already has it" : null, sv.autoHas && !sv.state ? "Already being done by Framework" : null, !sv.enabled ? "Switched off for everyone" : null].filter(Boolean);
     const item = fold({ number: String(i + 1).padStart(2, "0"), title: sv.name, meta: sv.category || null, open: openSvc.has(sv.key),
       badges: flags.length ? flags.map((f) => badge(f, f === "Recommended" ? "ok" : "")) : badge("Shown", "ok"),
       body:
@@ -46,6 +54,7 @@ export async function render(orgId, ctx) {
         h("div", { class: "adm-field" }, h("label", { for: k + "-st", text: "Visibility for this client" }), stateSel),
         h("div", { class: "adm-field" }, h("label", { for: k + "-n", text: "Note" }), note),
         h("div", { class: "adm-field" }, h("label", { class: "adm-choice", for: k + "-rec" }, rec, h("span", { text: "Recommended" })), h("p", { class: "adm-field__hint", text: "Shows a Recommended label on the card. It never brings back a service the client already has." })),
+        linkBlock,
         canWrite() ? h("div", { class: "adm-actions" },
           h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => act({ key: sv.key, state: stateSel.value, ...(stateSel.value === "automatic" ? {} : { note: note.value }) }, `${sv.name}: visibility saved.`) }, "Save visibility"),
           h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => act({ key: sv.key, recommended: rec.checked }, `${sv.name}: ${rec.checked ? "marked Recommended" : "no longer Recommended"} for this client.`) }, "Save Recommended"),

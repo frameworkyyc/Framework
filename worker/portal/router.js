@@ -5,7 +5,7 @@
  * Returns null (= "not mine"; worker/index.js then answers portalNotFound(), never the static site) when the portal is off, or the request is not for the portal or not on the
  * portal host. When it IS enabled but misconfigured it fails closed with a generic 503 for portal paths.
  */
-import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled, servicesEnabled, websiteEnabled, discoveryEnabled } from "./config.js";
+import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandingEnabled, servicesEnabled, websiteEnabled, discoveryEnabled, requestsEnabled } from "./config.js";
 import { handleGuest, isGuestPath, memberApi, MAX_REVIEW_BODY } from "./discovery/routes.js";
 import { listClientAssessments as listClientDiscoveries } from "./repo/discovery.js";
 import { errorPage, newRef, redirect, checkSameSiteMutation, securityHeaders, serializeCookie, safeReturnPath, VIEW_ROLE_COOKIE } from "./http.js";
@@ -38,6 +38,8 @@ import { readForm, readUpload, readUploads, declaredBodyProblem, MAX_PROFILE_FOR
 import { submitPortalFeedback, validPageKey } from "./repo/portal-feedback.js";
 import { checkCsrf, csrfFor } from "./sessions.js";
 import { can } from "./policy.js";
+import { buildRequestRoutes } from "./requests/routes.js";
+import * as requestsRepo from "./requests/repo.js";
 import { getClientBrand, listClientUploads, uploadUsage, getBrandKit, listServiceRequests, createServiceRequest } from "./repo/brand.js";
 import { loadPricing, listPrices } from "./repo/prices.js";
 import { listClientInvoices, clientInvoiceSummary } from "./repo/invoices.js";
@@ -146,6 +148,7 @@ const discoveryOn = (ctx) => discoveryEnabled(ctx.env) && brandingEnabled(ctx.en
 const DISCOVERY = memberApi(pages, { csrfFor, checkCsrf });
 const servicesOn = (ctx) => servicesEnabled(ctx.env);
 const websiteOn = (ctx) => websiteEnabled(ctx.env);
+const requestsOn = (ctx) => requestsEnabled(ctx.env);
 
 /** Save one questionnaire step. Every check below runs on the server for every save; the organization comes from the membership, never the form. */
 async function saveProfile(ctx, a, stepId) {
@@ -634,8 +637,13 @@ async function postNewRequest(ctx, a) {
     logEvent({ evt: "support.request", outcome: "rejected", reason: "csrf", status: 403, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
     return errorPage(403, { ref: ctx.ref });
   }
-  const values = { category: read.fields.get("category") || "", title: read.fields.get("title") || "", description: read.fields.get("description") || "" };
-  const res = await clientCreateRequest(brandDeps(ctx), { ...who(a), ...values, files: read.files });
+  const values = { category: read.fields.get("category") || "", title: read.fields.get("title") || "", description: read.fields.get("description") || "", urgency: read.fields.get("urgency") || "none" };
+  // The title is optional on the form: when it is blank the start of the message is used. Urgency, when it is not "Not urgent", is the first line of the message.
+  const urgent = ["soon", "urgent"].includes(values.urgency) ? values.urgency : "";
+  const firstLine = (values.description.split("\n").map((l) => l.replace(/\s+/g, " ").trim()).find(Boolean) || "");
+  const title = values.title.trim() || (firstLine.length > 80 ? `${firstLine.slice(0, 80).replace(/\s+\S*$/, "")}…` : firstLine) || "New request";
+  const description = urgent && values.description.trim() ? `Urgency: ${urgent === "urgent" ? "Urgent" : "Soon"}\n\n${values.description}` : values.description;
+  const res = await clientCreateRequest(brandDeps(ctx), { ...who(a), category: values.category, title, description, files: read.files });
   if (!res.ok) {
     const status = supportStatus(res.error);
     logEvent({ evt: "support.request", outcome: "refused", reason: res.error, status, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
@@ -697,16 +705,39 @@ const SERVICES_ROUTES = [
   { when: servicesOn, re: /^\/portal\/o\/([^/]+)\/services\/contact$/, action: "services.view", run: (ctx, a) => pages.contactPage(ctx, a) },
 ];
 
+/** The request area (Deliverables, SEO, Custom Development, My Requests): routes live in requests/routes.js; everything they need from this file is handed in. */
+const REQUEST_ROUTES = buildRequestRoutes({ pages, who, brandDeps, notFoundPage, errorPage, redirect, fileProblem, withPortalHeaders, logEvent, routeName, readUploads, readForm, UPLOAD_FORM_OVERHEAD, checkCsrf, dispatchNotifications, UUID, can, requestsOn, servicesOn });
+
+/** What Home needs from the request area where it is on: what waits for the person, and the open requests per service (null when it cannot be read: no migration yet, or the flag is off). */
+async function requestsHomeData(ctx, a) {
+  if (!requestsOn(ctx)) return null;
+  try {
+    const org = a.membership.organizationId;
+    const summary = await requestsRepo.clientSummary(ctx.db, org, { owner: can(a.membership.role, "requests.accept_quote") });
+    const open = (await requestsRepo.listClientRequests(ctx.db, org)).filter((r) => !r.closed);
+    const counts = {}, needs = {};
+    for (const r of open) counts[r.kind] = (counts[r.kind] || 0) + 1;
+    for (const x of summary.actions) needs[x.kind] = (needs[x.kind] || 0) + 1;
+    let support = null;
+    if (servicesOn(ctx)) { const s = await supportSummary(ctx, a); support = { open: s ? s.open : 0, attention: [...(s && s.unread ? [`${s.unread} new ${s.unread === 1 ? "reply" : "replies"}`] : []), ...(s && s.quoted ? [`${s.quoted} ${s.quoted === 1 ? "quote" : "quotes"} to review`] : [])] }; }
+    return { summary, counts, needs, support };
+  } catch (err) {
+    if (err instanceof Unavailable || /no such table/i.test(String(err && err.message))) return null;
+    throw err;
+  }
+}
+
 const ORG_ROUTES = [
   ...BRANDING_ROUTES,
   ...WEBSITE_ROUTES,
   ...SERVICES_ROUTES,
+  ...REQUEST_ROUTES,
   { re: /^\/portal\/o\/([^/]+)$/, action: "org.view", run: async (ctx, a) => {
       // One read serves both the greeting's name fallback and the module progress. null (unreadable) shows "Progress unavailable", never 0%.
       if (servicesOn(ctx)) await dispatchNotifications(ctx.env, ctx); // a client visit is also a chance to retry any email that did not go out (see service-notifications.js)
       const answers = await readAnswers(ctx, a);
       const shown = { ...withDisplayName(a, answers), returning: await returningVisitor(ctx, a) };
-      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }), await brandCard(ctx, a), await servicesAttention(ctx, a), await websiteCard(ctx, a));
+      return pages.homePage(ctx, shown, moduleStatuses(pages.liveAreasFor(ctx), { profile: answers }), nextActions(pages.liveAreasFor(ctx), { profile: answers }), await brandCard(ctx, a), await servicesAttention(ctx, a), await websiteCard(ctx, a), await requestsHomeData(ctx, a));
     },
   },
   { re: /^\/portal\/o\/([^/]+)\/progress$/, action: "org.view", run: async (ctx, a) => pages.overviewPage(ctx, { ...a, returning: await returningVisitor(ctx, a) }, { projects: await listProjects(ctx.db, a.membership.organizationId), activity: await listActivity(ctx.db, a.membership.organizationId, { limit: 5 }) }) },

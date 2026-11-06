@@ -126,6 +126,13 @@ export const PROFILES = Object.freeze({
   // Inspiration files a Discovery recipient adds: pictures and PDFs only (no vector, font, archive or office files).
   discovery_inspiration: Object.freeze(["png", "jpg", "webp", "pdf"]),
   website_package: Object.freeze(["zip"]),
+  // Request engine (Deliverables and the other service sections). Reference files from the client: the brand upload set (logos, vector, fonts, documents, a ZIP).
+  request_reference: Object.freeze(["png", "jpg", "webp", "svg", "pdf", "ai", "eps", "ttf", "otf", "woff", "woff2", "txt", "docx", "xlsx", "pptx", "zip"]),
+  // A design proof (staff only): a picture a browser can show, or a PDF (which gets a picture preview).
+  request_proof: Object.freeze(["png", "jpg", "webp", "pdf"]),
+  request_preview: Object.freeze(["png", "jpg", "webp"]),
+  // Final deliverables (staff only): the same set as Admin brand files. Design-suite source formats are NOT accepted until Framework decides which to allow.
+  request_final: Object.freeze(["png", "jpg", "webp", "svg", "pdf", "ai", "eps", "ttf", "otf", "woff", "woff2", "txt", "docx", "xlsx", "pptx", "zip"]),
   brand_admin: Object.freeze(["png", "jpg", "webp", "svg", "pdf", "ai", "eps", "ttf", "otf", "woff", "woff2", "txt", "docx", "xlsx", "pptx", "zip"]),
 });
 
