@@ -148,10 +148,31 @@ async function renderProfile(id, ctx) {
     toggleAll.textContent = open ? "Collapse all" : "Expand all";
   } });
   const missing = p.steps.filter((s) => s.state !== "complete");
+  // Export: Copy for AI, Download PDF and Copy Complete Client Brief. The text is fetched with the page so the copy happens inside the click.
+  const live = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
+  const say = (text, tone = "info") => { live.textContent = text; live.className = "adm-msg is-" + tone; live.setAttribute("role", tone === "error" ? "alert" : "status"); live.hidden = !text; };
+  let exp = null;
+  try { exp = await api("/clients/" + encodeURIComponent(id) + "/profile-export"); } catch { exp = null; }
+  let timer = 0;
+  const copyBtn = (label, text, said, cls) => {
+    const b = h("button", { class: "btn " + cls, type: "button", onclick: async () => {
+      try { await navigator.clipboard.writeText(text); b.textContent = "Copied to clipboard"; say(said, "success"); }
+      catch { say("Copying was blocked by the browser. Allow clipboard access for this site and try again.", "error"); return; }
+      clearTimeout(timer); timer = setTimeout(() => { b.textContent = label; say(""); }, 3000);
+    } }, label);
+    return b;
+  };
+  const exportBar = exp ? h("div", { class: "adm-exportwrap" },
+    h("div", { class: "adm-export" },
+      copyBtn("Copy for AI", exp.profileMarkdown, "Business Profile copied to clipboard. Paste it into ChatGPT or Claude.", "btn--primary"),
+      h("a", { class: "btn btn--secondary", href: `/api/admin/clients/${encodeURIComponent(id)}/profile-export.pdf`, download: "" }, "Download PDF"),
+      copyBtn("Copy Complete Client Brief", exp.briefMarkdown, "Complete client brief copied to clipboard. Paste it into ChatGPT or Claude.", "btn--secondary")),
+    exp.discovery && !exp.discovery.complete ? h("p", { class: "adm-field__hint", text: "Brand Discovery " + ({ in_progress: "has been started but not submitted", not_started: "hasn’t been started", none: "hasn’t been assigned" }[exp.discovery.state] || "isn’t complete") + ". The client brief says so." }) : null) : null;
   const node = h("div", { class: "adm-page adm-detail" },
     back,
     h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, o.name), h("h1", { class: "adm-title", tabindex: "-1" }, "Business Profile"),
-      h("p", { class: "adm-sub" }, "Answers are shown as the client saved them; staff cannot edit them here."))),
+      h("p", { class: "adm-sub" }, "Answers are shown as the client saved them; staff cannot edit them here.")), exportBar),
+    live,
     h("div", { class: "adm-tile adm-tile--profile adm-tile--" + (p.done === p.total ? "ok" : p.steps.every((s) => s.answered === 0) ? "plain" : "pending") },
       h("p", { class: "adm-tile__label" }, "Completion"),
       h("p", { class: "adm-tile__big" }, `${p.percent}%`, h("span", { class: "adm-tile__unit", text: "complete" })),
