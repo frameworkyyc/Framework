@@ -109,7 +109,7 @@ export function sectionPage(vm, kind, d) {
   const showcase = kind === "deliverable" || kind === "development";
   const status = open.length ? `<span class="status status--active">${plural(open.length, "request")} in progress</span>` : `<span class="status status--idle">Nothing in progress</span>`;
   return `<header class="page-head page-head--compact">${crumbs(vm, [[K.label]])}<h1 class="h1 h1--section">${e(K.label)}</h1><p class="lead">${e(K.blurb)}</p><p class="rq-state">${status}</p></header>
-${needs.length ? `<section class="rq-block rq-block--action" aria-labelledby="rq-need"><h2 class="h3" id="rq-need">Needs your action</h2>${rowsOf(vm, needs, reasons)}</section>` : ""}
+${d.lead || ""}${needs.length ? `<section class="rq-block rq-block--action" aria-labelledby="rq-need"><h2 class="h3" id="rq-need">Needs your action</h2>${rowsOf(vm, needs, reasons)}</section>` : ""}
 <section class="rq-block" aria-labelledby="rq-active"><h2 class="h3" id="rq-active">Active</h2>${open.length ? rowsOf(vm, open, reasons) : `<p class="muted">No ${e(K.noun)} requests are in progress. Choose one below to start.</p>`}</section>
 ${d.extra || ""}
 <section class="rq-block" aria-labelledby="rq-avail"><h2 class="h3" id="rq-avail">Available to request</h2>${d.canRequest === false ? `<p class="muted">Ask an owner of your organization to make a request.</p>` : ""}
@@ -132,13 +132,7 @@ export function seoOverview(vm, sites, seoOf) {
 ${bits.length ? `<ul class="rq-site__facts">${bits.map((b) => `<li>${b}</li>`).join("")}</ul>` : `<p class="muted small">No SEO work is recorded for this website yet.</p>`}
 <a class="text-link" href="${e(href(vm, `/website/${s.id}/seo`))}">${d ? "Open the SEO details" : "Open the website"}</a></li>`;
   }).join("");
-  const ready = [
-    ["Google Search Console", "Not connected", "A connection will let Framework show your real search figures here. It is planned, not available yet."],
-    ["Google Business Profile", "Not set up", "Ask for Local SEO and Google Business Profile below and Framework will check what you have."],
-    ["Keyword rankings", "Not tracked", "Rankings are not shown because no ranking data is connected. Nothing here is estimated."],
-  ];
-  return `<section class="rq-block" aria-labelledby="rq-sites"><h2 class="h3" id="rq-sites">Your websites</h2>${sites.length ? `<ul class="rq-sites">${rows}</ul>` : `<p class="muted">No website is listed for your organization yet.</p>`}</section>
-<section class="rq-block" aria-labelledby="rq-ready"><h2 class="h3" id="rq-ready">Connections and reporting</h2><ul class="rq-ready">${ready.map(([t, s, w]) => `<li><span class="rq-ready__t">${e(t)}</span><span class="status status--idle">${e(s)}</span><span class="muted small">${e(w)}</span></li>`).join("")}</ul></section>`;
+  return `<section class="rq-block" aria-labelledby="rq-sites"><h2 class="h3" id="rq-sites">Your websites</h2>${sites.length ? `<ul class="rq-sites">${rows}</ul>` : `<p class="muted">No website is listed for your organization yet.</p>`}</section>`;
 }
 
 /* ------------------------------------------------------------------ the guided request form */

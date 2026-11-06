@@ -7,6 +7,7 @@ const SEO_STATUS = { not_started: "Not started", in_progress: "In progress", opt
 const ITEM_STATUS = { todo: "To do", in_progress: "In progress", done: "Done" };
 const PRIORITY = { "": "No priority", high: "High", medium: "Medium", low: "Low" };
 const ERROR = {
+  invalid_keyword: "Enter a keyword of 2 to 80 characters.", invalid_location: "Enter a place of 2 to 80 characters, or leave it empty.", invalid_position: "The position is a whole number from 1 to 200, or leave it empty for “not found”.", invalid_url: "Use a full https:// link with no spaces.", duplicate: "That keyword and place are already tracked, or figures for that day already exist.",
   invalid_title: "Give it a title (up to 120 characters, one line).", invalid_detail: "That detail is too long (500 characters at most).", invalid_summary: "That summary is too long (1000 characters at most).",
   invalid_link: "Use a full https:// link with no spaces.", invalid_date: "Use real dates, with the end on or after the start.", invalid_number: "Use whole numbers (and a position between 1 and 1000).",
   invalid_note: "That note is too long (300 characters at most) or has odd characters.", invalid_period: "That period label is too long (40 characters at most).", invalid_input: "Check the details and try again.",
@@ -27,7 +28,7 @@ export function seoPanel({ base, site, canWrite, say }) {
   const root = h("div", { class: "adm-ws__block adm-seo" });
   const url = `${base}/${encodeURIComponent(site.id)}/seo`;
   const pre = "seo-" + site.id.slice(0, 8);
-  let data = null, busy = false;
+  let data = null, kwData = null, busy = false;
   const opened = new Set(); // which sections are open survives a redraw after a save
   const fold = (key, title, meta, ...children) => h("details", { class: "adm-acc adm-acc--quiet", id: pre + "-" + key, open: opened.has(key) ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add(key); else opened.delete(key); } }, h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: title }), meta ? h("span", { class: "adm-acc__meta", text: meta }) : null), h("div", { class: "adm-acc__body" }, ...children));
 
@@ -39,6 +40,7 @@ export function seoPanel({ base, site, canWrite, say }) {
     await load();
   }
   async function load() {
+    try { kwData = await api(`${url}/keywords`); } catch { kwData = null; }
     try { data = await api(url); } catch (err) { root.replaceChildren(h("p", { class: "acc__group" }, "SEO & Search Visibility"), h("p", { class: "adm-muted", text: errorText(err) })); return; }
     draw();
   }
@@ -117,11 +119,31 @@ export function seoPanel({ base, site, canWrite, say }) {
         save("Add figures", () => act(() => api(`${url}/metrics`, { method: "POST", body: metricBody(f) }), "Figures added. They are a draft until you show them to the client."))] : null);
   }
 
+  function keywordRow(k) {
+    const id = pre + "-k-" + k.id.slice(0, 8);
+    const day = text(id + "-d", new Date().toISOString().slice(0, 10), { maxlength: "10" }), pos = text(id + "-p", "", { inputmode: "numeric", maxlength: "3" }), link = text(id + "-u", "", { maxlength: "300", placeholder: "https://… (optional)" });
+    const last = k.checks[0];
+    return h("li", { class: "adm-seo__row" }, h("p", null, h("strong", { text: k.keyword }), h("span", { class: "adm-muted", text: ` · ${k.location || "Anywhere"} · ${last ? `last check ${last.checkedOn}: ${last.position == null ? "not found in the results checked" : "position " + last.position}` : "not checked yet"}` })),
+      k.checks.length ? h("ul", { class: "adm-seo__list" }, k.checks.slice(0, 6).map((c) => h("li", null, h("span", { text: `${c.checkedOn}: ${c.position == null ? "not found" : "position " + c.position}${c.source === "provider" ? " (automatic)" : ""}` }), canWrite() ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => act(() => api(`${url}/keywords/${k.id}/checks/${c.id}/delete`, { method: "POST", body: {} }), "Check removed.") }, "Remove") : null))) : null,
+      canWrite() ? [field(id + "-d", "Checked on", day), field(id + "-p", "Position (1 to 200)", pos, "Leave empty if the site was not in the results you checked."), field(id + "-u", "Page that ranked", link),
+        save("Record check", () => act(() => api(`${url}/keywords/${k.id}/checks`, { method: "POST", body: { checked_on: day.value.trim(), position: orNull(pos.value), url: orNull(link.value) } }), "Check recorded. The client sees it now.")),
+        h("button", { class: "btn btn--secondary adm-small adm-actions__danger", type: "button", onclick: () => act(() => api(`${url}/keywords/${k.id}/archive`, { method: "POST", body: {} }), "Keyword removed from tracking.") }, "Stop tracking")] : null);
+  }
+  function keywordsSection() {
+    if (!kwData || kwData.available === false) return fold("keywords", "Keyword rankings", "Unavailable", h("p", { class: "adm-muted", text: "Keyword tracking isn’t available on this site yet (a database change is waiting)." }));
+    const id = pre + "-new-k", kword = text(id + "-k", "", { maxlength: "80" }), place = text(id + "-l", "", { maxlength: "80", placeholder: "Calgary, Alberta" });
+    return fold("keywords", "Keyword rankings", kwData.keywords.length ? String(kwData.keywords.length) : "None yet",
+      h("p", { class: "adm-muted", text: "The client chooses the keywords and places; you look each one up for that place and record the result. The client sees recorded results straight away, as checked by Framework. Never record a guess." }),
+      kwData.keywords.length ? h("ul", { class: "adm-seo__list" }, kwData.keywords.map(keywordRow)) : h("p", { class: "adm-muted", text: "No keywords are tracked yet." }),
+      canWrite() ? [h("p", { class: "adm-field__hint", text: "Track a keyword for the client:" }), field(id + "-k", "Keyword", kword), field(id + "-l", "Place (optional)", place),
+        save("Track keyword", () => act(() => api(`${url}/keywords`, { method: "POST", body: { keyword: kword.value, location: place.value } }), "Keyword added."))] : null);
+  }
+
   function draw() {
     if (!data.available) { root.replaceChildren(h("p", { class: "acc__group" }, "SEO & Search Visibility"), h("p", { class: "adm-muted", text: "SEO details aren’t available on this site yet (a database change is waiting)." })); return; }
     root.replaceChildren(h("p", { class: "acc__group" }, "SEO & Search Visibility"),
       h("p", { class: "adm-muted", text: "Shown to the client under Website, only once you turn it on below. Nothing is fetched from Google: you enter the information." }),
-      head(), itemSection("checklist", "Checklist", data.checklist), itemSection("recommendation", "Recommendations", data.recommendations), metricsSection(), reportsSection());
+      head(), itemSection("checklist", "Checklist", data.checklist), itemSection("recommendation", "Recommendations", data.recommendations), metricsSection(), keywordsSection(), reportsSection());
   }
 
   root.append(h("p", { class: "acc__group" }, "SEO & Search Visibility"), h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: (ev) => { ev.currentTarget.remove(); load(); } }, "Open SEO details"));

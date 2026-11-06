@@ -116,7 +116,8 @@ test("the sections: Deliverables lists eight services with 'Custom quote' and tw
   assert.ok(!/\$\s?\d/.test(dl), "no price is shown anywhere unless Admin entered one");
   assert.match(dl, /Nothing in progress/); assert.match(dl, /Sending a request does not authorize any paid work/);
   const seo = await text(ann, "/seo");
-  assert.match(seo, /Not connected/); assert.match(seo, /Rankings are not shown because no ranking data is connected/);
+  assert.match(seo, /Search performance/); assert.match(seo, /Not connected/); assert.match(seo, /Not tracked/); assert.match(seo, /Keyword rankings/); assert.match(seo, /not your ranking for one particular search/);
+  assert.ok(seo.indexOf("Search performance") < seo.indexOf("Available to request"), "performance comes first on SEO");
   assert.ok(!/\d+ (clicks|impressions)|position \d|ranking #/i.test(seo), "no analytics or rankings are invented");
   assert.equal([...seo.matchAll(/requests\/new\?type=/g)].length, 5);
   const dev = await text(ann, "/development");
