@@ -25,7 +25,7 @@ function brand() {
 }
 
 // How the sidebar is grouped (worker/admin/DESIGN-SYSTEM.md). A module not listed here still appears, after the groups.
-const NAV_GROUPS = [[null, ["overview"]], ["Inbox", ["feedback", "support", "requests"]], ["Assessments", ["assessments", "discovery"]], ["Marketing", ["demo-traffic"]], ["People", ["clients", "approved-emails"]], ["Setup", ["additional-services", "service-pricing", "settings"]]];
+const NAV_GROUPS = [[null, ["overview", "leads"]], ["Inbox", ["feedback", "support", "requests"]], ["Assessments", ["assessments", "discovery"]], ["People", ["clients", "approved-emails"]], ["Setup", ["additional-services", "service-pricing", "settings"]]];
 
 function navItem(m) {
   const a = h("a", { class: "adm-nav__link", href: m.path, "data-link": "", "data-module": m.id }, navIcon(m.id), h("span", { text: m.label }));
@@ -111,6 +111,7 @@ async function refreshBadge() {
 async function route() {
   const token = ++routeToken;
   if (clean(location.pathname) === "/admin/portal-feedback") history.replaceState(null, "", "/admin/feedback/portal" + location.search); // the old address now lives under the Feedback tabs
+  if (clean(location.pathname) === "/admin/demo-traffic") history.replaceState(null, "", "/admin/leads/activity" + location.search); // Demo traffic is now the Activity view of Leads
   const url = new URL(location.href);
   const module = resolve(url.pathname);
   navLinks.forEach((a) => (a.dataset.module === (module && module.id) ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));

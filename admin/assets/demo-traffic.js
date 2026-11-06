@@ -6,18 +6,18 @@ import { h, api, errorState, confirmDialog } from "./ui.js";
 import { badge, fold, statCard, emptyState } from "./kit.js";
 
 const NS = "http://www.w3.org/2000/svg";
-const when = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Edmonton" });
+export const when = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Edmonton" });
 const whenSec = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium", timeStyle: "medium", timeZone: "America/Edmonton" });
-const fmt = (f, iso) => (iso && Number.isFinite(Date.parse(iso)) ? f.format(new Date(iso)) : "");
+export const fmt = (f, iso) => (iso && Number.isFinite(Date.parse(iso)) ? f.format(new Date(iso)) : "");
 const num = (n) => new Intl.NumberFormat("en-CA").format(Number(n) || 0);
-const pretty = (v) => String(v || "").replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
+export const pretty = (v) => String(v || "").replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 
 const BOT_REASONS = { head: "Link check (HEAD request)", no_user_agent: "No browser signature", user_agent: "Crawler, preview or scanner", network: "Mail-security or data-centre network", no_accept_language: "Looks automated" };
 const EVENTS = { link_open: "Opened the link", view: "Viewed the page", active: "Interacted with the page", discipline: "Chose a discipline", vibe: "Chose a vibe", colour: "Chose a colour", company: "Entered a company", open: "Opened the demo", enquiry: "Sent an enquiry" };
 
 /** A square colour swatch. The colour is an SVG fill attribute (validated hex), so no inline style is needed. */
-function swatch(hex) {
+export function swatch(hex) {
   if (!HEX.test(hex || "")) return null;
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("class", "dt-swatch"); svg.setAttribute("viewBox", "0 0 1 1"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Colour " + hex.toUpperCase());
@@ -55,15 +55,17 @@ function visitorRow(j) {
   return el;
 }
 
-export async function render() {
+/** The Demo traffic report. /admin/demo-traffic and the Leads "Activity" view both render it; `title` is the page heading and `before` (optional) is a node placed under it, such as tabs. */
+export async function activity({ title = "Demo traffic", before = null } = {}) {
   const status = await api("/demo-traffic/status");
   const node = h("div", { class: "adm-page" },
-    h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Demo traffic"))),
+    h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, title))),
+    before,
     h("p", { class: "dt-note", text: "A link visit shows which link was used, not who visited." }));
 
   if (!status.ready) {
     node.append(emptyState({ title: "Demo traffic isn’t set up yet", body: `The database tables (proposed migration ${status.migration || "0021_demo_traffic.sql"}) have not been applied, so nothing is recorded and no links can be created until they are. Visitors are not affected: links still open the demo.` }));
-    return { title: "Demo traffic", node };
+    return { title, node };
   }
   if (!status.secret) node.append(h("p", { class: "adm-notice", role: "status", text: "A signing key is needed to create and copy links. Set DEMO_LINK_SECRET (or PORTAL_SESSION_PEPPER) for this deployment." }));
 
@@ -163,5 +165,7 @@ export async function render() {
 
   node.append(note, filters, stats, h("section", { class: "adm-section" }, visitors), h("section", { class: "adm-section" }, linksBox));
   await Promise.all([loadReport(), loadLinks()]);
-  return { title: "Demo traffic", node };
+  return { title, node };
 }
+
+export const render = () => activity();

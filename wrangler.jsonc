@@ -55,7 +55,8 @@
     // still served straight from static assets. /portal and /portal/* belong to the client portal router (worker/portal/router.js): it
     // answers only where PORTAL_ENABLED is "1" (set in previews.vars for Staging only, never at the top level, so never on Production); everywhere else the Worker returns
     // an explicit 404 for these paths. Note "/portal/*" does not match "/portal" itself, so both are listed. "/d/*" is the opaque demo tracking link (worker/demo-traffic.js): it only redirects to /demos/.
-    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/card", "/d/*", "/portal", "/portal/*"]
+    // "/u/*" is the unsubscribe page for outreach email (worker/leads.js): a GET only shows a button, a POST records the opt-out; it does nothing until migration 0022 is applied.
+    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/card", "/d/*", "/u/*", "/portal", "/portal/*"]
   },
   // Private client feedback responses (D1). This binding is used by normal `wrangler deploy` deployments.
   "d1_databases": [
@@ -138,7 +139,12 @@
       // Turns on Brand Discovery (assessments, secure guest links, the Branding card). STAGING ONLY, never at the top level. Needs migration 0018 (applied to Staging) and PORTAL_BRANDING. Exactly "1" or absent.
       "PORTAL_DISCOVERY": "1",
       // Turns on the unified request system (Deliverables, SEO and Development requests, My Requests, the wide navigation). STAGING ONLY, never at the top level. Needs migration 0020 (applied to Staging) and PORTAL_SERVICES. Exactly "1" or absent.
-      "PORTAL_REQUESTS": "1"
+      "PORTAL_REQUESTS": "1",
+      // Admin -> Leads outreach email, STAGING ONLY (never at the top level, so Production sends nothing). LEADS_SENDING exactly "1" lets the workspace send at all; because LEADS_TEST_RECIPIENT is also set,
+      // every email goes ONLY to that address (subject prefixed "[TEST for ...]"), is recorded as a test and never changes a lead's status. Staging can therefore never email a real business.
+      // Production would need its own reviewed change (no test recipient, plus LEADS_MAILING_ADDRESS). Setup and the checklist: worker/LEADS.md.
+      "LEADS_SENDING": "1",
+      "LEADS_TEST_RECIPIENT": "hello@frameworkco.ca"
     },
     "d1_databases": [
       {
@@ -151,6 +157,13 @@
         "database_name": "framework-portal-staging",
         "database_id": "1edda8a2-5249-4f40-9dbc-d29aa44e21f8",
         "migrations_dir": "migrations/portal"
+      },
+      // Admin -> Leads, STAGING ONLY (never at the top level, so never on Production): the finder Worker's database (framework-leadgen), bound so Admin can import its qualified candidates.
+      // Cloudflare cannot make a D1 binding read-only; worker/leads.js only ever sends SELECT statements to it (every call goes through finderSelect, and a test pins that).
+      {
+        "binding": "LEADGEN_DB",
+        "database_name": "framework-leadgen",
+        "database_id": "3162e849-ac70-4a1b-b37b-051430d24c39"
       }
     ],
     // Private bucket for client files. Not served publicly (no public access, no custom domain).

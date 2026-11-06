@@ -11,7 +11,8 @@ export const MODULES = [
   { id: "requests", label: "Requests", path: "/admin/requests", enabled: true, load: () => import("./requests.js") },
   { id: "assessments", label: "Assessments", path: "/admin/assessments", enabled: true, load: () => import("./assessments.js") },
   { id: "discovery", label: "Brand Discovery", path: "/admin/discovery", enabled: true, load: () => import("./discovery.js") },
-  { id: "demo-traffic", label: "Demo traffic", path: "/admin/demo-traffic", enabled: true, load: () => import("./demo-traffic.js") },
+  // Demo traffic is now the Activity view of Leads (/admin/leads/activity); the old address is redirected by the router (admin.js), so old links keep working.
+  { id: "leads", label: "Leads", path: "/admin/leads", enabled: true, load: () => import("./leads.js") },
 
   { id: "clients", label: "Clients", path: "/admin/clients", enabled: true, load: () => import("./clients.js") },
   { id: "approved-emails", label: "Approved Emails", path: "/admin/approved-emails", enabled: true, load: () => import("./approved-emails.js") },
@@ -19,6 +20,5 @@ export const MODULES = [
   { id: "additional-services", label: "Additional Services", path: "/admin/settings/additional-services", enabled: true, load: () => import("./settings.js") },
   { id: "service-pricing", label: "Service Pricing", path: "/admin/settings/service-pricing", enabled: true, load: () => import("./settings.js") },
   { id: "projects", label: "Projects", path: "/admin/projects", enabled: false },
-  { id: "leads", label: "Leads", path: "/admin/leads", enabled: false },
   { id: "settings", label: "Settings", path: "/admin/settings", enabled: true, load: () => import("./settings.js") },
 ];
