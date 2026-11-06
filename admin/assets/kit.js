@@ -31,8 +31,8 @@ export const foldControls = (container) => h("div", { class: "rk-folds-ctl" },
   h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => container.querySelectorAll("details.rk-fold").forEach((d) => { d.open = false; }) }, "Collapse all"));
 
 /** A bar list: [{ label, count }] drawn relative to the biggest. */
-export function barList(rows) {
-  const max = Math.max(1, ...rows.map((r) => r.count));
+export function barList(rows, { max: given } = {}) {
+  const max = given || Math.max(1, ...rows.map((r) => r.count));
   return h("ul", { class: "rk-bars" }, rows.map((r) => h("li", null, h("span", { class: "rk-bars__label", text: r.label }), h("progress", { class: "rk-bars__track", max: String(max), value: String(r.count), "aria-label": `${r.label}: ${r.count}` }), h("span", { class: "rk-bars__n", text: String(r.count) }))));
 }
 

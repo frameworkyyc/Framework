@@ -9,19 +9,30 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm,
 
 test("the design system is documented and the development instructions require it", () => {
   const doc = read("worker/admin/DESIGN-SYSTEM.md"), rules = read("CLAUDE.md");
-  for (const heading of ["## Principles", "## Tokens", "## Components", "## Navigation", "## Page patterns", "## Rules that are tested", "## Adding a page"]) assert.ok(doc.includes(heading), heading);
+  for (const heading of ["## Framework identity", "## Usability standards", "## Tokens", "## Components", "## Navigation", "## Page patterns", "## Rules that are tested", "## Adding a page"]) assert.ok(doc.includes(heading), heading);
   assert.match(rules, /admin\/DESIGN-SYSTEM\.md/);
   assert.match(rules, /Admin UI: every Admin screen follows/);
 });
 
-test("every documented kit component exists and every documented token is defined once, at :root", () => {
+test("every documented kit component exists and the status and spacing tokens are defined at :root", () => {
   const doc = read("worker/admin/DESIGN-SYSTEM.md"), kit = read("admin/assets/kit.js"), css = read("admin/assets/admin.css");
-  for (const name of ["statCard", "badge", "card", "fold", "foldControls", "barList", "choiceGroups", "choice", "visual", "attentionList", "emptyState", "linkCard", "navIcon"]) {
+  for (const name of ["statCard", "badge", "card", "fold", "foldControls", "barList", "choiceGroups", "choice", "visual", "attentionList", "emptyState", "linkCard", "navIcon", "searchBox"]) {
     assert.ok(new RegExp(`export (function|const) ${name}\\b`).test(kit), `kit exports ${name}`);
     assert.ok(doc.includes("`" + name) || doc.includes(name + "("), `documented: ${name}`);
   }
-  const root = css.slice(css.indexOf("ADMIN DESIGN SYSTEM, layer 2"));
-  for (const token of ["--ok:", "--warn:", "--bad:", "--pend:", "--adm-radius:", "--adm-radius-sm:", "--adm-card-pad:", "--adm-card-border:", "--adm-space-1:", "--adm-space-6:"]) assert.ok(root.includes(token), token);
+  const layer = css.slice(css.indexOf("ADMIN KIT (admin/assets/kit.js)"));
+  assert.ok(layer.length > 1000, "the kit layer exists");
+  for (const token of ["--ok:", "--warn:", "--bad:", "--pend:", "--adm-space-1:", "--adm-space-6:"]) assert.ok(layer.includes(token), token);
+});
+
+test("Framework identity: the kit layer has sharp corners, no shadows, no gradients and no radius token; the document states the rules", () => {
+  const css = read("admin/assets/admin.css"), doc = read("worker/admin/DESIGN-SYSTEM.md");
+  const layer = css.slice(css.indexOf("ADMIN KIT (admin/assets/kit.js)"));
+  assert.deepEqual([...layer.matchAll(/border-radius:\s*([^;}]+)/g)].map((m) => m[1].trim()).filter((v) => v !== "0"), [], "no rounded corners");
+  assert.ok(!/box-shadow|linear-gradient|radial-gradient|--adm-radius|--adm-card/.test(layer), "no shadows, gradients or radius tokens");
+  assert.ok(!/border-radius:\s*(?!0\b)/.test(read("admin/assets/kit.js")), "the kit sets no radius");
+  for (const phrase of ["## Framework identity", "Sharp corners only", "no pill-shaped", "## Usability standards", "Show, don't tell", "Switzer"]) assert.ok(doc.includes(phrase), phrase);
+  assert.match(read("CLAUDE.md"), /sharp corners, ruled lines, display type/);
 });
 
 test("the sidebar is grouped, every enabled module has an icon and a place, and nothing is dropped", () => {
