@@ -19,7 +19,9 @@
 <link rel="preconnect" href="https://api.fontshare.com">
 <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@600,700&f[]=general-sans@400,500,600&display=swap">
+<link rel="preload" as="image" href="/assets/img/contractors/landscaping-top-720.webp" imagesrcset="/assets/img/contractors/landscaping-top-720.webp 720w, /assets/img/contractors/landscaping-top.webp 1200w" imagesizes="(max-width: 960px) 92vw, 640px" fetchpriority="high">
 <link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="/assets/css/contractors.css">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -156,138 +158,252 @@
   </div>
 </header>
 <main id="main">
-  <section class="page-head">
-    <div class="container">
-      <span class="eyebrow">Contractor websites / Calgary, Alberta</span>
-      <h1 class="display">Websites for contractors, built to be found and trusted.</h1>
-      <p class="lead">When someone needs a contractor, they search, look at a few websites and call the one that seems to know what it's doing. Framework designs and builds that website for Calgary contractors and trades, and for businesses across Alberta and Canada.</p>
-      <div class="btn-row">
-        <a class="btn btn--primary" href="/contact" data-track="contact_cta" data-track-location="contractors_hero">Start your project</a>
-        <a class="btn btn--secondary" href="/assessment" data-track="assessment_cta" data-track-location="contractors_hero">Get a free online presence assessment</a>
+  <section class="section--ink cx-hero" aria-labelledby="hero-title">
+    <img class="cx-hero__photo" data-parallax="0.18" src="/assets/img/contractors/hero-frame.webp" srcset="/assets/img/contractors/hero-frame-960.webp 960w, /assets/img/contractors/hero-frame.webp 1920w" sizes="100vw" width="1920" height="1280" alt="" fetchpriority="high" decoding="async">
+    <div class="cx-hero__veil" aria-hidden="true"></div>
+    <div class="container cx-hero__grid">
+      <div class="cx-hero__copy">
+        <span class="eyebrow cx-in">Contractor websites / Calgary, Alberta</span>
+        <h1 class="cx-display cx-in" id="hero-title">Websites for contractors, built to be found and trusted.</h1>
+        <p class="cx-lead cx-in">Your work, shown the way it deserves. Designed and built in Calgary for contractors across Alberta and Canada.</p>
+        <div class="btn-row cx-in">
+          <a class="btn btn--primary" href="/contact" data-track="contact_cta" data-track-location="contractors_hero">Start your project</a>
+          <a class="btn btn--secondary" href="/assessment" data-track="assessment_cta" data-track-location="contractors_hero">Get a free online presence assessment</a>
+        </div>
+      </div>
+      <div class="cx-hero__stage" data-hero-stage>
+        <figure class="cx-frame cx-frame--back" data-depth="0.10">
+          <div class="cx-frame__bar" aria-hidden="true"><i></i><i></i><i></i><span>Concept / Keystone Build Co.</span></div>
+          <img src="/assets/img/contractors/general-top-720.webp" srcset="/assets/img/contractors/general-top-720.webp 720w, /assets/img/contractors/general-top.webp 1200w" sizes="(max-width: 860px) 70vw, 520px" width="1200" height="750" alt="" decoding="async">
+        </figure>
+        <figure class="cx-frame cx-frame--main" data-depth="-0.05">
+          <div class="cx-frame__bar" aria-hidden="true"><i></i><i></i><i></i><span>Concept / Foothills Grove Landscaping</span></div>
+          <img src="/assets/img/contractors/landscaping-top-720.webp" srcset="/assets/img/contractors/landscaping-top-720.webp 720w, /assets/img/contractors/landscaping-top.webp 1200w" sizes="(max-width: 860px) 92vw, 640px" width="1200" height="750" alt="Concept website for a landscaping company: a full-width photo of a finished backyard with a bold headline" fetchpriority="high" decoding="async">
+        </figure>
+        <figure class="cx-phone" data-depth="-0.14">
+          <img src="/assets/img/contractors/fence-phone.webp" width="520" height="1125" alt="Concept website for a fence and deck company, shown on a phone" decoding="async">
+        </figure>
       </div>
     </div>
+    <ul class="container cx-hero__trades" aria-label="Concept websites for four trades">
+      <li><a href="#concept-fence"><span>01</span>Fence &amp; deck</a></li>
+      <li><a href="#concept-landscaping"><span>02</span>Landscaping</a></li>
+      <li><a href="#concept-renovations"><span>03</span>Renovations</a></li>
+      <li><a href="#concept-general"><span>04</span>General contractor</a></li>
+    </ul>
   </section>
 
-  <section class="section" aria-labelledby="who-title">
+  <section class="section cx-who" aria-labelledby="who-title">
     <div class="container">
-      <div class="split section-head">
-        <div class="split__main">
-          <span class="eyebrow">Who we build for</span>
-          <h2 class="h2" id="who-title">The work is good. The website should show it.</h2>
-        </div>
-        <div class="split__side"><p class="muted">Contractors and trades are the businesses we focus on. Different trades, same problem: the quality of the work and the quality of the website rarely match, and customers decide quickly.</p></div>
-      </div>
-      <ul class="checklist" aria-label="Businesses we build websites for">
-        <li>General contractors and builders</li>
-        <li>Renovation and home improvement companies</li>
-        <li>Fencing, decking and landscaping businesses</li>
-        <li>Roofing, siding and exterior contractors</li>
-        <li>HVAC, plumbing and electrical trades</li>
-        <li>Concrete, excavation and site services</li>
+      <span class="eyebrow" data-reveal>Who we build for</span>
+      <h2 class="cx-h2" id="who-title" data-reveal>The work is good. The website should show it.</h2>
+    </div>
+    <div class="cx-ticker" data-reveal>
+      <ul class="cx-ticker__row" aria-label="Businesses we build websites for">
+        <li>General contractors and builders</li><li>Renovation and home improvement</li><li>Fencing and decking</li><li>Landscaping</li><li>Roofing and exteriors</li><li>HVAC, plumbing and electrical</li><li>Concrete and excavation</li>
+      </ul>
+      <ul class="cx-ticker__row" aria-hidden="true">
+        <li>General contractors and builders</li><li>Renovation and home improvement</li><li>Fencing and decking</li><li>Landscaping</li><li>Roofing and exteriors</li><li>HVAC, plumbing and electrical</li><li>Concrete and excavation</li>
       </ul>
     </div>
   </section>
 
-  <section class="section" aria-labelledby="needs-title">
+  <section class="section cx-jobs" aria-labelledby="needs-title">
     <div class="container">
-      <div class="split section-head">
-        <div class="split__main">
-          <span class="eyebrow">What the website has to do</span>
-          <h2 class="h2" id="needs-title">Four jobs, done well.</h2>
-        </div>
-        <div class="split__side"><p class="muted">A contractor website doesn't need to be clever. It needs to be clear, quick on a phone and easy to act on.</p></div>
+      <span class="eyebrow" data-reveal>What it has to do</span>
+      <h2 class="cx-h2" id="needs-title" data-reveal>Four jobs, done well.</h2>
+      <ol class="cx-jobs__grid">
+        <li data-reveal data-d="0">
+          <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="4" y="8" width="40" height="32" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 32l12-12 10 10 6-6 12 12" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="cx-index">01</span><h3 class="cx-h3">Show the work</h3><p>Real projects up front, in real photos.</p>
+        </li>
+        <li data-reveal data-d="1">
+          <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M6 12h36M6 24h36M6 36h22" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="cx-index">02</span><h3 class="cx-h3">Explain the service</h3><p>What you do, where you work and who it is for.</p>
+        </li>
+        <li data-reveal data-d="2">
+          <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="6" y="6" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 25l7 7 12-14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="cx-index">03</span><h3 class="cx-h3">Earn trust</h3><p>Credentials, process and past work, clearly shown.</p>
+        </li>
+        <li data-reveal data-d="3">
+          <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect x="6" y="6" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14 34L34 14M20 14h14v14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          <span class="cx-index">04</span><h3 class="cx-h3">Make contact easy</h3><p>One clear next step, on every page.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section cx-work" aria-labelledby="work-title">
+    <div class="container">
+      <span class="eyebrow" data-reveal>Our work</span>
+      <h2 class="cx-h2" id="work-title" data-reveal>Four trades. Four websites. One standard.</h2>
+      <p class="cx-note" data-reveal>These four sites are concepts we built to show what a contractor website can look like. The businesses, names and reviews in them are illustrative, not clients.</p>
+    </div>
+
+    <article class="container cx-stage" id="concept-fence" aria-labelledby="st-fence">
+      <div class="cx-stage__info" data-reveal>
+        <span class="cx-index">01 / Concept</span>
+        <h3 class="cx-h3 cx-h3--lg" id="st-fence">Fence &amp; deck</h3>
+        <p>Fences, decks, gates and repairs, presented with the craft behind them.</p>
+        <ul class="cx-tags"><li>Scroll-drawn build</li><li>Project gallery</li><li>Quote request</li></ul>
+        <a class="cx-arrow" href="/demos/fence-deck" data-track="demo_open" data-track-location="fence">Open the live concept</a>
       </div>
-      <div class="cells cells--4">
-        <div class="cell"><span class="index">01</span><h3 class="h3">Show the work</h3><p>Real projects and photos first, so a homeowner or property manager sees the quality before they pick up the phone.</p></div>
-        <div class="cell"><span class="index">02</span><h3 class="h3">Say what and where</h3><p>Clear services and the areas you cover, so the right customers, and search engines, understand what you do.</p></div>
-        <div class="cell"><span class="index">03</span><h3 class="h3">Make contact easy</h3><p>A quote request that works on a phone, asks only what you need, and never gets lost along the way.</p></div>
-        <div class="cell"><span class="index">04</span><h3 class="h3">Be easy to find</h3><p>A sound structure, plain-language pages and Google Business Profile guidance, so search has a fair chance to match you to the right customer.</p></div>
+      <div class="cx-stage__visual" data-reveal>
+        <a class="cx-frame cx-frame--scroll" href="/demos/fence-deck" tabindex="-1" aria-hidden="true" data-scroll-preview data-track="demo_open" data-track-location="fence_preview">
+          <span class="cx-frame__bar"><i></i><i></i><i></i><span>Concept / Ridgeline Fence &amp; Deck</span></span>
+          <span class="cx-frame__view"><img class="cx-frame__page" src="/assets/img/contractors/fence-page.webp" width="1200" height="2732" alt="" loading="lazy" decoding="async"></span>
+          <span class="cx-frame__open">Open concept</span>
+        </a>
+        <figure class="cx-phone cx-phone--stage" data-phone><img src="/assets/img/contractors/fence-phone.webp" width="520" height="1125" alt="The fence and deck concept on a phone" loading="lazy" decoding="async"></figure>
+      </div>
+    </article>
+
+    <article class="container cx-stage cx-stage--flip" id="concept-landscaping" aria-labelledby="st-landscaping">
+      <div class="cx-stage__info" data-reveal>
+        <span class="cx-index">02 / Concept</span>
+        <h3 class="cx-h3 cx-h3--lg" id="st-landscaping">Landscaping</h3>
+        <p>Design, hardscape, sod and maintenance, framed as a backyard worth wanting.</p>
+        <ul class="cx-tags"><li>Scroll-drawn build</li><li>Project gallery</li><li>Quote request</li></ul>
+        <a class="cx-arrow" href="/demos/landscaping" data-track="demo_open" data-track-location="landscaping">Open the live concept</a>
+      </div>
+      <div class="cx-stage__visual" data-reveal>
+        <a class="cx-frame cx-frame--scroll" href="/demos/landscaping" tabindex="-1" aria-hidden="true" data-scroll-preview data-track="demo_open" data-track-location="landscaping_preview">
+          <span class="cx-frame__bar"><i></i><i></i><i></i><span>Concept / Foothills Grove Landscaping</span></span>
+          <span class="cx-frame__view"><img class="cx-frame__page" src="/assets/img/contractors/landscaping-page.webp" width="1200" height="2694" alt="" loading="lazy" decoding="async"></span>
+          <span class="cx-frame__open">Open concept</span>
+        </a>
+        <figure class="cx-phone cx-phone--stage" data-phone><img src="/assets/img/contractors/landscaping-phone.webp" width="520" height="1125" alt="The landscaping concept on a phone" loading="lazy" decoding="async"></figure>
+      </div>
+    </article>
+
+    <article class="container cx-stage" id="concept-renovations" aria-labelledby="st-renovations">
+      <div class="cx-stage__info" data-reveal>
+        <span class="cx-index">03 / Concept</span>
+        <h3 class="cx-h3 cx-h3--lg" id="st-renovations">Renovations</h3>
+        <p>Kitchens, bathrooms and basements, with the finished result doing the talking.</p>
+        <ul class="cx-tags"><li>Scroll-drawn build</li><li>Project gallery</li><li>Quote request</li></ul>
+        <a class="cx-arrow" href="/demos/renovations" data-track="demo_open" data-track-location="renovations">Open the live concept</a>
+      </div>
+      <div class="cx-stage__visual" data-reveal>
+        <a class="cx-frame cx-frame--scroll" href="/demos/renovations" tabindex="-1" aria-hidden="true" data-scroll-preview data-track="demo_open" data-track-location="renovations_preview">
+          <span class="cx-frame__bar"><i></i><i></i><i></i><span>Concept / Hearth &amp; Hall Renovations</span></span>
+          <span class="cx-frame__view"><img class="cx-frame__page" src="/assets/img/contractors/renovations-page.webp" width="1200" height="3092" alt="" loading="lazy" decoding="async"></span>
+          <span class="cx-frame__open">Open concept</span>
+        </a>
+        <figure class="cx-phone cx-phone--stage" data-phone><img src="/assets/img/contractors/renovations-phone.webp" width="520" height="1125" alt="The renovations concept on a phone" loading="lazy" decoding="async"></figure>
+      </div>
+    </article>
+
+    <article class="container cx-stage cx-stage--flip" id="concept-general" aria-labelledby="st-general">
+      <div class="cx-stage__info" data-reveal>
+        <span class="cx-index">04 / Concept</span>
+        <h3 class="cx-h3 cx-h3--lg" id="st-general">General contractor</h3>
+        <p>Custom homes, additions and fit-outs, from foundation to final walkthrough.</p>
+        <ul class="cx-tags"><li>Scroll-drawn build</li><li>Project gallery</li><li>Quote request</li></ul>
+        <a class="cx-arrow" href="/demos/general-contractor" data-track="demo_open" data-track-location="general">Open the live concept</a>
+      </div>
+      <div class="cx-stage__visual" data-reveal>
+        <a class="cx-frame cx-frame--scroll" href="/demos/general-contractor" tabindex="-1" aria-hidden="true" data-scroll-preview data-track="demo_open" data-track-location="general_preview">
+          <span class="cx-frame__bar"><i></i><i></i><i></i><span>Concept / Keystone Build Co.</span></span>
+          <span class="cx-frame__view"><img class="cx-frame__page" src="/assets/img/contractors/general-page.webp" width="1200" height="2672" alt="" loading="lazy" decoding="async"></span>
+          <span class="cx-frame__open">Open concept</span>
+        </a>
+        <figure class="cx-phone cx-phone--stage" data-phone><img src="/assets/img/contractors/general-phone.webp" width="520" height="1125" alt="The general contractor concept on a phone" loading="lazy" decoding="async"></figure>
+      </div>
+    </article>
+
+    <div class="cx-band">
+      <img class="cx-band__photo" data-parallax="0.16" src="/assets/img/contractors/photo-framing.webp" srcset="/assets/img/contractors/photo-framing-900.webp 900w, /assets/img/contractors/photo-framing.webp 1800w" sizes="100vw" width="1800" height="1201" alt="" loading="lazy" decoding="async">
+      <div class="cx-band__veil" aria-hidden="true"></div>
+      <p class="cx-band__text container" data-reveal>Built right.<br>Shown right.</p>
+    </div>
+
+    <div class="container cx-clients">
+      <div class="cx-clients__head" data-reveal>
+        <span class="eyebrow">Client projects</span>
+        <h3 class="cx-h2">Built for real businesses.</h3>
+      </div>
+      <div class="cx-clients__grid">
+        <a class="cx-client" href="/portfolio#red-e-title" data-reveal>
+          <span class="cx-client__img"><img src="/assets/img/red-e-site-home.jpg" width="1600" height="1047" alt="The Red E Corp. website on a laptop" loading="lazy" decoding="async"></span>
+          <span class="cx-index">Client project</span>
+          <span class="cx-h3">Red E Corp.</span>
+          <span class="cx-client__line">Brand system and website for an industrial, commercial and institutional project management company.</span>
+          <span class="cx-arrow">See the project</span>
+        </a>
+        <a class="cx-client" href="/portfolio#au-title" data-reveal>
+          <span class="cx-client__img"><img src="/assets/img/aurora-hero.jpg" width="1600" height="1000" alt="The Aurora Surveys website hero with survey imagery" loading="lazy" decoding="async"></span>
+          <span class="cx-index">Client project</span>
+          <span class="cx-h3">Aurora Surveys</span>
+          <span class="cx-client__line">A website that shows survey work instead of describing it, for a geomatics engineering firm.</span>
+          <span class="cx-arrow">See the project</span>
+        </a>
       </div>
     </div>
   </section>
 
-  <section class="section" aria-labelledby="how-title">
+  <section class="section cx-how" aria-labelledby="how-title">
     <div class="container">
-      <div class="split section-head">
-        <div class="split__main">
-          <span class="eyebrow">How we build it</span>
-          <h2 class="h2" id="how-title">Strategy first. Design second. Execution third.</h2>
-        </div>
-        <div class="split__side"><p class="muted">The same <a class="link" href="/method">six-stage method</a> behind every Framework project. Your conversations, drafts and files live in your private client portal.</p></div>
-      </div>
-      <div class="cells">
-        <div class="cell"><span class="index">01</span><h3 class="h3">Strategy first</h3><p>Who you serve, which jobs you want more of, and where you work. Everything built afterward follows from this.</p></div>
-        <div class="cell"><span class="index">02</span><h3 class="h3">Design second</h3><p>An identity and a website that make a small crew look as capable as it is, and that feel like one business.</p></div>
-        <div class="cell"><span class="index">03</span><h3 class="h3">Execution third</h3><p>We build, launch and stay involved, refining the site and adding to it as the business grows.</p></div>
-      </div>
+      <span class="eyebrow" data-reveal>How we build it</span>
+      <h2 class="cx-h2" id="how-title" data-reveal>Strategy first. Design second. Execution third.</h2>
+      <ol class="cx-steps" data-draw>
+        <li data-reveal><span class="cx-index">01</span><h3 class="cx-h3">Strategy</h3><p>Who you want to reach and what they need to see.</p></li>
+        <li data-reveal><span class="cx-index">02</span><h3 class="cx-h3">Design</h3><p>A look that fits your trade and your name.</p></li>
+        <li data-reveal><span class="cx-index">03</span><h3 class="cx-h3">Execution</h3><p>Built carefully, tested on phones and ready to be found.</p></li>
+      </ol>
+      <a class="cx-arrow" href="/method" data-reveal>How the method works</a>
     </div>
   </section>
 
-  <section class="section" aria-labelledby="where-title">
-    <div class="container">
-      <div class="split section-head">
-        <div class="split__main">
-          <span class="eyebrow">Where we work</span>
-          <h2 class="h2" id="where-title">Based in Calgary. Working across Alberta and Canada.</h2>
-        </div>
-        <div class="split__side"><p class="muted">Calgary is home, and it's where most of our contractor conversations start. The process runs online, so contractors anywhere in Alberta or elsewhere in Canada can work with us the same way.</p></div>
+  <section class="section section--ink cx-where" aria-labelledby="where-title">
+    <div class="container cx-where__grid">
+      <div>
+        <span class="eyebrow" data-reveal>Where we work</span>
+        <h2 class="cx-h2" id="where-title" data-reveal>Based in Calgary. Working across Alberta and Canada.</h2>
+        <ul class="cx-places">
+          <li data-reveal><strong>Calgary</strong><span>Where we are, and where we focus first.</span></li>
+          <li data-reveal><strong>Alberta</strong><span>Contractors and trades in every Alberta city and town.</span></li>
+          <li data-reveal><strong>Canada</strong><span>Remote-friendly from the first call to launch.</span></li>
+        </ul>
       </div>
-    </div>
-  </section>
-
-  <section class="section" aria-labelledby="work-title">
-    <div class="container">
-      <div class="split section-head">
-        <div class="split__main">
-          <span class="eyebrow">Our work</span>
-          <h2 class="h2" id="work-title">Construction and industry, built by Framework.</h2>
-        </div>
-        <div class="split__side"><p class="muted">Two client projects from the portfolio, followed by concept websites for the trades.</p></div>
-      </div>
-      <div class="cells cells--2">
-        <div class="cell"><span class="index">Client project</span><h3 class="h3">Red E Corp.</h3><p>A brand system and website for an industrial, commercial and institutional project management company whose founder came up as a carpenter, ironworker and millwright. <a class="link" href="/portfolio#red-e-title">See the project</a></p></div>
-        <div class="cell"><span class="index">Client project</span><h3 class="h3">Aurora Surveys</h3><p>A website that shows survey work instead of describing it, for a geomatics engineering firm serving transportation, hydroelectric, mining and energy projects. <a class="link" href="/portfolio#au-title">See the project</a></p></div>
-      </div>
-      <h3 class="h3 concepts__head">Concept websites for the trades</h3>
-      <p class="muted concepts__note">These four sites are concepts we built to show what a contractor website can look like. The businesses, names and reviews in them are illustrative, not clients.</p>
-      <div class="cells cells--4 cells--spaced">
-        <div class="cell"><span class="index">Concept</span><h3 class="h3">Fence &amp; Decks</h3><p>Fences, decks, gates and repairs. <a class="link" href="/demos/fence-deck">View the concept</a></p></div>
-        <div class="cell"><span class="index">Concept</span><h3 class="h3">Landscaping</h3><p>Design, hardscape, sod and maintenance. <a class="link" href="/demos/landscaping">View the concept</a></p></div>
-        <div class="cell"><span class="index">Concept</span><h3 class="h3">Renovations</h3><p>Kitchens, bathrooms and basements. <a class="link" href="/demos/renovations">View the concept</a></p></div>
-        <div class="cell"><span class="index">Concept</span><h3 class="h3">General contractor</h3><p>Custom homes, additions and fit-outs. <a class="link" href="/demos/general-contractor">View the concept</a></p></div>
-      </div>
+      <svg class="cx-nest" viewBox="0 0 400 400" aria-hidden="true" focusable="false" data-nest>
+        <rect class="cx-nest__r3" x="8" y="8" width="384" height="384" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <rect class="cx-nest__r2" x="80" y="80" width="240" height="240" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <rect class="cx-nest__r1" x="150" y="150" width="100" height="100" fill="currentColor"/>
+      </svg>
     </div>
   </section>
 
   <section class="section" aria-labelledby="faq-title">
     <div class="container">
-      <div class="split section-head">
-        <div class="split__main">
-          <span class="eyebrow">Questions</span>
-          <h2 class="h2" id="faq-title">What contractors ask us.</h2>
-        </div>
-        <div class="split__side"><p class="muted">Straight answers. If yours isn't here, <a class="link" href="/contact">ask us</a>.</p></div>
+      <span class="eyebrow" data-reveal>Questions</span>
+      <h2 class="cx-h2" id="faq-title" data-reveal>What contractors ask us.</h2>
+      <div class="cx-faq" data-reveal>
+        <details><summary>Do you only work with Calgary contractors?</summary><p>No. We&#x27;re based in Calgary and it&#x27;s where we focus first, but we work with contractors and trades across Alberta and the rest of Canada.</p></details>
+        <details><summary>Do I need a logo or brand before the website?</summary><p>No. If you already have one, we build around it. If you don&#x27;t, branding is part of the same process, so the website and the identity look like they belong together from the start.</p></details>
+        <details><summary>Will the website get me to the top of Google?</summary><p>Nobody can promise a ranking, and we won&#x27;t. What we do is build the foundations search engines look for: a clear structure, pages that say what you do and where you work, fast pages on a phone, and guidance on your Google Business Profile.</p></details>
+        <details><summary>How much does a contractor website cost?</summary><p>It depends on what your business needs, so we scope each project instead of quoting from a price list. A short conversation, or the free assessment, is the quickest way to learn what you&#x27;d need now and what can wait.</p></details>
+        <details><summary>What do I need to get started?</summary><p>A conversation. Tell us what you do, where you work and what kind of jobs you want more of. Photos of past work help a great deal, and if you don&#x27;t have good ones yet we can talk about that too.</p></details>
+        <details><summary>Do you stay involved after the website launches?</summary><p>Yes. A website isn&#x27;t finished at launch. We stay involved to refine it and to build on it as your business grows.</p></details>
       </div>
-      <div class="cells cells--2">
-        <div class="cell"><h3 class="h3">Do you only work with Calgary contractors?</h3><p>No. We&#x27;re based in Calgary and it&#x27;s where we focus first, but we work with contractors and trades across Alberta and the rest of Canada.</p></div>
-        <div class="cell"><h3 class="h3">Do I need a logo or brand before the website?</h3><p>No. If you already have one, we build around it. If you don&#x27;t, branding is part of the same process, so the website and the identity look like they belong together from the start.</p></div>
-        <div class="cell"><h3 class="h3">Will the website get me to the top of Google?</h3><p>Nobody can promise a ranking, and we won&#x27;t. What we do is build the foundations search engines look for: a clear structure, pages that say what you do and where you work, fast pages on a phone, and guidance on your Google Business Profile.</p></div>
-        <div class="cell"><h3 class="h3">How much does a contractor website cost?</h3><p>It depends on what your business needs, so we scope each project instead of quoting from a price list. A short conversation, or the free assessment, is the quickest way to learn what you&#x27;d need now and what can wait.</p></div>
-        <div class="cell"><h3 class="h3">What do I need to get started?</h3><p>A conversation. Tell us what you do, where you work and what kind of jobs you want more of. Photos of past work help a great deal, and if you don&#x27;t have good ones yet we can talk about that too.</p></div>
-        <div class="cell"><h3 class="h3">Do you stay involved after the website launches?</h3><p>Yes. A website isn&#x27;t finished at launch. We stay involved to refine it and to build on it as your business grows.</p></div>
-      </div>
+      <p class="muted cx-faq__more">Not here? <a class="link" href="/contact">Ask us</a>.</p>
     </div>
   </section>
 
-  <section class="section section--ink cta">
-    <div class="container">
-      <span class="eyebrow">Get started</span>
-      <h2 class="h2">Ready to build your foundation?</h2>
-      <p>Tell us about your business and the work you want more of. We'll show you what a proper framework looks like, and what it would take to build yours.</p>
-      <div class="btn-row"><a class="btn btn--primary" href="/contact" data-track="contact_cta" data-track-location="contractors_cta">Start your project</a><a class="btn btn--secondary" href="/assessment" data-track="assessment_cta" data-track-location="contractors_cta">Free online presence assessment</a></div>
+  <section class="section section--ink cta cx-cta">
+    <img class="cx-band__photo" data-parallax="0.14" src="/assets/img/contractors/photo-scaffold.webp" srcset="/assets/img/contractors/photo-scaffold-900.webp 900w, /assets/img/contractors/photo-scaffold.webp 1800w" sizes="100vw" width="1800" height="1200" alt="" loading="lazy" decoding="async">
+    <div class="cx-band__veil" aria-hidden="true"></div>
+    <div class="container cx-cta__inner">
+      <h2 class="cx-display cx-display--md" data-reveal>Ready to build your foundation?</h2>
+      <div class="btn-row" data-reveal>
+        <a class="btn btn--primary" href="/contact" data-track="contact_cta" data-track-location="contractors_cta">Start your project</a>
+        <a class="btn btn--secondary" href="/assessment" data-track="assessment_cta" data-track-location="contractors_cta">Get a free online presence assessment</a>
+      </div>
     </div>
   </section>
+  <p class="container cx-credits">Concept websites by Framework. Photography on this page by Troy Mortier, Nate Johnston, Toni Reed and Marc Wieland on <a class="link" href="https://unsplash.com">Unsplash</a>; it does not show Framework clients.</p>
 </main>
+
 <footer class="site-footer">
   <div class="container">
     <div class="site-footer__grid">
@@ -334,6 +450,7 @@
   </div>
 </footer>
 <script src="assets/js/main.js" defer></script>
+<script src="/assets/js/contractors.js" defer></script>
 <script src="/assets/js/analytics-config.js" defer></script>
 <script src="/assets/js/analytics.js" defer></script>
 </body>

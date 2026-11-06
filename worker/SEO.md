@@ -37,6 +37,14 @@ Nothing that a visitor types into a form is ever sent to Google.
 
 Claim or create the profile (category "Website designer" or "Web designer"; mark it a service-area business and hide the address if you do not want one public; add services, a short description that matches the website, and the website link `https://frameworkco.ca/`). Use the same business name, "Framework", everywhere. This is the strongest local signal and is not something the website can do for you.
 
+## The contractor page visuals
+
+`/contractor-websites` is image-led: hero photo and concept-site frames, scroll-linked previews of each concept, a photo statement, client projects, and a drawn process line. Styles are in `assets/css/contractors.css` (sharp corners, no shadows) and motion in `assets/js/contractors.js`. Motion is decorative and switches off under `prefers-reduced-motion`; without the script everything is visible.
+
+- Concept previews in `assets/img/contractors/*-page.webp`, `*-top*.webp` and `*-phone.webp` are screenshots of the four `/demos` sites. If a demo changes, recapture it (1440px wide for the page, 390px at 2x for the phone) and convert to WebP at the same sizes.
+- Photography (`hero-frame`, `photo-framing`, `photo-rebar`, `photo-scaffold`) is from Unsplash (Troy Mortier, Nate Johnston, Toni Reed, Marc Wieland) and credited on the page. It is atmosphere, not Framework clients, and the credit line says so. Swap in real project photography when available.
+- Do not add testimonials, ratings or prices to the work section; `seo.test.mjs` guards that, and the image rules (dimensions, alt text, lazy-loading).
+
 ## Things to know
 
 - The contractor page links to `/demos/...` concept sites. Those exist only on Staging so far, so a Production release of this work must include them (they stay `noindex`).
