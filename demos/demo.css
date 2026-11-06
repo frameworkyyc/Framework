@@ -260,3 +260,10 @@ form.is-done .form-done{display:block}
   .build.is-live .build__stage svg{width:190%;max-width:none;transform:translateX(calc(var(--p,0) * -47.4%));will-change:transform}
   .build__hint{display:none!important}
 }
+
+/* Wireframe build scene (Fence & Decks): black, line work only, no colour */
+.build--wire{--accent:#fff;--accent-on-dark:#fff;--band-bg:#000;--band-ink:#fff;background:#000}
+.build--wire .build__stage{border-radius:0;border:1px solid rgba(255,255,255,.16);box-shadow:none}
+.build--wire .build__bar{background:rgba(255,255,255,.12)}
+.build--wire .build__fill{background:#fff}
+.build--wire .build__steps li::before{border-radius:0}
