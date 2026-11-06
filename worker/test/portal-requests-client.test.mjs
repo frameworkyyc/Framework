@@ -76,13 +76,13 @@ test("flag on: the full navigation (ten entries for an owner, Invoices only for 
 test("Home: services as active or available, and what needs the person's action", async () => {
   const { w, ann, mia, text, create, d, userOf } = await setup();
   let home = await text(ann, "");
-  // one design: greeting, six equal blocks in order, then (only when something waits) the needs block, then a compact Business Profile; nothing from the older layout
+  // one design: greeting, six equal blocks in order, Business Profile band, then six equal blocks in order, then (only when something waits) the needs block; nothing from the older layout
   const blocks = [...home.matchAll(/<a class="hm-block" href="([^"]+)"><span class="hm-block__top">[\s\S]*?<span class="hm-block__title">([^<]+)</g)].map((m) => [m[2], m[1].replace("/portal/o/alpha", "")]);
   assert.deepEqual(blocks, [["Branding", "/branding"], ["Websites", "/website"], ["SEO", "/seo"], ["Deliverables", "/deliverables"], ["Custom Development", "/development"], ["Support", "/services/requests"]]);
   assert.equal((home.match(/class="hm-block"/g) || []).length, 6);
   assert.equal((home.match(/Your services/g) || []).length, 1, "only the screen-reader heading of the grid"); assert.match(home, /class="visually-hidden" id="hm-svc-h">Your services/);
   for (const gone of ["Coming soon", "Client Services", 'class="hubs"', 'class="onboard"', "Getting started"]) assert.ok(!home.includes(gone), gone + " is gone from Home");
-  assert.ok(home.indexOf("hm-grid") < home.indexOf("hm-profile"), "the Business Profile comes after the six blocks");
+  assert.ok(home.indexOf("hm-profile") < home.indexOf("hm-grid"), "the Business Profile band sits above the six blocks"); assert.ok(home.indexOf("page-head--home") < home.indexOf("hm-profile"), "and under the greeting"); assert.match(home, /class="hm-profile"/); assert.match(home, /hm-profile__left">\d+ required answers? left/);
   assert.ok(home.indexOf("page-head--home") < home.indexOf("hm-grid"), "the greeting comes first");
   assert.ok(!/Needs your action/.test(home), "no empty needs block");
   assert.match(home, /status--idle">Available to request/);
@@ -95,34 +95,46 @@ test("Home: services as active or available, and what needs the person's action"
   await svc.adminUpload(d(), { organizationId: orgId, requestId: id, role: "proof", file: { bytes: png(), name: "p.png" }, actor: STAFF });
   await repo.setStatus(w.db, orgId, id, "client_review", STAFF);
   home = await text(mia, ""); assert.match(home, /Needs your action/); assert.match(home, /Review the design/); assert.match(home, /status--attention">1 waiting for you/);
-  assert.ok(home.indexOf("hm-grid") < home.indexOf("hm-need") && home.indexOf("hm-need") < home.indexOf("hm-profile"), "order: blocks, needs, profile");
+  assert.ok(home.indexOf("hm-profile") < home.indexOf("hm-grid") && home.indexOf("hm-grid") < home.indexOf("hm-need"), "order: greeting, profile, blocks, needs");
   assert.match(await text(mia, "/requests"), /Needs your action/);
 });
 
-test("the sections: Deliverables lists the nine types with 'Custom quote' and two included rounds and no invented price; SEO shows no analytics; Development lists seven", async () => {
+test("the sections: Deliverables lists eight services with 'Custom quote' and two included rounds and no invented price; SEO shows no analytics; Development lists eight", async () => {
   const { ann, text } = await setup();
   const dl = await text(ann, "/deliverables");
   const tiles = [...dl.matchAll(/href="\/portal\/o\/alpha\/requests\/new\?type=([a-z_]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(tiles, ["business_card", "digital_business_card", "poster", "flyer", "brochure", "social_graphics", "letterhead", "email_signature", "custom_branded"]);
-  assert.equal((dl.match(/Custom quote/g) || []).length, 9); assert.equal((dl.match(/2 revision rounds included/g) || []).length, 9);
+  const EIGHT = ["business_card", "digital_business_card", "poster", "flyer", "social_graphics", "letterhead", "email_signature", "custom_branded"];
+  assert.deepEqual(tiles, EIGHT, "one Request this service action per service, in order");
+  assert.deepEqual([...dl.matchAll(/class="sc-block" href="#svc-([a-z_]+)"/g)].map((m) => m[1]), EIGHT, "eight blocks in the grid, each linking to its section");
+  assert.deepEqual([...dl.matchAll(/<section class="sc-sec" id="svc-([a-z_]+)"/g)].map((m) => m[1]), EIGHT, "and one showcase section each");
+  assert.ok(dl.indexOf('class="sc-grid"') < dl.indexOf('class="sc-showcase"'), "the showcase sits below the grid");
+  assert.equal((dl.match(/\/assets\/img\/portal\/[a-z-]+\.svg/g) || []).length, 8); assert.equal((dl.match(/An illustration of the idea, not a client project/g) || []).length, 8, "every picture says it is a concept");
+  assert.match(dl, /Real example/); assert.match(dl, /href="https:\/\/frameworkco\.ca\/card" target="_blank" rel="noopener noreferrer"/);
+  assert.ok(!/type=brochure/.test(dl) && !/Brochure</.test(dl), "the old brochure option is folded into Flyer or brochure");
+  assert.match(dl, /A flyer \(one sheet\), A bi-fold brochure/);
+  assert.equal((dl.match(/Custom quote/g) || []).length, 8); assert.equal((dl.match(/2 revision rounds included/g) || []).length, 8);
   assert.ok(!/\$\s?\d/.test(dl), "no price is shown anywhere unless Admin entered one");
   assert.match(dl, /Nothing in progress/); assert.match(dl, /Sending a request does not authorize any paid work/);
   const seo = await text(ann, "/seo");
   assert.match(seo, /Not connected/); assert.match(seo, /Rankings are not shown because no ranking data is connected/);
   assert.ok(!/\d+ (clicks|impressions)|position \d|ranking #/i.test(seo), "no analytics or rankings are invented");
   assert.equal([...seo.matchAll(/requests\/new\?type=/g)].length, 5);
-  assert.equal([...(await text(ann, "/development")).matchAll(/requests\/new\?type=/g)].length, 7);
+  const dev = await text(ann, "/development");
+  assert.equal([...dev.matchAll(/class="btn btn--primary sc-cta" href="[^"]*requests\/new\?type=/g)].length, 8);
+  assert.deepEqual([...dev.matchAll(/class="sc-block" href="#svc-([a-z_]+)"/g)].map((m) => m[1]), ["custom_web_app", "business_dashboard", "business_portal", "ai_automation", "workflow_automation", "api_integration", "custom_tool", "other_development"]);
+  assert.match(dev, /Typical uses/); assert.ok(!/Revision round/.test(dev), "development has no design revision rounds");
   for (const p of ["/deliverables", "/seo", "/development", "/requests"]) assert.ok(!/style=|<script/.test(await text(ann, p)), p + " has no inline style or script");
 });
 
 test("a Framework-entered price and revision count are shown (and only then); a disabled service disappears", async () => {
   const { w, ann, text } = await setup();
   await repo.saveTypeSettings(w.db, "flyer", { revisionsIncluded: 3, pricingMode: "fixed", fixedPriceCents: 9500, turnaroundNote: "Five working days" }, STAFF);
-  await repo.saveTypeSettings(w.db, "brochure", { enabled: false }, STAFF);
+  await repo.saveTypeSettings(w.db, "letterhead", { enabled: false }, STAFF);
   const dl = await text(ann, "/deliverables");
   assert.match(dl, /Fixed price: \$95\.00 CAD/); assert.match(dl, /3 revision rounds included/); assert.match(dl, /Five working days/);
-  assert.ok(!dl.includes("type=brochure"));
-  assert.equal((await ann.get("/portal/o/alpha/requests/new?type=brochure")).status, 303, "a disabled type redirects to its section");
+  assert.ok(!dl.includes("type=letterhead") && !dl.includes("svc-letterhead"));
+  assert.equal((await ann.get("/portal/o/alpha/requests/new?type=letterhead")).status, 303, "a disabled type redirects to its section");
+  assert.equal((await ann.get("/portal/o/alpha/requests/new?type=brochure")).status, 303, "the retired brochure type is never offered");
 });
 
 test("the guided form: every question, the notice, brand and reference upload; refusals come back filled in and nothing is stored", async () => {
@@ -350,4 +362,16 @@ test("emails: Framework is told about a new request with its type; the client is
   assert.match(buildEmail({ audience: "client", event: "request_status" }, { org: { slug: "alpha", name: "Alpha Co" }, request: { id, unified: true, status: "client_review" } }, "https://x.test").subject, /design is ready for your review/);
   assert.match(buildEmail({ audience: "client", event: "request_status" }, { org: { slug: "alpha", name: "Alpha Co" }, request: { id, unified: true, status: "completed" } }, "https://x.test").subject, /request is complete/);
   assert.match(buildEmail({ audience: "client", event: "request_status" }, { org: { slug: "alpha", name: "Alpha Co" }, request: { id, unified: true, status: "quoted" }, quoteOpen: true }, "https://x.test").text, /Open it in your portal to review it/);
+});
+
+test("Business Profile band: prominent while answers are missing, one quiet line when complete, honest when unreadable", async () => {
+  const { unifiedHome } = await import("../portal/requests/views.js");
+  const vm = { base: "/portal/o/alpha", now: new Date() }, base = { summary: { actions: [], actionCount: 0, open: 0 }, counts: {}, needs: {}, support: null, brand: null, website: null };
+  const band = (status, next) => unifiedHome(vm, "<header></header>", { ...base, profile: { status, next } });
+  const missing = band({ state: "ready", percent: 40, requiredRemaining: 5, actionRequired: true }, { state: "continue", path: "/profile/x" });
+  assert.match(missing, /class="hm-profile"/); assert.match(missing, /40%<\/span>/); assert.match(missing, /5 required answers left/); assert.match(missing, /Continue your profile/); assert.match(missing, /<progress class="meter" max="100" value="40"/);
+  const done = band({ state: "ready", percent: 100, requiredRemaining: 0 }, { state: "complete" });
+  assert.match(done, /hm-profile hm-profile--done/); assert.match(done, /Review your profile/); assert.ok(!/required answer/.test(done));
+  const broken = band({ state: "unavailable" }, null);
+  assert.match(broken, /Progress unavailable right now/); assert.ok(!/<progress/.test(broken), "no bar and no invented number when progress cannot be read");
 });

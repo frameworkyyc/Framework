@@ -8,6 +8,7 @@
 import { e, fmtDay, fmtTime, relative } from "../ui.js";
 import { formatMoney } from "../repo/invoices.js";
 import { KINDS, getType, typesOfKind, effectiveSettings, optionLabel, typeLabel } from "./registry.js";
+import { showcaseOf } from "./showcase.js";
 import { STAGES, stageIndex, STATUS_LABEL, STATUS_TONE, ACTION_LABEL, isClosed, revisionsLeft } from "./workflow.js";
 
 const href = (vm, path) => `${vm.base}${path}`;
@@ -24,6 +25,7 @@ const G = {
   letter: '<rect x="5" y="3" width="14" height="18"/><path d="M8 7h4M8 12h8M8 15h8M8 18h5"/>', mail: '<rect x="3" y="5" width="18" height="14"/><path d="M3 6l9 7 9-7"/>', custom: '<path d="M12 3l9 5v8l-9 5-9-5V8z"/><path d="M12 12v9M3 8l9 4 9-4"/>',
   audit: '<rect x="4" y="3" width="16" height="18"/><path d="M8 8h8M8 12h8M8 16h4"/><path d="M15 15l3 3"/>', pin: '<path d="M12 21s-6-6-6-11a6 6 0 0 1 12 0c0 5-6 11-6 11z"/><path d="M12 8v4"/>', repeat: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>',
   doc: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>', wrench: '<path d="M14 6a4 4 0 0 0 5 5L9 21l-4-4L15 7"/>', app: '<rect x="3" y="4" width="18" height="16"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/>',
+  portal: '<rect x="3" y="4" width="18" height="16"/><path d="M3 9h18M7 13h5M7 16h3M15 13h2v3h-2z"/>',
   dashboard: '<rect x="3" y="3" width="8" height="10"/><rect x="13" y="3" width="8" height="6"/><rect x="13" y="11" width="8" height="10"/><rect x="3" y="15" width="8" height="6"/>', spark: '<path d="M12 3v6M12 15v6M3 12h6M15 12h6M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>',
   flow: '<rect x="3" y="4" width="6" height="5"/><rect x="15" y="4" width="6" height="5"/><rect x="9" y="15" width="6" height="5"/><path d="M6 9v3h12V9M12 12v3"/>', link: '<path d="M10 14l4-4M8 12l-2 2a3 3 0 0 0 4 4l2-2M16 12l2-2a3 3 0 0 0-4-4l-2 2"/>',
   calc: '<rect x="5" y="3" width="14" height="18"/><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h2M16 11v6"/>', plus: '<rect x="4" y="4" width="16" height="16"/><path d="M12 8v8M8 12h8"/>',
@@ -65,6 +67,33 @@ ${icon(type.icon, "rq-tile__icon")}<span class="rq-tile__title">${e(type.label)}
 <span class="rq-tile__facts">${facts.map((f) => `<span>${e(f)}</span>`).join("")}</span><span class="rq-tile__go">Request this</span></a></li>`;
 }
 
+/* ------------------------------------------------------------------ the visual showcase (Deliverables and Custom Development) */
+
+/** A block in the 4 x 2 grid: icon, name, one line, and a link to its section further down the same page. */
+function gridBlock(t) {
+  const sc = showcaseOf(t.key);
+  return `<li><a class="sc-block" href="#svc-${e(t.key)}">${icon(t.icon, "sc-block__icon")}<span class="sc-block__t">${e(t.label)}</span><span class="sc-block__d">${e((sc && sc.lead) || t.summary)}</span><span class="sc-block__go" aria-hidden="true">See it ↓</span></a></li>`;
+}
+
+/** What the form offers, read from the registry: each choice question as "Question: option, option". */
+function optionsOf(t) {
+  return t.fields.filter((f) => (f.type === "select" || f.type === "checks") && f.options.length > 1).map((f) => `<li><strong>${e(f.label.replace(/\?$/, ""))}:</strong> ${e(f.options.filter((o) => o[0] !== "").map((o) => o[1]).join(", "))}</li>`);
+}
+
+/** One section per service: the picture, a heading, a sentence, what is on offer, what is included and one clear request action. */
+function showcaseSection(vm, t, cfg, n, canRequest) {
+  const sc = showcaseOf(t.key) || {};
+  const facts = [...t.includes, t.proofs ? `${plural(cfg.revisionsIncluded, "revision round")} included` : "", priceLine(cfg), cfg.turnaroundNote].filter(Boolean);
+  const options = t.kind === "deliverable" ? optionsOf(t) : []; // development questions (budget, timeline) are not variations of the service
+  const concept = `<figure class="sc-fig"><img class="sc-fig__img" src="/assets/img/portal/${e(sc.art || "other")}.svg" width="640" height="400" alt="${e(sc.alt || t.label)}" loading="lazy" decoding="async"><figcaption class="sc-fig__cap"><span class="sc-tag">Concept</span> An illustration of the idea, not a client project.</figcaption></figure>`;
+  const real = sc.example ? `<figure class="sc-fig"><a class="sc-fig__link" href="${e(sc.example.href)}" target="_blank" rel="noopener noreferrer"><img class="sc-fig__img" src="${e(sc.example.img)}" width="${sc.example.w}" height="${sc.example.h}" alt="${e(sc.example.alt)}" loading="lazy" decoding="async"></a><figcaption class="sc-fig__cap"><span class="sc-tag sc-tag--real">Real example</span> <a class="text-link" href="${e(sc.example.href)}" target="_blank" rel="noopener noreferrer">${e(sc.example.label.replace(/^Real example: /, ""))}<span class="visually-hidden"> (opens in a new tab)</span></a></figcaption></figure>` : "";
+  const uses = sc.uses && sc.uses.length ? `<h3 class="sc-h">Typical uses</h3><ul class="sc-list">${sc.uses.map((u) => `<li>${e(u)}</li>`).join("")}</ul>` : "";
+  const cta = canRequest === false ? `<p class="muted">Ask an owner of your organization to make a request.</p>` : `<a class="btn btn--primary sc-cta" href="${e(href(vm, `/requests/new?type=${encodeURIComponent(t.key)}`))}">Request this service<span class="visually-hidden">: ${e(t.label)}</span></a>`;
+  return `<section class="sc-sec" id="svc-${e(t.key)}" aria-labelledby="svc-${e(t.key)}-h"><div class="sc-media">${concept}${real}</div>
+<div class="sc-text"><p class="sc-n" aria-hidden="true">${String(n).padStart(2, "0")}</p><h2 class="sc-title" id="svc-${e(t.key)}-h">${e(t.label)}</h2><p class="sc-lead">${e(sc.lead || t.summary)}</p>${uses}${options.length ? `<h3 class="sc-h">Choose</h3><ul class="sc-list">${options.join("")}</ul>` : ""}${facts.length ? `<h3 class="sc-h">Included</h3><ul class="sc-list">${facts.map((f) => `<li>${e(f)}</li>`).join("")}</ul>` : ""}
+<p class="sc-act">${cta} <a class="text-link" href="#sc-top">Back to all services</a></p></div></section>`;
+}
+
 /* ------------------------------------------------------------------ section pages (Deliverables, SEO, Custom Development) */
 
 /**
@@ -77,13 +106,15 @@ export function sectionPage(vm, kind, d) {
   const reasons = Object.fromEntries((d.actions || []).map((a) => [a.id, a.reason]));
   const needs = open.filter((r) => reasons[r.id]);
   const types = typesOfKind(kind).map((t) => ({ t, cfg: { ...effectiveSettings(t, d.settings && d.settings.get(t.key)), } })).filter((x) => x.cfg.enabled);
+  const showcase = kind === "deliverable" || kind === "development";
   const status = open.length ? `<span class="status status--active">${plural(open.length, "request")} in progress</span>` : `<span class="status status--idle">Nothing in progress</span>`;
   return `<header class="page-head page-head--compact">${crumbs(vm, [[K.label]])}<h1 class="h1 h1--section">${e(K.label)}</h1><p class="lead">${e(K.blurb)}</p><p class="rq-state">${status}</p></header>
 ${needs.length ? `<section class="rq-block rq-block--action" aria-labelledby="rq-need"><h2 class="h3" id="rq-need">Needs your action</h2>${rowsOf(vm, needs, reasons)}</section>` : ""}
 <section class="rq-block" aria-labelledby="rq-active"><h2 class="h3" id="rq-active">Active</h2>${open.length ? rowsOf(vm, open, reasons) : `<p class="muted">No ${e(K.noun)} requests are in progress. Choose one below to start.</p>`}</section>
 ${d.extra || ""}
 <section class="rq-block" aria-labelledby="rq-avail"><h2 class="h3" id="rq-avail">Available to request</h2>${d.canRequest === false ? `<p class="muted">Ask an owner of your organization to make a request.</p>` : ""}
-<ul class="rq-tiles">${types.map((x) => tile(vm, x.t, x.cfg)).join("")}</ul><p class="muted small rq-fine">${e(SUBMISSION_NOTICE)}</p></section>
+${showcase ? `<ul class="sc-grid" id="sc-top">${types.map((x) => gridBlock(x.t)).join("")}</ul><p class="muted small rq-fine">${e(SUBMISSION_NOTICE)}</p>` : `<ul class="rq-tiles">${types.map((x) => tile(vm, x.t, x.cfg)).join("")}</ul><p class="muted small rq-fine">${e(SUBMISSION_NOTICE)}</p>`}</section>
+${showcase ? `<div class="sc-showcase" aria-label="${e(K.label)} in detail">${types.map((x, i) => showcaseSection(vm, x.t, x.cfg, i + 1, d.canRequest)).join("")}</div>` : ""}
 ${closed.length ? `<section class="rq-block" aria-labelledby="rq-done"><h2 class="h3" id="rq-done">Completed and closed</h2>${rowsOf(vm, closed)}</section>` : ""}`;
 }
 
@@ -230,17 +261,23 @@ function needBlock(vm, summary) {
   return `<section class="hm-need" aria-labelledby="hm-need-h"><h2 class="h3" id="hm-need-h">Needs your action <span class="rq-count">${summary.actionCount}</span></h2><ul class="rq-rows">${rows}</ul><p class="hm-need__all"><a class="text-link" href="${e(href(vm, "/requests"))}">All requests${summary.open ? ` (${summary.open} open)` : ""}</a></p></section>`;
 }
 
-/** Business Profile as a compact, secondary strip: how far along it is and one action. */
+/**
+ * Business Profile as a black band under the greeting: prominent while answers are missing (the number, what is left, a filled button), a single quiet line once it is complete.
+ * Words carry every state; the bar is decoration for the number.
+ */
 function profileStrip(vm, d) {
   const s = d.profile && d.profile.status, n = d.profile && d.profile.next;
   const label = !n ? "Open Business Profile" : n.state === "start" ? "Start your profile" : n.state === "continue" ? "Continue your profile" : n.state === "complete" ? "Review your profile" : "Open Business Profile";
   const to = n && (n.state === "start" || n.state === "continue") && n.path ? n.path : "/profile";
   const ready = s && s.state === "ready" && Number.isInteger(s.percent) && s.percent >= 0 && s.percent <= 100;
   const left = ready && Number.isInteger(s.requiredRemaining) ? s.requiredRemaining : 0;
-  const progress = ready
-    ? `<p class="hm-profile__pct"><strong>${s.percent}% complete</strong>${left > 0 ? ` · ${plural(left, "required answer")} left` : ""}</p><progress class="meter" max="100" value="${s.percent}" aria-label="Business Profile ${s.percent}% complete">${s.percent}%</progress>`
-    : `<p class="hm-profile__pct hm-profile__pct--muted">${s && s.state === "unavailable" ? "Progress unavailable right now" : "Tell us about your business"}</p>`;
-  return `<section class="hm-profile" aria-labelledby="hm-pf-h"><h2 class="hm-profile__t" id="hm-pf-h">Business Profile</h2><div class="hm-profile__bar">${progress}</div><a class="btn btn--small" href="${e(href(vm, to))}">${e(label)}</a></section>`;
+  const complete = ready && s.percent === 100 && left === 0;
+  const lead = ready
+    ? `<p class="hm-profile__num"><span class="hm-profile__n">${s.percent}%</span> <span class="hm-profile__w">complete</span></p>${left > 0 ? `<p class="hm-profile__left">${plural(left, "required answer")} left</p>` : complete ? "" : `<p class="hm-profile__left">Optional answers help us do better work</p>`}`
+    : `<p class="hm-profile__left">${s && s.state === "unavailable" ? "Progress unavailable right now" : "Tell us about your business"}</p>`;
+  const bar = ready ? `<progress class="meter" max="100" value="${s.percent}" aria-label="Business Profile ${s.percent}% complete">${s.percent}%</progress>` : "";
+  return `<section class="hm-profile${complete ? " hm-profile--done" : ""}" aria-labelledby="hm-pf-h"><div class="hm-profile__head"><h2 class="hm-profile__t" id="hm-pf-h">Business Profile</h2>${lead}</div><div class="hm-profile__bar">${bar}</div><a class="btn btn--small hm-profile__btn" href="${e(href(vm, to))}">${e(label)}</a></section>
+`;
 }
 
 /**
@@ -248,8 +285,8 @@ function profileStrip(vm, d) {
  * d: { summary, counts: {kind: open}, needs: {kind: waiting}, brand, website, support: {open, attention[]} | null, profile: {status, next} }
  */
 export function unifiedHome(vm, greeting, d) {
-  return `${greeting}<section class="hm-services" aria-labelledby="hm-svc-h"><h2 class="visually-hidden" id="hm-svc-h">Your services</h2><ul class="hm-grid">${BLOCKS.map((b) => serviceBlock(vm, b, d)).join("")}</ul></section>
-${needBlock(vm, d.summary)}${profileStrip(vm, d)}`;
+  return `${greeting}${profileStrip(vm, d)}<section class="hm-services" aria-labelledby="hm-svc-h"><h2 class="visually-hidden" id="hm-svc-h">Your services</h2><ul class="hm-grid">${BLOCKS.map((b) => serviceBlock(vm, b, d)).join("")}</ul></section>
+${needBlock(vm, d.summary)}`;
 }
 
 /* ------------------------------------------------------------------ one request */
