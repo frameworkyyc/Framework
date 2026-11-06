@@ -136,7 +136,9 @@
       // Turns on the client-facing Website section (Phase 2: the client's websites, set by Framework Admin). STAGING ONLY, never at the top level. Needs migration 0011. Exactly "1" or absent.
       "PORTAL_WEBSITE": "1",
       // Turns on Brand Discovery (assessments, secure guest links, the Branding card). STAGING ONLY, never at the top level. Needs migration 0018 (applied to Staging) and PORTAL_BRANDING. Exactly "1" or absent.
-      "PORTAL_DISCOVERY": "1"
+      "PORTAL_DISCOVERY": "1",
+      // Turns on the unified request system (Deliverables, SEO and Development requests, My Requests, the wide navigation). STAGING ONLY, never at the top level. Needs migration 0020 (applied to Staging) and PORTAL_SERVICES. Exactly "1" or absent.
+      "PORTAL_REQUESTS": "1"
     },
     "d1_databases": [
       {
