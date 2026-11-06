@@ -164,7 +164,7 @@ export function dashboard({ org, profile, members, invitations, branding = null,
   /** A whole-card link in the same style as Business Profile: label and arrow, one big figure, a note and status chips. */
   const linkTile = ({ href, label, big, unit, note, chips }) => h("a", { class: "adm-tile adm-tile--link", href, "data-link": "" },
     h("p", { class: "adm-tile__label" }, label, h("span", { class: "adm-tile__go", "aria-hidden": "true" }, "→")),
-    h("p", { class: "adm-tile__big" }, big, unit ? h("span", { class: "adm-tile__unit", text: unit }) : null),
+    h("p", { class: "adm-tile__big" + (/^\d/.test(String(big)) ? "" : " adm-tile__big--sm") }, big, unit ? h("span", { class: "adm-tile__unit", text: unit }) : null),
     note ? h("p", { class: "adm-tile__note", text: note }) : null,
     h("p", { class: "adm-tile__chips" }, chips.filter(Boolean)),
     h("span", { class: "visually-hidden" }, `Open ${label}`));

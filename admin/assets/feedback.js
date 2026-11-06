@@ -2,7 +2,7 @@
 
 import { sharePanel } from "./feedback-share.js";
 import { feedbackTabs } from "./feedback-tabs.js";
-import { statCard, badge, fold } from "./kit.js";
+import { statCard, badge, fold, card, barList } from "./kit.js";
 import { h, api, ApiError, fmtDate, fmtDateTime, shortRef, clientName, permissionShort, rating5, score, meter10, stateBlock, confirmDialog } from "./ui.js";
 
 const RATING_LABELS = [
@@ -143,6 +143,9 @@ async function renderList(ctx) {
     statCard({ label: "Satisfaction", value: avg("satisfaction").toFixed(1), hint: "average out of 10", meter: avg("satisfaction") / 10 }),
     statCard({ label: "Would recommend", value: avg("recommend").toFixed(1), hint: "average out of 10", meter: avg("recommend") / 10 }),
     statCard({ label: "Needs attention", value: String(low), hint: low ? "low scores or a worse site" : "nothing flagged", tone: low ? "warn" : "ok" })) : null;
+  // How the scores spread: one bar per score that was given, highest first (a quick read of whether the average hides a problem)
+  const spreadRows = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map((n) => ({ label: `${n} out of 10`, count: rows.filter((r) => r.satisfaction === n).length })).filter((x) => x.count);
+  const spread = rows.length >= 3 && spreadRows.length ? card("How satisfied clients are", barList(spreadRows, { max: rows.length }), { id: "fb-spread" }) : null;
   const node = h("div", { class: "adm-page" },
     h("div", { class: "adm-head" },
       h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Feedback"),
@@ -151,6 +154,7 @@ async function renderList(ctx) {
     ),
     feedbackTabs("client"),
     stats,
+    spread,
     fold({ title: "Share the form and send invitations", meta: "Link, copy and invitation email", body: share }),
     data.reviewed_supported ? null : h("p", { class: "adm-banner" }, "Reviewed tracking is off. Apply migrations/0002_add_reviewed_at.sql in the D1 console to enable it."),
     rows.length ? bar : null,

@@ -188,7 +188,7 @@ function clientSection(cl) {
 function activitySection(items) {
   if (!items) return null;
   const body = items.length
-    ? h("ul", { class: "adm-feed" }, items.map((a) => row(a.orgName ? `${a.label}: ${a.orgName}` : a.label, ago(a.at), a.organizationId ? `/admin/clients/${enc(a.organizationId)}` : null)))
+    ? h("ul", { class: "adm-feed rk-timeline" }, items.map((a) => row(a.orgName ? `${a.label}: ${a.orgName}` : a.label, ago(a.at), a.organizationId ? `/admin/clients/${enc(a.organizationId)}` : null)))
     : empty("Nothing has happened yet.");
   return section("adm-act", "Recent activity", body);
 }
