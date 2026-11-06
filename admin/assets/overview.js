@@ -2,7 +2,8 @@
    Everything is live data from the Admin API; each part loads on its own, so one failing part never blanks the page. Server text is never inserted as HTML. */
 
 import { h, api, stateBlock, fmtDate, confirmDialog } from "./ui.js";
-import { responseTable } from "./feedback.js";
+import { responseCards } from "./feedback.js";
+import { navIcon, badge } from "./kit.js";
 
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const money = (cents) => new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format((Number(cents) || 0) / 100);
@@ -27,12 +28,12 @@ const kpi = ({ label, value, unit, note, href, local = false }) =>
     h("span", { class: "adm-kpi__value" }, value, unit ? h("span", { class: "adm-kpi__unit", text: unit }) : null),
     h("span", { class: "adm-kpi__note", text: note || " " }));
 
-const section = (id, title, body, more) =>
-  h("section", { class: "adm-section adm-dash__sec", "aria-labelledby": id },
-    h("div", { class: "adm-section-title" }, h("h2", { id, text: title }), more ? h("a", { class: "adm-link", href: more[0], "data-link": "" }, more[1] + " →") : null),
+const section = (id, title, body, more, plain = false) =>
+  h("section", { class: (plain ? "adm-dash__top " : "rk-card ") + "adm-dash__sec", "aria-labelledby": id },
+    h("div", { class: "rk-card__head" }, h("h2", { class: "rk-card__title", id, text: title }), more ? h("a", { class: "adm-link", href: more[0], "data-link": "" }, more[1] + " →") : null),
     body);
 
-const empty = (text) => h("p", { class: "adm-sub adm-dash__empty", text });
+const empty = (text) => h("p", { class: "rk-quiet" }, navIcon("check"), h("span", { text }));
 
 /** The ranked list of things that need a person. Most urgent first; each item says what and where to go. */
 export function attentionItems({ dash, services, assess, feedback }) {
@@ -85,7 +86,7 @@ function attentionSection(items) {
   const body = items.length
     ? h("ul", { class: "adm-todo" }, items.map((it) => todoRow(it)))
     : h("p", { class: "adm-todo__clear", role: "status" }, "All clear. Nothing needs your attention right now.");
-  return section("adm-attn", "Needs attention", body);
+  return section("adm-attn", "Needs attention", body, null, true);
 }
 
 function kpiGrid({ dash, feedback, requestsCard }) {
@@ -128,13 +129,14 @@ const requestHref = (r) => (r.kind === "branding" ? `/admin/clients/${enc(r.orga
 export function requestsSection(reqs) {
   if (!reqs) return null;
   const parts = [reqs.branding ? plural(reqs.branding, "Branding request") : null, reqs.support ? plural(reqs.support, "support or change request", "support or change requests") : null].filter(Boolean);
-  const count = h("p", { class: "adm-sub adm-req__count", role: "status", text: reqs.total ? `${reqs.total} outstanding${parts.length ? ` · ${parts.join(" · ")}` : ""}` : "Nothing outstanding" });
+  const count = reqs.total ? h("p", { class: "adm-sub adm-req__count", role: "status", text: `${reqs.total} outstanding${parts.length ? ` · ${parts.join(" · ")}` : ""}` }) : null;
   const list = reqs.items.length
     ? h("ul", { class: "adm-feed" }, reqs.items.map((r) => row(`${r.orgName}: ${r.type}`, `${r.statusLabel}${r.note ? ` · ${r.note}` : ""} · ${fmtDate(r.createdAt)}`, requestHref(r))))
     : empty("No client requests need a response.");
   const more = reqs.total > reqs.items.length ? h("p", { class: "adm-sub", text: `Showing the newest ${reqs.items.length} of ${reqs.total}.` }) : null;
-  return h("section", { class: "adm-section adm-dash__sec adm-dash__sec--wide", id: "adm-req-sec", "aria-labelledby": "adm-req" },
-    h("div", { class: "adm-section-title" }, h("h2", { id: "adm-req", text: "Client requests" }), reqs.support ? h("a", { class: "adm-link", href: "/admin/support", "data-link": "" }, "All support requests →") : null),
+  const title = h("h2", { id: "adm-req", text: "Client requests" }); title.className = "rk-card__title";
+  return h("section", { class: "rk-card adm-dash__sec" + (reqs.items.length ? " adm-dash__sec--wide" : ""), id: "adm-req-sec", "aria-labelledby": "adm-req" },
+    h("div", { class: "rk-card__head" }, title, reqs.support ? h("a", { class: "adm-link", href: "/admin/support", "data-link": "" }, "All support requests →") : null),
     count, list, more);
 }
 
@@ -186,7 +188,7 @@ function clientSection(cl) {
 function activitySection(items) {
   if (!items) return null;
   const body = items.length
-    ? h("ul", { class: "adm-feed" }, items.map((a) => row(a.orgName ? `${a.label}: ${a.orgName}` : a.label, ago(a.at), a.organizationId ? `/admin/clients/${enc(a.organizationId)}` : null)))
+    ? h("ul", { class: "adm-feed rk-timeline" }, items.map((a) => row(a.orgName ? `${a.label}: ${a.orgName}` : a.label, ago(a.at), a.organizationId ? `/admin/clients/${enc(a.organizationId)}` : null)))
     : empty("Nothing has happened yet.");
   return section("adm-act", "Recent activity", body);
 }
@@ -196,7 +198,7 @@ export async function render() {
   const d = dash && dash.available ? dash : null;
   const svc = services && services.available ? services : null;
   const recent = feedback && feedback.recent.length
-    ? responseTable(feedback.recent.slice(0, 5), ["client", "date", "satisfaction", "recommend", "testimonial", "view"])
+    ? responseCards(feedback.recent.slice(0, 3))
     : feedback ? stateBlock({ title: "No feedback yet", body: "Responses appear here after a client completes the feedback form." }) : null;
 
   // The outstanding support requests are rows of the Client requests list; the separate Support requests list is only the fallback when that list cannot load.

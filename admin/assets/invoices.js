@@ -4,6 +4,7 @@
    HTML; friendly copy is shown for known codes only. Invoices are archived, never deleted: there is no delete control. */
 
 import { h, api, confirmDialog, errorState, fmtDate } from "./ui.js";
+import { statCard } from "./kit.js";
 import { chip } from "./client-dashboard.js";
 
 const ERROR_TEXT = {
@@ -204,15 +205,17 @@ export async function render(orgId, ctx) {
   function draw() {
     const list = data.invoices;
     const s = data.summary;
-    const chips = [s.drafts ? chip("pending", plural(s.drafts, "draft") + " to publish", "info") : null, s.overdue ? chip("warn", `${s.overdue} past due`, "warn") : null, !s.total ? chip("plain", "No invoices yet") : null];
     root.replaceChildren(...[
       back,
       h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, data.organization.name), h("h1", { class: "adm-title", tabindex: "-1" }, "Invoices"),
-        h("p", { class: "adm-sub" }, "Enter an invoice, attach its PDF and publish it for this client’s owners. Invoices are archived, never deleted."))),
+        h("p", { class: "adm-sub" }, "Enter an invoice, attach its PDF, publish it for this client’s owners. Never deleted, only archived."))),
       caps().writes ? null : h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at invoices, but not change them."),
       caps().writes && !caps().storage ? h("p", { class: "adm-banner" }, "File storage isn’t available on this site, so PDFs can’t be attached yet.") : null,
       live,
-      h("p", { class: "adm-inv__chips" }, chips),
+      s.total ? h("div", { class: "rk-stats", role: "group", "aria-label": "Summary" },
+        statCard({ label: "Invoices", value: String(s.total), hint: "entered for this client" }),
+        statCard({ label: "Drafts", value: String(s.drafts || 0), hint: s.drafts ? "ready to publish" : "none waiting", tone: s.drafts ? "warn" : "" }),
+        statCard({ label: "Past due", value: String(s.overdue || 0), hint: s.overdue ? "needs a follow-up" : "nothing overdue", tone: s.overdue ? "bad" : "ok" })) : null,
       h("details", { class: "adm-acc", id: "inv-new", open: opened.has("inv-new") || !list.length ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add("inv-new"); else opened.delete("inv-new"); } },
         h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title" }, "New invoice")), h("div", { class: "adm-acc__body" }, newForm())),
       h("section", { class: "adm-section", "aria-labelledby": "adm-invlist-h" },

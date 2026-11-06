@@ -70,3 +70,11 @@ Add an entry to `KINDS` in `discovery/catalogue.js` (stages, questions, options 
 - **Branding page:** while an assessment waits, a black card ("Your Brand Discovery is ready", button **Start** or **Continue Brand Discovery**) sits above the nine sections; once sent it becomes a quiet card. The introduction changes with the stage (not started, in progress, sent, published).
 - **Picture questions (four at a time):** progress ("Showing images 5 to 8 of 16 · Reviewed 8 of 16 · 8 left"), "None of these, finish" and "I've seen them all" on the last set, then a plain **That's every image** panel with **Continue to next section** and **Review images again**. Choices stay ticked throughout. Without JavaScript every card is shown.
 - **Brand Imagery:** four options appended (never reordered): Earthy, Woody, Holistic, Ethereal & mystical, with Unsplash photos (`assets/img/discovery-imagery/`) and generated sketches as the fallback.
+
+## Admin review page (November 2026)
+
+`/admin/discovery/<client>/<assessment>` is now a dashboard first and a record second: overview cards (status, sections answered, questions answered, files), the strongest preferences, personality words and tone of voice, then "Worth a conversation" (conflicting preferences and things to clarify, the first few shown with the rest behind "Show more"), then "What they chose" as nine collapsible sections with the actual pictures (logo, direction, imagery and texture photos, colour swatches, lettering samples, layout and icon sketches). Likes and "not for me" are separate groups with a tick or cross. Secure links, review, reopen, archive, delete and the plain-text brief sit in a closed "Manage this assessment" section at the bottom.
+
+- Nothing about the answers or scoring changed: the brief only gained a `thumb` description on each choice (`discovery/thumbs.js`, shared with the client pages), so the page and the client saw the same picture.
+- Reusable pieces live in `admin/assets/kit.js` (stat card, badge, card, fold, bar list, choice tiles, attention list); a future assessment type passes its own data to them.
+- No inline styles and no markup insertion: bars are `<progress>`, swatches are SVG `fill` attributes, sketches are shown as `<img>`.

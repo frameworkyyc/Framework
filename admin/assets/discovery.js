@@ -1,7 +1,9 @@
 /* Framework Admin — Discovery assessments: /admin/discovery (assign and track), /admin/discovery/content (edit the questions, options and reference pictures),
    /admin/discovery/<client>/<assessment> (links, what the recipient answered, files, and the creative brief). Server text is never inserted as HTML. A secret link is
    shown once, when it is made, and never again (only its hash is stored). */
-import { h, api, fmtDateTime, errorState, confirmDialog } from "./ui.js";
+import { h, api, fmtDate, fmtDateTime, errorState, confirmDialog } from "./ui.js";
+import { badge, statCard, emptyState, card, fold, foldControls, barList, choiceGroups, attentionList } from "./kit.js";
+const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 
 const STATUS = { not_started: ["Not started", "pending"], in_progress: ["In progress", "warn"], submitted: ["Submitted", "ok"], reviewed: ["Reviewed", "ok"] };
 const statusChip = (s) => h("span", { class: "adm-chip adm-chip--" + (STATUS[s] || ["", "pending"])[1], text: (STATUS[s] || [s])[0] });
@@ -17,10 +19,10 @@ const errorText = (err) => ERROR[err && err.code] || "That didn’t work and not
 const orgHref = (org) => "/admin/clients/" + encodeURIComponent(org);
 const detailHref = (org, id) => `/admin/discovery/${encodeURIComponent(org)}/${encodeURIComponent(id)}`;
 
-function shell(root, { title, sub, back }) {
+function shell(root, { title, sub, back, actions }) {
   const live = h("p", { class: "adm-msg", role: "status", tabindex: "-1", hidden: true });
   const say = (text, tone = "info") => { live.textContent = text; live.className = "adm-msg is-" + tone; live.setAttribute("role", tone === "error" ? "alert" : "status"); live.hidden = !text; if (text && tone === "error") live.focus(); };
-  return { say, head: [back || null, h("div", { class: "adm-idhead" }, h("div", { class: "adm-idhead__text" }, h("span", { class: "eyebrow" }, "Discovery"), h("h1", { class: "adm-title", tabindex: "-1" }, title), sub ? h("p", { class: "adm-sub" }, sub) : null)), live] };
+  return { say, head: [back || null, h("div", { class: "adm-idhead" }, h("div", { class: "adm-idhead__text" }, h("span", { class: "eyebrow" }, "Discovery"), h("h1", { class: "adm-title", tabindex: "-1" }, title), sub ? h("p", { class: "adm-sub" }, sub) : null), actions ? h("div", { class: "adm-idhead__actions" }, actions) : null), live] };
 }
 
 export async function render(ctx) {
@@ -39,7 +41,7 @@ async function listPage(ctx) {
   try { [data, clients, ret] = await Promise.all([api("/discovery"), api("/clients"), api("/discovery/retention").catch(() => null)]); } catch (err) { return { title: "Discovery", node: h("div", { class: "adm-page" }, errorState(err, ctx.retry)) }; }
   const root = h("div", { class: "adm-page adm-dsc" });
   const writes = Boolean(data.capabilities && data.capabilities.writes);
-  const s = shell(root, { title: "Brand Discovery", sub: h("span", null, "Visual assessments that help a client or prospect show what they like. Recipients need no account: send them a secure link, or they can complete it in their Client Portal Branding area. Answers never change a brand kit. ", h("a", { class: "adm-link", href: "/admin/discovery/content", "data-link": "" }, "Edit the questions and pictures")) });
+  const s = shell(root, { title: "Brand Discovery", sub: "Visual assessments a client or prospect fills in from a secure link or in their portal. Answers never change a brand kit.", actions: h("a", { class: "btn btn--secondary", href: "/admin/discovery/content", "data-link": "" }, "Edit questions and pictures") });
   const org = h("select", { id: "dsc-org", class: "input" }, h("option", { value: "" }, "Choose a client"), clients.clients.filter((c) => c.status === "active").map((c) => h("option", { value: c.id, selected: new URLSearchParams(location.search).get("org") === c.id ? true : null, text: c.name })));
   const kind = h("select", { id: "dsc-kind", class: "input" }, (data.kinds || []).map((k) => h("option", { value: k.kind, text: k.label })));
   const title = h("input", { id: "dsc-title", class: "input", type: "text", maxlength: "120", value: "Brand Discovery", autocomplete: "off" });
@@ -49,7 +51,6 @@ async function listPage(ctx) {
     if (!org.value) { s.say("Choose a client first.", "error"); return; }
     try { const r = await api("/clients/" + encodeURIComponent(org.value) + "/discovery", { method: "POST", body: { kind: kind.value, title: title.value, recipient_name: who.value || undefined } }); ctx.navigate ? ctx.navigate(detailHref(org.value, r.id)) : (location.href = detailHref(org.value, r.id)); } catch (err) { s.say(errorText(err), "error"); }
   } },
-    h("h2", { class: "adm-h2" }, "Assign a new assessment"),
     h("div", { class: "adm-dsc__fields" },
       h("div", { class: "adm-field" }, h("label", { for: "dsc-org", text: "Client" }), org), h("div", { class: "adm-field" }, h("label", { for: "dsc-kind", text: "Type" }), kind),
       h("div", { class: "adm-field" }, h("label", { for: "dsc-title", text: "Title" }), title), h("div", { class: "adm-field" }, h("label", { for: "dsc-who", text: "Recipient" }), who)),
@@ -59,17 +60,25 @@ async function listPage(ctx) {
   const list = h("div", { class: "adm-dsc__list" });
   function draw() {
     const rows = data.assessments.filter((a) => !filter.value || a.status === filter.value);
-    list.replaceChildren(rows.length ? h("table", { class: "adm-table" }, h("thead", null, h("tr", null, ["Client", "Assessment", "Status", "Answered", "Files", "Links", "Created"].map((t) => h("th", { scope: "col", text: t })))),
-      h("tbody", null, rows.map((a) => h("tr", null,
-        h("td", null, h("a", { class: "adm-link", href: orgHref(a.organizationId), "data-link": "" }, a.organizationName)),
-        h("td", null, h("a", { class: "adm-link", href: detailHref(a.organizationId, a.id), "data-link": "" }, a.title), a.recipientName ? h("div", { class: "adm-muted", text: a.recipientName }) : null),
-        h("td", null, statusChip(a.status)), h("td", { text: String(a.answered) }), h("td", { text: String(a.uploads) }), h("td", { text: String(a.activeLinks) }), h("td", { text: fmtDateTime(a.createdAt) }))))) : h("p", { class: "adm-sub", text: data.assessments.length ? "Nothing with that status." : "No assessments yet. Assign one above." }));
+    list.replaceChildren(rows.length ? h("ul", { class: "adm-reqlist", "aria-label": "Assessments" }, rows.map((a) => h("li", null, h("a", { class: "adm-reqrow", href: detailHref(a.organizationId, a.id), "data-link": "" },
+      h("span", { class: "adm-reqrow__main" }, h("span", { class: "adm-reqrow__client", text: a.organizationName }), h("span", { class: "adm-reqrow__title", text: a.title }),
+        h("span", { class: "adm-sub", text: [a.recipientName ? "for " + a.recipientName : "", `${a.answered} answered`, a.uploads ? plural(a.uploads, "file") : "", "created " + fmtDate(a.createdAt)].filter(Boolean).join(" · ") })),
+      h("span", { class: "adm-reqrow__chips" }, statusChip(a.status), a.activeLinks ? badge(plural(a.activeLinks, "active link"), "pending") : null),
+      h("span", { class: "adm-reqrow__go", "aria-hidden": "true", text: "→" }))))) : emptyState({ title: data.assessments.length ? "Nothing with that status" : "No assessments yet", body: data.assessments.length ? null : "Assign the first one with “Assign a new assessment” below." }));
   }
   draw();
+  const count = (st) => data.assessments.filter((a) => a.status === st).length;
+  const stats = data.assessments.length ? h("div", { class: "rk-stats" },
+    statCard({ label: "Assigned", value: String(data.assessments.length), hint: "across all clients" }),
+    statCard({ label: "In progress", value: String(count("in_progress") + count("not_started")), hint: count("not_started") ? `${count("not_started")} not started` : "being filled in", tone: count("in_progress") ? "warn" : "" }),
+    statCard({ label: "Ready to review", value: String(count("submitted")), hint: "submitted by the client", tone: count("submitted") ? "ok" : "" }),
+    statCard({ label: "Reviewed", value: String(count("reviewed")), hint: "done" })) : null;
   root.replaceChildren(...[...s.head, !data.available ? h("p", { class: "adm-banner" }, "Discovery needs a database update that hasn’t been applied here yet. Nothing is lost: it will appear here once it is.") : null,
     !data.capabilities.enabled ? h("p", { class: "adm-banner" }, "Discovery is switched off for clients on this site (PORTAL_DISCOVERY). You can prepare assessments, but links and the Branding card stay inactive until it is on.") : null,
     !writes ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look, but not change.") : null,
-    data.available ? form : null, h("div", { class: "adm-dsc__bar" }, h("h2", { class: "adm-h2" }, "Assessments"), filter), list, retentionPanel(ret, clients, writes, s)].filter(Boolean));
+    stats, h("div", { class: "adm-dsc__bar" }, h("h2", { class: "adm-h2" }, "Assessments"), filter), list,
+    data.available ? fold({ title: "Assign a new assessment", meta: "Choose a client, then share a secure link", open: !data.assessments.length || Boolean(new URLSearchParams(location.search).get("org")), body: form }) : null,
+    retentionPanel(ret, clients, writes, s)].filter(Boolean));
   return { title: "Discovery", node: root };
 }
 
@@ -104,7 +113,7 @@ function retentionPanel(ret, clients, writes, s) {
       d.available ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary", type: "button", disabled: writes ? null : true, onclick: check }, "Check what would be deleted")) : null].filter(Boolean));
   }
   redraw();
-  return h("section", { class: "adm-dsc__retention", "aria-labelledby": "ret-h" }, h("h2", { class: "adm-h2", id: "ret-h" }, "Retention and deletion"), body);
+  return fold({ title: "Retention and deletion", meta: "How long answers and files are kept", body });
 }
 
 /* ------------------------------------------------------------------ one assessment */
@@ -135,29 +144,51 @@ async function detailPage(orgId, id, ctx) {
       data.links.length ? h("ul", { class: "adm-dsc__links" }, data.links.map((l) => h("li", null, h("span", null, h("strong", { text: l.label || "Link" }), ` · created ${fmtDateTime(l.createdAt)} · `, h("span", { class: "adm-chip adm-chip--" + (l.state === "active" ? "ok" : "pending"), text: l.state === "active" ? "Active" : l.state === "expired" ? "Expired" : "Revoked" }), l.state === "active" ? ` · expires ${fmtDateTime(l.expiresAt)}` : "", l.useCount ? ` · opened ${l.useCount} time${l.useCount === 1 ? "" : "s"}` : ""),
         l.state === "active" && writes() ? h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: async () => { if (await confirmDialog({ title: "Revoke this link?", body: "Anyone using it will no longer be able to open the assessment.", confirmLabel: "Revoke link" })) act(`/links/${encodeURIComponent(l.id)}/revoke`, {}, "Link revoked."); } }, "Revoke") : null))) : h("p", { class: "adm-muted", text: "No links yet." }));
   }
-  function briefPanel() {
+  const SECTION_STATUS = { answered: ["Answered", "ok"], partial: ["Partly answered", "warn"], not_sure: ["Not sure", "pending"], unanswered: ["Not answered", ""], not_included: ["Not included", ""] };
+  function overview() {
+    const b = data.brief, st = a().status, when = a().reviewedAt ? `Reviewed ${fmtDateTime(a().reviewedAt)}` : a().submittedAt ? `Submitted ${fmtDateTime(a().submittedAt)}` : a().startedAt ? `Started ${fmtDateTime(a().startedAt)}` : `Created ${fmtDateTime(a().createdAt)}`;
+    const cards = h("div", { class: "rk-stats" },
+      statCard({ label: "Status", value: (STATUS[st] || [st])[0], hint: when, tone: st === "submitted" ? "ok" : st === "in_progress" ? "warn" : "" }),
+      statCard({ label: "Branding sections", value: `${b.summary.sectionsAnswered} of ${b.summary.sectionsTotal}`, hint: "answered", meter: b.summary.sectionsTotal ? b.summary.sectionsAnswered / b.summary.sectionsTotal : 0 }),
+      statCard({ label: "Questions answered", value: String(data.answered), hint: a().recipientName ? `by ${a().recipientName}` : null }),
+      statCard({ label: "Inspiration files", value: String(data.uploads.length), hint: data.uploads.length ? "from the client" : "none added" }));
+    const tags = (list, tone) => list.length ? h("div", { class: "rk-tags" }, list.map((w) => badge(w, tone))) : h("p", { class: "adm-muted", text: "Not chosen." });
+    const direction = card("Strongest preferences", b.themes.length ? barList(b.themes.map((t) => ({ label: t.label, count: t.count }))) : h("p", { class: "adm-muted", text: "No preferences chosen yet." }), { id: "rk-dir" });
+    const voice = card("Personality and tone", h("div", null, h("h3", { class: "rk-sub", text: "Brand personality" }), tags(b.summary.personality, "ok"), h("h3", { class: "rk-sub", text: "Tone of voice" }), tags(b.summary.tone, "pending")), { id: "rk-voice" });
+    return [cards, h("div", { class: "rk-two" }, direction, voice), a().overallComment ? h("blockquote", { class: "rk-quote" }, h("span", { class: "rk-quote__label", text: "In their words" }), a().overallComment) : null];
+  }
+  function attention() {
     const b = data.brief;
-    const sec = (x) => h("details", { class: "adm-dsc__sec", open: x.status !== "unanswered" && x.status !== "not_included" ? true : null },
-      h("summary", null, h("span", { class: "adm-dsc__no", text: x.number }), h("strong", { text: x.label }), " ", h("span", { class: "adm-chip adm-chip--" + (x.status === "answered" ? "ok" : x.status === "partial" ? "warn" : "pending"), text: { answered: "Answered", partial: "Partly answered", not_sure: "Not sure", unanswered: "Not answered", not_included: "Not included" }[x.status] })),
-      x.items.map((it) => h("div", { class: "adm-dsc__item" }, h("p", { class: "adm-req__label", text: it.prompt }),
-        it.state === "not_sure" ? h("p", { text: "I’m not sure" }) : it.state === "surprise" ? h("p", { text: "Surprise me" + (it.dislikes.length ? " (but not: " + it.dislikes.map((d) => d.label).join(", ") + ")" : "") }) : null,
-        it.likes.length ? h("p", null, h("strong", { text: "Likes: " }), it.likes.map((l) => l.label).join(", ")) : null,
-        it.dislikes.length && it.state !== "surprise" ? h("p", null, h("strong", { text: "Not for me: " }), it.dislikes.map((l) => l.label).join(", ")) : null,
-        it.comment ? h("p", { class: "adm-dsc__quote", text: "“" + it.comment + "”" }) : null,
-        it.state === "none" ? h("p", { class: "adm-muted", text: "No answer." }) : null)));
-    return h("section", { class: "adm-dsc__panel", "aria-labelledby": "db-h" }, h("h2", { class: "adm-h2", id: "db-h" }, "Creative brief"),
-      h("p", { class: "adm-sub" }, `${b.summary.sectionsAnswered} of ${b.summary.sectionsTotal} Branding sections answered. This is a summary of preferences, kept separate from the approved brand: it never changes a brand kit, an asset or a requirement.`),
-      b.themes.length ? h("p", null, h("strong", { text: "At a glance: " }), b.themes.map((t) => `${t.label} (${t.count})`).join(", ")) : null,
-      b.summary.personality.length ? h("p", null, h("strong", { text: "Personality words: " }), b.summary.personality.join(", ")) : null,
-      b.summary.tone.length ? h("p", null, h("strong", { text: "Tone of voice: " }), b.summary.tone.join(", ")) : null,
-      a().overallComment ? h("p", { class: "adm-dsc__quote", text: "Overall: “" + a().overallComment + "”" }) : null,
-      h("h3", { class: "adm-h3" }, "Tensions and contradictions"),
-      b.conflicts.length ? h("ul", { class: "adm-dsc__flags" }, b.conflicts.map((c) => h("li", null, h("span", { class: "adm-chip adm-chip--" + (c.severity === "strong" ? "warn" : "pending"), text: c.type === "contradiction" ? "Contradiction" : c.severity === "strong" ? "Strong tension" : "Tension" }), " ", h("strong", { text: c.title + ". " }), c.detail, " ", h("span", { class: "adm-muted", text: "(" + c.sections.join(", ") + ")" })))) : h("p", { class: "adm-muted", text: "None found." }),
-      h("h3", { class: "adm-h3" }, "To clarify with the client"),
-      b.clarify.length ? h("ul", { class: "adm-dsc__flags" }, b.clarify.map((c) => h("li", null, h("strong", { text: c.section + ": " }), c.reason))) : h("p", { class: "adm-muted", text: "Nothing outstanding." }),
-      h("h3", { class: "adm-h3" }, "By Branding section"), b.sections.map(sec),
-      h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary", type: "button", onclick: async (ev) => { try { await navigator.clipboard.writeText(data.markdown); ev.target.textContent = "Brief copied"; } catch { ev.target.textContent = "Copy not available: select the text below"; } } }, "Copy brief as text")),
-      h("details", { class: "adm-dsc__raw" }, h("summary", { text: "Plain-text version" }), h("pre", { class: "adm-dsc__pre", text: data.markdown })));
+    const conflicts = b.conflicts.map((c) => ({ badge: c.type === "contradiction" ? "Contradiction" : c.severity === "strong" ? "Strong tension" : "Tension", tone: c.severity === "strong" ? "warn" : "pending", title: c.title, detail: c.detail, where: c.sections.join(", ") }));
+    const clarify = b.clarify.map((c) => ({ badge: c.section, tone: "", title: c.reason }));
+    return card("Worth a conversation", h("div", { class: "rk-two rk-two--flush" },
+      h("div", null, h("h3", { class: "rk-sub" }, "Conflicting preferences ", badge(String(conflicts.length), conflicts.length ? "warn" : "")), attentionList(conflicts, { limit: 3, empty: "None found." })),
+      h("div", null, h("h3", { class: "rk-sub" }, "To clarify with the client ", badge(String(clarify.length), clarify.length ? "pending" : "")), attentionList(clarify, { limit: 4, empty: "Nothing outstanding." }))), { id: "rk-attn", wide: true });
+  }
+  function selections() {
+    const b = data.brief;
+    const wrap = h("div", { class: "rk-folds" });
+    const itemView = (it) => {
+      const state = it.state === "not_sure" ? badge("Not sure", "pending") : it.state === "surprise" ? badge("Surprise me", "pending") : null;
+      const groups = it.state === "surprise" ? choiceGroups({ dislikes: it.dislikes }) : choiceGroups({ likes: it.likes, dislikes: it.dislikes });
+      return h("div", { class: "rk-item" }, h("h3", { class: "rk-item__q" }, it.prompt, state ? [" ", state] : null), ...groups,
+        it.comment ? h("blockquote", { class: "rk-note", text: it.comment }) : null,
+        it.state === "none" ? h("p", { class: "adm-muted", text: "No answer." }) : null);
+    };
+    b.sections.forEach((x) => {
+      const [t, tone] = SECTION_STATUS[x.status] || ["", ""];
+      const likes = x.likes.length, dislikes = x.dislikes.length;
+      wrap.append(fold({ number: x.number, title: x.label, open: false, meta: [likes ? `${likes} liked` : "", dislikes ? `${dislikes} not for me` : ""].filter(Boolean).join(" · "), badges: badge(t, tone), body: x.items.length ? x.items.map(itemView) : h("p", { class: "adm-muted", text: "Not part of this assessment." }) }));
+    });
+    return h("section", { class: "rk-selections", "aria-labelledby": "rk-sel" }, h("div", { class: "rk-card__head" }, h("h2", { class: "rk-card__title", id: "rk-sel", text: "What they chose" }), foldControls(wrap)),
+      h("p", { class: "adm-sub", text: "Pictures are the ones the client saw. A tick is a like; a cross is “not for me”. Open a section for the detail." }), wrap);
+  }
+  function management() {
+    return h("details", { class: "rk-manage" }, h("summary", { class: "rk-manage__sum" }, h("span", { class: "rk-card__title", text: "Manage this assessment" }), h("span", { class: "rk-fold__meta", text: "Secure links, review, reopen, archive, delete" })),
+      h("div", { class: "rk-manage__body" }, linksPanel(), actionsPanel(),
+        h("section", { class: "adm-dsc__panel" }, h("h2", { class: "adm-h2" }, "Plain-text version"), h("p", { class: "adm-sub" }, "The same brief as text, to paste into a document or message. It is a summary of preferences and never changes a brand kit, an asset or a requirement."),
+          h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary", type: "button", onclick: async (ev) => { try { await navigator.clipboard.writeText(data.markdown); ev.target.textContent = "Brief copied"; } catch { ev.target.textContent = "Copy not available: select the text below"; } } }, "Copy brief as text")),
+          h("details", { class: "adm-dsc__raw" }, h("summary", { text: "Show the text" }), h("pre", { class: "adm-dsc__pre", text: data.markdown })))));
   }
   function filesPanel() {
     return h("section", { class: "adm-dsc__panel", "aria-labelledby": "df-h" }, h("h2", { class: "adm-h2", id: "df-h" }, "Inspiration files"),
@@ -180,10 +211,12 @@ async function detailPage(orgId, id, ctx) {
         h("button", { class: "btn btn--secondary adm-actions__danger", type: "button", onclick: async () => { if (await confirmDialog({ title: "Delete this assessment permanently?", body: "Its answers, links and files are deleted for good, including the backup copies of the files. This is for a deletion request or the end of the retention period, and it cannot be undone.", confirmLabel: "Delete permanently" })) { try { await api(base + "/delete", { method: "POST", body: { confirm: "DELETE" } }); location.assign("/admin/discovery"); } catch (err) { s.say(errorText(err), "error"); } } } }, "Delete permanently")));
   }
   function draw() {
+    const open = management_open();
+    const mg = management(); if (open) mg.open = true;
     root.replaceChildren(...[...s.head, !writes() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look, but not change.") : null,
-      h("p", { class: "adm-sub" }, `Created ${fmtDateTime(a().createdAt)}${a().startedAt ? ` · started ${fmtDateTime(a().startedAt)}` : ""}${a().submittedAt ? ` · submitted ${fmtDateTime(a().submittedAt)}` : ""}${a().reviewedAt ? ` · reviewed ${fmtDateTime(a().reviewedAt)} by ${a().reviewedBy}` : ""}. ${data.answered} question${data.answered === 1 ? "" : "s"} answered.`),
-      linksPanel(), briefPanel(), filesPanel(), actionsPanel()].filter(Boolean));
+      ...overview(), attention(), selections(), filesPanel(), mg].filter(Boolean));
   }
+  const management_open = () => Boolean(root.querySelector("details.rk-manage[open]")) || Boolean(fresh);
   draw();
   return { title: data.assessment.title, node: root };
 }
@@ -195,7 +228,7 @@ async function contentPage(ctx) {
   const load = () => api("/discovery/content?kind=brand");
   try { data = await load(); } catch (err) { return { title: "Discovery content", node: h("div", { class: "adm-page" }, errorState(err, ctx.retry)) }; }
   const root = h("div", { class: "adm-page adm-dsc" });
-  const s = shell(root, { title: "Questions and pictures", sub: "Reword, hide, reorder and add options, and attach a real picture to any option. Changes apply to every assessment, including ones in progress. Nothing you change here alters answers already given.", back: h("a", { class: "adm-back", href: "/admin/discovery", "data-link": "" }, "← All assessments") });
+  const s = shell(root, { title: "Questions and pictures", sub: "Reword, hide, reorder and add options, and attach a real picture to any. Changes apply to every assessment, including ones in progress, and never alter answers already given.", back: h("a", { class: "adm-back", href: "/admin/discovery", "data-link": "" }, "← All assessments") });
   const writes = () => Boolean(data.capabilities && data.capabilities.writes);
   let busy = false;
   async function act(body, ok) {
@@ -251,7 +284,7 @@ async function contentPage(ctx) {
   function draw() {
     const open = new Set([...root.querySelectorAll("details.adm-dsc__q[open]")].map((d) => d.id));
     root.replaceChildren(...[...s.head, !data.available ? h("p", { class: "adm-banner" }, "Discovery needs a database update that hasn’t been applied here yet.") : null, !writes() ? h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look, but not change.") : null,
-      h("p", { class: "adm-sub" }, "Built-in options draw a sketch. Text cards (words, fonts, taglines) have no picture to attach."), ...data.questions.map((q) => { const d = question(q); if (open.has(d.id)) d.open = true; return d; })].filter(Boolean));
+      h("p", { class: "adm-sub" }, "Built-in options draw a sketch. Text cards (words, fonts, taglines) have no picture to attach."), h("div", { class: "adm-dsc__qs" }, ...data.questions.map((q) => { const d = question(q); if (open.has(d.id)) d.open = true; return d; }))].filter(Boolean));
   }
   draw();
   return { title: "Discovery content", node: root };
