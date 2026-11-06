@@ -7,7 +7,6 @@
   var LABEL = { "general-contractor": "General Contracting", "fence-deck": "Fence & Decks", renovations: "Renovations / Restoration", landscaping: "Landscaping" };
   var VIBE = { rugged: "Rugged", modern: "Modern", minimal: "Minimal", friendly: "Friendly" };
   var COLOURS = [["Ember", "#C2410C"], ["Amber", "#F2B705"], ["Forest", "#2F6B3F"], ["Teal", "#0F766E"], ["Sky", "#1D6FB8"], ["Navy", "#1E3A8A"], ["Berry", "#9D174D"], ["Plum", "#6D28D9"], ["Clay", "#8C6A43"], ["Slate", "#475569"], ["Black", "#111111"]];
-  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var state = { d: "", v: "", c: "", n: "" };
   var flow = $("#flow"), stage = $("#stage"), frame = $("#frame"), device = $("#device"), view = $("#view"), cover = $("#cover"), urlEl = $("#url");
   var open1 = $("#open"), open2 = $("#open2"), openbar = $("#openbar");
