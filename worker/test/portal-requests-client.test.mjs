@@ -376,3 +376,25 @@ test("Business Profile band: prominent while answers are missing, one quiet line
   const broken = band({ state: "unavailable" }, null);
   assert.match(broken, /Progress unavailable right now/); assert.ok(!/<progress/.test(broken), "no bar and no invented number when progress cannot be read");
 });
+
+
+test("Production configuration: requests on, Client Services OFF. Five blocks link, Support says it is not available yet, no Support or Invoices entry, and the whole request workflow works", async () => {
+  const { w, ann, mia, text, create, post, d, userOf } = await setup({ services: false });
+  const home = await text(ann, "");
+  assert.deepEqual([...home.matchAll(/<a class="hm-block" href="[^"]+"><span class="hm-block__top">[\s\S]*?<span class="hm-block__title">([^<]+)</g)].map((m) => m[1]), ["Branding", "Websites", "SEO", "Deliverables", "Custom Development"]);
+  assert.match(home, /<div class="hm-block hm-block--off" role="group" aria-label="Support, not available yet">/); assert.match(home, /Not available yet/);
+  assert.equal((home.match(/class="hm-block"/g) || []).length + (home.match(/class="hm-block hm-block--off"/g) || []).length, 6, "still six equal blocks");
+  assert.ok(!/\/services\//.test(home), "nothing on Home points into Client Services");
+  const nav = navOf(home); assert.deepEqual(nav, ["Home", "Websites", "Branding", "Deliverables", "SEO", "Custom Development", "My Requests", "Settings"]);
+  for (const gone of ["/services/requests", "/services/invoices", "/services/requests/new"]) assert.equal((await ann.get(`/portal/o/alpha${gone}`)).status, 404, gone + " does not exist while Services is off");
+  // the request workflow does not depend on Services: submit, follow, reply, review, approve, download
+  const id = await create(ann); const orgId = sql(w.db, "SELECT organization_id o FROM requests")[0].o;
+  assert.equal((await post(mia, `/requests/${id}/reply`, { body: "A question" }, { multipart: true, csrfFrom: `/requests/${id}` })).status, 303);
+  await repo.setStatus(w.db, orgId, id, "in_review", STAFF); await repo.approveRequest(w.db, orgId, id, { via: "staff_record", actorLabel: STAFF }); await repo.setStatus(w.db, orgId, id, "in_progress", STAFF);
+  await svc.adminUpload(d(), { organizationId: orgId, requestId: id, role: "proof", file: { bytes: png(), name: "p.png" }, actor: STAFF }); await repo.setStatus(w.db, orgId, id, "client_review", STAFF);
+  assert.match(await text(mia, `/requests/${id}`), /Review your design/);
+  assert.equal((await post(ann, `/requests/${id}/approve`, { note: "ok" }, { csrfFrom: `/requests/${id}` })).status, 303);
+  assert.match(await text(ann, `/requests/${id}`), /aria-label="Progress: Completed"/);
+  // staff are told about the new request (the outbox does not need Client Services)
+  assert.ok(sql(w.db, "SELECT count(*) n FROM service_notifications WHERE event = 'request_submitted' AND audience = 'staff'")[0].n >= 1); void userOf;
+});
