@@ -16,7 +16,7 @@ Search Console cannot answer "where do I rank for *fences and decks* in *Calgary
 - Dashboard with setup states: no figures gives a plain "not connected yet" panel and a button to ask Framework to set it up; one period shows the figures and says trends need a second; two or more show the change (words and arrows, never colour alone) and charts. Sources are never mixed into one line.
 - Keyword + place tracking: owners add and stop tracking (max 20 per organization, duplicates refused, case ignored); members can see. "Stop tracking" archives; the history stays.
 - Admin records checks per keyword (Admin, Websites, SEO details, Keyword rankings): date, position 1 to 200 or empty for "not found in the results checked", optional page. A check cannot be dated in the future. Mistaken checks can be removed. Everything is audited.
-- Migration **0022_seo_keywords.sql** (two additive tables) is **proposed, not applied**. Until it is applied the page says keyword tracking is being set up and shows no form; the rest of SEO works.
+- Migration **0022_seo_keywords.sql** (two additive tables) is applied to Staging; Production only by the manual workflow. Without it the page says keyword tracking is being set up and shows no form; the rest of SEO works.
 
 ## Google Search Console: the practical architecture (not built, needs approval)
 

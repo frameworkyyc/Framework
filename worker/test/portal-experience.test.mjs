@@ -57,6 +57,10 @@ async function setup({ migrated = true, branding = false } = {}) {
   return { w, bucket, A, Bo, ann, mia, bob, anon, call, site, upload, publish, csrf, send, svc };
 }
 const html = async (r) => r.text();
+/* The claims check must read what a person reads, not the page's markup: every form carries a random CSRF token (43 base64url characters) and a token containing, say, "10x" would
+   fail a check meant for marketing copy (about 1 render in 3,200). Tags and their attributes are removed before the words are checked. */
+const visibleText = (markup) => markup.replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/\s+/g, " ");
+const CLAIMS = /guarantee|guaranteed|#1|number one|best in|instantly|10x|\d+% (more|increase)/i;
 const WEB_ZIP = () => S.zip([{ name: "index.html", data: S.text("<h1>hi</h1>") }, { name: "assets/app.js", data: S.text("console.log(1)") }, { name: "styles.css", data: S.text("body{}") }, { name: "contact.php", data: S.text("<?php ?>") }]);
 
 
@@ -258,7 +262,7 @@ test("Additional Services: expandable benefit-led cards explain the problem, the
   const sec = await svcSec(s.ann);
   assert.equal((sec.match(/<details class="svc-card/g) || []).length, 5);
   for (const [x, n] of [["The problem", 4], ["What you get", 5], ["Why you might need it", 4]]) assert.equal((sec.match(new RegExp(x, "g")) || []).length, n, x + " (Nexus has no problem or why text, so none is invented)");
-  assert.match(sec, /Send them straight to your customers/); assert.doesNotMatch(sec, /guarantee|guaranteed|#1|number one|best in|instantly|10x|\d+% (more|increase)/i, "no exaggerated or unsupported claims");
+  assert.match(sec, /Send them straight to your customers/); assert.doesNotMatch(visibleText(sec), CLAIMS, "no exaggerated or unsupported claims in the words people read");
   assert.equal((sec.match(/<details class="svc-card[^>]*open/g) || []).length, 1, "one card starts open (the suggested one); the rest are one tidy line");
   assert.match(sec, /Suggested for you<\/span><span class="svc-reason[^>]*>Your website is live/);
   assert.ok(sec.indexOf("SEO &amp; Visibility") < sec.indexOf("Client Admin Portal"), "the relevant service is listed first");
@@ -356,4 +360,12 @@ test("the catalogue is a reusable component: one loader and one renderer, so ano
   assert.match(out, /action="\/portal\/o\/alpha\/elsewhere\/request"/); assert.match(out, /name="csrf" value="tok"/);
   assert.equal(serviceCatalogue({}, null), "");
   assert.equal(serviceCatalogue({}, { items: [] }), "");
+});
+
+test("the claims check reads the words people read: a random token in a form never trips it, and real unsupported copy still does", () => {
+  const token = "Efm7-4SDhs1tVs8UkjShimflCu0LFgjfjUwn10xKcF4"; // a real CSRF-shaped value that contains "10x": it made the copy test fail about once in 3,200 runs
+  const page = `<form><input type="hidden" name="csrf" value="${token}"><button>Ask about Invoice Sender</button></form><p>Consistent, professional invoices.</p>`;
+  assert.match(page, CLAIMS, "the raw markup would have failed the check");
+  assert.doesNotMatch(visibleText(page), CLAIMS, "the words alone pass");
+  for (const claim of ["We guarantee more leads", "Get 40% more sales", "The #1 choice", "Results instantly", "10x your traffic", "The best in Calgary"]) assert.match(visibleText(`<p>${claim}</p>`), CLAIMS, "real claims are still caught: " + claim);
 });
