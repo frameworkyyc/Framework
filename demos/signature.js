@@ -10,11 +10,24 @@
   function seen(el, cb, margin) { if (!("IntersectionObserver" in window)) { cb(); return; } var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { io.disconnect(); cb(); } }, { threshold: 0.35, rootMargin: margin || "0px" }); io.observe(el); }
 
   /* ---- Opening: headline words, one animation style per trade ---- */
-  var h1 = $(".hero h1");
+  var h1 = $(".hero h1, .c-hero h1");
   if (h1 && motion) {
     var label = h1.textContent.trim(), n = 0;
     h1.setAttribute("aria-label", label);
-    h1.innerHTML = label.split(/\s+/).map(function (w) { return '<span class="w" aria-hidden="true"><span style="--i:' + (n++) + '">' + w.replace(/[<>&]/g, "") + "</span></span>"; }).join(" ");
+    (function wrap(node) {
+      [].slice.call(node.childNodes).forEach(function (c) {
+        if (c.nodeType === 3) {
+          var frag = document.createDocumentFragment();
+          c.textContent.split(/(\s+)/).forEach(function (w) {
+            if (!w) return;
+            if (/^\s+$/.test(w)) { frag.appendChild(document.createTextNode(" ")); return; }
+            var o = document.createElement("span"), i = document.createElement("span");
+            o.className = "w"; o.setAttribute("aria-hidden", "true"); i.style.setProperty("--i", n++); i.textContent = w; o.appendChild(i); frag.appendChild(o);
+          });
+          node.replaceChild(frag, c);
+        } else if (c.nodeType === 1) wrap(c);
+      });
+    })(h1);
     h1.classList.add("is-split");
     var kind = { "fence-deck": ["wordup", ".8s"], landscaping: ["wordblur", "1.3s"], renovations: ["wordmask", "1.2s"], "general-contractor": ["wordslam", ".7s"] }[slug];
     if (kind) { h1.style.setProperty("--wk", kind[0]); h1.style.setProperty("--wd", kind[1]); }
@@ -39,8 +52,8 @@
     }
     estimator();
   }
-  if (slug === "landscaping") seasons();
-  if (slug === "renovations") beforeAfter();
+  if (slug === "landscaping") dusk();
+  if (slug === "renovations") tour();
   if (slug === "general-contractor") tracker();
 
   /* ---- Fence & Decks: ballpark estimator with a live line drawing ---- */
@@ -65,21 +78,21 @@
     }
     function draw() {
       var a = "", ground = 170, W = 600;
-      a += '<path d="M0 ' + ground + 'H600" stroke="#fff" stroke-width="1.5" fill="none"/>';
+      a += '<path d="M0 ' + ground + 'H600" stroke="currentColor" stroke-width="1.5" fill="none"/>';
       if (type === "deck") {
         var bays = clamp(Math.round(area / 90), 2, 7), w = 420 + (area - 80) / 520 * 150, x0 = (W - w) / 2, step = w / bays, top = 98;
-        a += '<path d="M' + x0 + " " + top + "H" + (x0 + w) + "V" + (top + 14) + "H" + x0 + 'Z" stroke="#fff" fill="none" stroke-width="1.6"/>';
-        for (var i = 0; i <= bays; i++) a += '<path d="M' + (x0 + i * step - 4) + " " + (top + 14) + "V" + ground + 'h8V' + (top + 14) + '" stroke="#fff" fill="none" stroke-opacity=".75"/>';
-        if (extra) for (var j = 0; j <= bays; j++) { var px = x0 + j * step; a += '<path d="M' + px + " " + top + "V" + (top - 46) + '" stroke="#fff" fill="none" stroke-width="1.6"/>'; if (j < bays) a += '<path d="M' + px + " " + (top - 46) + "H" + (px + step) + "M" + px + " " + (top - 6) + "H" + (px + step) + '" stroke="#fff" fill="none" stroke-opacity=".8"/><path d="M' + (px + 14) + " " + (top - 6) + "L" + (px + 38) + " " + (top - 40) + '" stroke="#fff" fill="none" stroke-opacity=".3"/>'; }
+        a += '<path d="M' + x0 + " " + top + "H" + (x0 + w) + "V" + (top + 14) + "H" + x0 + 'Z" stroke="currentColor" fill="none" stroke-width="1.6"/>';
+        for (var i = 0; i <= bays; i++) a += '<path d="M' + (x0 + i * step - 4) + " " + (top + 14) + "V" + ground + 'h8V' + (top + 14) + '" stroke="currentColor" fill="none" stroke-opacity=".75"/>';
+        if (extra) for (var j = 0; j <= bays; j++) { var px = x0 + j * step; a += '<path d="M' + px + " " + top + "V" + (top - 46) + '" stroke="currentColor" fill="none" stroke-width="1.6"/>'; if (j < bays) a += '<path d="M' + px + " " + (top - 46) + "H" + (px + step) + "M" + px + " " + (top - 6) + "H" + (px + step) + '" stroke="currentColor" fill="none" stroke-opacity=".8"/><path d="M' + (px + 14) + " " + (top - 6) + "L" + (px + 38) + " " + (top - 40) + '" stroke="currentColor" fill="none" stroke-opacity=".3"/>'; }
       } else {
         var bay = clamp(Math.round(len / 16), 2, 12), w2 = 380 + (len - 20) / 180 * 190, x1 = (W - w2) / 2, st = w2 / bay, h = tall === 6 ? 90 : 60, t = ground - h;
-        for (var k = 0; k <= bay; k++) a += '<path d="M' + (x1 + k * st - 3) + " " + (t - 8) + "V" + (ground + 12) + 'h6V' + (t - 8) + 'Z" stroke="#fff" fill="none" stroke-width="1.5"/>';
+        for (var k = 0; k <= bay; k++) a += '<path d="M' + (x1 + k * st - 3) + " " + (t - 8) + "V" + (ground + 12) + 'h6V' + (t - 8) + 'Z" stroke="currentColor" fill="none" stroke-width="1.5"/>';
         for (var m = 0; m < bay; m++) {
           var bx = x1 + m * st + 4, bw = st - 8;
-          if (type === "cedar") { for (var q = 0; q < Math.floor(bw / 8); q++) a += '<path d="M' + (bx + q * 8) + " " + t + "V" + ground + '" stroke="#fff" stroke-opacity=".55" fill="none"/>'; a += '<path d="M' + bx + " " + (t + 14) + "h" + bw + "M" + bx + " " + (ground - 14) + "h" + bw + '" stroke="#fff" stroke-opacity=".9" fill="none"/>'; }
-          else { for (var q2 = 0; q2 < Math.floor(bw / 10); q2++) a += '<path d="M' + (bx + 3 + q2 * 10) + " " + (t + 4) + "V" + (ground - 4) + '" stroke="#fff" stroke-opacity=".6" fill="none"/>'; a += '<path d="M' + bx + " " + (t + 4) + "h" + bw + "M" + bx + " " + (ground - 4) + "h" + bw + '" stroke="#fff" fill="none"/>'; }
+          if (type === "cedar") { for (var q = 0; q < Math.floor(bw / 8); q++) a += '<path d="M' + (bx + q * 8) + " " + t + "V" + ground + '" stroke="currentColor" stroke-opacity=".55" fill="none"/>'; a += '<path d="M' + bx + " " + (t + 14) + "h" + bw + "M" + bx + " " + (ground - 14) + "h" + bw + '" stroke="currentColor" stroke-opacity=".9" fill="none"/>'; }
+          else { for (var q2 = 0; q2 < Math.floor(bw / 10); q2++) a += '<path d="M' + (bx + 3 + q2 * 10) + " " + (t + 4) + "V" + (ground - 4) + '" stroke="currentColor" stroke-opacity=".6" fill="none"/>'; a += '<path d="M' + bx + " " + (t + 4) + "h" + bw + "M" + bx + " " + (ground - 4) + "h" + bw + '" stroke="currentColor" fill="none"/>'; }
         }
-        if (extra) { var gx = x1 + st * Math.floor(bay / 2); a += '<path d="M' + gx + " " + (t + 6) + "h" + st + "V" + ground + "H" + gx + 'Z" stroke="#fff" stroke-width="2.4" fill="none"/>'; }
+        if (extra) { var gx = x1 + st * Math.floor(bay / 2); a += '<path d="M' + gx + " " + (t + 6) + "h" + st + "V" + ground + "H" + gx + 'Z" stroke="currentColor" stroke-width="2.4" fill="none"/>'; }
       }
       svg.innerHTML = a;
     }
@@ -110,81 +123,71 @@
     sync(); render();
   }
 
-  /* ---- Landscaping: four seasons with weather ---- */
-  function seasons() {
-    var stage = $("#seasons .seasons__stage"); if (!stage) return;
-    var tabs = $$(".seasons__tabs button"), tagB = $(".seasons__tag b", stage), tagS = $(".seasons__tag span", stage), cv = $("canvas", stage), ctx = cv.getContext("2d");
-    var INFO = { spring: ["Spring: wake-up", "Perennials emerge, beds are edged and mulched, and new sod goes down."], summer: ["Summer: the payoff", "Patio season. Evening lighting, lush beds and a lawn that stays green."], autumn: ["Autumn: tuck it in", "Bulbs planted, lawns aerated and hardy shrubs set before the freeze."], winter: ["Winter: built to last", "Drainage, hardy evergreens and wall caps designed for Calgary's freeze-thaw."] };
-    var order = ["spring", "summer", "autumn", "winter"], cur = "summer", auto = true, timer, parts = [], W = 0, H = 0, run = false, raf;
-    function size() { var r = stage.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 1.5); W = r.width; H = r.height; cv.width = W * d; cv.height = H * d; ctx.setTransform(d, 0, 0, d, 0, 0); }
-    function spawn(first) {
-      var p = { x: Math.random() * W, y: first ? Math.random() * H : -20, r: 1 + Math.random() * 2.6, v: .5 + Math.random() * 1.1, s: Math.random() * 6.28, a: .5 + Math.random() * .5 };
-      if (cur === "summer") { p.y = Math.random() * H; p.v = .12 + Math.random() * .25; p.r = 1 + Math.random() * 1.8; }
-      if (cur === "autumn") { p.r = 4 + Math.random() * 5; p.v = .9 + Math.random() * 1.1; }
-      if (cur === "spring") { p.r = 3 + Math.random() * 3; p.v = .6 + Math.random() * .8; }
-      return p;
+  /* ---- Landscaping: afternoon to dusk, on the real patio photo ---- */
+  function dusk() {
+    var root = $("#evenings .dusk"); if (!root) return;
+    var range = $(".dusk__range", root), tagB = $(".dusk__tag b", root), tagS = $(".dusk__tag span", root), stops = $$(".dusk__scale span", root);
+    var COPY = [["Afternoon", "Bright and open. This is the yard you see when you plan it."], ["Golden hour", "Warm light on stone and timber. Planting and texture do the work."], ["Dusk", "Low-voltage lighting takes over: paths, walls and seating, all on a timer."]];
+    function set(v) {
+      var d = clamp(v / 100, 0, 1), i = d < 0.34 ? 0 : d < 0.72 ? 1 : 2;
+      root.style.setProperty("--d", d.toFixed(3)); range.value = v;
+      tagB.textContent = COPY[i][0]; tagS.textContent = COPY[i][1];
+      stops.forEach(function (s, k) { s.style.opacity = k === i ? 1 : .45; });
     }
-    function fill() { var n = Math.round(W * H / (cur === "winter" ? 5200 : 9000)); parts = []; for (var i = 0; i < n; i++) parts.push(spawn(true)); }
-    function step(t) {
-      if (!run) return; ctx.clearRect(0, 0, W, H);
-      parts.forEach(function (p, i) {
-        p.s += .02; var sway = Math.sin(p.s) * (cur === "winter" ? .6 : 1.2);
-        if (cur === "summer") { p.x += sway * .3; p.y -= p.v * .4; p.a = .35 + .45 * Math.abs(Math.sin(p.s)); } else { p.x += sway + (cur === "autumn" ? .6 : .2); p.y += p.v; }
-        if (p.y > H + 20 || p.y < -30 || p.x > W + 30) parts[i] = spawn(false);
-        ctx.globalAlpha = p.a;
-        if (cur === "winter") { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.28); ctx.fill(); }
-        else if (cur === "summer") { ctx.fillStyle = "#FFE9A8"; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.28); ctx.fill(); }
-        else { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.s); ctx.fillStyle = cur === "autumn" ? (i % 3 ? "#D9701E" : "#B8421A") : "#FFC9DA"; ctx.beginPath(); ctx.ellipse(0, 0, p.r, p.r * .55, 0, 0, 6.28); ctx.fill(); ctx.restore(); }
-      });
-      ctx.globalAlpha = 1; raf = requestAnimationFrame(step);
-    }
-    function pick(s, byUser) {
-      cur = s; stage.setAttribute("data-season", s);
-      tabs.forEach(function (b) { var on = b.getAttribute("data-season") === s; b.setAttribute("aria-selected", String(on)); b.classList.toggle("is-auto", on && !byUser && auto); });
-      tagB.textContent = INFO[s][0]; tagS.textContent = INFO[s][1];
-      fill();
-    }
-    tabs.forEach(function (b) { b.addEventListener("click", function () { auto = false; clearTimeout(timer); pick(b.getAttribute("data-season"), true); }); });
-    function cycle() { if (!auto) return; timer = setTimeout(function () { pick(order[(order.indexOf(cur) + 1) % 4], false); cycle(); }, 6000); }
-    var reduce = !motion;
-    size(); pick("summer", true);
-    window.addEventListener("resize", function () { size(); fill(); });
-    if ("IntersectionObserver" in window) new IntersectionObserver(function (es) {
-      var v = es[0].isIntersecting;
-      if (v && !run && !reduce) { run = true; raf = requestAnimationFrame(step); if (auto) { pick("spring", false); cycle(); } }
-      if (!v) { run = false; cancelAnimationFrame(raf); clearTimeout(timer); }
-    }, { threshold: 0.3 }).observe(stage);
+    var user = false, raf;
+    range.addEventListener("input", function () { user = true; cancelAnimationFrame(raf); set(+range.value); });
+    set(0);
+    if (motion) seen($(".dusk__stage", root), function () {
+      var t0 = performance.now(), dur = 5200;
+      (function f(now) { if (user) return; var k = clamp((now - t0) / dur, 0, 1); k = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; set(k * 100); if (k < 1) raf = requestAnimationFrame(f); })(t0);
+    });
   }
 
-  /* ---- Renovations: before / after reveal ---- */
-  function beforeAfter() {
-    var root = $("#transformations"); if (!root) return;
-    var stage = $(".ba__stage", root), range = $(".ba__range", root), imgs = $$("img", stage), tabs = $$("[data-ba]", root), facts = $$(".ba__facts b", root);
-    var SETS = {
-      kitchen: ["project-1", "6 weeks", "Full gut, new layout", "Custom white oak"],
-      bathroom: ["project-2", "3 weeks", "Walk-in glass shower", "Large-format tile"],
-      basement: ["project-3", "8 weeks", "Family room and bath", "Egress window added"],
-      powder: ["project-5", "10 days", "Powder room refresh", "Feature wallpaper"]
+  /* ---- Renovations: hotspot tour of the finished rooms ---- */
+  function tour() {
+    var root = $("#inside"); if (!root) return;
+    var ROOMS = {
+      kitchen: { src: "hero.jpg", alt: "A finished open-plan kitchen with a waterfall quartz island", facts: [["6 weeks", "Timeline"], ["Open-plan, new layout", "Scope"], ["Fixed price", "Contract"]], spots: [
+        [62, 66, "Waterfall quartz island", "Full-height waterfall edges hide the seams and take daily life in their stride. Templated on site for a tight fit."],
+        [55, 15, "Layered lighting", "Pendants on a dimmer, plus recessed pot lights, so every task has the right light and the room has a mood."],
+        [66, 38, "Herringbone backsplash", "A tile feature behind the range, with a pot filler where you actually cook."],
+        [12, 80, "Wide-plank flooring", "Waterproof plank runs through the whole open plan for one calm, continuous floor."]] },
+      bathroom: { src: "project-2.jpg", alt: "A finished bathroom with a walk-in glass shower", facts: [["3 weeks", "Timeline"], ["Curbless walk-in shower", "Scope"], ["Waterproofed to code", "Detail"]], spots: [
+        [41, 50, "Frameless glass", "10 mm tempered glass with black hardware keeps the room open and easy to clean."],
+        [52, 10, "Rain shower", "A ceiling rain head plus handheld on a slide bar, on a thermostatic valve."],
+        [64, 42, "Recessed niche", "Framed and waterproofed before the tile goes on, in place of clutter-catching shelves."],
+        [66, 88, "Linear drain", "Curbless entry with a linear drain: no threshold, and a floor that slopes properly."]] },
+      basement: { src: "project-3.jpg", alt: "A finished basement living room", facts: [["8 weeks", "Timeline"], ["Family room and bath", "Scope"], ["Permitted and inspected", "Process"]], spots: [
+        [87, 32, "Egress window", "A code-compliant egress window and proper well make a legal bedroom or rec room."],
+        [77, 16, "Recessed lighting", "Slim LED pot lights keep a low ceiling feeling taller and brighter."],
+        [13, 62, "Feature fireplace", "An electric fireplace wall gives the room a focal point with no chimney or gas permit."],
+        [22, 88, "Warm, dry floors", "Moisture-rated plank over a dimpled membrane, so the floor stays warm and dry."]] }
     };
-    function setPos(v) { stage.style.setProperty("--pos", v + "%"); range.value = v; range.setAttribute("aria-valuetext", Math.round(v) + "% of the photo shows before"); }
-    function show(key) {
-      var s = SETS[key], src = "../assets/img/demos/renovations/" + s[0] + ".jpg";
-      imgs.forEach(function (i) { i.src = src; });
-      tabs.forEach(function (b) { b.setAttribute("aria-selected", String(b.getAttribute("data-ba") === key)); });
-      facts[0].textContent = s[1]; facts[1].textContent = s[2]; facts[2].textContent = s[3];
+    var tabs = $$("[data-room]", root), stage = $(".tour__stage", root), img = $("img", stage), hots = $(".tour__hots", stage), card = $(".tour__card", stage), facts = $(".tour__facts", root);
+    var key, spots = [], cur = 0, user = false, timer;
+    function show(i) {
+      cur = i; var s = ROOMS[key].spots[i];
+      $$(".hot", hots).forEach(function (h, k) { h.setAttribute("aria-pressed", String(k === i)); });
+      $("small", card).textContent = "Detail " + (i + 1) + " of " + ROOMS[key].spots.length; $("b", card).textContent = s[2]; $("p", card).textContent = s[3];
+      card.style.animation = "none"; void card.offsetWidth; card.style.animation = "";
     }
-    tabs.forEach(function (b) { b.addEventListener("click", function () { show(b.getAttribute("data-ba")); setPos(50); }); });
-    range.addEventListener("input", function () { stopDemo = true; setPos(+range.value); });
-    var stopDemo = false;
+    function room(k) {
+      key = k; var r = ROOMS[k]; clearTimeout(timer);
+      img.src = "../assets/img/demos/renovations/" + r.src; img.alt = r.alt;
+      hots.textContent = "";
+      r.spots.forEach(function (s, i) {
+        var b = document.createElement("button"); b.type = "button"; b.className = "hot"; b.style.setProperty("--x", s[0] + "%"); b.style.setProperty("--y", s[1] + "%");
+        b.setAttribute("aria-label", s[2]); b.textContent = String(i + 1); b.addEventListener("click", function () { user = true; clearTimeout(timer); show(i); }); hots.appendChild(b);
+      });
+      facts.textContent = ""; r.facts.forEach(function (f) { var li = document.createElement("li"), b = document.createElement("b"), sp = document.createElement("span"); b.textContent = f[0]; sp.textContent = f[1]; li.appendChild(b); li.appendChild(sp); facts.appendChild(li); });
+      tabs.forEach(function (t) { t.setAttribute("aria-selected", String(t.getAttribute("data-room") === k)); });
+      show(0);
+    }
+    tabs.forEach(function (t) { t.addEventListener("click", function () { user = true; room(t.getAttribute("data-room")); }); });
+    room("kitchen");
     if (motion) seen(stage, function () {
-      var t0 = performance.now(), path = [[0, 50], [900, 12], [1900, 88], [2700, 50]];
-      (function f(now) {
-        if (stopDemo) return; var t = now - t0, i = 0; while (i < path.length - 2 && t > path[i + 1][0]) i++;
-        var a = path[i], b = path[i + 1], k = clamp((t - a[0]) / (b[0] - a[0]), 0, 1); k = k * k * (3 - 2 * k);
-        setPos(a[1] + (b[1] - a[1]) * k); if (t < 2700) requestAnimationFrame(f);
-      })(t0);
+      (function next() { if (user) return; timer = setTimeout(function () { if (user) return; var n = cur + 1; if (n < ROOMS[key].spots.length) { show(n); next(); } }, 3400); })();
     });
-    show("kitchen"); setPos(50);
   }
 
   /* ---- General Contractor: scrub a live project schedule ---- */

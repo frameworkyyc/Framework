@@ -17,7 +17,7 @@ const sign = (c, key = pair.privateKey) => { const h = b64u(JSON.stringify({ alg
 const claims = (over = {}) => ({ iss: `https://${TEAM}`, aud: [AUD], email: "owner@frameworkco.ca", iat: T, exp: T + 600, ...over });
 const UUID = "00000000-0000-4000-8000-000000000000";
 
-const PAGES = ["/admin", "/admin/", "/admin/clients", `/admin/clients/${UUID}`, `/admin/clients/${UUID}/invoices`, `/admin/clients/${UUID}/support`, `/admin/clients/${UUID}/branding`, "/admin/approved-emails", "/admin/support", "/admin/requests", `/admin/requests/${UUID}/${UUID}`, "/admin/requests/settings", `/admin/clients/${UUID}/requests`, "/admin/assessments", "/admin/feedback", "/admin/portal-feedback", "/admin/assets/admin.js", "/admin/assets/clients.js", "/admin/assets/approved-emails.js", "/admin/zz-unknown"];
+const PAGES = ["/admin", "/admin/", "/admin/clients", `/admin/clients/${UUID}`, `/admin/clients/${UUID}/invoices`, `/admin/clients/${UUID}/support`, `/admin/clients/${UUID}/branding`, "/admin/approved-emails", "/admin/support", "/admin/requests", `/admin/requests/${UUID}/${UUID}`, "/admin/requests/settings", `/admin/clients/${UUID}/requests`, "/admin/assessments", "/admin/feedback", "/admin/portal-feedback", "/admin/demo-traffic", "/admin/assets/admin.js", "/admin/assets/clients.js", "/admin/assets/approved-emails.js", "/admin/zz-unknown"];
 const API = [
   ["GET", "/api/admin"], ["GET", "/api/admin/clients"], ["POST", "/api/admin/clients"], ["GET", `/api/admin/clients/${UUID}`], ["GET", `/api/admin/clients/${UUID}/access`],
   ["POST", `/api/admin/clients/${UUID}/delete`], ["POST", `/api/admin/clients/${UUID}/restore`], ["POST", `/api/admin/clients/${UUID}/invitations`],
@@ -26,7 +26,7 @@ const API = [
   ["GET", `/api/admin/clients/${UUID}/invoices`], ["GET", `/api/admin/clients/${UUID}/support`], ["GET", `/api/admin/clients/${UUID}/branding`], ["GET", `/api/admin/clients/${UUID}/branding/files/${UUID}/download`],
   ["GET", "/api/admin/support"], ["GET", `/api/admin/clients/${UUID}/websites/${UUID}/seo/keywords`], ["POST", `/api/admin/clients/${UUID}/websites/${UUID}/seo/keywords/${UUID}/checks`], ["GET", "/api/admin/requests"], ["GET", "/api/admin/requests/attention"], ["POST", "/api/admin/requests/settings"], ["GET", `/api/admin/clients/${UUID}/requests`], ["POST", `/api/admin/clients/${UUID}/requests/${UUID}/status`], ["POST", `/api/admin/clients/${UUID}/requests/${UUID}/quotes`], ["GET", "/api/admin/services/attention"], ["POST", "/api/admin/services/notifications/process"],
   ["GET", `/api/admin/clients/${UUID}/discovery/${UUID}/export.pdf`], ["GET", `/api/admin/clients/${UUID}/profile-export`], ["GET", `/api/admin/clients/${UUID}/profile-export.pdf`],
-  ["GET", "/api/admin/feedback"], ["GET", "/api/admin/portal-feedback"], ["GET", "/api/admin/assessments"], ["GET", "/api/admin/database"], ["GET", "/api/admin/zz-not-a-route"],
+  ["GET", "/api/admin/feedback"], ["GET", "/api/admin/portal-feedback"],  ["GET", "/api/admin/assessments"], ["GET", "/api/admin/demo-traffic/status"], ["GET", "/api/admin/demo-traffic/links"], ["POST", "/api/admin/demo-traffic/links"], ["GET", "/api/admin/demo-traffic/export.csv"], ["GET", "/api/admin/database"], ["GET", "/api/admin/zz-not-a-route"],
 ];
 
 test("without a valid admin token every admin page and API route is refused, reveals no data, and writes nothing", async () => {
