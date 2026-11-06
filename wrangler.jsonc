@@ -41,7 +41,11 @@
     // Needs migrations 0011 and 0012 and the PORTAL_FILES binding. Exactly "1" or absent: absent returns Website to a "Coming soon" page. Rollback: delete this line (a one-line revert PR).
     "PORTAL_WEBSITE": "1",
     // Brand Discovery release: assessments, secure guest links and the Branding card. Needs migration 0018 (applied to Production by the manual Production D1 workflow BEFORE this deploys), PORTAL_BRANDING and the PORTAL_FILES binding. Exactly "1" or absent: absent hides it. Rollback: delete this line.
-    "PORTAL_DISCOVERY": "1"
+    "PORTAL_DISCOVERY": "1",
+    // Client Portal release (requests): the unified request system (Deliverables, SEO and Custom Development requests, My Requests, the wide navigation, the six-block Home, the SEO dashboard and
+    // digital business card address). Needs migrations 0020, 0022 and 0023 (applied to Production by the manual Production D1 workflow BEFORE this deploys). It does NOT need PORTAL_SERVICES, which stays off here
+    // (the Support and Invoices entries, the Support block's link and the new-request form live under it). Exactly "1" or absent: absent returns the previous Home and navigation. Rollback: delete this line.
+    "PORTAL_REQUESTS": "1"
   },
   // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
   // redact_query_string keeps ?code= / ?invitation_token= out of platform logs; invocation_logs is OFF because the automatic per-request record
@@ -137,7 +141,7 @@
       "PORTAL_WEBSITE": "1",
       // Turns on Brand Discovery (assessments, secure guest links, the Branding card). STAGING ONLY, never at the top level. Needs migration 0018 (applied to Staging) and PORTAL_BRANDING. Exactly "1" or absent.
       "PORTAL_DISCOVERY": "1",
-      // Turns on the unified request system (Deliverables, SEO and Development requests, My Requests, the wide navigation). STAGING ONLY, never at the top level. Needs migration 0020 (applied to Staging) and PORTAL_SERVICES. Exactly "1" or absent.
+      // Turns on the unified request system (Deliverables, SEO and Development requests, My Requests, the wide navigation). Needs migration 0020 (applied to Staging). Exactly "1" or absent. Production has its own line at the top level.
       "PORTAL_REQUESTS": "1"
     },
     "d1_databases": [
