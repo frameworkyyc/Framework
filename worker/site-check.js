@@ -2,8 +2,9 @@
  * Website availability check for Admin -> Leads. Answers one question honestly: does this business's website load for a person? Three answers, never two:
  *
  *   online      a normal page was served (after any redirects, http -> https, www <-> apex).
- *   offline     the site itself is missing or broken, with hard evidence: the domain does not exist (DNS), the home page is a real 404/410, the server (or the CDN in
- *               front of it) reports its origin unreachable or answers a 5xx on every try.
+ *   offline     the site itself is missing or broken, with hard evidence: the domain does not exist (DNS), the home page is a real 404/410, or the CDN in front of the
+ *               server reports the origin down for EVERY visitor (Cloudflare 521-526, 530). A plain 5xx or Cloudflare's 520 is NOT proof: a firewall that refuses robots
+ *               answers exactly that way, so it is unverified.
  *   unverified  we could NOT tell. Bot protection and rate limits (401/403/405/406/429/999, challenge pages, "Just a moment"), a redirect loop that needs cookies, or a
  *               failure to connect that could just as well be our address being refused. A blocked request is NEVER offline: it says nothing about whether people can open it.
  *
@@ -80,8 +81,8 @@ export function detectProtection(status, headers, body = "") {
 }
 
 const BLOCKED_STATUS = new Set([401, 403, 405, 406, 407, 409, 412, 418, 423, 429, 451, 999]);
-const ORIGIN_DOWN = new Set([521, 522, 523, 524, 530]); // Cloudflare: the web server behind it is down or unreachable
-const TEMPORARY = new Set([500, 502, 503, 504, 520, 525, 526, 527]);
+const ORIGIN_DOWN = new Set([521, 522, 523, 524, 525, 526, 530]); // Cloudflare: the origin is down, unreachable or fails TLS for every visitor, not just for a robot
+const TEMPORARY = new Set([500, 502, 503, 504, 527]);
 
 const short = (s, n) => String(s == null ? "" : s).replace(/[\r\n\t]+/g, " ").slice(0, n);
 
@@ -178,6 +179,7 @@ function judge(a) {
   if (s >= 300 && s < 400) return out("unverified", `redirect without a destination (${s})`, { status: s });
   if (a.protection || BLOCKED_STATUS.has(s)) return out("unverified", `blocked or protected (HTTP ${s}${a.protection ? `, ${a.protection}` : ""})`, { status: s, protected: true });
   if (s === 404 || s === 410) return out("offline", `home page not found (HTTP ${s})`, { status: s });
+  if (s === 520) return out("unverified", "origin sent an empty or unexpected response (HTTP 520); may be refusing robots", { status: s });
   if (ORIGIN_DOWN.has(s)) return out("offline", `web server unreachable (HTTP ${s})`, { status: s });
   if (TEMPORARY.has(s)) return out("unverified", `server error (HTTP ${s})`, { status: s, temporary: true });
   return out("unverified", `unexpected response (HTTP ${s})`, { status: s });
@@ -204,7 +206,7 @@ export async function checkSite(website, { fetchImpl = globalThis.fetch, timeout
     let a = await attempt(url, fetchImpl, timeoutMs, now, limit);
     tried++;
     let verdict = judge(a);
-    if (verdict.temporary) { await pause(1200); const again = await attempt(url, fetchImpl, timeoutMs, now, limit); tried++; const v2 = judge(again); attempts.push(rec(url, a, verdict)); a = again; verdict = v2.state === "online" ? v2 : { ...verdict, ...(v2.status ? { status: v2.status, reason: v2.reason } : {}), state: v2.state === "unverified" && v2.temporary ? "offline" : v2.state, reason: v2.state === "unverified" && v2.temporary ? `server error on every try (HTTP ${v2.status})` : v2.reason }; }
+    if (verdict.temporary) { await pause(1200); const again = await attempt(url, fetchImpl, timeoutMs, now, limit); tried++; const v2 = judge(again); attempts.push(rec(url, a, verdict)); a = again; verdict = v2.state === "online" ? v2 : v2.temporary ? { ...v2, reason: `server error on every try (HTTP ${v2.status}); may be refusing robots` } : v2; }
     attempts.push(rec(url, a, verdict));
     if (verdict.protected || (a.ok && a.protection)) sawProtection = a.protection || sawProtection || "bot protection";
     if (!a.ok && !a.loop) connectFailures++;

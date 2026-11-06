@@ -123,18 +123,32 @@ test("an address that must not be requested is never requested, and says why", a
 
 /* ---------------------------------------------------------------- offline: hard evidence only */
 
-test("Offline needs hard evidence: a real 404/410, an unreachable origin, a server error on every try, or a domain that does not exist", async () => {
+test("Offline needs hard evidence: a real 404/410, the CDN reporting the origin down for everyone, or a domain that does not exist", async () => {
   let r = await run("https://c.ca", { "*": R(404) });
   assert.deepEqual([r.state, r.reason, r.httpStatus], ["offline", "home page not found (HTTP 404)", 404]);
   assert.equal((await run("https://c.ca", { "*": R(410) })).state, "offline");
-  r = await run("https://c.ca", { "*": R(521, { server: "cloudflare" }) });
-  assert.deepEqual([r.state, r.reason], ["offline", "web server unreachable (HTTP 521)"]);
-  r = await run("https://c.ca", { "*": R(500) });
-  assert.deepEqual([r.state, r.reason], ["offline", "server error on every try (HTTP 500)"]);
-  r = await run("https://c.ca", { "*": R(502) });
-  assert.equal(r.state, "offline");
+  for (const code of [521, 522, 523, 524, 525, 526, 530]) {
+    r = await run("https://c.ca", { "*": R(code, { server: "cloudflare" }) });
+    assert.deepEqual([r.state, r.reason], ["offline", `web server unreachable (HTTP ${code})`], String(code));
+  }
   r = await run("https://gone.example.ca", { "cloudflare-dns.com": DNS(3) });
   assert.deepEqual([r.state, r.reason, r.httpStatus], ["offline", "domain does not exist (DNS)", null]);
+});
+
+test("REGRESSION: HTTP 520 and plain 5xx errors are NOT proof of an offline site: a firewall that refuses robots answers the same way", async () => {
+  // seen live from Cloudflare's network: working sites answered 520 to the finder's request
+  let r = await run("https://c.ca", { "*": R(520, { server: "cloudflare", "cf-ray": "1" }) });
+  assert.deepEqual([r.state, r.httpStatus], ["unverified", 520]);
+  assert.match(r.reason, /origin sent an empty or unexpected response \(HTTP 520\); may be refusing robots/);
+  assert.equal(r.protection, null, "a 520 is not labelled as bot protection: nobody knows that");
+  assert.ok(diagnosticLines(r).every((l) => l.length <= 120) && /may be refusing robots/.test(diagnosticLines(r)[0]), "the whole reason fits in the stored diagnostic line");
+  assert.match(r.summary, /Not treated as offline\./);
+  for (const code of [500, 502, 503, 504]) {
+    r = await run("https://c.ca", { "*": R(code) });
+    assert.equal(r.state, "unverified", `HTTP ${code} on every try`);
+    assert.match(r.reason, new RegExp(`server error on every try \\(HTTP ${code}\\); may be refusing robots`));
+    assert.ok(diagnosticLines(r).every((l) => l.length <= 120) && /may be refusing robots/.test(diagnosticLines(r)[0]), "the whole reason fits in the stored diagnostic line");
+  }
 });
 
 test("a 5xx is retried once: a site that recovers is Online", async () => {
