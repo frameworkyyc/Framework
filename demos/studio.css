@@ -10,18 +10,25 @@ h1,h2,p{margin:0}
 .brand{display:flex;align-items:center;gap:12px;text-decoration:none;font-weight:600;letter-spacing:.18em;text-transform:uppercase;font-size:14px}.brand svg{width:32px;height:32px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:14px 22px;min-height:48px;font:600 15px/1 "General Sans",system-ui,sans-serif;text-decoration:none;border:1px solid #0A0A0A;background:#fff;color:#0A0A0A;cursor:pointer;transition:background .2s,color .2s,transform .15s}
 .btn:hover{transform:translateY(-1px)}.btn--dark{background:#0A0A0A;color:#fff}
-.hello{padding:clamp(40px,6vw,88px) 0 clamp(28px,4vw,48px);display:grid;gap:18px;max-width:980px;margin-left:max(clamp(16px,3vw,48px),calc((100% - 1240px) / 2))}
-.hello h1{font:700 clamp(40px,6.6vw,92px)/.98 Switzer,"General Sans",sans-serif;letter-spacing:-.03em}
-/* ---- Pitch band: one strong statement, full-bleed black, sharp corners ---- */
-.pitch{background:#0A0A0A;color:#fff;padding:clamp(48px,6.5vw,92px) 0;margin-bottom:clamp(36px,5vw,64px)}
-.pitch__h{font:700 clamp(36px,6vw,84px)/1.02 Switzer,"General Sans",sans-serif;letter-spacing:-.03em;max-width:15ch}
-.pitch__p{margin-top:clamp(22px,2.6vw,36px);max-width:58ch;color:#E4E4E4;font-size:clamp(18px,1.7vw,22px);line-height:1.6}
+/* ---- Opening: one strong question, a compact black band, then the builder ---- */
+.hello{padding:clamp(24px,3.2vw,44px) 0 clamp(20px,2.8vw,34px)}
+.hello h1{font:700 clamp(28px,3.5vw,52px)/1.06 Switzer,"General Sans",sans-serif;letter-spacing:-.03em}
+.hello h1 span{display:block}
+.pitch{background:#0A0A0A;color:#fff;padding:clamp(28px,3.4vw,48px) 0}
+.pitch .wrap{display:grid;gap:clamp(14px,2vw,22px) clamp(32px,6vw,96px);align-items:center}
+.pitch__h{font:700 clamp(30px,3.8vw,52px)/1.02 Switzer,"General Sans",sans-serif;letter-spacing:-.03em}
+.pitch__h span{display:block}
+.pitch__p{color:#E4E4E4;font-size:clamp(18px,1.6vw,21px);line-height:1.6;max-width:44ch}
+.intro{padding:clamp(26px,3.2vw,44px) 0 clamp(16px,2.2vw,26px)}
+.intro h2{font:700 clamp(26px,3vw,42px)/1.1 Switzer,"General Sans",sans-serif;letter-spacing:-.02em}
+.intro p{margin-top:10px;color:#5C5C5C;font-size:clamp(17px,1.5vw,20px)}
+@media (min-width:900px){.pitch .wrap{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 
 /* ---- Flow ---- */
-.flow{display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(24px,4vw,64px);padding-bottom:clamp(56px,8vw,112px);align-items:start}
+.flow{display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(24px,4vw,64px);padding-bottom:clamp(28px,3.6vw,48px);align-items:start}
 .flow[data-stage=preview]{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}
 /* desktop: room below the last step so a step can glide up under the header while the pinned preview stays pinned (top below the header) instead of releasing early */
-@media (min-width:1001px){.flow[data-stage=preview] .steps{padding-bottom:calc(100vh - 200px)}}
+@media (min-width:1001px){.flow[data-stage=preview] .steps{padding-bottom:440px}}
 .steps{display:grid;gap:0;border-top:1px solid #0A0A0A}
 .step{border-bottom:1px solid #E0E0E0;padding:clamp(18px,2.4vw,28px) 0;scroll-margin-top:calc(var(--stage-h,0px) + 84px)}
 .opt,.sw button,.name input{scroll-margin-top:calc(var(--stage-h,0px) + 96px)}
@@ -106,6 +113,43 @@ h1,h2,p{margin:0}
 .priv ul{margin:0;padding-left:18px;display:grid;gap:4px}
 .foot__c a{color:#0A0A0A}
 
+
+/* ---- After the builder: credibility, the offer, a real client, the next step ---- */
+.sec{padding:clamp(40px,6vw,88px) 0;border-top:1px solid #0A0A0A}
+.sec + .sec{border-top-color:#E0E0E0}
+.flow + .sec{border-top:0}
+.sec__in{display:grid;gap:clamp(18px,3vw,32px) clamp(32px,6vw,96px)}
+.sec__h{font:700 clamp(28px,3.6vw,48px)/1.06 Switzer,"General Sans",sans-serif;letter-spacing:-.025em}
+.sec__b{display:grid;gap:18px}
+.sec__b p,.sec__lead{font-size:clamp(17px,1.5vw,20px);line-height:1.6;color:#2B2B2B;max-width:60ch}
+.sec__lead{color:#5C5C5C}
+.sec__note{font-size:15px;color:#6a6a6a}
+.cols{display:grid;gap:clamp(28px,3vw,40px);margin-top:clamp(8px,1.6vw,20px)}
+.col{border-top:1px solid #0A0A0A;padding-top:18px}
+.col__h{font:600 13px/1 "General Sans",sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#6a6a6a;margin:0 0 6px}
+.lines{list-style:none;margin:0;padding:0}
+.lines li{padding:13px 0;border-bottom:1px solid #E0E0E0;font-size:17px;line-height:1.45}
+.lines--n li{display:flex;gap:14px;align-items:baseline}
+.lines--n b{flex:none;display:inline-grid;place-items:center;width:28px;height:28px;border:1px solid #0A0A0A;font:600 14px/1 "General Sans",sans-serif;transform:translateY(-1px)}
+.words{margin:0;display:grid;gap:20px;max-width:64ch}
+.words blockquote{margin:0;padding-left:clamp(16px,2vw,28px);border-left:2px solid #0A0A0A}
+.words blockquote p{font-size:clamp(18px,1.7vw,22px);line-height:1.55;color:#0A0A0A}
+.words figcaption{display:grid;gap:4px;padding-left:clamp(18px,2vw,30px);font-size:15.5px;color:#5C5C5C}
+.words figcaption strong{color:#0A0A0A;font-size:17px}
+.words figcaption a{justify-self:start;color:#0A0A0A;margin-top:4px}
+.cta{background:#0A0A0A;color:#fff;padding:clamp(52px,8vw,112px) 0}
+.cta .wrap{display:grid;gap:clamp(16px,2.4vw,26px)}
+.cta__h{font:700 clamp(34px,5.4vw,76px)/1.02 Switzer,"General Sans",sans-serif;letter-spacing:-.03em;max-width:14ch}
+.cta__p{color:#E4E4E4;font-size:clamp(18px,1.6vw,21px);line-height:1.6;max-width:46ch}
+.cta__row{display:flex;flex-wrap:wrap;align-items:center;gap:18px 28px;margin-top:6px}
+.btn--light{background:#fff;color:#0A0A0A;border-color:#fff}
+.cta__link{color:#fff;font-size:16px}
+@media (min-width:900px){
+  .sec__in{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);align-items:start}
+  .sec__in--wide{grid-template-columns:minmax(0,1fr)}
+  .cols{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+
 /* ---- Tablet + phone: one column, a pinned preview, a bottom Open bar ---- */
 @media (max-width:1000px){
   .flow[data-stage=preview]{grid-template-columns:minmax(0,1fr);gap:0}
@@ -125,7 +169,7 @@ h1,h2,p{margin:0}
   .name__row .btn{width:100%}
   .step__s{width:100%;margin-left:48px}
   .sw button{width:44px;height:44px}.sw button[aria-checked=true]::after{left:15px;top:9px}
-  .hello h1{font-size:clamp(36px,10.4vw,48px)}
-  .pitch__h{font-size:clamp(34px,10.4vw,46px)}
+  .hello h1{font-size:clamp(28px,8.4vw,36px)}
+  .pitch__h{font-size:clamp(32px,9.6vw,42px)}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
