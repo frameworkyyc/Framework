@@ -37,9 +37,12 @@
   function goTo(n) {
     var s = steps[n - 1]; if (!s) return;
     setTimeout(function () {
-      var head = $(".top"), under = (head ? head.getBoundingClientRect().bottom : 68) + (narrow() ? (stage.hidden ? 0 : stage.offsetHeight) + 12 : 20);
+      var head = $(".top"), wide = !narrow(), under = (head ? head.getBoundingClientRect().bottom : 68) + (wide ? 20 : (stage.hidden ? 0 : stage.offsetHeight) + 12);
       var slide = 0; try { slide = new DOMMatrix(getComputedStyle(s).transform).m42 || 0; } catch (e) { /* no transform */ } // the step is still sliding in: aim at where it settles
-      window.scrollTo({ top: Math.max(0, s.getBoundingClientRect().top - slide + window.scrollY - under), behavior: reduce ? "auto" : "smooth" });
+      var y = s.getBoundingClientRect().top - slide + window.scrollY - under;
+      // desktop: never scroll so far that the end of the steps releases the pinned preview; the step then lands a little lower, with the whole preview in view
+      if (wide && !stage.hidden) y = Math.min(y, flow.getBoundingClientRect().bottom - (parseFloat(getComputedStyle(flow).paddingBottom) || 0) + window.scrollY - (parseFloat(getComputedStyle(stage).top) || 88) - stage.getBoundingClientRect().height);
+      window.scrollTo({ top: Math.max(0, y), behavior: reduce ? "auto" : "smooth" });
     }, 120);
   }
 
