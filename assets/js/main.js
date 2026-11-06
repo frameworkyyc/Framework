@@ -43,12 +43,22 @@
 
   /* Arriving from a demo website ("Make it yours"): pre-fill the business name and say which demo they liked. */
   (function () {
-    var q = new URLSearchParams(window.location.search), biz = (q.get("business") || "").replace(/[\u0000-\u001F<>]/g, "").trim().slice(0, 60);
-    var demos = { "fence-deck": "Fence & Decks", landscaping: "Landscaping", renovations: "Renovations", "general-contractor": "General Contractor" };
-    var demo = demos[q.get("demo")], bizInput = document.getElementById("business"), msg = document.getElementById("message");
+    // The company name comes from this tab's session (set by the demo pages), not from the URL, so it is never in a link or a server log.
+    var saved = {}; try { saved = JSON.parse(window.sessionStorage.getItem("fw_demo") || "{}") || {}; } catch (e) { saved = {}; }
+    var q = new URLSearchParams(window.location.search), biz = String(saved.n || q.get("business") || "").replace(/[\u0000-\u001F<>]/g, "").trim().slice(0, 60);
+    var demos = { "fence-deck": "Fence & Decks", landscaping: "Landscaping", renovations: "Renovations / Restoration", "general-contractor": "General Contracting" };
+    var vibes = { rugged: "rugged", modern: "modern", minimal: "minimal", friendly: "friendly" };
+    var demoKey = q.get("demo") || saved.d, demo = demos[demoKey], vibe = vibes[saved.v], bizInput = document.getElementById("business"), msg = document.getElementById("message");
     if (biz && bizInput && !bizInput.value) bizInput.value = biz;
-    if (demo && msg && !msg.value) msg.value = "I'd like a website like the " + demo + " demo" + (biz ? ", made for " + biz : "") + ".";
+    if (demo && msg && !msg.value) msg.value = "I'd like a website like the " + demo + " demo" + (vibe ? " in the " + vibe + " style" : "") + (biz ? ", made for " + biz : "") + ".";
   })();
+
+  /* The demo pages' private visit id (a random value in this tab's session), so Framework can see that a demo visit led to this enquiry.
+     Respects Do Not Track and Global Privacy Control; nothing from this form is stored with it (worker/DEMO-TRAFFIC.md). */
+  var demoJourney = function () {
+    if (navigator.doNotTrack === "1" || window.doNotTrack === "1" || navigator.globalPrivacyControl === true) return "";
+    try { var j = window.sessionStorage.getItem("fw_dj") || ""; return /^[A-Za-z0-9_-]{22}$/.test(j) ? j : ""; } catch (e) { return ""; }
+  };
 
   var success = document.getElementById("form-success");
   var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -124,7 +134,7 @@
     window.fetch("/api/contact", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: val("name"), email: val("email"), business: val("business"), project_type: val("project_type"), message: val("message"),
-        hp: form.elements.hp ? form.elements.hp.value : "", turnstile_token: turnstileToken, elapsed_ms: Date.now() - loadedAt, submission_id: submissionId, page: window.location.pathname })
+        hp: form.elements.hp ? form.elements.hp.value : "", turnstile_token: turnstileToken, elapsed_ms: Date.now() - loadedAt, submission_id: submissionId, page: window.location.pathname, journey: demoJourney() })
     }).then(function (r) {
       if (!r.ok) throw new Error("status " + r.status);
       form.hidden = true; success.hidden = false; success.focus();

@@ -62,6 +62,7 @@ The sidebar is grouped in `admin.js` (`NAV_GROUPS`: Inbox, Assessments, People, 
 - **List** (Clients, Support, Feedback): a toolbar (search, filters), one rounded list, a status chip per row, an empty state.
 - **Detail**: header (name, status chip), the stat row, folds for the sections.
 - **Hub** (Settings): link cards.
+- **Report** (Demo traffic): a one-line caveat, filters (period, one checkbox) beside the prominent export button, stat cards, a fold per visitor whose body (a timestamped timeline, `.dt-timeline`) loads when opened, then a ruled list of items with a copy button (`.dt-link`) and a closed Manage fold for create, revoke and delete. A colour choice is a square SVG swatch (`.dt-swatch`, fill attribute, no inline style). Details: `worker/DEMO-TRAFFIC.md`.
 - **Form**: labelled fields in one column, the primary button last, the destructive action apart (`.adm-actions__danger`).
 
 ## How each page applies it
