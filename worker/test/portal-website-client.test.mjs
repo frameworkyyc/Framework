@@ -80,7 +80,7 @@ test("state 3, In development: Framework is building it, no address needed, 'man
   assert.match(page, /Managed by Framework/);
   assert.ok(!/Not managed by Framework/.test(page));
   assert.match(page, /Framework is building this website/);
-  assert.ok(!/<a class="text-link" href="https?:/.test(page), "no address, no link");
+  assert.ok(!/<a class="text-link" href="https?:\/\/(?!frameworkco\.ca\/card")/.test(page), "no address, no link (the labelled real example of Framework's own digital card is the only outside link)");
 });
 
 test("state 4, Live: link, launch date, domain and hosting facts; status and 'managed' are separate", async () => {

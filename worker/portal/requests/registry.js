@@ -8,6 +8,7 @@
  *            type: text | textarea | select | checks | date. Values are validated and stored in requests.details_json; nothing else is ever stored from the form.
  *   brand    true when the form offers the organization's published brand (logos, colours, fonts) and snapshots it with the request
  *   website  true when the request may name one of the organization's websites
+ *   hidden   true when the type is kept only so earlier requests of that type still open and read; it is never offered (see `brochure`: folded into the flyer type)
  *   files    the hint shown beside the reference upload
  *
  * Nothing here is a price or a contractual term. Prices come from Admin (request_type_settings) or from a quote; where neither exists the page says "custom quote".
@@ -63,10 +64,10 @@ const DEFS = [
   { key: "poster", kind: "deliverable", label: "Poster", icon: "poster", summary: "A poster for an event, offer or announcement.", proofs: true, brand: true, files: "Photos, logos or an earlier poster.", note: PRINT_NOTE,
     fields: [text("headline", "Headline", { required: true }), select("size", "Size", [["letter", "Letter (8.5 x 11 in)"], ["tabloid", "Tabloid (11 x 17 in)"], ["18x24", "18 x 24 in"], ["24x36", "24 x 36 in"], ["other", "Another size (say which below)"]]), select("orientation", "Orientation", [["portrait", "Portrait"], ["landscape", "Landscape"]]), area("details", "Event or offer details", { required: true, max: 1500, help: "Date, place, price, how to take part." }), ...DELIVERABLE_COMMON],
     includes: ["A design for your approval", "Final files delivered in the portal"] },
-  { key: "flyer", kind: "deliverable", label: "Flyer", icon: "flyer", summary: "A one or two sided flyer.", proofs: true, brand: true, files: "Photos, logos or an earlier flyer.", note: PRINT_NOTE,
-    fields: [text("headline", "Headline", { required: true }), select("size", "Size", [["letter", "Letter (8.5 x 11 in)"], ["half", "Half letter (5.5 x 8.5 in)"], ["dl", "DL (4 x 9 in)"], ["other", "Another size (say which below)"]]), select("sides", "Sides", [["one", "Front only"], ["two", "Front and back"]]), area("details", "What it needs to say", { required: true, max: 1500 }), text("action", "What should people do?", { help: "For example call, visit or book online." }), ...DELIVERABLE_COMMON],
+  { key: "flyer", kind: "deliverable", label: "Flyer or brochure", icon: "flyer", summary: "A flyer, or a folded brochure.", proofs: true, brand: true, files: "Photos, logos or an earlier flyer.", note: PRINT_NOTE,
+    fields: [select("format", "What do you need?", [["flyer", "A flyer (one sheet)"], ["bifold", "A bi-fold brochure (4 panels)"], ["trifold", "A tri-fold brochure (6 panels)"]]), text("headline", "Headline", { required: true }), select("size", "Size", [["letter", "Letter (8.5 x 11 in)"], ["half", "Half letter (5.5 x 8.5 in)"], ["dl", "DL (4 x 9 in)"], ["other", "Another size (say which below)"]]), select("sides", "Sides", [["one", "Front only"], ["two", "Front and back"]]), area("details", "What it needs to say", { required: true, max: 1500 }), text("action", "What should people do?", { help: "For example call, visit or book online." }), ...DELIVERABLE_COMMON],
     includes: ["A design for your approval", "Final files delivered in the portal"] },
-  { key: "brochure", kind: "deliverable", label: "Brochure", icon: "brochure", summary: "A folded brochure or a short multi-page document.", proofs: true, brand: true, files: "Photos, logos and any existing text or brochure.", note: PRINT_NOTE,
+  { key: "brochure", kind: "deliverable", hidden: true, label: "Brochure", icon: "brochure", summary: "A folded brochure or a short multi-page document.", proofs: true, brand: true, files: "Photos, logos and any existing text or brochure.", note: PRINT_NOTE,
     fields: [select("format", "Format", [["bifold", "Bi-fold (4 panels)"], ["trifold", "Tri-fold (6 panels)"], ["pages", "Multi-page document"], ["other", "Not sure"]]), area("sections", "Sections or panels", { required: true, max: 2000, help: "What each panel or page should cover." }), ...DELIVERABLE_COMMON],
     includes: ["A design for your approval", "Final files delivered in the portal"] },
   { key: "social_graphics", kind: "deliverable", label: "Social media graphics", icon: "social", summary: "Graphics sized for your social channels.", proofs: true, brand: true, files: "Photos, logos or posts you like.",
@@ -91,7 +92,8 @@ const DEFS = [
 
   // ---- Custom development
   { key: "custom_web_app", kind: "development", label: "Custom web application", icon: "app", summary: "A web application built around how your business works.", proofs: false, files: "Screenshots, documents or sketches.", fields: DEVELOPMENT_FIELDS("What problem should the application solve?"), includes: ["A scoped quote before work starts"] },
-  { key: "business_portal", kind: "development", label: "Business dashboard or portal", icon: "dashboard", summary: "A dashboard or portal for your team or your customers.", proofs: false, files: "Screenshots, documents or sketches.", fields: DEVELOPMENT_FIELDS("What should the dashboard or portal help you see or do?"), includes: ["A scoped quote before work starts"] },
+  { key: "business_dashboard", kind: "development", label: "Business dashboard", icon: "dashboard", summary: "One screen that shows how your business is doing.", proofs: false, files: "Screenshots, documents or sketches.", fields: DEVELOPMENT_FIELDS("What should the dashboard help you see?"), includes: ["A scoped quote before work starts"] },
+  { key: "business_portal", kind: "development", label: "Client portal", icon: "portal", summary: "A private workspace where your customers log in.", proofs: false, files: "Screenshots, documents or sketches.", fields: DEVELOPMENT_FIELDS("What should your customers be able to see or do in the portal?"), includes: ["A scoped quote before work starts"] },
   { key: "ai_automation", kind: "development", label: "AI automation", icon: "spark", summary: "Use AI to take a repetitive task off your team.", proofs: false, files: "Examples of the work, with anything private removed.", fields: DEVELOPMENT_FIELDS("Which task or process would you like to automate with AI?"), includes: ["A scoped quote before work starts"] },
   { key: "workflow_automation", kind: "development", label: "Workflow automation", icon: "flow", summary: "Connect the steps of a process so they run themselves.", proofs: false, files: "Process notes or diagrams.", fields: DEVELOPMENT_FIELDS("Which process or workflow should run automatically?"), includes: ["A scoped quote before work starts"] },
   { key: "api_integration", kind: "development", label: "API or software integration", icon: "link", summary: "Make two tools share information.", proofs: false, files: "Documentation or examples.", fields: DEVELOPMENT_FIELDS("Which tools should be connected, and what should pass between them?"), includes: ["A scoped quote before work starts"] },
@@ -115,7 +117,7 @@ export const typeLabel = (key) => (getType(key) ? getType(key).label : String(ke
 export function effectiveSettings(type, row = null) {
   const fixed = row && row.pricing_mode === "fixed" && Number.isInteger(row.fixed_price_cents);
   return {
-    enabled: row ? row.enabled === 1 : true,
+    enabled: type.hidden ? false : row ? row.enabled === 1 : true,
     revisionsIncluded: row && Number.isInteger(row.revisions_included) ? row.revisions_included : DEFAULT_REVISIONS,
     pricing: fixed ? { mode: "fixed", fixedPriceCents: row.fixed_price_cents } : { mode: "quote", fixedPriceCents: null },
     turnaroundNote: row && row.turnaround_note ? row.turnaround_note : "",

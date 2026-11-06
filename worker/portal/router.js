@@ -637,8 +637,13 @@ async function postNewRequest(ctx, a) {
     logEvent({ evt: "support.request", outcome: "rejected", reason: "csrf", status: 403, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
     return errorPage(403, { ref: ctx.ref });
   }
-  const values = { category: read.fields.get("category") || "", title: read.fields.get("title") || "", description: read.fields.get("description") || "" };
-  const res = await clientCreateRequest(brandDeps(ctx), { ...who(a), ...values, files: read.files });
+  const values = { category: read.fields.get("category") || "", title: read.fields.get("title") || "", description: read.fields.get("description") || "", urgency: read.fields.get("urgency") || "none" };
+  // The title is optional on the form: when it is blank the start of the message is used. Urgency, when it is not "Not urgent", is the first line of the message.
+  const urgent = ["soon", "urgent"].includes(values.urgency) ? values.urgency : "";
+  const firstLine = (values.description.split("\n").map((l) => l.replace(/\s+/g, " ").trim()).find(Boolean) || "");
+  const title = values.title.trim() || (firstLine.length > 80 ? `${firstLine.slice(0, 80).replace(/\s+\S*$/, "")}…` : firstLine) || "New request";
+  const description = urgent && values.description.trim() ? `Urgency: ${urgent === "urgent" ? "Urgent" : "Soon"}\n\n${values.description}` : values.description;
+  const res = await clientCreateRequest(brandDeps(ctx), { ...who(a), category: values.category, title, description, files: read.files });
   if (!res.ok) {
     const status = supportStatus(res.error);
     logEvent({ evt: "support.request", outcome: "refused", reason: res.error, status, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
