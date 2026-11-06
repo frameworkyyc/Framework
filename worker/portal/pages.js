@@ -16,6 +16,7 @@ import * as websiteLive from "./website-live.js";
 import { frameSources } from "./website-preview.js";
 import { brandingEnabled, servicesEnabled, websiteEnabled, requestsEnabled } from "./config.js";
 import { requestsNav, activeKey } from "./requests/nav.js";
+import { unifiedHome as requestsUnifiedHome } from "./requests/views.js";
 import { LIVE_AREAS } from "./guided-data.js";
 import { specimenSlots } from "./brand-type.js";
 
@@ -103,11 +104,14 @@ export async function pickerPage(ctx, session, memberships) {
 }
 
 /** The home of the connected portal: the six workspace blocks. Nothing from the demonstration is shown. */
-/** The needs-your-action block goes right under the greeting, not above it. */
-const placeAfterGreeting = (home, top) => { if (!top) return home; const i = home.indexOf("</header>"); return i < 0 ? top + home : home.slice(0, i + 9) + top + home.slice(i + 9); };
-export async function homePage(ctx, a, moduleStatus = {}, nextAction = {}, brand = null, servicesAttention = [], website = null, top = "") {
+export async function homePage(ctx, a, moduleStatus = {}, nextAction = {}, brand = null, servicesAttention = [], website = null, unified = null) {
   const vm = { ...liveModel(ctx, a, {}), moduleStatus, nextAction, brand, servicesAttention, website };
-  return shell(ctx, a, { title: "Home", active: "home", body: placeAfterGreeting(guided.home(vm), top), vm, ref: "home" });
+  // Where the request area is on, Home is one design: the greeting, six equal service blocks, what needs the person, and the Business Profile.
+  if (unified) {
+    const d = { ...unified, brand, website, profile: { status: moduleStatus && moduleStatus.profile, next: nextAction && nextAction.profile } };
+    return shell(ctx, a, { title: "Home", active: "home", body: requestsUnifiedHome({ base: vm.base, now: ctx.now }, guided.homeGreeting(vm), d), vm, ref: "home" });
+  }
+  return shell(ctx, a, { title: "Home", active: "home", body: guided.home(vm), vm, ref: "home" });
 }
 export async function overviewPage(ctx, a, data) {
   const vm = liveModel(ctx, a, data);
