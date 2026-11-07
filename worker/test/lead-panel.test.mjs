@@ -42,11 +42,12 @@ test("search, status filter with counts and bulk selection are all still there",
   for (const t of ["Search name, trade or city", "ld-seg", "Approve selected", "Dismiss selected", "Review & send", "ld-selall"]) assert.ok(list.includes(t), t);
 });
 
-test("details: three figures (score, Maps position, rating), a verdict, outreach, then folds; no Next Step box or Measured labels", () => {
+test("details: four figures (score, Google Search, Google Maps, rating), a verdict, outreach, then folds; no Next Step box or Measured labels", () => {
   const paint = panel.slice(panel.indexOf("function paint()"));
   const order = ["overview(bar), figs", "opportunity()", 'section("Outreach"', "seoDetails(), notes(), siteCheck(), sources(), history()"].map((t) => paint.indexOf(t));
   assert.ok(order.every((i) => i > 0) && [...order].sort((a, b) => a - b).join() === order.join(), "in this order");
-  assert.ok(panel.includes("figures()")); for (const t of ['"SEO opportunity"', '"Google Maps"', '"Rating"']) assert.ok(panel.includes(`label: ${t}`), t);
+  assert.ok(panel.includes("figures()")); const labels = [...panel.matchAll(/\{ label: "(SEO opportunity|Google Search|Google Maps|Rating)"/g)].map((m) => m[1]);
+  assert.deepEqual(labels, ["SEO opportunity", "Google Search", "Google Maps", "Rating"], "four primary figures, Search and Maps kept apart");
   assert.ok(!/ld-tag|ld-step|Next step|"Why they|"Measured"/.test(panel), "no per-figure Measured tags; unmeasured items just show a dash, with the reason inside SEO details");
   assert.ok(!/\.ld-tag|\.ld-step/.test(css));
 });
@@ -83,17 +84,21 @@ test("Admin design rules hold: no rounded corners, shadows, gradients or inline 
   for (const f of ["lead-panel.js", "leads.js", "leads-common.js", "lead-pitch.js", "lead-review.js"]) assert.ok(!/[←-⇿☀-➿⬀-⯿\u{1F000}-\u{1FAFF}]/u.test(src(f)), f);
 });
 
-test("responsive: the figures stay three across with fluid type; the competitor and score rows stack on a phone; the menu is a ruled box", () => {
-  assert.match(css, /\.ld-figs \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
-  assert.match(css, /clamp\(44px, 9vw, 88px\)/);
+test("responsive: the four figures are two by two on a phone and four across from 700px, with fluid type; the competitor and score rows stack on a phone; the menu is a ruled box", () => {
+  assert.match(css, /\.ld-figs \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /@media \(min-width: 700px\) \{ \.ld-figs \{ grid-template-columns: 1\.25fr 1fr 1fr 1fr/);
+  assert.match(css, /clamp\(52px, 11vw, 88px\)/);
   assert.match(css, /@media \(min-width: 700px\) \{ \.ld-bk/);
   assert.match(css, /\.ld-menu__list \{[^}]*border: 1px solid var\(--ink\)/);
   assert.match(css, /\.ld-panel \{ max-width: 1040px/);
 });
 
-test("organic rankings: a Google Search line under the figures and every tracked keyword with its real position (or 'Not in top N') in SEO details", () => {
-  assert.match(panel, /class: "ld-gsearch"/); assert.match(panel, /Google Search by keyword/);
-  assert.match(panel, /Not in top \$\{q\.depth\}/); assert.match(panel, /Not checked yet/);
-  assert.match(panel, /`#\$\{q\.position\}`/);
-  assert.ok(!/ld-kw[^"]*"[^)]*Measured/.test(panel));
+test("organic rankings: a Google Search figure (best measured position, 'Not found in the top N', or 'Not measured yet') and every keyword in an expandable list", () => {
+  assert.match(panel, /Not measured yet/); assert.match(panel, /value: "Not found", sub: `in the top \$\{depth\}`/);
+  assert.match(panel, /value: `#\$\{best\.position\}`, sub: `for "\$\{clip\(best\.keyword\)\}"`/);
+  assert.match(panel, /title: "Google Search by keyword"/); assert.match(panel, /Not found in top \$\{q\.depth\}/);
+  assert.match(panel, /Google Maps: a separate measurement/);
+  assert.ok(!/ld-gsearch/.test(panel + css), "the old one-line summary is gone");
+  const search = panel.slice(panel.indexOf("const search ="), panel.indexOf("// Google Maps: a separate"));
+  assert.ok(!/r\.maps/.test(search), "the Search figure never reads the Maps position");
 });

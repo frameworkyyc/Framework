@@ -61,22 +61,32 @@ export async function render(id, ctx) {
 
   function figures() {
     const l = data.lead, s = l.seo, r = s && s.report;
-    const mapsOk = !!(r && r.maps);
     const rep = r && r.reputation ? r.reputation : l.rating ? { rating: Number(l.rating), reviews: l.review_count } : null;
-    const figs = [
-      { label: "SEO opportunity", value: s && s.score !== null ? String(s.score) : "–", unit: s && s.score !== null ? "/100" : "", sub: s ? "" : "Not assessed yet", lead: true, level: s ? s.level : "unknown" },
-      { label: "Google Maps", value: !mapsOk ? "–" : r.maps.position === null ? `${r.maps.checked}+` : `#${r.maps.position}`, unit: "", sub: !mapsOk ? "" : r.maps.position === null ? `not in the first ${r.maps.checked}` : `of ${r.maps.checked}`, off: !mapsOk },
-      { label: "Rating", value: rep ? rep.rating.toFixed(1) : "–", unit: "", sub: rep && rep.reviews ? `${rep.reviews} reviews` : "", off: !rep },
-    ];
+    const clip = (t) => (t.length > 30 ? t.slice(0, 29) + "…" : t);
+    // Google Search: the best measured position among the tracked keywords; if none was found, that it was not found in the results that were checked; otherwise not measured
     const org = r && r.organic && r.organic.length ? r.organic : null;
     const found = org ? org.filter((q) => q.position !== null) : [];
     const best = found.length ? found.reduce((b, q) => (q.position < b.position ? q : b)) : null;
-    const searchLine = org ? h("p", { class: "ld-gsearch" }, h("span", { class: "ld-label", text: "Google Search" }),
-      h("span", { text: best ? `Best #${best.position} for "${best.keyword}"${found.length < org.length ? `, not in the top ${best.depth} for ${org.length - found.length} of ${org.length} keywords` : ""}` : `Not in the top ${org[0].depth} for ${org.length === 1 ? "its keyword" : `any of ${org.length} keywords`}` })) : null;
-    return h("div", null, h("div", { class: "ld-figs" }, figs.map((f) => h("div", { class: "ld-fig" + (f.lead ? " ld-fig--lead ld-fig--" + f.level : "") + (f.off ? " ld-fig--off" : "") },
+    const depth = org ? Math.min(...org.map((q) => q.depth)) : 0;
+    const search = !org ? { value: "–", sub: "Not measured yet", off: true }
+      : best ? { value: `#${best.position}`, sub: `for "${clip(best.keyword)}"` }
+      : { value: "Not found", sub: `in the top ${depth}`, word: true };
+    // Google Maps: a separate measurement (Places result order), never mixed with the Search position
+    const mapsOk = !!(r && r.maps);
+    const maps = !mapsOk ? { value: "–", sub: "Not measured yet", off: true }
+      : r.maps.position === null ? { value: "Not found", sub: `in the top ${r.maps.checked}`, word: true }
+      : { value: `#${r.maps.position}`, sub: `of ${r.maps.checked}` };
+    const figs = [
+      { label: "SEO opportunity", value: s && s.score !== null ? String(s.score) : "–", unit: s && s.score !== null ? "/100" : "", sub: s ? "" : "Not assessed yet", lead: true, level: s ? s.level : "unknown" },
+      { label: "Google Search", ...search },
+      { label: "Google Maps", ...maps },
+      { label: "Rating", value: rep ? rep.rating.toFixed(1) : "–", sub: rep && rep.reviews ? `${rep.reviews} reviews` : "", off: !rep },
+    ];
+    const fig = h("div", { class: "ld-figs" }, figs.map((f) => h("div", { class: "ld-fig" + (f.lead ? " ld-fig--lead ld-fig--" + f.level : "") + (f.off ? " ld-fig--off" : "") },
       h("span", { class: "ld-fig__label", text: f.label }),
-      h("strong", { class: "ld-fig__value" }, f.value, f.unit ? h("span", { class: "ld-fig__unit", text: f.unit }) : null),
-      f.sub ? h("span", { class: "ld-fig__sub", text: f.sub }) : null))), searchLine);
+      h("strong", { class: "ld-fig__value" + (f.word ? " ld-fig__value--word" : "") }, f.value, f.unit ? h("span", { class: "ld-fig__unit", text: f.unit }) : null),
+      f.sub ? h("span", { class: "ld-fig__sub", text: f.sub }) : null)));
+    return h("div", null, fig, org ? fold({ title: "Google Search by keyword", meta: `${org.length} keyword${org.length === 1 ? "" : "s"}`, body: organicList(r) }) : null);
   }
 
   /* ---------- Opportunity: the verdict and the three things that matter ---------- */
@@ -149,7 +159,6 @@ export async function render(id, ctx) {
     const comps = r && r.competitor && r.competitor.top && r.competitor.top.length ? competitors(r) : null;
     return fold({ title: "SEO details", meta: `${wrong.length} finding${wrong.length === 1 ? "" : "s"}`, body: h("div", null,
       h("dl", { class: "adm-spec ld-facts" }, facts.map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", { text: v })))),
-      organicList(r),
       h("h3", { class: "ld-sub", text: "Score" }), h("ul", { class: "ld-bks", "aria-label": "Score components" }, rows),
       comps ? h("div", null, h("h3", { class: "ld-sub", text: "Local competitors" }), comps) : null,
       wrong.length || fix.length ? h("div", { class: "ld-cols" }, h("div", null, h("h3", { class: "ld-sub", text: "Findings" }), wrong.length ? list(wrong) : null), h("div", null, h("h3", { class: "ld-sub", text: "To improve" }), fix.length ? list(fix) : null)) : null) });
@@ -158,12 +167,10 @@ export async function render(id, ctx) {
   /** Every tracked keyword with the business's real position, or that it was not among the results checked. Nothing is shown for a keyword that was not checked. */
   function organicList(r) {
     const org = r && r.organic ? r.organic : [];
-    if (!org.length) return h("div", null, h("h3", { class: "ld-sub", text: "Google Search by keyword" }), h("p", { class: "rk-quiet", text: "Not checked yet." }));
-    return h("div", null, h("h3", { class: "ld-sub", text: "Google Search by keyword" }),
-      h("ul", { class: "ld-kw", "aria-label": "Google Search rankings by keyword" }, org.map((q) => h("li", { class: "ld-kw__row" },
-        h("span", { class: "ld-kw__q", text: q.keyword }),
-        h("strong", { class: "ld-kw__pos" + (q.position === null ? " ld-kw__pos--none" : ""), text: q.position === null ? `Not in top ${q.depth}` : `#${q.position}` }),
-        h("span", { class: "ld-kw__when adm-muted", text: [q.location, q.checked].filter(Boolean).join(" · ") })))));
+    return h("ul", { class: "ld-kw", "aria-label": "Google Search rankings by keyword" }, org.map((q) => h("li", { class: "ld-kw__row" },
+      h("span", { class: "ld-kw__q", text: q.keyword }),
+      h("strong", { class: "ld-kw__pos" + (q.position === null ? " ld-kw__pos--none" : ""), text: q.position === null ? `Not found in top ${q.depth}` : `#${q.position}` }),
+      h("span", { class: "ld-kw__when adm-muted", text: [q.location, q.checked ? "checked " + q.checked : ""].filter(Boolean).join(" · ") }))));
   }
 
   function competitors(r) {
