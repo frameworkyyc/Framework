@@ -76,7 +76,10 @@
       // Safeguard: without this, `wrangler d1 migrations ...` on this binding would default to ./migrations, the FEEDBACK database's folder.
       // The portal's migrations live in migrations/portal (one .sql file). Nothing runs on deploy; the reviewed manual workflow applies them.
       "migrations_dir": "migrations/portal"
-    }
+    },
+    // Admin -> Leads (Production): the finder Worker's database (framework-leadgen), bound so Admin can import its qualified, assessed candidates. Cloudflare cannot make a D1 binding read-only;
+    // worker/leads.js only ever sends SELECT statements to it (every call goes through finderSelect, and a test pins that). Sending email stays OFF in Production (no LEADS_SENDING).
+    { "binding": "LEADGEN_DB", "database_name": "framework-leadgen", "database_id": "3162e849-ac70-4a1b-b37b-051430d24c39" }
   ],
   // Client files (PRODUCTION rollout Stage 3): two PRIVATE R2 buckets, no public access and no custom domain. PORTAL_FILES holds the files; PORTAL_FILES_BACKUP holds
   // copies (worker/portal/file-backup.js; it has a retain-everything bucket lock, and the application never deletes there). Bound here, but nothing uses them for clients until
