@@ -1,5 +1,5 @@
 -- 0021: private traffic reporting for the demo landing page (/demos/): opaque tracking links, anonymous journeys and their events.
--- PROPOSED. Not applied anywhere. Show for review and wait for approval before applying it to Staging; Production only through the manual
+-- Applied to Staging. Not applied to Production: Production only through the manual
 -- "Portal Production D1 migration" workflow, after its own approval.
 --
 -- Three additive tables. Nothing existing changes. No IP address and no user-agent string is stored: only a coarse country, a device class,

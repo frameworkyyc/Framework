@@ -11,6 +11,8 @@
  *   POST /api/contact           Website contact form (emails Framework; stores nothing)
  *   GET  /d/<token>             opaque demo tracking link, redirects to /demos/ (worker/demo-traffic.js)
  *   POST /api/demo-events       anonymous demo-page interaction events (204; stored privately, shown only in Admin)
+ *   GET/POST /u/<token>         unsubscribe page for outreach email (GET only shows a button; POST records the opt-out; worker/leads.js)
+ *   POST /api/leads/webhook     Resend delivery events for outreach email (Svix signature required; worker/leads.js)
  *   GET  /api/client-revenue    the combined client revenue total for the homepage (no per-client data)
  *   GET  /api/feedback/export   CSV / JSON export, requires  Authorization: Bearer <FEEDBACK_EXPORT_TOKEN>
  *
@@ -27,6 +29,7 @@ import { combinedRevenue } from "./revenue.js";
 import { handleAssessmentSubmit, handleAssessmentConfig } from "./assessment.js";
 import { handleContactSubmit } from "./contact.js";
 import { handleDemoLink, handleDemoEvents } from "./demo-traffic.js";
+import { handleUnsubscribe, handleLeadsWebhook } from "./leads.js";
 import { handleCardPage } from "./card.js";
 import { handlePortal, portalNotFound } from "./portal/router.js";
 import { runScheduled } from "./portal/scheduled.js";
@@ -340,6 +343,12 @@ export default {
     if (path.startsWith("/d/")) return handleDemoLink(request, env, deps);
     if (path === "/api/demo-events") {
       try { return await handleDemoEvents(request, env, deps); } catch (err) { console.error("demo events error", err && err.message); return new Response(null, { status: 204 }); }
+    }
+
+    // Public: outreach unsubscribe page and the email provider's delivery webhook (see worker/leads.js). Both do nothing until migration 0022 is applied.
+    if (path.startsWith("/u/")) return handleUnsubscribe(request, env, deps);
+    if (path === "/api/leads/webhook") {
+      try { return await handleLeadsWebhook(request, env, deps); } catch (err) { console.error("leads webhook error", err && err.message); return json({ error: "server_error" }, 500); }
     }
 
     // Public: website contact form (see worker/contact.js).

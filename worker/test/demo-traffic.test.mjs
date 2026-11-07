@@ -23,7 +23,7 @@ const humanHeaders = (ua = CHROME) => ({ "User-Agent": ua, "Accept-Language": "e
 
 /** A fake D1 that records every bound parameter and every SQL text, so tests can prove what is (not) stored. */
 function world({ migrated = true, env = {} } = {}) {
-  const db = openPortalDb({ proposed: migrated ? ["0021_demo_traffic.sql"] : [] });
+  const db = openPortalDb({ skip: migrated ? ["0024_leads.sql", "0025_seo_leads.sql"] : ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql"] });
   const bound = [];
   const prepare = db.prepare.bind(db);
   db.prepare = (sql) => { const s = prepare(sql); const bind = s.bind; s.bind = (...p) => { bound.push({ sql, p }); return bind(...p); }; return s; };
@@ -496,8 +496,8 @@ test("wiring: /d/* runs the Worker first, the public routes are in index.js, the
   const idx = readFileSync(new URL("../index.js", import.meta.url), "utf8");
   assert.match(idx, /path\.startsWith\("\/d\/"\)/); assert.match(idx, /path === "\/api\/demo-events"/);
   assert.match(readFileSync(new URL("../admin/router.js", import.meta.url), "utf8"), /handleDemoTrafficApi/);
-  const sql = readFileSync(new URL("../../migrations/portal-proposed/0021_demo_traffic.sql", import.meta.url), "utf8");
-  assert.match(sql, /PROPOSED\. Not applied/);
+  const sql = readFileSync(new URL("../../migrations/portal/0021_demo_traffic.sql", import.meta.url), "utf8");
+  assert.match(sql, /Not applied to Production/);
   assert.ok(!/DROP |DELETE FROM|ALTER |\bUPDATE /i.test(sql.replace(/--.*$/gm, "")), "additive only");
   assert.ok(!/ip_?address|user_?agent|\bua\b/i.test(sql.replace(/--.*$/gm, "")), "no column can hold an address or a user agent");
 });

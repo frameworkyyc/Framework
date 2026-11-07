@@ -12,7 +12,7 @@ import { buildPlan, compareSchemas, readSchema, renderReport } from "../../scrip
 import { applyPlan } from "../../scripts/ops/staging-sync/apply.mjs";
 import { preflight } from "../../scripts/ops/staging-sync/cli.mjs";
 
-const PROD_SKIP = ["0014_brand_requirements.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql", "0018_discovery.sql", "0020_requests.sql", "0022_seo_keywords.sql", "0023_client_service_links.sql"];
+const PROD_SKIP = ["0014_brand_requirements.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql", "0018_discovery.sql", "0020_requests.sql", "0021_demo_traffic.sql", "0022_seo_keywords.sql", "0023_client_service_links.sql", "0024_leads.sql", "0025_seo_leads.sql"];
 const sha = (b) => createHash("sha256").update(b).digest("hex");
 const ORG_A = "11111111-1111-4111-8111-111111111111", ORG_B = "22222222-2222-4222-8222-222222222222", ORG_C = "33333333-3333-4333-8333-333333333333";
 const USER_P = "99999999-9999-4999-8999-999999999999";
@@ -347,4 +347,12 @@ test("the workflow: manual only, Staging ref, protected environment, verify-only
   assert.ok(!/framework-portal"?\s*$/m.test(y) || true);
   assert.match(y, /permissions:\s*\n\s*contents: read/);
   for (const line of y.split("\n").filter((l) => /uses:/.test(l))) assert.match(line, /@[0-9a-f]{40}/, "actions are pinned to a commit");
+});
+
+test("Demo traffic and Leads tables are excluded from the refresh: prospect and outreach data, tracking links and opt-outs never reach Staging, and the classification guard still stops on any other new table", async () => {
+  const { COPIED: copied, EXCLUDED: excluded } = await import("../../scripts/ops/staging-sync/tables.mjs");
+  const leadgen = ["demo_links", "demo_journeys", "demo_events", "outreach_leads", "outreach_contacts", "outreach_suppressions", "outreach_messages", "outreach_events"];
+  for (const t of leadgen) { assert.ok(t in excluded, t + " is excluded"); assert.ok(!copied.some((c) => c.table === t), t + " is not copied"); }
+  const plan = readFileSync(new URL("../../scripts/ops/staging-sync/plan.mjs", import.meta.url), "utf8");
+  assert.match(plan, /Production table\(s\) with no copy\/exclude decision/, "an unclassified table still stops the preflight");
 });

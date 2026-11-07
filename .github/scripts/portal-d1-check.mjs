@@ -41,6 +41,11 @@ export const STAGES = Object.freeze([
   { file: "0020_requests.sql", tables: ["request_events", "request_files", "request_quotes", "request_type_settings", "requests"], indexes: ["idx_invoices_request", "idx_request_events_request", "idx_request_files_request", "idx_request_quotes_request", "idx_requests_org", "idx_requests_status"] }, // five additive tables (the unified request engine) and one nullable column on invoices; nothing existing is touched
   { file: "0022_seo_keywords.sql", tables: ["seo_keywords", "seo_rank_checks"], indexes: ["idx_seo_keywords_live", "idx_seo_keywords_org", "idx_seo_rank_checks_kw"] }, // two tables (tracked keywords and their verified rank checks); nothing existing is touched
   { file: "0023_client_service_links.sql", tables: ["client_service_links"], indexes: [] }, // one table (a link per client and service: the address of a client's own digital business card); nothing existing is touched
+  // Applied AFTER 0023 on Production (it never received 0021, which was proposed while 0022 and 0023 were released), so the list is in APPLICATION order here, not file-name order:
+  // the pending list must still be an exact tail of it, which keeps the safeguard strict. Wrangler applies these three in file-name order (0021, 0024, 0025), the same order.
+  { file: "0021_demo_traffic.sql", tables: ["demo_events", "demo_journeys", "demo_links"], indexes: ["idx_demo_events_at", "idx_demo_events_journey", "idx_demo_journeys_last_seen", "idx_demo_journeys_link"] }, // three tables (anonymous demo-page traffic); nothing existing is touched
+  { file: "0024_leads.sql", tables: ["outreach_contacts", "outreach_events", "outreach_leads", "outreach_messages", "outreach_suppressions"], indexes: ["idx_outreach_contacts_lead", "idx_outreach_events_lead", "idx_outreach_leads_source_ref", "idx_outreach_leads_status", "idx_outreach_leads_updated", "idx_outreach_messages_lead", "idx_outreach_messages_live", "idx_outreach_messages_provider"] }, // five tables for the Leads workspace; needs 0021 (demo_links)
+  { file: "0025_seo_leads.sql", tables: [], indexes: ["idx_outreach_leads_seo"] }, // four nullable columns on outreach_leads and one index; needs 0024
 ]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",
@@ -89,8 +94,11 @@ export function assertPendingIsTail(names) {
   const known = EXPECTED.migrations;
   const unknown = names.filter((n) => !known.includes(n));
   if (unknown.length) fail("unexpected pending migration(s): " + unknown.join(", "));
-  const tail = known.slice(known.length - names.length);
-  if (names.length > known.length || names.some((n, i) => n !== tail[i])) fail("pending migrations are not the next ones in order; found: " + names.join(", "));
+  // The known list is in application order, so its last N entries are the N migrations that may be pending. They are compared as a SORTED set because wrangler applies pending
+  // files in file-name order (0021 before 0024 before 0025), which differs from the application-order list only for the three LeadGen migrations.
+  const tail = known.slice(Math.max(0, known.length - names.length));
+  const sortedTail = [...tail].sort(), sortedNames = [...names].sort();
+  if (names.length > known.length || sortedNames.some((n, i) => n !== sortedTail[i])) fail("pending migrations are not the next ones in order; found: " + names.join(", "));
 }
 export function checkPendingBefore(text, mode) {
   const names = [...pendingMigrations(text)].sort();

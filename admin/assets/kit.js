@@ -95,8 +95,11 @@ const ICONS = {
   assessments: "M8 4h8v3H8zM6 5H5v16h14V5h-1M9 12h6M9 16h4", discovery: "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 100 6 3 3 0 000-6z",
   clients: "M9 11a3 3 0 100-6 3 3 0 000 6zM3 20v-1a5 5 0 0110 0v1M17 11a3 3 0 000-6M21 20v-1a5 5 0 00-4-4.9", "approved-emails": "M3 6h18v12H3zM3 7l9 6 9-6",
   "additional-services": "M4 4h16v16H4zM12 8v8M8 12h8", "service-pricing": "M3 12V3h9l9 9-9 9zM8 8h.01", settings: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M14 4v4M8 10v4M16 16v4",
-  requests: "M5 4h14v16H5zM9 9h6M9 13h6M9 17h3", "demo-traffic": "M4 4v16h16M8 15l3-4 3 2 5-6",
+  requests: "M5 4h14v16H5zM9 9h6M9 13h6M9 17h3", leads: "M3 5h18l-7 8v6l-4 2v-8z", "demo-traffic": "M4 4v16h16M8 15l3-4 3 2 5-6",
   check: "M12 3a9 9 0 100 18 9 9 0 000-18zM8 12.4l2.7 2.7L16 9.8", chevron: "M9 6l6 6-6 6",
+  star: "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z", external: "M14 4h6v6M20 4l-9 9M18 14v5H5V6h5", back: "M19 12H5M11 6l-6 6 6 6",
+  download: "M12 4v11M7 11l5 5 5-5M5 20h14", copy: "M9 9h11v11H9zM5 15V4h11",
+  pin: "M12 21s-6-5.5-6-11a6 6 0 0112 0c0 5.5-6 11-6 11zM12 7.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z", report: "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5", note: "M4 5h16v11H9l-5 4zM8 9h8M8 12h5",
 };
 /** A 20px line icon by name (the module ids, plus check and chevron). Decorative: it is hidden from screen readers. */
 export function navIcon(name) {
