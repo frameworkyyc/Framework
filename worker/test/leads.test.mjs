@@ -1044,11 +1044,11 @@ test("the migration is additive, held in migrations/portal for the manual Produc
   assert.match(readme, /0024_leads\.sql` \(applied to Staging/);
 });
 
-test("wiring: /u/* runs the Worker first, the public routes are in index.js, the API is registered, and Production has no leads settings", () => {
+test("wiring: /u/* runs the Worker first, the public routes are in index.js, the API is registered, and Production binds the finder database but has no sending settings", () => {
   const cfg = readFileSync(new URL("../../wrangler.jsonc", import.meta.url), "utf8");
   assert.match(cfg, /"run_worker_first": \[[^\]]*"\/u\/\*"/);
   const before = cfg.slice(0, cfg.indexOf('"previews"')).replace(/^\s*\/\/.*$/gm, "");
-  assert.ok(!/LEADS_|LEADGEN/.test(before), "nothing about leads at the top level");
+  assert.ok(!/LEADS_/.test(before), "no LEADS_* settings at the top level (Production sends nothing)"); assert.equal((before.match(/LEADGEN_DB/g) || []).length, 1, "only the finder binding");
   const idx = readFileSync(new URL("../index.js", import.meta.url), "utf8");
   assert.match(idx, /path\.startsWith\("\/u\/"\)/); assert.match(idx, /path === "\/api\/leads\/webhook"/);
   assert.match(readFileSync(new URL("../admin/router.js", import.meta.url), "utf8"), /handleLeadsApi/);

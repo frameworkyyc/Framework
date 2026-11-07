@@ -14,18 +14,19 @@ const STAGING = { binding: "DB", database_name: "framework-staging", database_id
 
 const PORTAL_PRODUCTION = { binding: "PORTAL_DB", database_name: "framework-portal", database_id: "b213b7db-ed29-4ab6-946c-0728dd6709e8", migrations_dir: "migrations/portal" };
 
-test("Production: exactly two D1 bindings: DB -> framework-feedback (original ID unchanged) and PORTAL_DB -> framework-portal", () => {
-  assert.deepEqual(config.d1_databases, [PRODUCTION, PORTAL_PRODUCTION]);
+test("Production: DB -> framework-feedback (original ID unchanged), PORTAL_DB -> framework-portal, and LEADGEN_DB -> the finder database (read by Admin -> Leads)", () => {
+  assert.deepEqual(config.d1_databases, [PRODUCTION, PORTAL_PRODUCTION, { binding: "LEADGEN_DB", database_name: "framework-leadgen", database_id: "3162e849-ac70-4a1b-b37b-051430d24c39" }]);
 });
 
 const PORTAL_STAGING = { binding: "PORTAL_DB", database_name: "framework-portal-staging", database_id: "1edda8a2-5249-4f40-9dbc-d29aa44e21f8", migrations_dir: "migrations/portal" };
 
 const LEADGEN_STAGING = { binding: "LEADGEN_DB", database_name: "framework-leadgen", database_id: "3162e849-ac70-4a1b-b37b-051430d24c39" };
 
-test("Staging (Preview): DB -> framework-staging is preserved, plus PORTAL_DB -> framework-portal-staging and LEADGEN_DB (the finder's database, read by Admin -> Leads), which Production does not have", () => {
+test("Staging (Preview): DB -> framework-staging is preserved, plus PORTAL_DB -> framework-portal-staging and LEADGEN_DB (the finder's database, read by Admin -> Leads), which Production now has too (read only by Admin -> Leads; no LEADS_* settings, so Production sends nothing)", () => {
   assert.deepEqual(config.previews.d1_databases, [STAGING, PORTAL_STAGING, LEADGEN_STAGING]);
-  assert.ok(!JSON.stringify(config.d1_databases).includes("LEADGEN") && !JSON.stringify(config.d1_databases).includes("3162e849"), "the finder database is bound in previews only");
-  assert.equal(raw.split(LEADGEN_STAGING.database_id).length - 1, 1, "its id appears once, inside previews");
+  assert.deepEqual(config.d1_databases.filter((d) => d.binding === "LEADGEN_DB"), [LEADGEN_STAGING], "Production binds the same finder database under the same name");
+  assert.equal(raw.split(LEADGEN_STAGING.database_id).length - 1, 2, "its id appears once at the top level and once inside previews");
+  assert.ok(!/LEADS_SENDING|LEADS_TEST_RECIPIENT/.test(raw.slice(0, raw.indexOf('"previews"')).replace(/^\s*\/\/.*$/gm, "")), "Production has no sending settings");
 });
 
 test("Production's portal resources are exactly: its own portal database, the WorkOS settings, the four launch switches, the limiter; the two private R2 buckets (Stage 3), the Branding switch (Release 2), no Client Services switch and no probe flag", () => {
