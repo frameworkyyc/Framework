@@ -3,8 +3,8 @@
    API: GET /leads/<id> and the action endpoints in the contract. Text from the server is only ever set as text. */
 
 import { h, api, errorState, confirmDialog, fmtDateTime, fmtDate } from "./ui.js";
-import { badge, card, fold, statCard } from "./kit.js";
-import { statusChip, view, SITE_WORDS, SITE_TONE, extLink, safeUrl, shortUrl, stars, errText, copyText, iconLabel, opportunityChip } from "./leads-common.js";
+import { badge, card, fold, navIcon, statCard } from "./kit.js";
+import { statusChip, view, SITE_WORDS, SITE_TONE, extLink, safeUrl, shortUrl, errText, copyText, iconLabel } from "./leads-common.js";
 import { pitchSection } from "./lead-pitch.js";
 import { reviewScreen } from "./lead-review.js";
 import { swatch, pretty, fmt, when } from "./demo-traffic.js";
@@ -14,6 +14,17 @@ const EVENT_WORD = { imported: "Found by the finder", approved: "Approved", dism
 const ELIG = { eligible: ["Eligible", "ok"], review: ["Needs your check", "warn"], blocked: ["Blocked", "bad"] };
 const DAY = 86400000;
 const clock = new Intl.DateTimeFormat("en-CA", { timeStyle: "short", timeZone: "America/Edmonton" });
+
+const siteHost = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return shortUrl(u); } };
+const LEVEL_WORD = { high: "Worth contacting", medium: "Worth a look", low: "Low priority", unknown: "Not enough data yet" };
+const unique = (list) => [...new Set(list)];
+
+/** A section: a black rule, an icon and a title, then its content. */
+const section = (title, icon, body, id) => h("section", { class: "ld-sec", "aria-labelledby": id }, h("h2", { class: "ld-sec__title", id }, navIcon(icon), h("span", { text: title })), body);
+/** Whether a figure was measured is always visible next to it. */
+const tag = (measured) => h("span", { class: "ld-tag" + (measured ? "" : " ld-tag--off"), text: measured ? "Measured" : "Not measured" });
+const metric = ({ label, icon, value, sub, measured }) => h("div", { class: "ld-m" + (measured ? "" : " ld-m--off") },
+  h("span", { class: "ld-m__label" }, navIcon(icon), h("span", { text: label })), h("strong", { class: "ld-m__value", text: value }), sub ? h("span", { class: "ld-m__sub", text: sub }) : h("span", { class: "ld-m__sub" }), tag(measured));
 
 export async function render(id, ctx) {
   const host = h("div");
@@ -36,19 +47,94 @@ export async function render(id, ctx) {
   };
   const post = (path, body = {}) => api(`/leads/${encodeURIComponent(id)}${path}`, { method: "POST", body });
 
-  /* ---------- header, next action, action bar ---------- */
+  /* ---------- 1. Business overview ---------- */
 
-  function header() {
+  function overview(bar) {
     const l = data.lead;
-    const links = [extLink(l.website, "Website", "adm-link"), extLink(l.maps_url, "Google Maps", "adm-link")].filter(Boolean);
-    return h("header", { class: "ld-head" },
-      h("div", { class: "ld-head__top" }, h("h1", { class: "adm-title", tabindex: "-1", text: l.name }), statusChip(l), opportunityChip(l)),
-      h("p", { class: "ld-head__meta" }, [l.trade, l.city].filter(Boolean).join(" · "), links.length ? " " : null, links.map((a, i) => [i ? " · " : "", a])));
+    const links = [l.website ? extLink(l.website, siteHost(l.website), "adm-link") : null, extLink(l.maps_url, "Google Maps", "adm-link")].filter(Boolean);
+    const step = h("div", { class: "ld-step" },
+      h("div", { class: "ld-step__text" }, h("span", { class: "ld-label", text: "Next step" }), h("p", { class: "ld-step__what", text: l.next_action || "" }), bar.hint ? h("p", { class: "ld-hint", role: "status", text: bar.hint }) : null),
+      bar.primary.length ? h("div", { class: "adm-actions" }, bar.primary) : null);
+    return h("header", { class: "ld-ov" },
+      h("div", { class: "ld-ov__top" }, h("h1", { class: "adm-title", tabindex: "-1", text: l.name }), statusChip(l)),
+      h("p", { class: "ld-ov__meta" }, [l.trade, l.city].filter(Boolean).join(" · ")),
+      links.length ? h("div", { class: "ld-links" }, links) : null,
+      step);
   }
 
-  function nextBox() {
+  /* ---------- 2. SEO performance ---------- */
+
+  function seoPerformance() {
+    const l = data.lead, s = l.seo, r = s && s.report;
+    if (!s) return section("SEO performance", "demo-traffic", h("p", { class: "rk-quiet", text: "Not assessed yet. The finder measures a business’s Google Maps position, its website and its local competitors; the result appears here." }), "ld-s-seo");
+    const comp = (cid) => s.components.find((c) => c.id === cid) || {};
+    const measuredMaps = !!(r && r.maps), orgC = comp("organic");
+    const mapsValue = !measuredMaps ? "–" : r.maps.position === null ? `Not in top ${r.maps.checked}` : `#${r.maps.position}`;
+    const mapsSub = !measuredMaps ? "No positions recorded yet" : r.maps.position === null ? "Google Maps search" : `of ${r.maps.checked} results`;
+    const rep = r && r.reputation, median = r && r.competitor && r.competitor.median;
+    const lh = r && r.lighthouse && r.lighthouse.seo !== null ? r.lighthouse.seo : null;
+    const onC = comp("onpage"), issues = r && r.issues ? r.issues : [];
+    const metrics = [
+      metric({ label: "Google Maps", icon: "pin", value: mapsValue, sub: mapsSub, measured: measuredMaps }),
+      metric({ label: "Google Search", icon: "discovery", value: orgC.basis === "measured" ? String(orgC.finding).replace(/^Google search:\s*/, "") : "–", sub: orgC.basis === "measured" ? "" : "No ranking data connected", measured: orgC.basis === "measured" }),
+      metric({ label: "Rating", icon: "star", value: rep ? rep.rating.toFixed(1) : "–", sub: rep ? `${rep.reviews} reviews${median ? `, local median ${median}` : ""}` : "No review data", measured: !!rep }),
+      metric({ label: "Lighthouse SEO", icon: "check", value: lh === null ? "–" : `${lh}/100`, sub: lh === null ? (r && r.psi_error ? `PageSpeed: ${r.psi_error}` : "PageSpeed not available") : "Google Lighthouse", measured: lh !== null }),
+      metric({ label: "Technical issues", icon: "report", value: onC.basis === "measured" ? String(issues.length) : "–", sub: onC.basis === "measured" ? "found on the home page" : "Website not readable", measured: onC.basis === "measured" }),
+    ];
+    const level = s.level;
+    const hero = h("div", { class: "ld-score ld-score--" + level },
+      h("span", { class: "ld-label", text: "SEO opportunity" }),
+      h("strong", { class: "ld-score__n" }, s.score === null ? "–" : String(s.score), h("span", { class: "ld-score__of", text: s.score === null ? "" : "/100" })),
+      s.score === null ? null : h("progress", { class: "rk-meter", max: "100", value: String(s.score), "aria-label": `SEO opportunity ${s.score} out of 100` }),
+      h("span", { class: "ld-score__word", text: LEVEL_WORD[level] || "" }),
+      h("span", { class: "ld-score__note", text: `${s.label}. An estimate; the figures beside it are measured.` }));
+    const rows = s.components.map((c) => h("li", { class: "ld-bk" },
+      h("span", { class: "ld-bk__label", text: c.label }),
+      c.basis === "measured" ? h("progress", { class: "rk-meter ld-bk__bar", max: String(c.max), value: String(c.points), "aria-label": `${c.label}: ${c.points} of ${c.max}` }) : h("span", { class: "ld-bk__bar" }),
+      h("span", { class: "ld-bk__pts", text: c.basis === "measured" ? `${c.points}/${c.max}` : "–" }),
+      tag(c.basis === "measured"),
+      h("span", { class: "ld-bk__text", text: c.basis === "measured" ? c.finding : c.note })));
+    const comps = r && r.competitor && r.competitor.top && r.competitor.top.length ? competitors(r) : h("p", { class: "rk-quiet", text: "No local competitor data recorded for this search." });
+    return section("SEO performance", "demo-traffic", h("div", null,
+      h("div", { class: "ld-hero" }, hero, h("div", { class: "ld-metrics" }, metrics)),
+      h("h3", { class: "ld-sub", text: "How the score is made up" }), h("ul", { class: "ld-bks", "aria-label": "Score components" }, rows),
+      h("h3", { class: "ld-sub", text: "Against local competitors" }), comps), "ld-s-seo");
+  }
+
+  function competitors(r) {
+    const me = data.lead;
+    const row = (pos, name, rating, reviews, mine) => h("li", { class: "ld-cmp__row" + (mine ? " ld-cmp__row--me" : "") },
+      h("span", { class: "ld-cmp__pos", text: pos }), h("span", { class: "ld-cmp__name", text: name }),
+      h("span", { class: "ld-cmp__n", text: rating === null || rating === undefined ? "–" : Number(rating).toFixed(1) }), h("span", { class: "ld-cmp__n", text: reviews === null || reviews === undefined ? "–" : String(reviews) }));
+    const myPos = r.maps && r.maps.position !== null && r.maps.position !== undefined ? "#" + r.maps.position : "–";
+    return h("div", { class: "ld-cmp" },
+      h("div", { class: "ld-cmp__head", "aria-hidden": "true" }, h("span", { text: "Rank" }), h("span", { text: "Business" }), h("span", { class: "ld-cmp__n", text: "Rating" }), h("span", { class: "ld-cmp__n", text: "Reviews" })),
+      h("ul", { class: "ld-cmp__list", "aria-label": "Competitors" }, [row(myPos, me.name, me.rating, me.review_count, true), ...r.competitor.top.map((t) => row("#" + t.position, t.name, t.rating, t.reviews, false))]),
+      r.competitor.median ? h("p", { class: "ld-cmp__foot adm-muted", text: `Local median: ${r.competitor.median} reviews${r.competitor.medianRating ? `, ${r.competitor.medianRating} stars` : ""}, across ${r.competitor.compared} other businesses in the same search.` }) : null);
+  }
+
+  /* ---------- 3. Opportunity analysis ---------- */
+
+  function analysis() {
+    const l = data.lead, s = l.seo, r = s && s.report;
+    if (!s) return section("Opportunity analysis", "discovery", h("p", { class: "ld-fallback", text: l.reason || "No assessment yet." }), "ld-s-an");
+    const mc = s.components.find((c) => c.id === "maps" && c.basis === "measured" && c.points > 0);
+    const gc = s.components.find((c) => c.id === "competitors" && c.basis === "measured" && c.points / c.max >= 0.4);
+    const wrong = [mc && mc.finding, gc && gc.finding, ...((r && r.issues) || []).map((i) => i.text)].filter(Boolean).slice(0, 7);
+    const fix = unique([...((r && r.issues) || []).map((i) => i.fix), ...((r && r.recommendations) || []).filter((x) => !/\(.*\.\)$/.test(x) && !/^No significant/.test(x))]).slice(0, 7);
+    const list = (items, empty) => (items.length ? h("ul", { class: "ld-pts" }, items.map((t) => h("li", { text: t }))) : h("p", { class: "rk-quiet", text: empty }));
+    return section("Opportunity analysis", "discovery", h("div", null,
+      h("p", { class: "ld-verdict" }, h("strong", { text: LEVEL_WORD[s.level] || "" }), h("span", { text: s.score === null ? "" : ` · score ${s.score}/100` })),
+      h("div", { class: "ld-cols" },
+        h("div", null, h("h3", { class: "ld-sub", text: "What’s wrong" }), list(wrong, "Nothing significant was measured.")),
+        h("div", null, h("h3", { class: "ld-sub", text: "What to improve" }), list(fix, "No improvements suggested.")))), "ld-s-an");
+  }
+
+  /* ---------- 4. Next actions ---------- */
+
+  const NOTE = () => {
     const l = data.lead;
-    const note = h("input", { class: "input", id: "ld-nextnote", type: "text", maxlength: "200", value: l.next_action_note || "", placeholder: "Add your own note (optional)", "aria-label": "Your note on the next action", autocomplete: "off" });
+    const note = h("input", { class: "input", id: "ld-nextnote", type: "text", maxlength: "200", value: l.next_action_note || "", placeholder: "A short note on the next step (optional)", "aria-label": "Your note on the next step", autocomplete: "off" });
     const saved = h("span", { class: "ld-saved", role: "status", "aria-live": "polite" });
     let last = l.next_action_note || "";
     note.addEventListener("blur", async () => {
@@ -56,22 +142,53 @@ export async function render(id, ctx) {
       try { await api("/leads/" + encodeURIComponent(id), { method: "PATCH", body: { next_action_note: note.value } }); last = note.value; saved.textContent = "Saved"; window.setTimeout(() => { saved.textContent = ""; }, 2500); }
       catch (err) { saved.textContent = errText(err); }
     });
-    return h("div", { class: "ld-next" }, h("span", { class: "ld-label", text: "Next action" }), h("p", { class: "ld-next__text", text: l.next_action || "" }), h("div", { class: "ld-next__note" }, note, saved));
+    return h("div", { class: "ld-next__note" }, note, saved);
+  };
+
+  function reportButtons() {
+    if (!data.lead.seo) return [];
+    const say = h("span", { class: "ld-saved", role: "status", "aria-live": "polite" });
+    const manual = h("textarea", { class: "input dt-link__manual", readonly: true, hidden: true, rows: "6", "aria-label": "Report text" });
+    const copy = h("button", { class: "btn btn--secondary", type: "button" }, iconLabel("copy", "Copy SEO assessment"));
+    copy.addEventListener("click", async () => {
+      copy.disabled = true; say.textContent = "";
+      try {
+        const r = await api(`/leads/${encodeURIComponent(id)}/seo-report`);
+        try { await navigator.clipboard.writeText(r.markdown); say.textContent = "Copied. Paste it into ChatGPT or Claude."; }
+        catch { manual.hidden = false; manual.value = r.markdown; manual.focus(); manual.select(); say.textContent = "Copy the text below."; }
+      } catch (err) { say.textContent = errText(err); }
+      copy.disabled = false;
+    });
+    const pdf = h("a", { class: "btn btn--secondary", href: `/api/admin/leads/${encodeURIComponent(id)}/seo-report.pdf`, download: "" }, iconLabel("download", "Generate report (PDF)"));
+    return [copy, pdf, say, manual];
   }
 
-  function openReview() {
-    host.hidden = true;
-    const box = h("div", null, h("div"));
-    node.append(box);
-    box.replaceChildren(reviewScreen({ ids: [id], mode: "send", notify: ctx.notify, onBack: async (changed) => { box.remove(); host.hidden = false; if (changed) await reload(); window.scrollTo(0, 0); } }));
-    window.scrollTo(0, 0);
+  function nextActions(bar) {
+    const rb = reportButtons();
+    const toolbar = bar.secondary.length || rb.length ? h("div", { class: "adm-actions ld-tools" }, bar.secondary, rb) : null;
+    return section("Next actions", "check", h("div", null, toolbar, NOTE(), notes(), contacts(), pitchSection({ data, reload, ctl }), demo()), "ld-s-act");
+  }
+
+  /* ---------- 5. Additional details (collapsed) ---------- */
+
+  function sources() {
+    const l = data.lead;
+    const srcs = [], seen = new Set();
+    const add = (label, url) => { if (safeUrl(url) && !seen.has(url)) { seen.add(url); srcs.push(h("li", null, h("span", { class: "adm-muted", text: label + ": " }), extLink(url, siteHost(url)))); } };
+    add("Google Maps", l.maps_url); add("Website", l.website);
+    data.contacts.forEach((c) => add(c.type === "email" ? "Where " + c.value + " was published" : "Source of " + c.value, c.source_url));
+    return fold({ title: "Sources", meta: srcs.length ? `${srcs.length} link${srcs.length === 1 ? "" : "s"}` : "None", body: srcs.length ? h("ul", { class: "ld-sources" }, srcs) : h("p", { class: "rk-quiet", text: "No source links recorded." }) });
+  }
+
+  function details() {
+    return section("Additional details", "settings", h("div", { class: "ld-folds" }, sources(), siteCheck(), history()), "ld-s-more");
   }
 
   function actionBar() {
     const { lead: l, message: m, messages } = data;
-    const btns = [];
+    const primary = [], secondary = [];
     let hint = "";
-    const btn = (label, cls, fn) => { const b = h("button", { class: "btn " + cls, type: "button" }, label); b.addEventListener("click", act(b, () => fn(b))); btns.push(b); return b; };
+    const btn = (label, cls, fn) => { const b = h("button", { class: "btn " + cls, type: "button" }, label); b.addEventListener("click", act(b, () => fn(b))); (/btn--primary/.test(cls) ? primary : secondary).push(b); return b; };
     const confirmed = (opts, fn) => async (b) => { if (await confirmDialog(opts)) await fn(); else b.disabled = false; };
     const dismiss = () => btn("Dismiss", "btn--secondary", confirmed({ title: "Dismiss this lead?", body: "It leaves your working lists and won’t be contacted. You can reopen it later if it was never contacted.", details: [["Business", l.name]], confirmLabel: "Dismiss lead" }, async () => { await post("/dismiss"); await reload(); }));
 
@@ -103,80 +220,15 @@ export async function render(id, ctx) {
       if (!l.contacted_at && !l.opted_out) btn("Reopen", "btn--primary", async () => { await post("/reopen"); await reload(); });
       else hint = l.opted_out ? "This business opted out, so it cannot be reopened." : "It was already contacted, so it cannot be reopened.";
     }
-    return h("div", { class: "ld-actionbar" }, btns.length ? h("div", { class: "adm-actions" }, btns) : null, hint ? h("p", { class: "ld-hint", role: "status", text: hint }) : null);
+    return { primary, secondary, hint };
   }
 
-  /* ---------- why, contacts ---------- */
-
-  function why() {
-    const l = data.lead;
-    const srcs = [];
-    const seen = new Set();
-    const add = (label, url) => { if (safeUrl(url) && !seen.has(url)) { seen.add(url); srcs.push(h("li", null, h("span", { class: "adm-muted", text: label + ": " }), extLink(url, shortUrl(url)))); } };
-    add("Google Maps", l.maps_url); add("Website", l.website);
-    data.contacts.forEach((c) => add(c.type === "email" ? "Where " + c.value + " was published" : "Source of " + c.value, c.source_url));
-    const rating = stars(l.rating, l.review_count);
-    return card("Why they’re a prospect", h("div", null,
-      h("p", { class: "ld-reason", text: l.reason }),
-      h("dl", { class: "adm-spec ld-facts" },
-        [rating ? ["Reviews", rating + (l.last_review_at ? ` (latest ${fmtDate(l.last_review_at)})` : "")] : null, l.address ? ["Address", l.address] : null]
-          .filter(Boolean).map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", { text: v })))),
-      srcs.length ? h("div", null, h("p", { class: "rk-sub", text: "Sources" }), h("ul", { class: "ld-sources" }, srcs)) : null), { id: "ld-why" });
-  }
-
-  /* ---------- SEO assessment ---------- */
-
-  function seoSection() {
-    const l = data.lead, s = l.seo;
-    if (!s) return card("SEO assessment", h("p", { class: "rk-quiet", text: "Not assessed yet. The finder measures a business’s Google Maps position, its website and its local competitors, and the result appears here." }), { id: "ld-seo" });
-    const rows = s.components.map((c) => h("li", { class: "ld-seo__row" },
-      h("div", { class: "ld-seo__head" }, h("strong", { text: c.label }), badge(c.basis === "measured" ? "Measured" : "Not measured", c.basis === "measured" ? "ok" : ""), c.basis === "measured" ? h("span", { class: "ld-seo__pts adm-muted", text: `${c.points} of ${c.max}` }) : null),
-      h("p", { class: "ld-seo__text", text: c.basis === "measured" ? c.finding : c.note }),
-      c.source ? h("p", { class: "adm-muted ld-seo__src", text: c.source }) : null));
-    const say = h("span", { class: "ld-saved", role: "status", "aria-live": "polite" });
-    const manual = h("textarea", { class: "input dt-link__manual", readonly: true, hidden: true, rows: "6", "aria-label": "Report text" });
-    const copy = h("button", { class: "btn btn--secondary", type: "button" }, iconLabel("copy", "Copy for AI"));
-    copy.addEventListener("click", async () => {
-      copy.disabled = true; say.textContent = "";
-      try {
-        const r = await api(`/leads/${encodeURIComponent(id)}/seo-report`);
-        try { await navigator.clipboard.writeText(r.markdown); say.textContent = "Copied. Paste it into ChatGPT or Claude."; }
-        catch { manual.hidden = false; manual.value = r.markdown; manual.focus(); manual.select(); say.textContent = "Copy the text below."; }
-      } catch (err) { say.textContent = errText(err); }
-      copy.disabled = false;
-    });
-    const pdf = h("a", { class: "btn btn--secondary", href: `/api/admin/leads/${encodeURIComponent(id)}/seo-report.pdf`, download: "" }, iconLabel("download", "Download PDF"));
-    return card("SEO assessment", h("div", null,
-      h("div", { class: "rk-stats ld-stats" }, statCard({ label: "SEO opportunity", value: s.score === null ? "Not scored" : `${s.score}/100`, tone: s.level === "high" ? "ok" : "" })),
-      h("p", { class: "adm-muted ld-seo__note", text: `${s.label}${s.assessed_at ? ", measured " + fmtDate(s.assessed_at) : ""}. The score is an estimate; items marked Measured were recorded from real data, and anything not measured is left out of the score.` }),
-      h("ul", { class: "ld-seo", "aria-label": "How the score is made up" }, rows),
-      h("div", { class: "adm-actions" }, copy, pdf, say), manual), { id: "ld-seo" });
-  }
-
-  /* ---------- Website check: a secondary diagnostic, collapsed by default ---------- */
-
-  function siteCheck() {
-    const l = data.lead;
-    if (!l.website && !l.site_status) return null;
-    let issues = [];
-    try { const p = JSON.parse(l.site_issues || "[]"); if (Array.isArray(p)) issues = p.filter((x) => typeof x === "string"); } catch { /* none */ }
-    const verified = !!l.site_verified_at;
-    const btns = [];
-    if (l.website && l.status === "new" && !verified && ["broken", "unverified", "offline", "online"].includes(l.site_status)) {
-      const b = h("button", { class: "btn btn--secondary", type: "button" }, "Check website again");
-      b.addEventListener("click", act(b, async () => { await api("/leads/recheck-sites", { method: "POST", body: { ids: [id] } }); await reload(); }));
-      btns.push(b);
-    }
-    if (l.website) {
-      const b = h("button", { class: "btn btn--secondary", type: "button" }, verified ? "Remove Working mark" : "Mark as Working");
-      b.addEventListener("click", act(b, async () => { await post("/site-working", { verified: !verified }); await reload(); }));
-      btns.push(b);
-    }
-    const facts = [["Status", verified ? "Marked as working by you" : SITE_WORDS[l.site_status] || "Unknown"], issues.length ? ["What the check saw", issues.join("; ")] : null, verified ? ["Marked", fmtDateTime(l.site_verified_at)] : null].filter(Boolean);
-    return fold({ title: "Website check (technical)", badges: badge(verified ? "Working" : SITE_WORDS[l.site_status] || "Unknown", verified ? "ok" : SITE_TONE[l.site_status] || ""),
-      body: h("div", null, h("dl", { class: "adm-spec ld-facts" }, facts.map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", { text: v })))),
-        h("p", { class: "adm-muted", text: "Whether the website loads is a side check. It does not change the SEO score. If you have opened the site yourself and it works, mark it as working and it won’t be overruled." }),
-        btns.length ? h("div", { class: "adm-actions" }, btns) : null) });
+  function openReview() {
+    host.hidden = true;
+    const box = h("div", null, h("div"));
+    node.append(box);
+    box.replaceChildren(reviewScreen({ ids: [id], mode: "send", notify: ctx.notify, onBack: async (changed) => { box.remove(); host.hidden = false; if (changed) await reload(); window.scrollTo(0, 0); } }));
+    window.scrollTo(0, 0);
   }
 
   function contactRow(c) {
@@ -222,8 +274,6 @@ export async function render(id, ctx) {
       !emailsOk && list.length ? h("p", { class: "ld-hint", text: "No address is ready to email yet. Confirm one above or add one." }) : null,
       addContact()), { id: "ld-contacts" });
   }
-
-  /* ---------- demo activity, timeline, notes ---------- */
 
   function journeyRow(j) {
     const choices = [j.discipline, j.vibe].filter(Boolean).map(pretty).join(" · ");
@@ -274,9 +324,35 @@ export async function render(id, ctx) {
     return card("Notes", h("div", null, ta, saved), { id: "ld-notes-h" });
   }
 
+  function siteCheck() {
+    const l = data.lead;
+    if (!l.website && !l.site_status) return null;
+    let issues = [];
+    try { const p = JSON.parse(l.site_issues || "[]"); if (Array.isArray(p)) issues = p.filter((x) => typeof x === "string"); } catch { /* none */ }
+    const verified = !!l.site_verified_at;
+    const btns = [];
+    if (l.website && l.status === "new" && !verified && ["broken", "unverified", "offline", "online"].includes(l.site_status)) {
+      const b = h("button", { class: "btn btn--secondary", type: "button" }, "Check website again");
+      b.addEventListener("click", act(b, async () => { await api("/leads/recheck-sites", { method: "POST", body: { ids: [id] } }); await reload(); }));
+      btns.push(b);
+    }
+    if (l.website) {
+      const b = h("button", { class: "btn btn--secondary", type: "button" }, verified ? "Remove Working mark" : "Mark as Working");
+      b.addEventListener("click", act(b, async () => { await post("/site-working", { verified: !verified }); await reload(); }));
+      btns.push(b);
+    }
+    const facts = [["Status", verified ? "Marked as working by you" : SITE_WORDS[l.site_status] || "Unknown"], issues.length ? ["What the check saw", issues.join("; ")] : null, verified ? ["Marked", fmtDateTime(l.site_verified_at)] : null].filter(Boolean);
+    return fold({ title: "Website check (technical)", badges: badge(verified ? "Working" : SITE_WORDS[l.site_status] || "Unknown", verified ? "ok" : SITE_TONE[l.site_status] || ""),
+      body: h("div", null, h("dl", { class: "adm-spec ld-facts" }, facts.map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", { text: v })))),
+        h("p", { class: "adm-muted", text: "Whether the website loads is a side check. It does not change the SEO score. If you have opened the site yourself and it works, mark it as working and it won’t be overruled." }),
+        btns.length ? h("div", { class: "adm-actions" }, btns) : null) });
+  }
+
+
   function paint() {
     const keepOpen = [...host.querySelectorAll("details[open]")].map((d) => d.querySelector("summary") && d.querySelector("summary").textContent);
-    host.replaceChildren(back, header(), nextBox(), actionBar(), why(), seoSection(), siteCheck(), contacts(), pitchSection({ data, reload, ctl }), demo(), history(), notes());
+    const bar = actionBar();
+    host.replaceChildren(back, overview(bar), seoPerformance(), analysis(), nextActions(bar), details());
     host.querySelectorAll("details").forEach((d) => { const t = d.querySelector("summary"); if (t && keepOpen.includes(t.textContent)) d.open = true; });
     document.title = data.lead.name + " — Leads — Framework Admin";
   }

@@ -99,6 +99,7 @@ const ICONS = {
   check: "M12 3a9 9 0 100 18 9 9 0 000-18zM8 12.4l2.7 2.7L16 9.8", chevron: "M9 6l6 6-6 6",
   star: "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z", external: "M14 4h6v6M20 4l-9 9M18 14v5H5V6h5", back: "M19 12H5M11 6l-6 6 6 6",
   download: "M12 4v11M7 11l5 5 5-5M5 20h14", copy: "M9 9h11v11H9zM5 15V4h11",
+  pin: "M12 21s-6-5.5-6-11a6 6 0 0112 0c0 5.5-6 11-6 11zM12 7.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z", report: "M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5", note: "M4 5h16v11H9l-5 4zM8 9h8M8 12h5",
 };
 /** A 20px line icon by name (the module ids, plus check and chevron). Decorative: it is hidden from screen readers. */
 export function navIcon(name) {

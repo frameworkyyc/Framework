@@ -45,6 +45,7 @@ export function buildSeoReport(lead, now = new Date()) {
   if (c && reviews !== null && num(c.medianReviews) !== null && reviews < c.medianReviews) recs.push(`Build up reviews: ${reviews} against a local median of ${c.medianReviews}.`);
   if (!recs.length) recs.push("No significant weaknesses were measured. Re-check after the next assessment before approaching.");
   const limits = [
+    ...(a.psiError ? [`Google PageSpeed (Lighthouse) was not measured: ${clean(a.psiError, 80)}.`] : []),
     "The Google Maps position comes from the Google Places API result order for one search from one location, on the date shown. Real results vary by searcher and place.",
     "Google Search rankings are only shown when a ranking-data provider has measured them.",
     "On-page checks read the home page only. A site that blocks automated visits cannot be read, and then no on-page result is shown.",
@@ -54,7 +55,8 @@ export function buildSeoReport(lead, now = new Date()) {
     business: clean(lead.name, 120), trade: clean(lead.trade, 60), city: clean(lead.city, 60), website: clean(lead.website, 200), assessedAt: a.assessedAt || lead.seo_assessed_at || "", generated: now.toISOString().slice(0, 10),
     score: sc.score, level: opportunityLevel(sc.score), scoreLabel: sc.label, components: sc.components, visibility, issues, reputation: rating !== null && reviews !== null ? { rating, reviews } : null,
     competitor: c ? { median: num(c.medianReviews), medianRating: num(c.medianRating), compared: num(c.resultsCompared), top: comps } : null,
-    recommendations: recs, help: HELP, limits, siteState: a.site ? a.site.state : null,
+    recommendations: recs, help: HELP, limits, siteState: a.site ? a.site.state : null, psiError: a.psiError ? clean(a.psiError, 80) : null,
+    lighthouse: a.psi ? { seo: num(a.psi.seo), performance: num(a.psi.performance) } : null, maps: m ? { position: m.position === null ? null : num(m.position), checked: num(m.resultsChecked) } : null,
   };
 }
 

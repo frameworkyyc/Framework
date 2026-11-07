@@ -201,3 +201,18 @@ test("the import threshold defaults to 35 and is configurable with SEO_IMPORT_TH
   assert.equal((await syncFinder({ ...high.env, SEO_IMPORT_THRESHOLD: "95" }, deps)).imported, 0);
   assert.equal((await syncFinder({ ...w.env, SEO_IMPORT_THRESHOLD: "10" }, deps)).imported, 1);
 });
+
+test("detail carries what the lead page draws: the report parts, the PageSpeed failure reason, and nothing that changes the score", async () => {
+  const w = world();
+  w.add({ name: "Reason Co" }, snap({ psi: null, psiError: "HTTP 403 PERMISSION_DENIED" }));
+  await syncFinder(w.env, deps);
+  const id = w.q("SELECT id FROM outreach_leads")[0].id;
+  const d = (await jsonOf(await api(w, "GET", `/leads/${id}`))).body.lead;
+  assert.deepEqual(Object.keys(d.seo.report).sort(), ["competitor", "issues", "lighthouse", "maps", "psi_error", "recommendations", "reputation", "visibility"]);
+  assert.equal(d.seo.report.psi_error, "HTTP 403 PERMISSION_DENIED"); assert.equal(d.seo.report.lighthouse, null);
+  assert.deepEqual(d.seo.report.maps, { position: null, checked: 12 });
+  assert.ok(d.seo.report.issues.every((i) => i.text && i.fix && !("w" in i)));
+  assert.equal(d.seo.score, w.q("SELECT seo_score FROM outreach_leads WHERE id = ?", id)[0].seo_score, "the page shows the stored score, computed by the same scoring");
+  const md = reportMarkdown(buildSeoReport(w.q("SELECT * FROM outreach_leads WHERE id = ?", id)[0], NOW));
+  assert.match(md, /PageSpeed \(Lighthouse\) was not measured: HTTP 403 PERMISSION_DENIED\./);
+});
