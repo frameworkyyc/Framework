@@ -237,6 +237,12 @@ export async function finderSelect(finder, sql, params = []) {
 export const finderBound = (env) => !!env && !!env.LEADGEN_DB && typeof env.LEADGEN_DB.prepare === "function";
 
 const CANDIDATES = "status IN ('qualified', 'approved') AND COALESCE(no_solicit, 0) = 0 AND site_status <> 'ok'";
+/** The lowest SEO Opportunity Score that is imported: the SEO_IMPORT_THRESHOLD variable (a whole number 0 to 100), else the default of 35. */
+export function seoThreshold(env) {
+  const raw = env && env.SEO_IMPORT_THRESHOLD;
+  const n = typeof raw === "string" && /^\d{1,3}$/.test(raw.trim()) ? Number(raw) : typeof raw === "number" && Number.isInteger(raw) ? raw : NaN;
+  return n >= 0 && n <= 100 ? n : SEO_IMPORT_THRESHOLD;
+}
 const SEO_CANDIDATES = "l.status IN ('qualified', 'approved') AND COALESCE(l.no_solicit, 0) = 0";
 /** Finder leads that have an SEO assessment (SELECT only). Throws when the finder has no assessment table yet. */
 const assessedBatch = (finder, after) => finderSelect(finder, `SELECT l.id, l.place_id, l.name, l.trade, l.city, l.address, l.maps_url, l.website, l.rating, l.review_count, l.last_review_at, l.site_status, l.site_score, l.site_issues, l.no_solicit, l.status, a.data AS seo_data, a.assessed_at AS seo_assessed_at
@@ -250,6 +256,7 @@ async function scanFinder(env) {
   let skipped = 0, after = 0, scanned = 0;
   // Once the SEO migration and the finder's assessment table exist, only assessed businesses with a worthwhile SEO opportunity are imported; before that, the earlier rule.
   let seo = await seoReady(db);
+  const threshold = seoThreshold(env);
   if (seo) { try { await assessedBatch(finder, -1); } catch { seo = false; } }
   while (scanned < MAX_SCAN) {
     const rows = seo ? await assessedBatch(finder, after) : await finderSelect(finder, `SELECT id, place_id, name, trade, city, address, maps_url, website, rating, review_count, last_review_at, site_status, site_score, site_issues, no_solicit, status FROM leads WHERE id > ? AND ${CANDIDATES} ORDER BY id LIMIT 500`, [after]);
@@ -261,7 +268,7 @@ async function scanFinder(env) {
       if (!name) { skipped++; continue; }
       if (seo) {
         const sc = scoreLead(parseAssessment(r.seo_data), r);
-        if (sc.score === null || sc.score < SEO_IMPORT_THRESHOLD) { skipped++; continue; }
+        if (sc.score === null || sc.score < threshold) { skipped++; continue; }
         r.seo_score = sc.score;
       }
       const key = dedupeKey(r);

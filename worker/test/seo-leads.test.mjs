@@ -4,7 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { openPortalDb } from "./helpers/portal-db.mjs";
-import { syncFinder, syncAssessments, markSiteWorking, recheckLeadSite, buildReason, composeDraft, seoFact, seoHeadline, seoReady, forgetLeadsReady, lintFirstEmail, wordCount } from "../leads.js";
+import { seoThreshold, syncFinder, syncAssessments, markSiteWorking, recheckLeadSite, buildReason, composeDraft, seoFact, seoHeadline, seoReady, forgetLeadsReady, lintFirstEmail, wordCount } from "../leads.js";
 
 const NOW = new Date("2026-11-07T15:00:00.000Z");
 const deps = { now: () => NOW };
@@ -191,4 +191,13 @@ test("site-working route: marks, unmarks, validates; the list row reflects it", 
   assert.equal((await api(w, "POST", `/leads/${id}/site-working`, {}).then((r) => r.status)), 200);
   const csrf = await handleLeadsApi(new Request(ORIGIN + `/api/admin/leads/${id}/site-working`, { method: "POST", body: "{}" }), w.env, {}, `/leads/${id}/site-working`, deps);
   assert.equal(csrf.status, 403);
+});
+
+test("the import threshold defaults to 35 and is configurable with SEO_IMPORT_THRESHOLD; bad values fall back", async () => {
+  assert.deepEqual([seoThreshold({}), seoThreshold({ SEO_IMPORT_THRESHOLD: "50" }), seoThreshold({ SEO_IMPORT_THRESHOLD: "0" }), seoThreshold({ SEO_IMPORT_THRESHOLD: "abc" }), seoThreshold({ SEO_IMPORT_THRESHOLD: "101" }), seoThreshold({ SEO_IMPORT_THRESHOLD: "-5" })], [35, 50, 0, 35, 35, 35]);
+  const w = world();
+  w.add({ name: "Mid Co" }, snap({ maps: maps(8), onpage: page(), robots: { robots: "ok", sitemap: "ok" }, psi: { seo: 95, performance: 80 } }));
+  const high = world(); high.add({ name: "Mid Co" }, snap({ maps: maps(8), onpage: page(), robots: { robots: "ok", sitemap: "ok" }, psi: { seo: 95, performance: 80 } }));
+  assert.equal((await syncFinder({ ...high.env, SEO_IMPORT_THRESHOLD: "95" }, deps)).imported, 0);
+  assert.equal((await syncFinder({ ...w.env, SEO_IMPORT_THRESHOLD: "10" }, deps)).imported, 1);
 });
