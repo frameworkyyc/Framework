@@ -2,8 +2,8 @@
    Candidates come from the finder, are reviewed here (Approve / Dismiss), pitched and sent from here. API contract: /api/admin/leads/* . Text from the server is only ever set as text. */
 
 import { h, api, errorState, stateBlock, confirmDialog } from "./ui.js";
-import { badge, emptyState, fold } from "./kit.js";
-import { STATUSES, statusWord, view, SITE_WORDS, SITE_TONE, stars, leadsTabs, errText, opportunityChip } from "./leads-common.js";
+import { badge, emptyState, fold, navIcon } from "./kit.js";
+import { STATUSES, statusWord, view, shortName, leadsTabs, errText } from "./leads-common.js";
 import { reviewScreen } from "./lead-review.js";
 
 export async function render(ctx) {
@@ -43,43 +43,24 @@ function setupStrip(st) {
   const items = setupItems(st);
   const todo = items.filter(([, ok]) => !ok);
   if (!todo.length) return null;
-  return fold({ title: "Setup", meta: `${plural(todo.length, "thing")} to set up`, badges: badge("Awaiting setup", "warn"),
+  return fold({ title: "Setup needed", meta: todo.map(([name]) => name).join(", "),
     body: h("ul", { class: "ld-setup" }, items.map(([name, ok, text]) => h("li", { class: "ld-setup__row" },
       h("span", { class: "ld-setup__name", text: name }), badge(ok ? "Working" : "Awaiting setup", ok ? "ok" : "warn"), h("span", { class: "ld-setup__text", text })))) });
 }
 
 /* ---------- Row ---------- */
 
-function rowChips(l) {
-  const out = [];
-  if (l.opted_out) out.push(badge("Opted out", "bad"));
-  const opp = opportunityChip(l);
-  if (opp) out.unshift(opp);
-  out.push(l.site_verified ? badge("Website working (checked by you)", "ok") : badge(SITE_WORDS[l.site_status] || "Website unknown", SITE_TONE[l.site_status] || ""));
-  const r = stars(l.rating, l.review_count);
-  if (r) out.push(badge(r, ""));
-  out.push(l.has_eligible_email ? badge("Email found", "ok") : l.has_email ? badge("Email needs a check", "warn") : l.phone ? badge("Phone only", "pending") : badge("No contact yet", "warn"));
-  const d = l.demo;
-  if (d) {
-    if (d.opens > 0) out.push(badge("Opened demo", "ok"));
-    if (d.company) out.push(badge("Added company name", "ok"));
-    if (d.enquired) out.push(badge("Enquiry", "ok"));
-  }
-  return out;
-}
-
-function leadRow(l, { selectable, selected, onToggle }) {
+/* A row says who, what and where, and the one number that decides: the SEO Opportunity Score. The status shows in the All view (the filter above already says it elsewhere). */
+function leadRow(l, { selectable, selected, onToggle, showStatus }) {
   const box = selectable ? h("label", { class: "ld-pick" }, h("input", { type: "checkbox", checked: selected.has(l.id) ? true : null, "aria-label": "Select " + l.name, onchange: (e) => onToggle(l.id, e.target.checked) })) : null;
+  const meta = [l.trade, l.city, l.opted_out ? "Opted out" : showStatus ? statusWord(l.status) : ""].filter(Boolean).join(" · ");
+  const scored = Number.isFinite(l.seo_score);
   return h("li", { class: "ld-row" + (selectable ? "" : " ld-row--plain") },
     box,
     h("a", { class: "ld-row__link", href: "/admin/leads/" + encodeURIComponent(l.id), "data-link": "" },
-      h("span", { class: "ld-row__main" },
-        h("span", { class: "ld-row__name", text: l.name }),
-        h("span", { class: "ld-row__meta", text: [l.trade, l.city].filter(Boolean).join(" · ") }),
-        h("span", { class: "ld-row__reason", text: l.reason || "" })),
-      h("span", { class: "ld-row__side" },
-        h("span", { class: "ld-chips" }, rowChips(l)),
-        h("span", { class: "ld-row__next" }, h("span", { class: "ld-label", text: "Next" }), h("span", { text: l.next_action || "" })))));
+      h("span", { class: "ld-row__main" }, h("span", { class: "ld-row__name", text: shortName(l.name, l.city) }), h("span", { class: "ld-row__meta", text: meta })),
+      h("span", { class: "ld-row__score ld-row__score--" + (scored ? l.seo_level : "none") }, h("span", { class: "rk-sr", text: "SEO opportunity score " }), h("span", { text: scored ? String(l.seo_score) : "–" })),
+      navIcon("chevron")));
 }
 
 /* ---------- List ---------- */
@@ -101,13 +82,15 @@ function renderList(ctx) {
   const barBox = h("div", { class: "ld-barbox" });
   const reviewBox = h("div");
   const main = h("div", null, setup, filterBox, listBox);
-  const sub = h("p", { class: "adm-sub", text: "Local businesses with the most to gain from better search visibility, best opportunity first. Approve the good ones, then review and send." });
   const syncNote = h("p", { class: "ld-note", role: "status", hidden: true });
-  const syncBtn = h("button", { class: "btn btn--secondary", type: "button" }, "Check for new candidates");
-  const checkBtn = h("button", { class: "btn btn--secondary", type: "button", hidden: true }, "Check websites");
+  const syncBtn = h("button", { class: "ld-menu__item", type: "button", role: "menuitem" }, "Find new candidates");
+  const checkBtn = h("button", { class: "ld-menu__item", type: "button", role: "menuitem", hidden: true }, "Check websites");
+  const menu = h("details", { class: "ld-menu" }, h("summary", { class: "btn btn--secondary ld-menu__btn" }, h("span", { text: "Actions" }), navIcon("chevron")), h("div", { class: "ld-menu__list", role: "menu" }, syncBtn, checkBtn));
+  menu.addEventListener("click", (e) => { if (e.target.closest(".ld-menu__item")) menu.open = false; });
+  document.addEventListener("click", (e) => { if (menu.open && !menu.contains(e.target)) menu.open = false; });
 
   const node = h("div", { class: "adm-page ld-page" },
-    h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Leads"), sub), h("div", { class: "adm-actions" }, checkBtn, syncBtn)),
+    h("div", { class: "ld-top" }, h("h1", { class: "adm-title", tabindex: "-1" }, "Leads"), menu),
     leadsTabs("leads"), syncNote, main, reviewBox, barBox);
 
   const say = (t) => { syncNote.textContent = t; syncNote.hidden = !t; };
@@ -186,7 +169,7 @@ function renderList(ctx) {
     }
     const all = selectable ? h("label", { class: "ld-selall adm-check" }, h("input", { type: "checkbox", id: "ld-selall", "aria-label": `Select all ${leads.length}`, onchange: (e) => { leads.forEach((l) => (e.target.checked ? selected.add(l.id) : selected.delete(l.id))); drawList(); drawBar(); } }), h("span", { text: `Select all ${leads.length}` })) : null;
     if (all) all.querySelector("input").checked = leads.length > 0 && leads.every((l) => selected.has(l.id));
-    const ul = h("ul", { class: "ld-list", "aria-label": "Leads" }, leads.map((l) => leadRow(l, { selectable, selected, onToggle: (id, on) => { if (on) selected.add(id); else selected.delete(id); drawBar(); const a = document.getElementById("ld-selall"); if (a) a.checked = leads.every((x) => selected.has(x.id)); } })));
+    const ul = h("ul", { class: "ld-list", "aria-label": "Leads" }, leads.map((l) => leadRow(l, { selectable, selected, showStatus: status === "all", onToggle: (id, on) => { if (on) selected.add(id); else selected.delete(id); drawBar(); const a = document.getElementById("ld-selall"); if (a) a.checked = leads.every((x) => selected.has(x.id)); } })));
     listBox.replaceChildren(...[all, ul, leads.length >= (data.limit || 300) ? h("p", { class: "adm-muted", text: `Showing the newest ${data.limit || 300}. Search to narrow it down.` }) : null].filter(Boolean));
   }
 
@@ -229,9 +212,9 @@ function renderList(ctx) {
   }
 
   function openReview(ids, mode) {
-    main.hidden = true; barBox.replaceChildren(); syncBtn.hidden = true;
+    main.hidden = true; barBox.replaceChildren(); menu.hidden = true;
     reviewBox.replaceChildren(reviewScreen({ ids, mode, notify: ctx.notify, onBack: (changed) => {
-      reviewBox.replaceChildren(); main.hidden = false; syncBtn.hidden = false; selected.clear();
+      reviewBox.replaceChildren(); main.hidden = false; menu.hidden = false; selected.clear();
       if (changed) loadList(); else { drawList(); drawBar(); }
       window.scrollTo(0, 0);
     } }));
@@ -241,9 +224,9 @@ function renderList(ctx) {
   /* boot */
   (async () => {
     try { st = await api("/leads/status"); }
-    catch (err) { main.replaceChildren(errorState(err, ctx.retry)); syncBtn.hidden = true; return; }
+    catch (err) { main.replaceChildren(errorState(err, ctx.retry)); menu.hidden = true; return; }
     if (!st.ready) {
-      syncBtn.hidden = true;
+      menu.hidden = true;
       main.replaceChildren(emptyState({ title: "Leads isn’t set up yet", body: `The database tables (proposed migration ${st.migration || "0024_leads.sql"}) have not been applied, so nothing can be imported or saved until they are. Nothing else is affected.` }));
       return;
     }
