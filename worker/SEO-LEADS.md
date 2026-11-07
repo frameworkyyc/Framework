@@ -11,9 +11,14 @@ Admin -> Leads finds local businesses that would gain the most from better searc
 ## Score (version 1)
 Maps visibility 25, Google Search rankings 25, on-page and technical 25, competitor gap 15, reputation to build on 10. A signal that was not measured is **left out** and the rest renormalised; below 40% coverage no score is given. The score is an **estimate**; positions and page facts are **measured** and show their source and date. "Not among the first N results" is only said for the N actually checked.
 
+## Google Search rankings (Serper)
+The finder checks a fixed set of keywords per trade (table `rank_keywords`; renovations in Calgary, Alberta first, three enabled and two on file) once a week through Serper (`SERPER_API_KEY`, a secret on `framework-leadgen`). Each check stores the top 100 organic results with their real positions (`serp_results`), and leads are matched by their own domain (www and subdomains; never a social page). A lead's assessment then records, per keyword, its position or that it was not among the N results checked, with the location and date. Maps position and Google Search position stay separate (two score components). A keyword that was not checked gives no entry, and a signal with no data is left out of the score, never counted against the business.
+
+Cost control: `SERPER_CREDIT_LIMIT` is a hard monthly limit on credits (default 250); usage is the credits the API reports, summed per calendar month in `serp_checks`, and a request is not made when the remaining credits cannot cover it. A keyword with a good check in the last 7 days is never searched again, a failed one waits an hour, and no search is ever made per lead. `RANK_PER_RUN` (default 1) keeps checks spread across runs.
+
 ## Limits
 - The Maps position is the Places API result order for one search from one location; it is close to, not identical to, what a person sees.
-- Organic rankings are not measured unless a paid provider is connected (off by default).
+- Organic rankings cover only the tracked keywords, from one location, and the 100 results checked; "not found" means not among those.
 - On-page checks read the home page only; a site that blocks automated visits is reported as unreadable, not as bad.
 
 ## Website verification

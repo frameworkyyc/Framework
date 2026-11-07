@@ -208,11 +208,46 @@ test("detail carries what the lead page draws: the report parts, the PageSpeed f
   await syncFinder(w.env, deps);
   const id = w.q("SELECT id FROM outreach_leads")[0].id;
   const d = (await jsonOf(await api(w, "GET", `/leads/${id}`))).body.lead;
-  assert.deepEqual(Object.keys(d.seo.report).sort(), ["competitor", "issues", "lighthouse", "maps", "psi_error", "recommendations", "reputation", "visibility"]);
+  assert.deepEqual(Object.keys(d.seo.report).sort(), ["competitor", "issues", "lighthouse", "maps", "organic", "psi_error", "recommendations", "reputation", "visibility"]);
   assert.equal(d.seo.report.psi_error, "HTTP 403 PERMISSION_DENIED"); assert.equal(d.seo.report.lighthouse, null);
   assert.deepEqual(d.seo.report.maps, { position: null, checked: 12 });
   assert.ok(d.seo.report.issues.every((i) => i.text && i.fix && !("w" in i)));
   assert.equal(d.seo.score, w.q("SELECT seo_score FROM outreach_leads WHERE id = ?", id)[0].seo_score, "the page shows the stored score, computed by the same scoring");
   const md = reportMarkdown(buildSeoReport(w.q("SELECT * FROM outreach_leads WHERE id = ?", id)[0], NOW));
   assert.match(md, /PageSpeed \(Lighthouse\) was not measured: HTTP 403 PERMISSION_DENIED\./);
+});
+
+const ORG = (queries) => ({ provider: "serper", queries });
+const Q = (q, position, depth = 100) => ({ q, location: "Calgary, Alberta, Canada", position, depth, checkedAt: "2026-11-09T10:00:00.000Z", topDomains: ["a.ca"] });
+
+test("organic rankings reach the lead page data, the report (Markdown and PDF) and the outreach draft", async () => {
+  const w = world();
+  w.add({ name: "Ranked Co" }, snap({ organic: ORG([Q("home renovation contractor calgary", 7), Q("kitchen renovation calgary", null)]) }));
+  await syncFinder(w.env, deps);
+  const id = w.q("SELECT id FROM outreach_leads")[0].id;
+  const d = (await jsonOf(await api(w, "GET", `/leads/${id}`))).body.lead;
+  assert.deepEqual(d.seo.report.organic.map((o) => [o.keyword, o.position, o.depth, o.location, o.checked]), [["home renovation contractor calgary", 7, 100, "Calgary, Alberta, Canada", "2026-11-09"], ["kitchen renovation calgary", null, 100, "Calgary, Alberta, Canada", "2026-11-09"]]);
+  const org = d.seo.components.find((c) => c.id === "organic");
+  assert.equal(org.finding, 'Best Google result #7 for "home renovation contractor calgary"; not in the top 100 for 1 of 2 keywords');
+  const md = (await jsonOf(await api(w, "GET", `/leads/${id}/seo-report`))).body.markdown;
+  assert.match(md, /### Google Search rankings by keyword/);
+  assert.match(md, /"home renovation contractor calgary" \(Calgary, Alberta, Canada\): position 7 of the top 100 checked, checked 2026-11-09/);
+  assert.match(md, /"kitchen renovation calgary" \(Calgary, Alberta, Canada\): not found in the top 100 results/);
+  assert.equal((await api(w, "GET", `/leads/${id}/seo-report.pdf`)).status, 200);
+  const lead = { name: "Ranked Co", trade: "renovations", city: "Calgary", rating: 4.8, review_count: 40, site_status: "online", seo_data: JSON.stringify(snap({ organic: ORG([Q("kitchen renovation calgary", null)]) })) };
+  const f = seoFact(lead);
+  assert.equal(f.observe, 'I searched Google for "kitchen renovation calgary" and Ranked Co wasn\'t in the first 100 results.');
+  const draft = composeDraft(lead, { demoUrl: "https://x.test/d/1", senderName: "Alex" });
+  assert.equal(draft.subject, "Ranked Co on Google"); assert.match(draft.body, /wasn't in the first 100 results/);
+  assert.equal(lintFirstEmail(draft.subject, draft.body), null);
+  assert.ok(!/last|worst|bottom/i.test(draft.body));
+});
+
+test("outreach only claims what was checked: a shallow check, a good position or no organic data make no organic claim", () => {
+  const base = { name: "X Co", trade: "renovations", city: "Calgary", rating: 4.8, review_count: 40, site_status: "online" };
+  const withOrg = (queries) => seoFact({ ...base, seo_data: JSON.stringify(snap({ maps: maps(2), organic: queries ? ORG(queries) : null })) });
+  assert.ok(!/Google for/.test(withOrg([Q("k", null, 20)]).observe), "only 20 results checked: no 'not found' claim");
+  assert.ok(!/Google for/.test(withOrg([Q("k", 3)]).observe), "ranking well: nothing to point out");
+  assert.match(withOrg([Q("k", 14)]).observe, /came up at position 14/);
+  assert.ok(!/Google for/.test(withOrg(null).observe));
 });

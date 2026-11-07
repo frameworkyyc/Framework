@@ -68,10 +68,15 @@ export async function render(id, ctx) {
       { label: "Google Maps", value: !mapsOk ? "–" : r.maps.position === null ? `${r.maps.checked}+` : `#${r.maps.position}`, unit: "", sub: !mapsOk ? "" : r.maps.position === null ? `not in the first ${r.maps.checked}` : `of ${r.maps.checked}`, off: !mapsOk },
       { label: "Rating", value: rep ? rep.rating.toFixed(1) : "–", unit: "", sub: rep && rep.reviews ? `${rep.reviews} reviews` : "", off: !rep },
     ];
-    return h("div", { class: "ld-figs" }, figs.map((f) => h("div", { class: "ld-fig" + (f.lead ? " ld-fig--lead ld-fig--" + f.level : "") + (f.off ? " ld-fig--off" : "") },
+    const org = r && r.organic && r.organic.length ? r.organic : null;
+    const found = org ? org.filter((q) => q.position !== null) : [];
+    const best = found.length ? found.reduce((b, q) => (q.position < b.position ? q : b)) : null;
+    const searchLine = org ? h("p", { class: "ld-gsearch" }, h("span", { class: "ld-label", text: "Google Search" }),
+      h("span", { text: best ? `Best #${best.position} for "${best.keyword}"${found.length < org.length ? `, not in the top ${best.depth} for ${org.length - found.length} of ${org.length} keywords` : ""}` : `Not in the top ${org[0].depth} for ${org.length === 1 ? "its keyword" : `any of ${org.length} keywords`}` })) : null;
+    return h("div", null, h("div", { class: "ld-figs" }, figs.map((f) => h("div", { class: "ld-fig" + (f.lead ? " ld-fig--lead ld-fig--" + f.level : "") + (f.off ? " ld-fig--off" : "") },
       h("span", { class: "ld-fig__label", text: f.label }),
       h("strong", { class: "ld-fig__value" }, f.value, f.unit ? h("span", { class: "ld-fig__unit", text: f.unit }) : null),
-      f.sub ? h("span", { class: "ld-fig__sub", text: f.sub }) : null)));
+      f.sub ? h("span", { class: "ld-fig__sub", text: f.sub }) : null))), searchLine);
   }
 
   /* ---------- Opportunity: the verdict and the three things that matter ---------- */
@@ -135,18 +140,30 @@ export async function render(id, ctx) {
       c.basis === "measured" ? h("progress", { class: "rk-meter ld-bk__bar", max: String(c.max), value: String(c.points), "aria-label": `${c.label}: ${c.points} of ${c.max}` }) : h("span", { class: "ld-bk__bar" }),
       h("span", { class: "ld-bk__pts", text: c.basis === "measured" ? `${c.points}/${c.max}` : "–" }),
       h("span", { class: "ld-bk__text", text: c.basis === "measured" ? c.finding : c.note })));
-    const orgC = s.components.find((c) => c.id === "organic") || {}, onC = s.components.find((c) => c.id === "onpage") || {};
+    const onC = s.components.find((c) => c.id === "onpage") || {};
     const lh = r && r.lighthouse && r.lighthouse.seo !== null ? `${r.lighthouse.seo}/100` : r && r.psi_error ? `Not available (${r.psi_error})` : "Not available";
-    const facts = [["Google Search", orgC.basis === "measured" ? String(orgC.finding).replace(/^Google search:\s*/, "") : "Not measured"], ["Lighthouse SEO", lh], ["Technical issues", onC.basis === "measured" ? String((r && r.issues ? r.issues : []).length) : "Not measured"]];
+    const facts = [["Lighthouse SEO", lh], ["Technical issues", onC.basis === "measured" ? String((r && r.issues ? r.issues : []).length) : "Not measured"]];
     const wrong = findings();
     const fix = unique([...((r && r.issues) || []).map((i) => i.fix), ...((r && r.recommendations) || []).filter((x) => !/\(.*\.\)$/.test(x) && !/^No significant/.test(x))]);
     const list = (items) => h("ul", { class: "ld-pts" }, items.map((t) => h("li", { text: t })));
     const comps = r && r.competitor && r.competitor.top && r.competitor.top.length ? competitors(r) : null;
     return fold({ title: "SEO details", meta: `${wrong.length} finding${wrong.length === 1 ? "" : "s"}`, body: h("div", null,
       h("dl", { class: "adm-spec ld-facts" }, facts.map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", { text: v })))),
+      organicList(r),
       h("h3", { class: "ld-sub", text: "Score" }), h("ul", { class: "ld-bks", "aria-label": "Score components" }, rows),
       comps ? h("div", null, h("h3", { class: "ld-sub", text: "Local competitors" }), comps) : null,
       wrong.length || fix.length ? h("div", { class: "ld-cols" }, h("div", null, h("h3", { class: "ld-sub", text: "Findings" }), wrong.length ? list(wrong) : null), h("div", null, h("h3", { class: "ld-sub", text: "To improve" }), fix.length ? list(fix) : null)) : null) });
+  }
+
+  /** Every tracked keyword with the business's real position, or that it was not among the results checked. Nothing is shown for a keyword that was not checked. */
+  function organicList(r) {
+    const org = r && r.organic ? r.organic : [];
+    if (!org.length) return h("div", null, h("h3", { class: "ld-sub", text: "Google Search by keyword" }), h("p", { class: "rk-quiet", text: "Not checked yet." }));
+    return h("div", null, h("h3", { class: "ld-sub", text: "Google Search by keyword" }),
+      h("ul", { class: "ld-kw", "aria-label": "Google Search rankings by keyword" }, org.map((q) => h("li", { class: "ld-kw__row" },
+        h("span", { class: "ld-kw__q", text: q.keyword }),
+        h("strong", { class: "ld-kw__pos" + (q.position === null ? " ld-kw__pos--none" : ""), text: q.position === null ? `Not in top ${q.depth}` : `#${q.position}` }),
+        h("span", { class: "ld-kw__when adm-muted", text: [q.location, q.checked].filter(Boolean).join(" · ") })))));
   }
 
   function competitors(r) {
