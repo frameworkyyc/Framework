@@ -102,16 +102,16 @@ const sendLead = async (w, id) => { const p = await previewHash(w, id); return (
 
 test("reason strings are specific, built only from the data", () => {
   const d28 = new Date(NOW.getTime() - 28 * DAY).toISOString();
-  assert.equal(buildReason({ site_status: "none", rating: 4.6, review_count: 77, last_review_at: d28 }, NOW), "No website; 4.6★ from 77 reviews, latest review 28 days ago.");
+  assert.equal(buildReason({ site_status: "none", rating: 4.6, review_count: 77, last_review_at: d28 }, NOW), "No website; 4.6 stars from 77 reviews, latest review 28 days ago.");
   // "doesn't load" is only ever said of a site a check confirmed offline; the finder's own claim ("broken") is unconfirmed, and online/unverified say what they are
-  assert.equal(buildReason({ site_status: "offline", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Website doesn't load (totalfencinginc.com); 4.9★ from 58 reviews.");
-  assert.equal(buildReason({ site_status: "broken", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Finder reported the website as not loading (totalfencinginc.com); not confirmed yet; 4.9★ from 58 reviews.");
-  assert.equal(buildReason({ site_status: "unverified", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Website couldn't be checked automatically (totalfencinginc.com); it may be protected, not offline; 4.9★ from 58 reviews.");
-  assert.equal(buildReason({ site_status: "online", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Website is online (totalfencinginc.com); 4.9★ from 58 reviews.");
-  assert.equal(buildReason({ site_status: "social_only", website: "https://facebook.com/x", rating: 5, review_count: 17 }, NOW), "Only a Facebook page; 5.0★ from 17 reviews.");
-  assert.equal(buildReason({ site_status: "outdated", website: "https://a.ca", site_issues: '["No HTTPS","Not mobile-friendly"]', rating: 4.4, review_count: 31 }, NOW), "Outdated site: no HTTPS, not mobile-friendly; 4.4★ from 31 reviews.");
+  assert.equal(buildReason({ site_status: "offline", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Website doesn't load (totalfencinginc.com); 4.9 stars from 58 reviews.");
+  assert.equal(buildReason({ site_status: "broken", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Finder reported the website as not loading (totalfencinginc.com); not confirmed yet; 4.9 stars from 58 reviews.");
+  assert.equal(buildReason({ site_status: "unverified", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Website couldn't be checked automatically (totalfencinginc.com); it may be protected, not offline; 4.9 stars from 58 reviews.");
+  assert.equal(buildReason({ site_status: "online", website: "https://www.totalfencinginc.com/", rating: 4.9, review_count: 58 }, NOW), "Website is online (totalfencinginc.com); 4.9 stars from 58 reviews.");
+  assert.equal(buildReason({ site_status: "social_only", website: "https://facebook.com/x", rating: 5, review_count: 17 }, NOW), "Only a Facebook page; 5.0 stars from 17 reviews.");
+  assert.equal(buildReason({ site_status: "outdated", website: "https://a.ca", site_issues: '["No HTTPS","Not mobile-friendly"]', rating: 4.4, review_count: 31 }, NOW), "Outdated site: no HTTPS, not mobile-friendly; 4.4 stars from 31 reviews.");
   assert.equal(buildReason({ site_status: "none" }, NOW), "No website.");
-  assert.equal(buildReason({ site_status: "none", rating: 4, review_count: 1 }, NOW, { oldFinder: true }), "No website; 4.0★ from 1 review. Approved in the old finder dashboard.");
+  assert.equal(buildReason({ site_status: "none", rating: 4, review_count: 1 }, NOW, { oldFinder: true }), "No website; 4.0 stars from 1 review. Approved in the old finder dashboard.");
 });
 
 test("dedupe key: the website host (without www) for a real site, else name and city", () => {
@@ -186,14 +186,14 @@ test("sync imports only qualified or approved, not do-not-solicit, not-ok-site f
   for (const [name, o] of [["Good Site", { site_status: "ok", website: "https://good.ca" }], ["Nope", { no_solicit: 1 }], ["DQ", { status: "disqualified" }], ["Rej", { status: "rejected" }], ["Fresh", { status: "new" }]]) w.f.add({ name, ...o });
   const r = await w.api("POST", "/leads/sync");
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body, { imported: 4, skipped: 0, waiting: 0 });
+  assert.deepEqual(r.body, { imported: 4, skipped: 0, waiting: 0, assessed: 0 });
   assert.deepEqual(w.q("SELECT name FROM outreach_leads ORDER BY name").map((x) => x.name), ["FB Co", "No Site Co", "Old Dash Co", "Summit Fencing"]);
   const by = (n) => lead(w, leadId(w, n));
-  assert.equal(by("No Site Co").reason, "No website; 4.6★ from 77 reviews, latest review 28 days ago.");
-  assert.equal(by("Old Dash Co").reason, "Finder reported the website as not loading (totalfencinginc.com); not confirmed yet; 4.9★ from 58 reviews. Approved in the old finder dashboard.");
+  assert.equal(by("No Site Co").reason, "No website; 4.6 stars from 77 reviews, latest review 28 days ago.");
+  assert.equal(by("Old Dash Co").reason, "Finder reported the website as not loading (totalfencinginc.com); not confirmed yet; 4.9 stars from 58 reviews. Approved in the old finder dashboard.");
   assert.equal(by("Old Dash Co").site_status, "broken", "the finder's claim is stored as it was, and stays unconfirmed until a check runs");
-  assert.equal(by("FB Co").reason, "Only a Facebook page; 5.0★ from 17 reviews.");
-  assert.equal(by("Summit Fencing").reason, "Outdated site: no HTTPS, not mobile-friendly; 4.4★ from 31 reviews.");
+  assert.equal(by("FB Co").reason, "Only a Facebook page; 5.0 stars from 17 reviews.");
+  assert.equal(by("Summit Fencing").reason, "Outdated site: no HTTPS, not mobile-friendly; 4.4 stars from 31 reviews.");
   const s = by("Summit Fencing");
   assert.equal(s.status, "new"); assert.equal(s.source, "finder"); assert.match(s.source_ref, /^pl\d+$/); assert.equal(s.dedupe_key, "summitfencing.ca"); assert.equal(s.trade, "fence"); assert.equal(s.city, "Calgary");
   assert.deepEqual(JSON.parse(s.site_issues), ["No HTTPS", "Not mobile-friendly"]);
@@ -204,7 +204,7 @@ test("sync imports only qualified or approved, not do-not-solicit, not-ok-site f
   ]);
   assert.equal(w.q("SELECT count(*) AS n FROM outreach_events WHERE type = 'imported'")[0].n, 4);
   const again = await w.api("POST", "/leads/sync");
-  assert.deepEqual(again.body, { imported: 0, skipped: 4, waiting: 0 });
+  assert.deepEqual(again.body, { imported: 0, skipped: 4, waiting: 0, assessed: 0 });
   assert.equal(w.q("SELECT count(*) AS n FROM outreach_leads")[0].n, 4);
 });
 
@@ -809,7 +809,7 @@ test("list: counts per status, filters by status and text, the row shape, and se
   assert.deepEqual(all.counts, { new: 1, approved: 1, ready: 0, contacted: 0, replied: 0, won: 0, dismissed: 1 });
   assert.equal(all.limit, 300); assert.equal(all.leads.length, 3);
   const row = all.leads.find((l) => l.id === summit);
-  assert.deepEqual(Object.keys(row).sort(), ["city", "demo", "has_eligible_email", "has_email", "id", "contacted_at", "name", "next_action", "opted_out", "phone", "rating", "reason", "review_count", "site_status", "source_note", "status", "trade", "updated_at", "website"].sort());
+  assert.deepEqual(Object.keys(row).sort(), ["city", "demo", "has_eligible_email", "has_email", "id", "contacted_at", "name", "next_action", "opted_out", "phone", "rating", "reason", "review_count", "seo_level", "seo_score", "site_status", "site_verified", "source_note", "status", "trade", "updated_at", "website"].sort());
   assert.equal(row.has_eligible_email, true); assert.equal(row.phone, "403-555-0100"); assert.deepEqual(row.demo, { visits: 0, opens: 0, company: null, enquired: false, last_activity: null });
   assert.equal(row.next_action, "Review the draft and approve the email"); assert.equal(row.opted_out, false);
   assert.equal(all.leads.find((l) => l.id === alpha).next_action, "Dismissed: Retired");
@@ -1100,7 +1100,7 @@ test("recheck: a working site flagged 'doesn't load' becomes Online and is no lo
   assert.deepEqual([r.body.checked, r.body.remaining, r.body.results[0].state, r.body.results[0].changed, r.body.results[0].was], [1, 0, "online", true, "broken"]);
   const l = lead(w, ids["Working Co"]);
   assert.deepEqual([l.site_status, l.site_score], ["online", null], "an online site is not scored as a broken-site prospect");
-  assert.match(l.reason, /^Website is online \(workingco\.ca\); 4\.6★ from 77 reviews\.$/);
+  assert.match(l.reason, /^Website is online \(workingco\.ca\); 4\.6 stars from 77 reviews\.$/);
   assert.deepEqual(JSON.parse(l.site_issues), ["Checked 2026-11-06: online, ok", "HTTP status 200 after 1 redirect"]);
   const note = w.q("SELECT type, detail FROM outreach_events WHERE lead_id = ? AND type = 'note'", l.id);
   assert.equal(note.length, 1); assert.match(note[0].detail, /^Website check: Online: ok \(HTTP 200, 1 redirect\) at www\.workingco\.ca\.$/);
@@ -1131,7 +1131,7 @@ test("recheck: a verified offline site keeps its score and the plain 'doesn't lo
   assert.deepEqual(r.body.results.map((x) => [x.state, x.httpStatus]).sort(), [["offline", 404], ["offline", 521]]);
   const l = lead(w, ids["Gone Co"]);
   assert.deepEqual([l.site_status, l.site_score], ["offline", scoreBefore]);
-  assert.equal(l.reason, "Website doesn't load (goneco.ca); 4.6★ from 77 reviews.");
+  assert.equal(l.reason, "Website doesn't load (goneco.ca); 4.6 stars from 77 reviews.");
   assert.match(JSON.parse(l.site_issues)[0], /^Checked 2026-11-06: offline, home page not found \(HTTP 404\)$/);
 });
 
@@ -1210,7 +1210,7 @@ test("coordination with the finder: its 'offline' (proven) and 'unverified' (cou
   w.f.raw.prepare("UPDATE leads SET site_score = NULL WHERE name = 'Guarded Finder Co'").run();
   assert.equal((await w.api("POST", "/leads/sync")).status, 200);
   const gone = w.q("SELECT * FROM outreach_leads WHERE name = 'Proven Gone Co'")[0], guarded = w.q("SELECT * FROM outreach_leads WHERE name = 'Guarded Finder Co'")[0];
-  assert.deepEqual([gone.site_status, gone.reason], ["offline", "Website doesn't load (provengone.ca); 4.6★ from 77 reviews."]);
+  assert.deepEqual([gone.site_status, gone.reason], ["offline", "Website doesn't load (provengone.ca); 4.6 stars from 77 reviews."]);
   assert.deepEqual([guarded.site_status, guarded.site_score], ["unverified", null]);
   assert.match(guarded.reason, /^Website couldn't be checked automatically \(guardedfinder\.ca\); it may be protected, not offline; /);
   assert.deepEqual(JSON.parse(guarded.site_issues), ["Checked 2026-11-06: unverified, blocked or protected (HTTP 403, Cloudflare challenge)", "Bot protection seen: Cloudflare challenge"]);

@@ -15,6 +15,9 @@ import {
   approveLead, dismissLead, reopenLead, markLead, addContact, confirmContact, draftMessage, draftFollowup, editMessage, approveMessage, unapproveMessage, previewSend, sendMessages,
 } from "../leads.js";
 import { emailConfig } from "../assessment.js";
+import { seoReady, markSiteWorking } from "../leads.js";
+import { scoreLead, parseAssessment, opportunityLevel } from "../seo-score.js";
+import { buildSeoReport, reportMarkdown, renderSeoPdf } from "../seo-report.js";
 
 const LIST_LIMIT = 300;
 const TIMELINE_LIMIT = 200;
@@ -85,17 +88,20 @@ async function list(url, env, now) {
   const D = (agg, extra = "") => `(SELECT ${agg} FROM demo_journeys j WHERE j.link_id = l.demo_link_id AND j.bot = 0${extra})`;
   const demoCols = demo ? `, ${D("COUNT(*)")} AS d_visits, ${D("COALESCE(SUM(j.demo_opens), 0)")} AS d_opens, (SELECT j.company FROM demo_journeys j WHERE j.link_id = l.demo_link_id AND j.bot = 0 AND j.company IS NOT NULL ORDER BY j.last_seen_at DESC LIMIT 1) AS d_company,
     ${D("COUNT(*)", " AND j.enquired = 1")} AS d_enq, ${D("MAX(j.last_seen_at)")} AS d_last` : "";
+  const seo = await seoReady(db, now.getTime());
+  const seoCols = seo ? ", l.seo_score, l.seo_assessed_at, l.site_verified_at" : "";
+  const byOpportunity = seo && url.searchParams.get("sort") === "opportunity";
   const where = [], params = [];
   if (st !== "all") { where.push("l.status = ?"); params.push(st); }
   if (q) { where.push("(l.name LIKE ? ESCAPE '\\' OR l.trade LIKE ? ESCAPE '\\' OR l.city LIKE ? ESCAPE '\\' OR l.website LIKE ? ESCAPE '\\')"); const p = `%${likeEscape(q)}%`; params.push(p, p, p, p); }
-  const rows = await all(db, `SELECT l.id, l.name, l.trade, l.city, l.status, l.reason, l.website, l.site_status, l.rating, l.review_count, l.updated_at, l.contacted_at, l.replied_at, l.dismiss_reason, l.demo_link_id,
+  const rows = await all(db, `SELECT l.id, l.name, l.trade, l.city, l.status, l.reason, l.website, l.site_status, l.rating, l.review_count, l.updated_at, l.contacted_at, l.replied_at, l.dismiss_reason, l.demo_link_id${seoCols},
       EXISTS (SELECT 1 FROM outreach_contacts c WHERE c.lead_id = l.id AND c.type = 'email' AND c.eligibility = 'eligible' AND c.opted_out_at IS NULL AND NOT EXISTS (SELECT 1 FROM outreach_suppressions s WHERE s.email = lower(c.value))) AS has_eligible_email,
       EXISTS (SELECT 1 FROM outreach_contacts c WHERE c.lead_id = l.id AND c.type = 'email') AS has_email,
       (SELECT c.value FROM outreach_contacts c WHERE c.lead_id = l.id AND c.type = 'phone' ORDER BY c.id LIMIT 1) AS phone,
       (SELECT m.status FROM outreach_messages m WHERE m.lead_id = l.id AND m.is_test = 0 ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) AS msg_status,
       (SELECT m.sent_at FROM outreach_messages m WHERE m.lead_id = l.id AND m.kind = 'first' AND m.is_test = 0 AND m.status = 'sent' ORDER BY m.sent_at DESC LIMIT 1) AS first_sent_at,
       EXISTS (SELECT 1 FROM outreach_messages m WHERE m.lead_id = l.id AND m.kind = 'followup' AND m.is_test = 0 AND m.status IN ('approved', 'sending', 'sent', 'bounced', 'complained')) AS followup_live${demoCols}
-    FROM outreach_leads l ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY l.updated_at DESC, l.id LIMIT ${LIST_LIMIT}`, params);
+    FROM outreach_leads l ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY ${byOpportunity ? "l.seo_score IS NULL, l.seo_score DESC, " : ""}l.updated_at DESC, l.id LIMIT ${LIST_LIMIT}`, params);
   const counts = Object.fromEntries(STATUSES.map((s) => [s, 0]));
   for (const r of await all(db, "SELECT status, COUNT(*) AS n FROM outreach_leads GROUP BY status")) if (r.status in counts) counts[r.status] = r.n;
   const leads = rows.map((r) => {
@@ -107,11 +113,12 @@ async function list(url, env, now) {
       has_eligible_email: flag(r.has_eligible_email), has_email: flag(r.has_email), phone: r.phone || null,
       demo: demo && r.demo_link_id ? { visits: r.d_visits, opens: r.d_opens, company: r.d_company || null, enquired: r.d_enq > 0, last_activity: r.d_last || null } : null,
       next_action: nextAction(r, { hasEligible: flag(r.has_eligible_email), hasEmail: flag(r.has_email), msgStatus: r.msg_status, followup, followupLive: flag(r.followup_live) }),
+      seo_score: seo && Number.isFinite(r.seo_score) ? r.seo_score : null, seo_level: seo ? opportunityLevel(Number.isFinite(r.seo_score) ? r.seo_score : null) : null, site_verified: seo && !!r.site_verified_at,
       updated_at: r.updated_at, contacted_at: r.contacted_at, opted_out: optedOut,
       source_note: r.reason && r.reason.includes(OLD_FINDER_NOTE) ? OLD_FINDER_NOTE : null,
     };
   });
-  return json({ counts, leads, limit: LIST_LIMIT });
+  return json({ counts, leads, limit: LIST_LIMIT, seo });
 }
 
 /* ---------- One lead ---------- */
@@ -125,7 +132,11 @@ async function leadOut(env, lead, now) {
   const followup = await followupState(db, lead, now);
   const live = await db.prepare("SELECT 1 AS x FROM outreach_messages WHERE lead_id = ? AND kind = 'followup' AND is_test = 0 AND status IN ('approved', 'sending', 'sent', 'bounced', 'complained')").bind(lead.id).first();
   const optedOut = isOptedOut(lead);
-  return { ...lead, opted_out: optedOut, next_action: nextAction(lead, { hasEligible: !!preferred, hasEmail: contacts.some((c) => c.type === "email"), msgStatus: msg && msg.status, followup, followupLive: !!live }) };
+  const { seo_data: seoRaw, ...rest } = lead;
+  const snap = parseAssessment(seoRaw);
+  const sc = snap ? scoreLead(snap, lead) : null;
+  const seo = sc ? { score: sc.score, level: opportunityLevel(sc.score), label: sc.label, coverage: sc.coverage, assessed_at: lead.seo_assessed_at || snap.assessedAt || null, components: sc.components.map(({ issues, ...c }) => c) } : null;
+  return { ...rest, seo, opted_out: optedOut, next_action: nextAction(lead, { hasEligible: !!preferred, hasEmail: contacts.some((c) => c.type === "email"), msgStatus: msg && msg.status, followup, followupLive: !!live }) };
 }
 
 async function demoSection(env, lead, origin, includeBots, now) {
@@ -289,6 +300,24 @@ async function recheckBody(body, env, now, ctx) {
   return json(await recheckSites(env, { ids }, { now, fetch: ctx.siteFetch }));
 }
 
+/** GET /leads/:id/seo-report (JSON: the report and its Markdown) or /seo-report.pdf. 404 when the lead has no stored assessment. */
+async function seoReport(env, id, pdf, now) {
+  const lead = await getLead(env.PORTAL_DB, id);
+  if (!lead) return json({ error: "not_found" }, 404);
+  const report = buildSeoReport(lead, now);
+  if (!report) return json({ error: "no_assessment" }, 404);
+  if (!pdf) return json({ report, markdown: reportMarkdown(report) }, 200, { "Cache-Control": "private, no-store" });
+  const slug = (report.business.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "lead").slice(0, 60);
+  return new Response(renderSeoPdf(report, { exportedOn: now }), { status: 200, headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="seo-assessment-${slug}.pdf"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+}
+
+/** POST /leads/:id/site-working { verified?: boolean }: "Mark as Working" (default) or take the mark off. */
+async function siteWorking(body, env, id, ctx) {
+  if (body.verified !== undefined && typeof body.verified !== "boolean") return bad("verified");
+  const r = await markSiteWorking(env, id, { verified: body.verified !== false }, { now: new Date(ctx.at) });
+  return r.ok ? json({ lead: await leadOut(env, r.lead, new Date(ctx.at)) }) : failure({ ...r, status: r.error === "not_found" ? 404 : 409 });
+}
+
 export async function handleLeadsApi(request, env, principal, path, deps = {}) {
   const m = path.match(/^\/leads(\/.*)?$/);
   if (!m) return null;
@@ -297,7 +326,7 @@ export async function handleLeadsApi(request, env, principal, path, deps = {}) {
   if (!env.PORTAL_DB) return sub === "/status" && method === "GET" ? status(env, now) : json({ error: "database_unavailable" }, 503);
   try {
     if (sub === "/status") return method === "GET" ? await status(env, now) : notAllowed("GET");
-    const lead = sub.match(/^\/([^/]+)(?:\/(approve|dismiss|reopen|draft|followup|status|contacts|message)(?:\/(\d+|approve|unapprove))?)?$/);
+    const lead = sub.match(/^\/([^/]+)(?:\/(approve|dismiss|reopen|draft|followup|status|contacts|message|site-working|seo-report|seo-report\.pdf)(?:\/(\d+|approve|unapprove))?)?$/);
     const fixed = sub.match(/^\/(sync|list|bulk|recheck-sites|send\/preview|send)$/);
     if (!fixed && !(lead && LEAD_ID.test(lead[1]))) return json({ error: "not_found" }, 404);
     if (!(await leadsReady(env.PORTAL_DB, now.getTime()))) return json({ error: "not_set_up", migration: MIGRATION }, 409);
@@ -318,6 +347,11 @@ export async function handleLeadsApi(request, env, principal, path, deps = {}) {
     }
 
     const [, id, action, arg] = lead;
+    if (action === "seo-report" || action === "seo-report.pdf") {
+      if (arg) return json({ error: "not_found" }, 404);
+      if (method !== "GET") return notAllowed("GET");
+      return await seoReport(env, id, action === "seo-report.pdf", now);
+    }
     if (!action) {
       if (method === "GET") return await detail(url, env, id, url.origin, now);
       if (method !== "PATCH") return notAllowed("GET, PATCH");
@@ -343,6 +377,7 @@ export async function handleLeadsApi(request, env, principal, path, deps = {}) {
       const r = await confirmContact(env, id, Number(arg), ctx);
       return r.ok ? json({ contact: publicContact(r.contact) }) : failure(r);
     }
+    if (action === "site-working") return await siteWorking(body, env, id, ctx);
     return await leadAction(action, body, env, principal, id, ctx);
   } catch (err) {
     console.error("admin leads api error:", err && err.message);

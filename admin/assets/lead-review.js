@@ -3,7 +3,7 @@
 
 import { h, api, errorState, confirmDialog, stateBlock } from "./ui.js";
 import { badge } from "./kit.js";
-import { errText, codeText } from "./leads-common.js";
+import { errText, codeText, iconLabel } from "./leads-common.js";
 
 const BATCH = 10;
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
@@ -17,7 +17,7 @@ export function reviewScreen({ ids, mode = "send", onBack, notify }) {
   const title = h("h2", { class: "ld-review__title", id: "ld-review-title", tabindex: "-1", text: mode === "approve" ? "Review emails" : "Review & send" });
   let changed = false;
   const back = () => onBack(changed);
-  root.append(h("button", { class: "btn btn--secondary adm-small ld-back", type: "button", onclick: back }, "← Back"), title, body);
+  root.append(h("button", { class: "btn btn--secondary adm-small ld-back", type: "button", onclick: back }, iconLabel("back", "Back")), title, body);
 
   async function load() {
     const batch = queue.slice(0, BATCH);

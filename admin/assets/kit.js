@@ -97,6 +97,8 @@ const ICONS = {
   "additional-services": "M4 4h16v16H4zM12 8v8M8 12h8", "service-pricing": "M3 12V3h9l9 9-9 9zM8 8h.01", settings: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M14 4v4M8 10v4M16 16v4",
   requests: "M5 4h14v16H5zM9 9h6M9 13h6M9 17h3", leads: "M3 5h18l-7 8v6l-4 2v-8z", "demo-traffic": "M4 4v16h16M8 15l3-4 3 2 5-6",
   check: "M12 3a9 9 0 100 18 9 9 0 000-18zM8 12.4l2.7 2.7L16 9.8", chevron: "M9 6l6 6-6 6",
+  star: "M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z", external: "M14 4h6v6M20 4l-9 9M18 14v5H5V6h5", back: "M19 12H5M11 6l-6 6 6 6",
+  download: "M12 4v11M7 11l5 5 5-5M5 20h14", copy: "M9 9h11v11H9zM5 15V4h11",
 };
 /** A 20px line icon by name (the module ids, plus check and chevron). Decorative: it is hidden from screen readers. */
 export function navIcon(name) {

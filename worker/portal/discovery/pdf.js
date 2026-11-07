@@ -84,7 +84,7 @@ function wrap(text, size, bold, max) {
 class Page { constructor() { this.ops = []; } }
 
 /** The page-layout toolkit both documents are drawn with: flowing text, rules, headings, quotations, a title block, then header/footer on every page once the count is known. */
-function makeDoc() {
+export function makeDoc() {
   const pages = [new Page()];
   let y = TOP;
   const cur = () => pages[pages.length - 1];
@@ -137,7 +137,7 @@ function makeDoc() {
   };
 
   /** Header (brand + label) and footer (note, page n of N) on every page, then the file. */
-  const finish = ({ label, title, exportedOn }) => {
+  const finish = ({ label, title, exportedOn, note = "Internal project documentation. Confidential." }) => {
     const total = pages.length;
     const day = exportedOn.toISOString().slice(0, 10);
     const right = (text, size, yy, grey) => { const gs = glyphs(text, false); let t = gs; while (t.length > 3 && widthOf(t, size) > BODY * 0.7) t = t.slice(0, -1); const g2 = t.length < gs.length ? [...t.slice(0, -1), ...glyphs("...", false)] : t; return { gs: g2, x: W - M - widthOf(g2, size), yy, size, grey }; };
@@ -148,7 +148,7 @@ function makeDoc() {
       const hd = right(label, 9, H - 40, 0.35); t(hd.gs, hd.x, hd.yy, 9, false, 0.35);
       add(`1 w 0 G ${M} ${H - 48} m ${W - M} ${H - 48} l S`);
       add(`0.5 w 0.6 G ${M} 52 m ${W - M} 52 l S`);
-      t(glyphs(`Internal project documentation. Confidential. Exported ${day}.`, false), M, 38, 8, false, 0.4);
+      t(glyphs(`${note} Exported ${day}.`, false), M, 38, 8, false, 0.4);
       const pg = glyphs(`Page ${i + 1} of ${total}`, false); t(pg, W - M - widthOf(pg, 8), 38, 8, false, 0.4);
     });
     return assemble(pages, title, exportedOn);

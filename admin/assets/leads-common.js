@@ -1,7 +1,7 @@
 /* Framework Admin — Leads: small shared pieces (status words, chips, links, error wording, tabs). Server text is only ever set as text. */
 
 import { h } from "./ui.js";
-import { badge } from "./kit.js";
+import { badge, navIcon } from "./kit.js";
 
 export const STATUSES = Object.freeze([["new", "New"], ["approved", "Approved"], ["ready", "Ready to send"], ["contacted", "Contacted"], ["replied", "Replied"], ["won", "Won"], ["dismissed", "Dismissed"]]);
 export const statusWord = (s) => (STATUSES.find(([id]) => id === s) || [s, s || ""])[1];
@@ -18,9 +18,22 @@ export const SITE_TONE = { none: "warn", offline: "warn", broken: "pending", unv
 /** Only http(s) addresses are ever made into links. */
 export const safeUrl = (u) => (typeof u === "string" && /^https?:\/\/[^\s]+$/i.test(u) ? u : null);
 export const shortUrl = (u) => String(u || "").replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
-export const extLink = (href, text, cls = "adm-link") => (safeUrl(href) ? h("a", { class: cls, href, target: "_blank", rel: "noopener noreferrer", text }) : null);
+export const extLink = (href, text, cls = "adm-link") => (safeUrl(href) ? h("a", { class: cls + " ld-ico", href, target: "_blank", rel: "noopener noreferrer" }, h("span", { text }), navIcon("external")) : null);
 
-export const stars = (rating, reviews) => (typeof rating === "number" && rating > 0 ? `${rating.toFixed(1)}★` + (reviews ? ` · ${reviews} reviews` : "") : "");
+export const stars = (rating, reviews) => (typeof rating === "number" && rating > 0 ? `${rating.toFixed(1)} stars` + (reviews ? ` · ${reviews} reviews` : "") : "");
+
+/** A line icon from the Admin kit followed by text: the one way Leads shows a symbol (no emoji or symbol characters). */
+export const iconLabel = (name, text) => h("span", { class: "ld-ico" }, navIcon(name), h("span", { text }));
+
+/** The SEO Opportunity badge for a list row or header: the score and its level. An unassessed lead says so rather than showing a number. */
+const LEVEL = { high: ["High", "ok"], medium: ["Medium", "pending"], low: ["Low", ""] };
+export const opportunityChip = (lead) => {
+  const score = lead.seo_score !== undefined ? lead.seo_score : lead.seo && lead.seo.score;
+  const level = lead.seo_level || (lead.seo && lead.seo.level);
+  if (score === null || score === undefined) return lead.seo_level === null || lead.seo === null ? null : badge("Not scored yet", "");
+  const [word, tone] = LEVEL[level] || ["", ""];
+  return badge(`SEO opportunity ${score}/100${word ? ", " + word.toLowerCase() : ""}`, tone);
+};
 export const words = (t) => (String(t || "").trim().match(/\S+/g) || []).length;
 
 const CODES = {

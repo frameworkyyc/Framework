@@ -3,7 +3,7 @@
 
 import { h, api, errorState, stateBlock, confirmDialog } from "./ui.js";
 import { badge, emptyState, fold } from "./kit.js";
-import { STATUSES, statusWord, view, SITE_WORDS, SITE_TONE, stars, leadsTabs, errText } from "./leads-common.js";
+import { STATUSES, statusWord, view, SITE_WORDS, SITE_TONE, stars, leadsTabs, errText, opportunityChip } from "./leads-common.js";
 import { reviewScreen } from "./lead-review.js";
 
 export async function render(ctx) {
@@ -53,7 +53,9 @@ function setupStrip(st) {
 function rowChips(l) {
   const out = [];
   if (l.opted_out) out.push(badge("Opted out", "bad"));
-  out.push(badge(SITE_WORDS[l.site_status] || "Website unknown", SITE_TONE[l.site_status] || ""));
+  const opp = opportunityChip(l);
+  if (opp) out.unshift(opp);
+  out.push(l.site_verified ? badge("Website working (checked by you)", "ok") : badge(SITE_WORDS[l.site_status] || "Website unknown", SITE_TONE[l.site_status] || ""));
   const r = stars(l.rating, l.review_count);
   if (r) out.push(badge(r, ""));
   out.push(l.has_eligible_email ? badge("Email found", "ok") : l.has_email ? badge("Email needs a check", "warn") : l.phone ? badge("Phone only", "pending") : badge("No contact yet", "warn"));
@@ -99,7 +101,7 @@ function renderList(ctx) {
   const barBox = h("div", { class: "ld-barbox" });
   const reviewBox = h("div");
   const main = h("div", null, setup, filterBox, listBox);
-  const sub = h("p", { class: "adm-sub", text: "Businesses worth a call, found for you. Approve the good ones, then review and send." });
+  const sub = h("p", { class: "adm-sub", text: "Local businesses with the most to gain from better search visibility, best opportunity first. Approve the good ones, then review and send." });
   const syncNote = h("p", { class: "ld-note", role: "status", hidden: true });
   const syncBtn = h("button", { class: "btn btn--secondary", type: "button" }, "Check for new candidates");
   const checkBtn = h("button", { class: "btn btn--secondary", type: "button", hidden: true }, "Check websites");
@@ -159,14 +161,14 @@ function renderList(ctx) {
     const token = ++loadToken;
     if (!data) listBox.replaceChildren(stateBlock({ title: "Loading leads…" }));
     try {
-      const qs = `status=${encodeURIComponent(status || "new")}` + (q ? `&q=${encodeURIComponent(q)}` : "");
+      const qs = `status=${encodeURIComponent(status || "new")}` + (q ? `&q=${encodeURIComponent(q)}` : "") + "&sort=opportunity";
       let r = await api("/leads/list?" + qs);
       if (token !== loadToken) return;
       if (!status) { // first load: New if it has any, else Approved or Ready to send, else All
         const c = r.counts || {};
         const pick = c.new > 0 ? "new" : c.approved > 0 ? "approved" : c.ready > 0 ? "ready" : "all";
         status = pick;
-        if (pick !== "new") { r = await api("/leads/list?status=" + pick + (q ? `&q=${encodeURIComponent(q)}` : "")); if (token !== loadToken) return; }
+        if (pick !== "new") { r = await api("/leads/list?status=" + pick + (q ? `&q=${encodeURIComponent(q)}` : "") + "&sort=opportunity"); if (token !== loadToken) return; }
       }
       data = r;
       checkBtn.hidden = !unconfirmed();
