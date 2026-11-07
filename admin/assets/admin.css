@@ -1168,6 +1168,18 @@ details[open] > .rk-fold__sum::after, details[open] > .rk-manage__sum::after { m
 .ld-setup .adm-chip { margin: 0; justify-self: start; }
 @media (max-width: 760px) { .ld-setup__row { grid-template-columns: minmax(0, 1fr) auto; } .ld-setup__text { grid-column: 1 / -1; } }
 
+/* Icon + text (Leads shows symbols only as kit line icons) and the SEO assessment rows */
+.ld-ico { display: inline-flex; align-items: center; gap: 6px; }
+.ld-ico .rk-ico { width: 16px; height: 16px; flex: none; }
+.ld-seo { list-style: none; margin: 0 0 var(--adm-space-3); padding: 0; }
+.ld-seo__row { padding: 12px 0; border-top: 1px solid var(--hairline); }
+.ld-seo__head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.ld-seo__head .adm-chip { margin: 0; }
+.ld-seo__pts { margin-left: auto; font-variant-numeric: tabular-nums; }
+.ld-seo__text { margin: 4px 0 0; overflow-wrap: anywhere; }
+.ld-seo__src { margin: 2px 0 0; font-size: 13px; }
+.ld-seo__note { margin: 0 0 var(--adm-space-3); font-size: 14px; }
+
 /* Segmented status filter: one ruled strip, scrolls sideways on a phone */
 .ld-seg { display: flex; overflow-x: auto; margin: 0 0 var(--adm-space-3); padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
 .ld-seg__btn { flex: none; min-height: 44px; padding: 0 16px; margin: 0 -1px 0 0; border: 1px solid var(--hairline); border-radius: 0; background: var(--paper); color: var(--ink); font: 500 15px/1 var(--font-body); cursor: pointer; white-space: nowrap; }

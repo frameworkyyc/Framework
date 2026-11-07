@@ -4,7 +4,7 @@
 
 import { h, api, errorState, confirmDialog, fmtDateTime, fmtDate } from "./ui.js";
 import { badge, card, fold, statCard } from "./kit.js";
-import { statusChip, view, SITE_WORDS, extLink, safeUrl, shortUrl, stars, errText, copyText } from "./leads-common.js";
+import { statusChip, view, SITE_WORDS, SITE_TONE, extLink, safeUrl, shortUrl, stars, errText, copyText, iconLabel, opportunityChip } from "./leads-common.js";
 import { pitchSection } from "./lead-pitch.js";
 import { reviewScreen } from "./lead-review.js";
 import { swatch, pretty, fmt, when } from "./demo-traffic.js";
@@ -21,7 +21,7 @@ export async function render(id, ctx) {
   const ctl = { pitch: null, flash: "" };
   let data = null;
 
-  const back = h("a", { class: "adm-back ld-backlink", href: "/admin/leads" + (view.status ? "?status=" + view.status : ""), "data-link": "" }, "← Back to leads");
+  const back = h("a", { class: "adm-back ld-backlink", href: "/admin/leads" + (view.status ? "?status=" + view.status : ""), "data-link": "" }, iconLabel("back", "Back to leads"));
 
   async function load() { data = await api("/leads/" + encodeURIComponent(id)); }
   async function reload() {
@@ -40,9 +40,9 @@ export async function render(id, ctx) {
 
   function header() {
     const l = data.lead;
-    const links = [extLink(l.website, "Website ↗", "adm-link"), extLink(l.maps_url, "Google Maps ↗", "adm-link")].filter(Boolean);
+    const links = [extLink(l.website, "Website", "adm-link"), extLink(l.maps_url, "Google Maps", "adm-link")].filter(Boolean);
     return h("header", { class: "ld-head" },
-      h("div", { class: "ld-head__top" }, h("h1", { class: "adm-title", tabindex: "-1", text: l.name }), statusChip(l)),
+      h("div", { class: "ld-head__top" }, h("h1", { class: "adm-title", tabindex: "-1", text: l.name }), statusChip(l), opportunityChip(l)),
       h("p", { class: "ld-head__meta" }, [l.trade, l.city].filter(Boolean).join(" · "), links.length ? " " : null, links.map((a, i) => [i ? " · " : "", a])));
   }
 
@@ -77,7 +77,6 @@ export async function render(id, ctx) {
 
     if (l.status === "new") {
       btn("Approve", "btn--primary", async () => { await post("/approve"); await reload(); });
-      if (l.website && ["broken", "unverified", "offline", "online"].includes(l.site_status)) btn("Check website again", "btn--secondary", async () => { await api("/leads/recheck-sites", { method: "POST", body: { ids: [id] } }); await reload(); });
       dismiss();
     } else if (l.status === "approved") {
       const b = btn("Approve email", "btn--primary", async () => { if (ctl.pitch && ctl.pitch.dirty()) await ctl.pitch.save(); await post("/message/approve"); await reload(); });
@@ -111,8 +110,6 @@ export async function render(id, ctx) {
 
   function why() {
     const l = data.lead;
-    let issues = [];
-    try { const p = JSON.parse(l.site_issues || "[]"); if (Array.isArray(p)) issues = p.filter((x) => typeof x === "string"); } catch { /* none */ }
     const srcs = [];
     const seen = new Set();
     const add = (label, url) => { if (safeUrl(url) && !seen.has(url)) { seen.add(url); srcs.push(h("li", null, h("span", { class: "adm-muted", text: label + ": " }), extLink(url, shortUrl(url)))); } };
@@ -122,9 +119,64 @@ export async function render(id, ctx) {
     return card("Why they’re a prospect", h("div", null,
       h("p", { class: "ld-reason", text: l.reason }),
       h("dl", { class: "adm-spec ld-facts" },
-        [["Website", SITE_WORDS[l.site_status] || "Unknown"], issues.length ? [["online", "offline", "unverified"].includes(l.site_status) ? "Website check" : "Website issues", issues.join("; ")] : null, rating ? ["Reviews", rating + (l.last_review_at ? ` (latest ${fmtDate(l.last_review_at)})` : "")] : null, l.address ? ["Address", l.address] : null]
+        [rating ? ["Reviews", rating + (l.last_review_at ? ` (latest ${fmtDate(l.last_review_at)})` : "")] : null, l.address ? ["Address", l.address] : null]
           .filter(Boolean).map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", { text: v })))),
       srcs.length ? h("div", null, h("p", { class: "rk-sub", text: "Sources" }), h("ul", { class: "ld-sources" }, srcs)) : null), { id: "ld-why" });
+  }
+
+  /* ---------- SEO assessment ---------- */
+
+  function seoSection() {
+    const l = data.lead, s = l.seo;
+    if (!s) return card("SEO assessment", h("p", { class: "rk-quiet", text: "Not assessed yet. The finder measures a business’s Google Maps position, its website and its local competitors, and the result appears here." }), { id: "ld-seo" });
+    const rows = s.components.map((c) => h("li", { class: "ld-seo__row" },
+      h("div", { class: "ld-seo__head" }, h("strong", { text: c.label }), badge(c.basis === "measured" ? "Measured" : "Not measured", c.basis === "measured" ? "ok" : ""), c.basis === "measured" ? h("span", { class: "ld-seo__pts adm-muted", text: `${c.points} of ${c.max}` }) : null),
+      h("p", { class: "ld-seo__text", text: c.basis === "measured" ? c.finding : c.note }),
+      c.source ? h("p", { class: "adm-muted ld-seo__src", text: c.source }) : null));
+    const say = h("span", { class: "ld-saved", role: "status", "aria-live": "polite" });
+    const manual = h("textarea", { class: "input dt-link__manual", readonly: true, hidden: true, rows: "6", "aria-label": "Report text" });
+    const copy = h("button", { class: "btn btn--secondary", type: "button" }, iconLabel("copy", "Copy for AI"));
+    copy.addEventListener("click", async () => {
+      copy.disabled = true; say.textContent = "";
+      try {
+        const r = await api(`/leads/${encodeURIComponent(id)}/seo-report`);
+        try { await navigator.clipboard.writeText(r.markdown); say.textContent = "Copied. Paste it into ChatGPT or Claude."; }
+        catch { manual.hidden = false; manual.value = r.markdown; manual.focus(); manual.select(); say.textContent = "Copy the text below."; }
+      } catch (err) { say.textContent = errText(err); }
+      copy.disabled = false;
+    });
+    const pdf = h("a", { class: "btn btn--secondary", href: `/api/admin/leads/${encodeURIComponent(id)}/seo-report.pdf`, download: "" }, iconLabel("download", "Download PDF"));
+    return card("SEO assessment", h("div", null,
+      h("div", { class: "rk-stats ld-stats" }, statCard({ label: "SEO opportunity", value: s.score === null ? "Not scored" : `${s.score}/100`, tone: s.level === "high" ? "ok" : "" })),
+      h("p", { class: "adm-muted ld-seo__note", text: `${s.label}${s.assessed_at ? ", measured " + fmtDate(s.assessed_at) : ""}. The score is an estimate; items marked Measured were recorded from real data, and anything not measured is left out of the score.` }),
+      h("ul", { class: "ld-seo", "aria-label": "How the score is made up" }, rows),
+      h("div", { class: "adm-actions" }, copy, pdf, say), manual), { id: "ld-seo" });
+  }
+
+  /* ---------- Website check: a secondary diagnostic, collapsed by default ---------- */
+
+  function siteCheck() {
+    const l = data.lead;
+    if (!l.website && !l.site_status) return null;
+    let issues = [];
+    try { const p = JSON.parse(l.site_issues || "[]"); if (Array.isArray(p)) issues = p.filter((x) => typeof x === "string"); } catch { /* none */ }
+    const verified = !!l.site_verified_at;
+    const btns = [];
+    if (l.website && l.status === "new" && !verified && ["broken", "unverified", "offline", "online"].includes(l.site_status)) {
+      const b = h("button", { class: "btn btn--secondary", type: "button" }, "Check website again");
+      b.addEventListener("click", act(b, async () => { await api("/leads/recheck-sites", { method: "POST", body: { ids: [id] } }); await reload(); }));
+      btns.push(b);
+    }
+    if (l.website) {
+      const b = h("button", { class: "btn btn--secondary", type: "button" }, verified ? "Remove Working mark" : "Mark as Working");
+      b.addEventListener("click", act(b, async () => { await post("/site-working", { verified: !verified }); await reload(); }));
+      btns.push(b);
+    }
+    const facts = [["Status", verified ? "Marked as working by you" : SITE_WORDS[l.site_status] || "Unknown"], issues.length ? ["What the check saw", issues.join("; ")] : null, verified ? ["Marked", fmtDateTime(l.site_verified_at)] : null].filter(Boolean);
+    return fold({ title: "Website check (technical)", badges: badge(verified ? "Working" : SITE_WORDS[l.site_status] || "Unknown", verified ? "ok" : SITE_TONE[l.site_status] || ""),
+      body: h("div", null, h("dl", { class: "adm-spec ld-facts" }, facts.map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", { text: v })))),
+        h("p", { class: "adm-muted", text: "Whether the website loads is a side check. It does not change the SEO score. If you have opened the site yourself and it works, mark it as working and it won’t be overruled." }),
+        btns.length ? h("div", { class: "adm-actions" }, btns) : null) });
   }
 
   function contactRow(c) {
@@ -182,7 +234,7 @@ export async function render(id, ctx) {
         choices || j.colour ? h("span", { class: "ld-journey__choice" }, swatch(j.colour), choices ? h("span", { text: "Chose " + choices }) : null) : h("span", { class: "adm-muted", text: "Opened the link" }),
         j.company ? h("span", { text: "Entered company: " + j.company }) : null,
         facts ? h("span", { class: "adm-muted", text: facts }) : null),
-      h("div", { class: "ld-chips" }, [j.bot ? badge("Likely bot", "warn") : null, j.demo_opens ? badge("Demo opened" + (j.demo_opens > 1 ? " ×" + j.demo_opens : ""), "ok") : null, j.enquired ? badge("Enquiry", "ok") : null].filter(Boolean)));
+      h("div", { class: "ld-chips" }, [j.bot ? badge("Likely bot", "warn") : null, j.demo_opens ? badge("Demo opened" + (j.demo_opens > 1 ? " (" + j.demo_opens + " times)" : ""), "ok") : null, j.enquired ? badge("Enquiry", "ok") : null].filter(Boolean)));
   }
 
   function demo() {
@@ -224,7 +276,7 @@ export async function render(id, ctx) {
 
   function paint() {
     const keepOpen = [...host.querySelectorAll("details[open]")].map((d) => d.querySelector("summary") && d.querySelector("summary").textContent);
-    host.replaceChildren(back, header(), nextBox(), actionBar(), why(), contacts(), pitchSection({ data, reload, ctl }), demo(), history(), notes());
+    host.replaceChildren(back, header(), nextBox(), actionBar(), why(), seoSection(), siteCheck(), contacts(), pitchSection({ data, reload, ctl }), demo(), history(), notes());
     host.querySelectorAll("details").forEach((d) => { const t = d.querySelector("summary"); if (t && keepOpen.includes(t.textContent)) d.open = true; });
     document.title = data.lead.name + " — Leads — Framework Admin";
   }

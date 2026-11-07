@@ -14,6 +14,7 @@ import { signingKey, tokenForLinkId, newLinkId, tablesReady } from "./demo-traff
 import { sendEmail, emailConfigured, notifyRecipient, readTextLimited, oneLine } from "./assessment.js";
 import { json } from "./shared.js";
 import { checkSite, diagnosticLines } from "./site-check.js";
+import { scoreLead, parseAssessment, onPageIssues, ordinal, SEO_IMPORT_THRESHOLD } from "./seo-score.js";
 
 export const MIGRATION = "0024_leads.sql";
 export const STATUSES = ["new", "approved", "ready", "contacted", "replied", "won", "dismissed"];
@@ -78,7 +79,25 @@ export async function leadsReady(db, now = Date.now()) {
   readyCache.set(db, { ready, at: now });
   return ready;
 }
-export const forgetLeadsReady = (db) => { if (db && typeof db === "object") readyCache.delete(db); };
+export const forgetLeadsReady = (db) => { if (db && typeof db === "object") readyCache.delete(db); forgetSeoReady(db); };
+
+const seoCache = new WeakMap();
+/** Whether migration 0025 (the SEO columns on outreach_leads) is applied. Cached like leadsReady; until it is, every SEO feature stays dormant. */
+export async function seoReady(db, now = Date.now()) {
+  if (!db || typeof db.prepare !== "function") return false;
+  const hit = seoCache.get(db);
+  if (hit && now - hit.at < (hit.ready ? 300000 : 30000)) return hit.ready;
+  let ready = false;
+  try {
+    const row = await db.prepare("SELECT COUNT(*) AS n FROM pragma_table_info('outreach_leads') WHERE name IN ('seo_score', 'seo_data', 'seo_assessed_at', 'site_verified_at')").first();
+    ready = !!row && Number(row.n) === 4;
+  } catch {
+    ready = false;
+  }
+  seoCache.set(db, { ready, at: now });
+  return ready;
+}
+export const forgetSeoReady = (db) => { if (db && typeof db === "object") seoCache.delete(db); };
 
 /* ---------- Reason, dedupe key, contact eligibility ---------- */
 
@@ -154,11 +173,27 @@ export function buildReason(lead, now = new Date(), { oldFinder = false } = {}) 
   const rating = Number(lead.rating), reviews = Number(lead.review_count);
   let rep = "";
   if (Number.isFinite(rating) && rating > 0 && Number.isFinite(reviews) && reviews > 0) {
-    rep = `${rating.toFixed(1)}★ from ${plural(reviews, "review")}`;
+    rep = `${rating.toFixed(1)} stars from ${plural(reviews, "review")}`;
     const ago = agoPhrase(lead.last_review_at, now);
     if (ago) rep += `, latest review ${ago}`;
   }
-  return `${site}${rep ? "; " + rep : ""}.${oldFinder ? ` ${OLD_FINDER_NOTE}.` : ""}`;
+  const seo = seoHeadline(lead);
+  return `${seo || site}${rep ? "; " + rep : ""}.${oldFinder ? ` ${OLD_FINDER_NOTE}.` : ""}`;
+}
+
+/** "SEO opportunity 72/100: ..." from the stored measurements, or null when the lead has none (or too little to score). Only measured findings are quoted. */
+export function seoHeadline(lead) {
+  const a = parseAssessment(lead.seo_data);
+  if (!a) return null;
+  const r = scoreLead(a, lead);
+  if (r.score === null) return null;
+  const measured = r.components.filter((c) => c.basis === "measured" && c.finding);
+  const order = ["maps", "organic"];
+  const first = measured.find((c) => order.includes(c.id) && (c.points || 0) > 0) || [...measured].sort((x, y) => y.points / y.max - x.points / x.max)[0];
+  const second = measured.filter((c) => c !== first && (c.points || 0) / c.max >= 0.4).sort((x, y) => y.points / y.max - x.points / x.max)[0];
+  const parts = [first && first.finding, second && second.finding].filter(Boolean).map((t) => clean(t, 110));
+  if (lead.site_status === "offline") parts.push("website doesn't load");
+  return `SEO opportunity ${r.score}/100${parts.length ? ": " + parts.join("; ") : ""}`;
 }
 
 const ownSiteUrl = (sourceUrl, lead) => {
@@ -202,6 +237,10 @@ export async function finderSelect(finder, sql, params = []) {
 export const finderBound = (env) => !!env && !!env.LEADGEN_DB && typeof env.LEADGEN_DB.prepare === "function";
 
 const CANDIDATES = "status IN ('qualified', 'approved') AND COALESCE(no_solicit, 0) = 0 AND site_status <> 'ok'";
+const SEO_CANDIDATES = "l.status IN ('qualified', 'approved') AND COALESCE(l.no_solicit, 0) = 0";
+/** Finder leads that have an SEO assessment (SELECT only). Throws when the finder has no assessment table yet. */
+const assessedBatch = (finder, after) => finderSelect(finder, `SELECT l.id, l.place_id, l.name, l.trade, l.city, l.address, l.maps_url, l.website, l.rating, l.review_count, l.last_review_at, l.site_status, l.site_score, l.site_issues, l.no_solicit, l.status, a.data AS seo_data, a.assessed_at AS seo_assessed_at
+  FROM leads l JOIN seo_assessments a ON a.lead_id = l.id WHERE l.id > ? AND ${SEO_CANDIDATES} ORDER BY l.id LIMIT 500`, [after]);
 
 async function scanFinder(env) {
   const db = env.PORTAL_DB, finder = env.LEADGEN_DB;
@@ -209,14 +248,22 @@ async function scanFinder(env) {
   const keys = new Set((await many(db, "SELECT dedupe_key FROM outreach_leads")).map((r) => r.dedupe_key));
   const fresh = [];
   let skipped = 0, after = 0, scanned = 0;
+  // Once the SEO migration and the finder's assessment table exist, only assessed businesses with a worthwhile SEO opportunity are imported; before that, the earlier rule.
+  let seo = await seoReady(db);
+  if (seo) { try { await assessedBatch(finder, -1); } catch { seo = false; } }
   while (scanned < MAX_SCAN) {
-    const rows = await finderSelect(finder, `SELECT id, place_id, name, trade, city, address, maps_url, website, rating, review_count, last_review_at, site_status, site_score, site_issues, no_solicit, status FROM leads WHERE id > ? AND ${CANDIDATES} ORDER BY id LIMIT 500`, [after]);
+    const rows = seo ? await assessedBatch(finder, after) : await finderSelect(finder, `SELECT id, place_id, name, trade, city, address, maps_url, website, rating, review_count, last_review_at, site_status, site_score, site_issues, no_solicit, status FROM leads WHERE id > ? AND ${CANDIDATES} ORDER BY id LIMIT 500`, [after]);
     if (!rows.length) break;
     for (const r of rows) {
       after = Math.max(after, Number(r.id));
       scanned++;
       const name = clean(r.name, 200);
       if (!name) { skipped++; continue; }
+      if (seo) {
+        const sc = scoreLead(parseAssessment(r.seo_data), r);
+        if (sc.score === null || sc.score < SEO_IMPORT_THRESHOLD) { skipped++; continue; }
+        r.seo_score = sc.score;
+      }
       const key = dedupeKey(r);
       if ((r.place_id && refs.has(r.place_id)) || keys.has(key)) { skipped++; continue; }
       keys.add(key);
@@ -248,8 +295,10 @@ export async function finderWaiting(env) {
 export async function syncFinder(env, deps = {}) {
   if (!finderBound(env)) return { imported: 0, skipped: 0, waiting: 0 };
   const db = env.PORTAL_DB, now = nowOf(deps), at = now.toISOString();
+  const assessed = await syncAssessments(env, deps); // refresh the snapshots of leads already here first
   const { fresh, skipped: dupes } = await scanFinder(env);
   const batch = fresh.slice(0, IMPORT_LIMIT);
+  const seoOn = await seoReady(db);
   const contacts = new Map();
   for (let i = 0; i < batch.length; i += 50) {
     const ids = batch.slice(i, i + 50).map((r) => r.id);
@@ -261,13 +310,14 @@ export async function syncFinder(env, deps = {}) {
   for (const r of batch) {
     const id = newId();
     const issues = JSON.stringify(parseIssues(r.site_issues));
-    const reason = buildReason(r, now, { oldFinder: r.status === "approved" });
+    const reason = buildReason(seoOn ? r : { ...r, seo_data: null }, now, { oldFinder: r.status === "approved" });
     const num = (v) => (Number.isFinite(Number(v)) && v !== null && v !== "" ? Number(v) : null);
     const stmts = [
       db.prepare("INSERT OR IGNORE INTO outreach_leads (id, source, source_ref, dedupe_key, name, trade, city, address, website, maps_url, rating, review_count, last_review_at, site_status, site_score, site_issues, reason, status, created_at, updated_at) VALUES (?, 'finder', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)")
         .bind(id, r.place_id ? clean(r.place_id, 200) : null, r.key, r.name, clean(r.trade, 80) || null, clean(r.city, 80) || null, clean(r.address, 300) || null, clean(r.website, 500) || null, clean(r.maps_url, 500) || null,
           num(r.rating), num(r.review_count), clean(r.last_review_at, 40) || null, clean(r.site_status, 20) || null, num(r.site_score), issues, reason, at, at),
     ];
+    if (seoOn && r.seo_data && Number.isFinite(r.seo_score)) stmts.push(db.prepare("UPDATE outreach_leads SET seo_score = ?, seo_data = ?, seo_assessed_at = ? WHERE id = ?").bind(r.seo_score, clean(r.seo_data, 60000), clean(r.seo_assessed_at, 40) || at, id));
     const seen = new Set();
     for (const c of contacts.get(r.id) || []) {
       const e = contactEligibility(c, r, suppressed);
@@ -279,7 +329,36 @@ export async function syncFinder(env, deps = {}) {
     stmts.push(eventStmt(db, id, at, "imported", r.status === "approved" ? OLD_FINDER_NOTE : "Imported from the finder"));
     try { await db.batch(stmts); imported++; } catch (e) { skipped++; console.error("leads import skipped one lead:", e && e.message); }
   }
-  return { imported, skipped, waiting: Math.max(0, fresh.length - imported) };
+  return { imported, skipped, waiting: Math.max(0, fresh.length - imported), assessed };
+}
+
+/**
+ * Copies newer SEO assessments from the finder (read only) onto leads that are already here: the stored score and snapshot are replaced, and for a lead nobody has started on
+ * (status `new`) the one-sentence reason is rebuilt from them. Notes, approvals, drafts and the timeline are never touched. Dormant until migration 0025 and the finder's table exist.
+ * @returns the number of leads updated
+ */
+export async function syncAssessments(env, deps = {}) {
+  if (!finderBound(env) || !(await seoReady(env.PORTAL_DB))) return 0;
+  const db = env.PORTAL_DB, now = nowOf(deps);
+  try {
+    const mark = await one(db, "SELECT MAX(seo_assessed_at) AS m FROM outreach_leads");
+    const rows = await finderSelect(env.LEADGEN_DB, "SELECT l.place_id, a.assessed_at, a.data FROM seo_assessments a JOIN leads l ON l.id = a.lead_id WHERE a.assessed_at > ? ORDER BY a.assessed_at LIMIT 200", [(mark && mark.m) || ""]);
+    let n = 0;
+    for (const r of rows) {
+      const lead = r.place_id ? await one(db, "SELECT * FROM outreach_leads WHERE source_ref = ?", r.place_id) : null;
+      const a = parseAssessment(r.data);
+      if (!lead || !a) continue;
+      const sc = scoreLead(a, lead);
+      const upd = { ...lead, seo_data: r.data };
+      const reason = lead.status === "new" ? buildReason(upd, now, { oldFinder: String(lead.reason || "").includes(OLD_FINDER_NOTE) }) : lead.reason;
+      await db.prepare("UPDATE outreach_leads SET seo_score = ?, seo_data = ?, seo_assessed_at = ?, reason = ? WHERE id = ?").bind(sc.score, clean(r.data, 60000), clean(r.assessed_at, 40), reason, lead.id).run();
+      n++;
+    }
+    return n;
+  } catch (e) {
+    console.error("leads assessment sync error:", e && e.message);
+    return 0;
+  }
 }
 
 /* ---------- Website check (Online / Offline / Unverified) ---------- */
@@ -301,6 +380,7 @@ export async function recheckLeadSite(env, leadId, deps = {}) {
   const base = { id: lead.id, name: lead.name };
   if (!lead.website || !SITE_CLAIMS.includes(lead.site_status)) return { ...base, ok: false, skipped: "no_website_claim" };
   if (lead.status !== "new") return { ...base, ok: false, skipped: "already_started" };
+  if (lead.site_verified_at) return { ...base, ok: false, skipped: "verified_by_hand" };
   const result = await (deps.checkSite || checkSite)(lead.website, { fetchImpl: deps.fetch || undefined, at: now });
   const state = result.state;
   const issues = JSON.stringify(diagnosticLines(result));
@@ -310,6 +390,30 @@ export async function recheckLeadSite(env, leadId, deps = {}) {
   if (!res.meta.changes) return { ...base, ok: false, skipped: "already_started" };
   await eventStmt(db, lead.id, at, "note", `Website check: ${result.summary}`).run();
   return { ...base, ok: true, state, reason: result.reason, httpStatus: result.httpStatus, protection: result.protection, changed: lead.site_status !== state, summary: result.summary, was: lead.site_status };
+}
+
+/**
+ * "Mark as Working": the owner looked at the website and it works. site_status becomes `online`, the automatic check will no longer overrule it, and the reason is rebuilt for a
+ * lead nobody has started on. With `verified: false` the mark is removed again. Only the website fields and the timeline change.
+ */
+export async function markSiteWorking(env, leadId, { verified = true } = {}, deps = {}) {
+  const db = env.PORTAL_DB, now = nowOf(deps), at = now.toISOString();
+  const lead = await getLead(db, leadId);
+  if (!lead) return { ok: false, error: "not_found" };
+  if (!lead.website && verified) return { ok: false, error: "no_website" };
+  const seo = await seoReady(db);
+  if (!verified) {
+    if (!seo || !lead.site_verified_at) return { ok: true, lead };
+    await db.prepare("UPDATE outreach_leads SET site_verified_at = NULL, updated_at = ? WHERE id = ?").bind(at, lead.id).run();
+    await eventStmt(db, lead.id, at, "note", "Website no longer marked as working by hand").run();
+    return { ok: true, lead: await getLead(db, lead.id) };
+  }
+  const issues = JSON.stringify(["Marked as working by hand"]);
+  const next = { ...lead, site_status: "online", site_issues: issues };
+  const reason = lead.status === "new" ? buildReason(next, now, { oldFinder: String(lead.reason || "").includes(OLD_FINDER_NOTE) }) : lead.reason;
+  await db.prepare(`UPDATE outreach_leads SET site_status = 'online', site_score = NULL, site_issues = ?, reason = ?, updated_at = ?${seo ? ", site_verified_at = ?" : ""} WHERE id = ?`).bind(...[issues, reason, at, ...(seo ? [at] : []), lead.id]).run();
+  await eventStmt(db, lead.id, at, "note", "Website marked as working (checked by hand)").run();
+  return { ok: true, lead: await getLead(db, lead.id) };
 }
 
 /**
@@ -328,7 +432,36 @@ export async function recheckSites(env, { ids = null } = {}, deps = {}) {
 
 const BIO = "I'm a carpenter in Calgary with about 10,000 hours in the trade, and these days I build websites for trades businesses.";
 
+/**
+ * What the email may say about search visibility: only facts measured for this business (its Maps position in a real search, or a problem read from its home page).
+ * Never names a competitor, never says it ranks "last", never promises results. null when there is nothing measured worth saying.
+ */
+export function seoFact(lead) {
+  const a = parseAssessment(lead.seo_data);
+  if (!a) return null;
+  const r = scoreLead(a, lead);
+  if (r.score === null) return null;
+  const name = clean(lead.name, 120);
+  const m = a.maps;
+  const q = m && clean(m.query, 80).replace(/"/g, "");
+  const n = m && Number(m.resultsChecked);
+  if (m && q && n >= 5 && m.position === null) {
+    return { observe: `I searched Google Maps for "${q}" and ${name} wasn't among the first ${n} results.`, short: `${name} wasn't among the first ${n} Google Maps results for "${q}"`, close: "People searching that way may never see you.", subject: `${name} on Google Maps` };
+  }
+  if (m && q && n >= 5 && Number(m.position) > 3) {
+    return { observe: `I searched Google Maps for "${q}" and ${name} came up ${ordinal(Number(m.position))} out of ${n}.`, short: `${name} came up ${ordinal(Number(m.position))} of ${n} on Google Maps for "${q}"`, close: "The businesses at the top are the ones people see first.", subject: `${name} on Google Maps` };
+  }
+  const top = onPageIssues(a).sort((x, y) => y.w - x.w)[0];
+  if (top && top.w >= 2) {
+    const text = lowerFirst(top.text).replace(/[.;]+$/, "");
+    return { observe: `I looked at the ${name} home page and noticed: ${text}.`, short: `I looked at the ${name} home page and noticed: ${text}`, close: "Fixing that helps Google understand what you do and where.", subject: `A note on ${name} and Google` };
+  }
+  return null;
+}
+
 const factOf = (lead) => {
+  const seoF = seoFact(lead);
+  if (seoF) return seoF;
   const host = hostOf(lead.website);
   const issues = parseIssues(lead.site_issues).slice(0, 2).map((i) => lowerFirst(i.replace(/[.;]+$/, "")).slice(0, 40));
   switch (lead.site_status) {

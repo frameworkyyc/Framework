@@ -32,6 +32,7 @@ test("only the Worker entry point and portal modules import the portal modules",
       if (!/\.(m?js)$/.test(e.name) || p.startsWith("worker/portal/") || p.startsWith("worker/test/") || p === "worker/index.js") continue;
       if (p === "worker/admin/router.js") { assert.deepEqual([...read(p).matchAll(/from "\.\.\/portal\/([^"]+)"/g)].map((m) => m[1]), ["admin-clients.js", "admin-access.js", "admin-branding.js", "admin-invoices.js", "admin-support.js", "admin-requests.js", "admin-approved-emails.js", "admin-pricing.js", "admin-websites.js", "admin-website-seo.js", "admin-services.js", "admin-discovery.js", "admin-staff.js", "admin-dashboard.js", "admin-feedback.js"], "the admin router imports exactly the two reviewed admin read modules"); continue; }
       if (p === "worker/leads.js") { assert.deepEqual([...read(p).matchAll(/from "\.\/portal\/([^"]+)"/g)].map((m) => m[1]), ["crypto.js"], "the Leads workspace reuses only the portal's HMAC helpers (a distinct label), like demo traffic"); continue; }
+      if (p === "worker/seo-report.js") { assert.deepEqual([...read(p).matchAll(/from "\.\/portal\/([^"]+)"/g)].map((m) => m[1]), ["discovery/pdf.js"], "the SEO report reuses only the portal's dependency-free PDF writer"); continue; }
       if (p === "worker/demo-traffic.js") { assert.deepEqual([...read(p).matchAll(/from "\.\/portal\/([^"]+)"/g)].map((m) => m[1]), ["crypto.js"], "demo traffic reuses only the portal's HMAC helpers (a distinct label)"); continue; }
       if (/portal\//.test(read(p))) offenders.push(p);
     }
