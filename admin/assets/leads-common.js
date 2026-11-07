@@ -34,6 +34,17 @@ export const opportunityChip = (lead) => {
   const [word, tone] = LEVEL[level] || ["", ""];
   return badge(`SEO opportunity ${score}/100${word ? ", " + word.toLowerCase() : ""}`, tone);
 };
+/**
+ * The business name without the city when the city is already shown beside it ("Vallarta Fence Calgary" in Calgary -> "Vallarta Fence").
+ * Only a whole-word city at the END (with any dash, comma, bracket or "in" joining it) is removed; a leading city is part of the brand and stays, and never the whole name.
+ */
+export function shortName(name, city) {
+  const n = String(name || "").trim(), c = String(city || "").trim();
+  if (!n || !c) return n;
+  const esc = c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const out = n.replace(new RegExp(`\\s*(?:[-\u2013\u2014|,:(]|\\bin\\b)?\\s*\\(?\\b${esc}\\b\\)?\\s*$`, "i"), "").trim();
+  return out.length >= 2 ? out : n;
+}
 export const words = (t) => (String(t || "").trim().match(/\S+/g) || []).length;
 
 const CODES = {
