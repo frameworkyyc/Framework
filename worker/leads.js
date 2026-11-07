@@ -449,6 +449,19 @@ export function seoFact(lead) {
   const r = scoreLead(a, lead);
   if (r.score === null) return null;
   const name = clean(lead.name, 120);
+  // Google Search first, when it was measured: only a keyword that really was checked, and "not found" only for the number of results that really were
+  const org = (a.organic && Array.isArray(a.organic.queries) ? a.organic.queries : []).filter((x) => x && typeof x.q === "string" && Number(x.depth) >= 50);
+  const orgMiss = org.find((x) => x.position === null || x.position === undefined);
+  const orgBad = !orgMiss ? org.filter((x) => Number(x.position) > 10).sort((x, y) => Number(y.position) - Number(x.position))[0] : null;
+  const ok = (x) => clean(x.q, 80).replace(/"/g, "");
+  if (orgMiss) {
+    const k = ok(orgMiss), depth = Number(orgMiss.depth);
+    return { observe: `I searched Google for "${k}" and ${name} wasn't in the first ${depth} results.`, short: `${name} wasn't in the first ${depth} Google results for "${k}"`, close: "People searching that way may never see you.", subject: `${name} on Google` };
+  }
+  if (orgBad) {
+    const k = ok(orgBad);
+    return { observe: `I searched Google for "${k}" and ${name} came up at position ${Number(orgBad.position)}.`, short: `${name} came up at position ${Number(orgBad.position)} on Google for "${k}"`, close: "The businesses at the top are the ones people see first.", subject: `${name} on Google` };
+  }
   const m = a.maps;
   const q = m && clean(m.query, 80).replace(/"/g, "");
   const n = m && Number(m.resultsChecked);

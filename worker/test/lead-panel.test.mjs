@@ -90,3 +90,10 @@ test("responsive: the figures stay three across with fluid type; the competitor 
   assert.match(css, /\.ld-menu__list \{[^}]*border: 1px solid var\(--ink\)/);
   assert.match(css, /\.ld-panel \{ max-width: 1040px/);
 });
+
+test("organic rankings: a Google Search line under the figures and every tracked keyword with its real position (or 'Not in top N') in SEO details", () => {
+  assert.match(panel, /class: "ld-gsearch"/); assert.match(panel, /Google Search by keyword/);
+  assert.match(panel, /Not in top \$\{q\.depth\}/); assert.match(panel, /Not checked yet/);
+  assert.match(panel, /`#\$\{q\.position\}`/);
+  assert.ok(!/ld-kw[^"]*"[^)]*Measured/.test(panel));
+});

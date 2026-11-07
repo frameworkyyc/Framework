@@ -1193,6 +1193,12 @@ details[open] > .rk-fold__sum::after, details[open] > .rk-manage__sum::after { m
 .ld-fig__unit { margin-left: 4px; font-size: .32em; font-weight: 600; letter-spacing: 0; color: var(--slate); }
 .ld-fig__sub { font-size: 14px; color: var(--slate); }
 .ld-fig--off .ld-fig__value { color: var(--slate); }
+.ld-gsearch { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: var(--adm-space-2) 0 0; font-size: 15px; }
+.ld-gsearch .ld-label { display: inline; }
+.ld-kw { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hairline); }
+.ld-kw__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+.ld-kw__q { overflow-wrap: anywhere; } .ld-kw__pos { font-variant-numeric: tabular-nums; white-space: nowrap; } .ld-kw__pos--none { color: var(--slate); font-weight: 500; }
+.ld-kw__when { grid-column: 1 / -1; font-size: 13px; }
 .ld-tools { margin-top: var(--adm-space-2); }
 .ld-tools .btn { min-height: 40px; font-size: 14px; }
 .ld-verdict { margin: 0 0 var(--adm-space-1); font-family: var(--font-display); font-weight: 600; font-size: clamp(20px, 2.6vw, 26px); line-height: 1.2; }

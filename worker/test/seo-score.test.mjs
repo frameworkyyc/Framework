@@ -38,11 +38,27 @@ test("a missing Maps position says 'not among the first N', never that it ranks 
   assert.equal(comps(scoreLead({ v: 1, maps: maps(3) }, lead), "maps").finding.startsWith("3rd of 12"), true);
 });
 
-test("organic rank only counts when a provider measured it", () => {
-  const org = { provider: "serper", queries: [{ q: "fence contractor calgary", position: null, depth: 10, checkedAt: "2026-11-06T10:00:00.000Z", topDomains: [] }] };
+test("organic rank only counts when it was measured; keywords and locations are kept; 'not found' says how many results were checked", () => {
+  const org = { provider: "serper", queries: [{ q: "fence contractor calgary", location: "Calgary, Alberta, Canada", position: null, depth: 100, checkedAt: "2026-11-06T10:00:00.000Z" }] };
   const r = scoreLead({ v: 1, maps: maps(5), organic: org, onpage: page() }, lead);
   assert.equal(comps(r, "organic").basis, "measured"); assert.equal(comps(r, "organic").points, 25);
-  assert.match(comps(r, "organic").finding, /not in the first 10 for "fence contractor calgary"/);
+  assert.equal(comps(r, "organic").finding, "Not in the top 100 Google results for its keyword");
+  assert.deepEqual(comps(r, "organic").queries, [{ q: "fence contractor calgary", location: "Calgary, Alberta, Canada", position: null, depth: 100, checkedAt: "2026-11-06T10:00:00.000Z" }]);
+  const mixed = scoreLead({ v: 1, maps: maps(5), organic: { provider: "serper", queries: [{ q: "a", position: 4, depth: 100, checkedAt: "2026-11-06" }, { q: "b", position: null, depth: 100, checkedAt: "2026-11-06" }, { q: "c", position: 40, depth: 100, checkedAt: "2026-11-06" }] } }, lead);
+  assert.equal(comps(mixed, "organic").finding, 'Best Google result #4 for "a"; not in the top 100 for 1 of 3 keywords');
+  assert.ok(comps(mixed, "organic").points < 25 && comps(mixed, "organic").points > 10);
+  const top = scoreLead({ v: 1, maps: maps(5), organic: { provider: "serper", queries: [{ q: "a", position: 1, depth: 100, checkedAt: "2026-11-06" }, { q: "b", position: 2, depth: 100, checkedAt: "2026-11-06" }] } }, lead);
+  assert.equal(comps(top, "organic").points, 0, "ranking well leaves no room to improve");
+});
+
+test("Maps and Google Search are separate components; missing organic data is left out, not penalised", () => {
+  const withoutOrganic = scoreLead({ v: 1, maps: maps(8), competitors: comp(100), onpage: page(), organic: null }, lead);
+  assert.equal(comps(withoutOrganic, "organic").basis, "unavailable"); assert.equal(comps(withoutOrganic, "organic").points, null);
+  assert.notEqual(comps(withoutOrganic, "maps").id, comps(withoutOrganic, "organic").id);
+  const bad = scoreLead({ v: 1, maps: maps(8), competitors: comp(100), onpage: page(), organic: { provider: "serper", queries: [{ q: "a", position: null, depth: 100, checkedAt: "2026-11-06" }] } }, lead);
+  const good = scoreLead({ v: 1, maps: maps(8), competitors: comp(100), onpage: page(), organic: { provider: "serper", queries: [{ q: "a", position: 1, depth: 100, checkedAt: "2026-11-06" }] } }, lead);
+  assert.ok(bad.score > good.score, "poor search visibility raises the opportunity, good lowers it");
+  assert.equal(withoutOrganic.coverage, 0.75, "the unmeasured weight is renormalised away");
 });
 
 test("no website of its own is itself the on-page finding; an unreadable website is not", () => {

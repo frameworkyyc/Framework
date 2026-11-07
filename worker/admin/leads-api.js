@@ -303,7 +303,7 @@ async function recheckBody(body, env, now, ctx) {
 /** The parts of the report the lead page draws (no scoring here: the score and components come from scoreLead). */
 function seoView(lead) {
   const r = buildSeoReport(lead);
-  return r ? { visibility: r.visibility, issues: r.issues.map((i) => ({ text: i.text, fix: i.fix })), competitor: r.competitor, recommendations: r.recommendations, reputation: r.reputation, lighthouse: r.lighthouse, maps: r.maps, psi_error: r.psiError } : null;
+  return r ? { visibility: r.visibility, issues: r.issues.map((i) => ({ text: i.text, fix: i.fix })), competitor: r.competitor, recommendations: r.recommendations, reputation: r.reputation, lighthouse: r.lighthouse, maps: r.maps, organic: r.organic, psi_error: r.psiError } : null;
 }
 
 /** GET /leads/:id/seo-report (JSON: the report and its Markdown) or /seo-report.pdf. 404 when the lead has no stored assessment. */

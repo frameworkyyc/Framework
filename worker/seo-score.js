@@ -34,13 +34,19 @@ function mapsComponent(a) {
 
 function organicComponent(a) {
   const o = a && a.organic;
-  if (!o || !Array.isArray(o.queries) || !o.queries.length) return { basis: "unavailable", note: "Google search rankings are not measured: no ranking-data provider is connected." };
+  if (!o || !Array.isArray(o.queries) || !o.queries.length) return { basis: "unavailable", note: "Google search rankings are not measured yet for this business." };
   const qs = o.queries.filter((q) => q && typeof q.q === "string");
   if (!qs.length) return { basis: "unavailable", note: "Google search rankings are not measured." };
   const gaps = qs.map((q) => rankGap(num(q.position), num(q.depth) || 0));
   const gap = gaps.reduce((s, g) => s + g, 0) / gaps.length;
-  const parts = qs.map((q) => (q.position === null ? `not in the first ${q.depth} for "${q.q}"` : `${ordinal(num(q.position))} for "${q.q}"`));
-  return { basis: "measured", gap, finding: `Google search: ${parts.join("; ")}`, source: `${o.provider} SERP lookup, ${String(qs[0].checkedAt || "").slice(0, 10)}` };
+  const found = qs.filter((q) => q.position !== null && q.position !== undefined);
+  const depth = Math.min(...qs.map((q) => num(q.depth) || 0));
+  const best = found.length ? found.reduce((b, q) => (num(q.position) < num(b.position) ? q : b)) : null;
+  const finding = best
+    ? `Best Google result #${num(best.position)} for "${best.q}"${found.length < qs.length ? `; not in the top ${depth} for ${qs.length - found.length} of ${qs.length} keywords` : ""}`
+    : `Not in the top ${depth} Google results for ${qs.length === 1 ? "its keyword" : `any of ${qs.length} keywords`}`;
+  const queries = qs.map((q) => ({ q: q.q, location: q.location || null, position: q.position === undefined ? null : q.position, depth: num(q.depth) || 0, checkedAt: q.checkedAt || null }));
+  return { basis: "measured", gap, finding, source: `${o.provider} Google search results, ${String(qs[0].checkedAt || "").slice(0, 10)}`, queries };
 }
 
 /** Individual on-page and technical problems, each with a weight, plain wording and a recommendation. Only things actually read from the page. */
@@ -125,7 +131,7 @@ export function scoreLead(assessment, lead = {}) {
     const r = w.run(a, lead, noSite);
     const base = { id: w.id, label: w.label, max: w.max, basis: r.basis };
     if (r.basis !== "measured") return { ...base, points: null, note: r.note };
-    return { ...base, points: Math.round(r.gap * w.max * 10) / 10, finding: r.finding, source: r.source, ...(r.issues ? { issues: r.issues } : {}), ...(r.position !== undefined ? { position: r.position } : {}) };
+    return { ...base, points: Math.round(r.gap * w.max * 10) / 10, finding: r.finding, source: r.source, ...(r.issues ? { issues: r.issues } : {}), ...(r.queries ? { queries: r.queries } : {}), ...(r.position !== undefined ? { position: r.position } : {}) };
   });
   const measuredMax = components.filter((c) => c.basis === "measured").reduce((s, c) => s + c.max, 0);
   const coverage = measuredMax / 100;
