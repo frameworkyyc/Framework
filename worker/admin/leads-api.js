@@ -135,7 +135,7 @@ async function leadOut(env, lead, now) {
   const { seo_data: seoRaw, ...rest } = lead;
   const snap = parseAssessment(seoRaw);
   const sc = snap ? scoreLead(snap, lead) : null;
-  const seo = sc ? { score: sc.score, level: opportunityLevel(sc.score), label: sc.label, coverage: sc.coverage, assessed_at: lead.seo_assessed_at || snap.assessedAt || null, components: sc.components.map(({ issues, ...c }) => c) } : null;
+  const seo = sc ? { score: sc.score, level: opportunityLevel(sc.score), label: sc.label, coverage: sc.coverage, assessed_at: lead.seo_assessed_at || snap.assessedAt || null, components: sc.components.map(({ issues, ...c }) => c), report: seoView(lead) } : null;
   return { ...rest, seo, opted_out: optedOut, next_action: nextAction(lead, { hasEligible: !!preferred, hasEmail: contacts.some((c) => c.type === "email"), msgStatus: msg && msg.status, followup, followupLive: !!live }) };
 }
 
@@ -298,6 +298,12 @@ async function recheckBody(body, env, now, ctx) {
     ids = [...new Set(body.ids)];
   }
   return json(await recheckSites(env, { ids }, { now, fetch: ctx.siteFetch }));
+}
+
+/** The parts of the report the lead page draws (no scoring here: the score and components come from scoreLead). */
+function seoView(lead) {
+  const r = buildSeoReport(lead);
+  return r ? { visibility: r.visibility, issues: r.issues.map((i) => ({ text: i.text, fix: i.fix })), competitor: r.competitor, recommendations: r.recommendations, reputation: r.reputation, lighthouse: r.lighthouse, maps: r.maps, psi_error: r.psiError } : null;
 }
 
 /** GET /leads/:id/seo-report (JSON: the report and its Markdown) or /seo-report.pdf. 404 when the lead has no stored assessment. */
