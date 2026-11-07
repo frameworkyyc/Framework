@@ -1,5 +1,5 @@
--- 0025 (seo leads): Admin Leads finds businesses by SEO opportunity. PROPOSED. Not applied anywhere. Show for review and wait for approval before applying it to
--- Staging; Production only through the manual "Portal Production D1 migration" workflow, after its own approval. Needs 0024 (outreach_leads).
+-- 0025 (seo leads): Admin Leads finds businesses by SEO opportunity. Applied to Staging. Not applied to Production:
+-- only through the manual "Portal Production D1 migration" workflow, after its own approval. Needs 0024 (outreach_leads).
 --
 -- Four additive, nullable columns on outreach_leads. No new table, nothing existing changes, every existing lead, note, approval and timeline row is kept as it is.
 --   seo_score        the SEO Opportunity Score (0-100), computed in Admin from the stored snapshot; NULL = not assessed or not enough measured data

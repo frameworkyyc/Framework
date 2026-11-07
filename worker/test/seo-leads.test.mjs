@@ -15,7 +15,7 @@ const page = (o = {}) => ({ title: "Fences | Acme", metaDescription: "x", h1: ["
 const snap = (o = {}) => ({ v: 1, assessedAt: "2026-11-06T12:00:00.000Z", keyword: "fence contractor in Calgary, AB", city: "Calgary", maps: maps(null), competitors: { sample: [{ name: "Rival One" }], medianReviews: 150, medianRating: 4.7, resultsCompared: 10 }, onpage: page({ title: null, metaDescription: null }), robots: { robots: "missing", sitemapDeclared: false, sitemap: "missing" }, psi: { seo: 70, performance: 40 }, organic: null, site: { state: "online" }, ...o });
 
 function world({ seo = true } = {}) {
-  const db = openPortalDb({ proposed: ["0021_demo_traffic.sql", "0024_leads.sql", ...(seo ? ["0025_seo_leads.sql"] : [])] });
+  const db = openPortalDb({ skip: seo ? [] : ["0025_seo_leads.sql"] });
   const raw = new DatabaseSync(":memory:");
   raw.exec(`CREATE TABLE leads (id INTEGER PRIMARY KEY, place_id TEXT UNIQUE, name TEXT, trade TEXT, city TEXT, address TEXT, maps_url TEXT, website TEXT, rating REAL, review_count INTEGER, last_review_at TEXT, site_status TEXT, site_score INTEGER, site_issues TEXT, no_solicit INTEGER DEFAULT 0, status TEXT);
     CREATE TABLE contacts (id INTEGER PRIMARY KEY, lead_id INTEGER, type TEXT, value TEXT, source_url TEXT, found_at TEXT);
