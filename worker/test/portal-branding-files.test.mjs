@@ -41,7 +41,7 @@ async function deliver(w, org, o = {}, f = file("logo.png", S.png()), actor = "a
 test("migration 0005 (approved for Staging only): additive, idempotent, and creates exactly the four branding tables; Production is not mentioned as applied", () => {
   assert.ok(readdirSync(new URL("../../migrations/portal/", import.meta.url)).includes("0005_branding.sql"));
   const proposed = readdirSync(new URL("../../migrations/", import.meta.url)).includes("portal-proposed") ? readdirSync(new URL("../../migrations/portal-proposed/", import.meta.url)) : [];
-  assert.deepEqual(proposed, ["0019_client_relationship.sql", "0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql"], "only 0019 (the client relationship end date for Discovery retention), 0021 (private demo-page traffic reporting) and 0024_leads (the Leads workspace) and 0025_seo_leads (SEO opportunity columns for Leads) wait in the proposal folder, unapplied; 0011 to 0018 and 0020 joined migrations/portal");
+  assert.deepEqual(proposed, ["0019_client_relationship.sql"], "only 0019 (the client relationship end date for Discovery retention) waits in the proposal folder, unapplied; 0021 (demo traffic), 0024 (Leads) and 0025 (SEO leads) moved to migrations/portal for the manual Production workflow");
   const sql = readFileSync(new URL("../../migrations/portal/0005_branding.sql", import.meta.url), "utf8");
   assert.match(sql, /NOT applied to Production/);
   assert.ok(!/\b(ALTER|DROP)\b|(?<!ON )\b(DELETE|UPDATE)\b/i.test(sql.replace(/--.*$/gm, "")), "no change to anything that exists");
