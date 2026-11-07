@@ -50,6 +50,15 @@ export const EXCLUDED = {
   seo_rank_checks: "recorded rank checks; not part of this refresh",
   // Service links (migration 0023): the address of a client's own digital business card, entered by Admin per environment.
   client_service_links: "per-client addresses entered in Admin; not part of this refresh",
+  // Demo traffic (migration 0021) and Leads (migrations 0024, 0025): prospect and outreach data, tracking links (credentials), contact addresses and opt-outs. Never copied to Staging, which has its own.
+  demo_links: "tracking-link ids and private prospect labels; per environment",
+  demo_journeys: "anonymous visitor journeys; per environment",
+  demo_events: "anonymous visitor events; per environment",
+  outreach_leads: "prospects, notes and approvals; never copied to Staging",
+  outreach_contacts: "prospect email addresses and phone numbers; never copied to Staging",
+  outreach_suppressions: "opt-outs and bounces; must never be mixed between environments",
+  outreach_messages: "drafted and sent outreach email; never copied to Staging",
+  outreach_events: "outreach timelines; never copied to Staging",
 };
 
 /** Tables SQLite/D1 manage themselves. */

@@ -55,7 +55,7 @@ function finderDb() {
 }
 
 function world({ migrated = true, finder = true, env = {} } = {}) {
-  const db = openPortalDb({ proposed: migrated ? ["0021_demo_traffic.sql", "0024_leads.sql"] : [] });
+  const db = openPortalDb({ skip: migrated ? ["0025_seo_leads.sql"] : ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql"] });
   const f = finder ? finderDb() : null;
   const w = { db, raw: db.raw, f, calls: [], clock: new Date(NOW), delay: 0 };
   w.fetch = async (url, init) => {
@@ -1027,21 +1027,21 @@ test("sendEmail: optional headers go to the provider, the provider's message id 
 
 /* ---------------- files and wiring ---------------- */
 
-test("the migration is proposed only, additive, and holds the contract's tables, constraints and partial unique indexes", () => {
-  const sql = readFileSync(new URL("../../migrations/portal-proposed/0024_leads.sql", import.meta.url), "utf8");
+test("the migration is additive, held in migrations/portal for the manual Production workflow, and holds the contract's tables, constraints and partial unique indexes", () => {
+  const sql = readFileSync(new URL("../../migrations/portal/0024_leads.sql", import.meta.url), "utf8");
   const code = sql.replace(/--.*$/gm, "");
-  assert.match(sql, /PROPOSED\. Not applied/);
+  assert.match(sql, /Not applied to Production/);
   assert.ok(!/DROP |DELETE FROM|ALTER |\bUPDATE |INSERT /i.test(code), "additive only, no seed rows");
   assert.deepEqual([...code.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]), ["outreach_leads", "outreach_contacts", "outreach_suppressions", "outreach_messages", "outreach_events"]);
   assert.match(code, /CREATE UNIQUE INDEX IF NOT EXISTS \w+ ON outreach_messages \(lead_id, kind\) WHERE is_test = 0 AND status IN \('approved', 'sending', 'sent', 'bounced', 'complained'\)/);
   assert.match(code, /ON outreach_leads \(source_ref\) WHERE source_ref IS NOT NULL/);
   assert.match(code, /demo_link_id\s+TEXT REFERENCES demo_links \(id\) ON DELETE SET NULL/);
-  const db = openPortalDb({ proposed: ["0021_demo_traffic.sql", "0024_leads.sql"] });
+  const db = openPortalDb({ skip: ["0025_seo_leads.sql"] });
   db.raw.exec(sql); // a second run changes nothing
   assert.throws(() => db.raw.exec("INSERT INTO outreach_leads (id, source, dedupe_key, name, reason, status, created_at, updated_at) VALUES ('0123456789abcdef', 'finder', 'k', 'n', 'r', 'bogus', 'x', 'x')"), /constraint/i);
   assert.throws(() => db.raw.exec("INSERT INTO outreach_suppressions (email, reason, at) VALUES ('a@b.ca', 'because', 'x')"), /constraint/i);
   const readme = readFileSync(new URL("../../migrations/portal/README.md", import.meta.url), "utf8");
-  assert.match(readme, /0024_leads\.sql` \(PROPOSED/);
+  assert.match(readme, /0024_leads\.sql` \(applied to Staging/);
 });
 
 test("wiring: /u/* runs the Worker first, the public routes are in index.js, the API is registered, and Production has no leads settings", () => {

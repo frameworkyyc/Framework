@@ -1,5 +1,5 @@
 -- 0024 (leads): the Leads workspace in Framework Admin: prospects imported from the separate finder Worker, their contacts and consent status, the drafted and sent emails, and a timeline.
--- PROPOSED. Not applied anywhere. Show for review and wait for approval before applying it to Staging; Production only through the manual
+-- Applied to Staging. Not applied to Production: Production only through the manual
 -- "Portal Production D1 migration" workflow, after its own approval. (The file name is distinct from 0022_seo_keywords.sql, also proposed: both can wait side by side.)
 --
 -- Five additive tables and eight indexes. Nothing existing changes. Needs 0021 (demo_links): an approved lead gets one tracking link.
