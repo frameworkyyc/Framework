@@ -377,6 +377,7 @@ test("Business Profile band: prominent while answers are missing, one quiet line
   assert.match(broken, /Progress unavailable right now/); assert.ok(!/<progress/.test(broken), "no bar and no invented number when progress cannot be read");
 });
 
+
 test("Production configuration: requests on, Client Services OFF. Five blocks link, Support says it is not available yet, no Support or Invoices entry, and the whole request workflow works", async () => {
   const { w, ann, mia, text, create, post, d, userOf } = await setup({ services: false });
   const home = await text(ann, "");

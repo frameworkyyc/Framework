@@ -14,14 +14,19 @@ const STAGING = { binding: "DB", database_name: "framework-staging", database_id
 
 const PORTAL_PRODUCTION = { binding: "PORTAL_DB", database_name: "framework-portal", database_id: "b213b7db-ed29-4ab6-946c-0728dd6709e8", migrations_dir: "migrations/portal" };
 
-test("Production: exactly two D1 bindings: DB -> framework-feedback (original ID unchanged) and PORTAL_DB -> framework-portal", () => {
-  assert.deepEqual(config.d1_databases, [PRODUCTION, PORTAL_PRODUCTION]);
+test("Production: DB -> framework-feedback (original ID unchanged), PORTAL_DB -> framework-portal, and LEADGEN_DB -> the finder database (read by Admin -> Leads)", () => {
+  assert.deepEqual(config.d1_databases, [PRODUCTION, PORTAL_PRODUCTION, { binding: "LEADGEN_DB", database_name: "framework-leadgen", database_id: "3162e849-ac70-4a1b-b37b-051430d24c39" }]);
 });
 
 const PORTAL_STAGING = { binding: "PORTAL_DB", database_name: "framework-portal-staging", database_id: "1edda8a2-5249-4f40-9dbc-d29aa44e21f8", migrations_dir: "migrations/portal" };
 
-test("Staging (Preview): DB -> framework-staging is preserved, plus PORTAL_DB -> framework-portal-staging", () => {
-  assert.deepEqual(config.previews.d1_databases, [STAGING, PORTAL_STAGING]);
+const LEADGEN_STAGING = { binding: "LEADGEN_DB", database_name: "framework-leadgen", database_id: "3162e849-ac70-4a1b-b37b-051430d24c39" };
+
+test("Staging (Preview): DB -> framework-staging is preserved, plus PORTAL_DB -> framework-portal-staging and LEADGEN_DB (the finder's database, read by Admin -> Leads), which Production now has too (read only by Admin -> Leads; no LEADS_* settings, so Production sends nothing)", () => {
+  assert.deepEqual(config.previews.d1_databases, [STAGING, PORTAL_STAGING, LEADGEN_STAGING]);
+  assert.deepEqual(config.d1_databases.filter((d) => d.binding === "LEADGEN_DB"), [LEADGEN_STAGING], "Production binds the same finder database under the same name");
+  assert.equal(raw.split(LEADGEN_STAGING.database_id).length - 1, 2, "its id appears once at the top level and once inside previews");
+  assert.ok(!/LEADS_SENDING|LEADS_TEST_RECIPIENT/.test(raw.slice(0, raw.indexOf('"previews"')).replace(/^\s*\/\/.*$/gm, "")), "Production has no sending settings");
 });
 
 test("Production's portal resources are exactly: its own portal database, the WorkOS settings, the four launch switches, the limiter; the two private R2 buckets (Stage 3), the Branding switch (Release 2), no Client Services switch and no probe flag", () => {
@@ -65,7 +70,7 @@ test("the Production ID appears exactly once in the file (never inside the previ
 test("Production (top-level vars) and Staging (previews.vars) each carry the sender, the same public Turnstile site key and their OWN WorkOS settings; both enable the portal (Production since launch), only Staging also has the demo", () => {
   const shared = { ASSESSMENT_FROM: "Framework <hello@frameworkco.ca>", TURNSTILE_SITE_KEY: "0x4AAAAAAFZzTbJqfnTzJNss" };
   assert.deepEqual(config.vars, { ...shared, ASSESSMENT_NOTIFY_TO: "hello@frameworkco.ca", PORTAL_AUTH_CLIENT_ID: "client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_BASE_URL: "https://frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C4236FYNJDQ3MM0E8V691", PORTAL_ENABLED: "1", PORTAL_ALLOW_PRODUCTION: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1", PORTAL_WEBSITE: "1", PORTAL_DISCOVERY: "1", PORTAL_REQUESTS: "1" });
-  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1", PORTAL_DEMO: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1", PORTAL_SERVICES: "1", PORTAL_WEBSITE: "1", PORTAL_DISCOVERY: "1", PORTAL_REQUESTS: "1" });
+  assert.deepEqual(config.previews.vars, { ...shared, PORTAL_AUTH_CLIENT_ID: "client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_BASE_URL: "https://staging.frameworkco.ca", PORTAL_AUTH_ISSUER: "https://api.workos.com/user_management/client_01M58C412YHC548S5JXP1TJ2ED", PORTAL_ENABLED: "1", PORTAL_DEMO: "1", PORTAL_ADMIN_WRITES: "1", PORTAL_INVITE_SENDING: "1", PORTAL_BRANDING: "1", PORTAL_SERVICES: "1", PORTAL_WEBSITE: "1", PORTAL_DISCOVERY: "1", PORTAL_REQUESTS: "1", LEADS_SENDING: "1", LEADS_TEST_RECIPIENT: "hello@frameworkco.ca" });
 });
 
 test("the verified WorkOS issuer is pinned and belongs to the configured client id (not the bare api.workos.com base)", () => {
@@ -94,8 +99,8 @@ test("the Staging portal base URL is the Staging host, not the live site", () =>
   assert.notEqual(new URL(config.vars.PORTAL_BASE_URL).hostname, new URL(config.previews.vars.PORTAL_BASE_URL).hostname);
 });
 
-test("shared routes: the existing worker routes are unchanged, /d/* (the opaque demo tracking link) was added, and /portal + /portal/* were added in place of the three probe paths", () => {
-  assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/admin", "/admin/*", "/card", "/d/*", "/portal", "/portal/*"]);
+test("shared routes: the existing worker routes are unchanged, /d/* (the opaque demo tracking link) and /u/* (the outreach unsubscribe page) were added, and /portal + /portal/* were added in place of the three probe paths", () => {
+  assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/admin", "/admin/*", "/card", "/d/*", "/u/*", "/portal", "/portal/*"]);
   assert.ok(!config.assets.run_worker_first.some((p) => p === "/*" || p === "/portal/login"), "no catch-all, no leftover probe paths");
 });
 
@@ -143,12 +148,15 @@ test("the sender is a valid From value that the Worker accepts as-is (no correct
 });
 
 test("only whitelisted NON-secret names may ever appear under vars", () => {
-  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED", "PORTAL_ALLOW_PRODUCTION", "PORTAL_BRANDING", "PORTAL_SERVICES", "PORTAL_WEBSITE", "PORTAL_DISCOVERY", "PORTAL_REQUESTS", "PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_DEMO"]);
+  const allowed = new Set(["ASSESSMENT_FROM", "ASSESSMENT_NOTIFY_TO", "TURNSTILE_SITE_KEY", "META_PIXEL_ID", "PORTAL_BASE_URL", "PORTAL_AUTH_ISSUER", "PORTAL_AUTH_CLIENT_ID", "PORTAL_ENABLED", "PORTAL_ALLOW_PRODUCTION", "PORTAL_BRANDING", "PORTAL_SERVICES", "PORTAL_WEBSITE", "PORTAL_DISCOVERY", "PORTAL_REQUESTS", "PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING", "PORTAL_DEMO", "LEADS_SENDING", "LEADS_TEST_RECIPIENT"]);
   for (const name of ["PORTAL_ADMIN_WRITES", "PORTAL_INVITE_SENDING"]) {
     assert.equal(config.vars[name], "1", name + " is on in Production since launch (invitations are still limited to the allowlist secret)");
     assert.equal(config.previews.vars[name], "1", name + " is on for Staging (invitations are still limited to the allowlist secret)");
   }
   assert.equal(config.vars.PORTAL_DEMO, undefined, "the demo is never a Production setting");
+  for (const name of ["LEADS_SENDING", "LEADS_TEST_RECIPIENT", "LEADS_MAILING_ADDRESS", "LEADS_SENDER_NAME"]) assert.equal(config.vars[name], undefined, name + " is never a Production setting here: Production outreach is off until its own reviewed change");
+  assert.equal(config.previews.vars.LEADS_SENDING, "1", "Staging may send...");
+  assert.equal(config.previews.vars.LEADS_TEST_RECIPIENT, "hello@frameworkco.ca", "...but only to the owner's own inbox, so Staging can never email a real business");
   assert.equal(config.previews.vars.PORTAL_ALLOW_PRODUCTION, undefined, "the production override is never a Staging setting");
   for (const vars of [config.vars, config.previews.vars]) for (const name of ["PORTAL_INVITE_ALLOWLIST", "PORTAL_INVITE_ALLOWED_EMAILS"]) assert.equal(vars[name], undefined, name + " is a Cloudflare secret, never a checked-in variable (the repository is public)");
   for (const vars of [config.vars, config.previews.vars]) for (const name of Object.keys(vars)) assert.ok(allowed.has(name), name + " is not an approved non-secret variable");
