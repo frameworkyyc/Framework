@@ -11,7 +11,7 @@ Phase 1 (Staging) of the plan to make frameworkco.ca visible for contractor webs
 - **Sitemap:** `sitemap.xml` lists the nine indexable pages by canonical address. Rebuild it with `node scripts/seo/update-sitemap.mjs` (dates come from git; a page with uncommitted changes gets today's date). `--check` fails if the list is out of date. Private pages (`/me`, `/card`, `/client-feedback`, `/portal`, `/admin`, `/demos`) are never listed and keep their `noindex`.
 - **Contact form:** now sends through the website (`POST /api/contact`, `worker/contact.js`) instead of opening the visitor's email program. It reuses the assessment form's email settings and spam protections (honeypot, minimum fill time, Cloudflare Turnstile when configured, the platform rate limiter). It stores nothing; the message arrives as an email to `ASSESSMENT_NOTIFY_TO` with the visitor as Reply-To. The visitor sees "Message sent" only when the email provider accepted it; otherwise the form stays filled and offers the email address.
 - **Analytics (Google Analytics 4):** built, consent-first, and **off** until you add a Measurement ID. See below.
-- **Privacy policy:** updated (effective date shown as November 6, 2026) for the contact form and Google Analytics. **Review it before it goes to Production.**
+- **Privacy policy:** updated (effective date November 8, 2026) for the contact form and Google Analytics. **Review it before it goes to Production.**
 
 ## Redirects, the 404 page and enquiry sources (SEO phase 2 groundwork)
 
@@ -19,7 +19,7 @@ Phase 1 (Staging) of the plan to make frameworkco.ca visible for contractor webs
 - **404 page:** `assets.not_found_handling: "404-page"` in `wrangler.jsonc` makes any missing page answer status 404 with `404.html` (branded, `noindex`, `<base href="/">` so it works at any depth). `/api/*` and the Worker's own routes keep their JSON 404s.
 - **Where an enquiry came from:** `assets/js/main.js` keeps the visit's campaign tags, first page and referring site (origin only) in this tab's sessionStorage (`fw_attribution`, the assessment form's key and shape). The contact form sends it with the message and `worker/contact.js` adds "How they found us" and "First page they saw" to the email. Nothing new is stored, nothing goes to analytics. The privacy policy and `PRIVACY-OPERATIONS.md` describe it.
 
-**Before any Production release of this work:** change the privacy policy's effective date (`privacy.html`, `#effective-date`) to the release date, and re-read the Browser storage, Campaign information, Contact form and retention paragraphs. Visitors whose browser sends Global Privacy Control or Do Not Track are never recorded (`main.js`, `assessment.js`); the contact and assessment forms work the same for them.
+**At Production release:** the privacy policy effective date (`privacy.html`, `#effective-date`) is the release date (if the release slips, update it again); re-read the Browser storage, Campaign information, Contact form and retention paragraphs. Visitors whose browser sends Global Privacy Control or Do Not Track are never recorded (`main.js`, `assessment.js`); the contact and assessment forms work the same for them.
 
 ## You: Google Search Console (about 10 minutes)
 
