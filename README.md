@@ -205,7 +205,8 @@ A phone-first card to share when meeting people (text, AirDrop, QR code, or an N
 * **Environment-aware address.** The permanent public address is `https://frameworkco.ca/card`. On `frameworkco.ca` / `www.frameworkco.ca` the QR code, Share button and saved contact use exactly that. On any other host (Staging, local) the page uses its own address, so tests never point at production. The link-preview tags (canonical, `og:url`, `og:image`, `twitter:image`) hold the production URLs in the HTML; `worker/card.js` (route `/card` in `run_worker_first`) rewrites them to the current host everywhere except production, and adds `X-Robots-Tag: noindex` off production. The page is `noindex` everywhere and not in the sitemap.
 * The logo is the landing-page animation (same SVG and `.dw-*` keyframes) set to play once and hold on this page only.
 * The social preview image uses a system sans-serif for its text (the brand fonts are web fonts); regenerate it from the same layout if the name or description changes.
-* Tests: `worker/test/card.test.mjs`. No analytics, cookies or storage.
+* **Apple Wallet.** An optional "Add to Apple Wallet" button (iPhone/iPad only) appears under Save Contact once a real Apple-signed pass exists and `walletUrl` is set in `card-config.js`; until then nothing shows. Signing happens on the owner's computer (`scripts/wallet/`, any OS), keys stay outside the repo. Setup: `scripts/wallet/SETUP.md`; design and security: `worker/WALLET.md`.
+* Tests: `worker/test/card.test.mjs`, `worker/test/card-wallet.test.mjs`. No analytics, cookies or storage (the one extra request is the Wallet readiness check to the site's own pass address).
 
 ## Automated tests and releases
 

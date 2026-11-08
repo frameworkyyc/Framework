@@ -60,6 +60,13 @@ html.card-lock { overflow: hidden; }
 .card-btn svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: square; stroke-linejoin: miter; }
 @media (hover: hover) { .card-btn:hover { background: var(--paper); color: var(--ink); } }
 
+/* Add to Apple Wallet: Apple's own badge, never restyled or recoloured; the padding is its required clear space. Shown by card.js only when ready. */
+.card-wallet { display: flex; justify-content: center; padding: 5px; margin: -4px 0 10px; -webkit-tap-highlight-color: transparent; }
+.card-wallet[hidden] { display: none; }
+.card-wallet img { display: block; height: 48px; width: auto; }
+.card__apple { margin: 10px 0 0; font-size: 11px; line-height: 1.4; color: var(--slate); }
+.card__apple[hidden] { display: none; }
+
 .card__trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-bottom: 6px; }
 .card__trio[data-count="0"] { display: none; }
 .card__trio[data-count="1"] { grid-template-columns: minmax(0, 1fr); }

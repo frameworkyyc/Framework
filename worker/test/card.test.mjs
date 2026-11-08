@@ -93,7 +93,10 @@ test("page: not listed for search engines, no analytics or trackers, no data col
   assert.match(html, /name="robots" content="noindex, follow"/);
   assert.ok(!read("sitemap.xml").includes("/card"));
   const js = read("assets/js/card.js");
-  assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|localStorage|sessionStorage|document\.cookie/.test(js));
+  assert.ok(!/XMLHttpRequest|sendBeacon|localStorage|sessionStorage|document\.cookie/.test(js));
+  // The one deliberate exception: the Apple Wallet readiness check, a credential-less HEAD to this site's own pass address.
+  const fetches = js.match(/fetch\([^)]*\)/g) || [];
+  assert.deepEqual(fetches, ['fetch(walletUrl, { method: "HEAD", credentials: "omit" })']);
 });
 
 test("page: the logo is the landing-page animation (same paths and classes) and the new links use real destinations", () => {
