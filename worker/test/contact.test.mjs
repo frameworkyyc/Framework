@@ -91,40 +91,113 @@ test("routing: POST /api/contact is public and handled by the Worker; other meth
 });
 
 // ---- where the enquiry came from (SEO phase 1) ----
-import { cleanAttribution, describeSource } from "../contact.js";
+import { cleanAttribution, describeSource, describeCampaign } from "../contact.js";
 import { readFileSync } from "node:fs";
 
-test("attribution: only known short keys are kept, control characters are removed, and anything else is dropped", () => {
-  const a = cleanAttribution({ utm_source: "goo\u0007gle", utm_medium: "x".repeat(400), _landing: "/contractor-websites?utm_campaign=a", evil: "<script>", _referrer: "https://www.google.com", gclid: "5", utm_term: { a: 1 } });
-  assert.deepEqual(Object.keys(a).sort(), ["_landing", "_referrer", "gclid", "utm_medium", "utm_source"]);
+test("attribution: only known short keys are kept, control characters are removed, page paths never carry a query string, and anything else is dropped", () => {
+  const a = cleanAttribution({ utm_source: "goo\u0007gle", utm_medium: "x".repeat(400), _landing: "/contractor-websites?utm_campaign=a#top", _campaign_landing: "/services?x=1", _referrer: "https://www.google.com", _campaign_referrer: "https://chatgpt.com", evil: "<script>", gclid: "5", utm_term: { a: 1 } });
+  assert.deepEqual(Object.keys(a).sort(), ["_campaign_landing", "_campaign_referrer", "_landing", "_referrer", "gclid", "utm_medium", "utm_source"]);
   assert.equal(a.utm_source, "goo gle"); assert.equal(a.utm_medium.length, 150); assert.equal(a.gclid, "5");
+  assert.equal(a._landing, "/contractor-websites"); assert.equal(a._campaign_landing, "/services");
   assert.deepEqual(cleanAttribution(null), {}); assert.deepEqual(cleanAttribution([1, 2]), {}); assert.deepEqual(cleanAttribution("x"), {});
 });
 
-test("attribution: the email says plainly how the visitor found the site", () => {
-  assert.equal(describeSource({ utm_source: "newsletter", utm_medium: "email", utm_campaign: "fall" }), "Campaign: newsletter / email / fall");
+test("attribution: the email describes the original visit and the latest campaign separately, in plain language", () => {
   assert.match(describeSource({ _referrer: "https://www.google.com" }), /^Search engine \(google\.com\)/);
   assert.match(describeSource({ _referrer: "https://ca.bing.com" }), /^Search engine \(ca\.bing\.com\)/);
   assert.equal(describeSource({ _referrer: "https://www.homestars.com" }), "Link from homestars.com");
-  assert.equal(describeSource({ gclid: "abc" }), "Google Ads click");
   assert.match(describeSource({}), /^Direct visit or unknown/);
   assert.match(describeSource({ _referrer: "not a url" }), /^Direct visit or unknown/);
   assert.match(describeSource({ _referrer: "https://notgoogle.example" }), /^Link from notgoogle\.example/);
+  assert.equal(describeSource({ utm_source: "x" }), "Direct visit or unknown (no referring site recorded)", "campaign tags are not part of the original-visit line");
+  assert.equal(describeCampaign({}), "None");
+  assert.equal(describeCampaign({ utm_source: "newsletter", utm_medium: "email", utm_campaign: "fall", _campaign_landing: "/services" }, "staging.frameworkco.ca"), "newsletter / email / fall (landed on staging.frameworkco.ca/services)");
+  assert.equal(describeCampaign({ gclid: "abc", _campaign_landing: "/", _campaign_referrer: "https://www.google.com" }), "Google Ads click (landed on frameworkco.ca/, from google.com)");
+  assert.equal(describeCampaign({ fbclid: "z" }), "Facebook or Instagram link");
 });
 
-test("attribution: an enquiry carrying it shows the source and first page in the email, escaped; one without still sends", async () => {
+test("attribution: an enquiry carrying it shows original visit, first page and latest campaign in the email, escaped; one without still sends", async () => {
   const f = provider();
-  const r = await handleContactSubmit(req(good({ attribution: { _referrer: "https://www.google.com", _landing: "/contractor-websites", utm_source: "<b>x</b>" } })), ENV, { fetch: f });
+  const r = await handleContactSubmit(req(good({ attribution: { _referrer: "https://www.google.com", _landing: "/contractor-websites?secret=1", utm_source: "<b>x</b>", utm_medium: "m", _campaign_landing: "/services", _campaign_referrer: "https://chatgpt.com" } })), ENV, { fetch: f });
   assert.equal(r.status, 200);
   const sent = JSON.parse(f.calls[0].init.body);
-  assert.match(sent.text, /How they found us: Campaign: <b>x<\/b>/);
-  assert.match(sent.text, /First page they saw: frameworkco\.ca\/contractor-websites/);
+  assert.match(sent.text, /How they found us: Search engine \(google\.com\)/);
+  assert.match(sent.text, /First page they saw: frameworkco\.ca\/contractor-websites\n/, "path only");
+  assert.ok(!sent.text.includes("secret=1"));
+  assert.match(sent.text, /Latest campaign: <b>x<\/b> \/ m \(landed on frameworkco\.ca\/services, from chatgpt\.com\)/);
   assert.ok(!sent.html.includes("<b>x</b>") && sent.html.includes("&lt;b&gt;x&lt;/b&gt;"), "HTML email escapes it");
   const g = provider();
   assert.equal((await handleContactSubmit(req(good()), ENV, { fetch: g })).status, 200);
-  assert.match(JSON.parse(g.calls[0].init.body).text, /How they found us: Direct visit or unknown/);
+  const plain = JSON.parse(g.calls[0].init.body).text;
+  assert.match(plain, /How they found us: Direct visit or unknown/); assert.match(plain, /Latest campaign: None/);
   const h = provider();
   assert.equal((await handleContactSubmit(req(good({ attribution: "garbage" })), ENV, { fetch: h })).status, 200);
+});
+
+// Runs the visit-recording script from assets/js/main.js in a fake browser, one page view at a time, in one tab (one sessionStorage).
+function tab(flags = {}) {
+  const main = readFileSync(new URL("../../assets/js/main.js", import.meta.url), "utf8");
+  const code = main.slice(0, main.indexOf("(function () {", main.indexOf("})();")));
+  const store = {};
+  const session = { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: (k) => { delete store[k]; } };
+  return {
+    store,
+    visit(path, search = "", referrer = "") {
+      const win = { location: { pathname: path, search, origin: "https://frameworkco.ca" }, sessionStorage: session };
+      new Function("window", "navigator", "document", "URLSearchParams", "URL", code)(win, { ...flags }, { referrer }, URLSearchParams, URL);
+      return store.fw_attribution === undefined ? undefined : JSON.parse(store.fw_attribution);
+    },
+  };
+}
+
+test("attribution (browser): the original landing page is kept without its query string and is never replaced in the tab", () => {
+  const t = tab();
+  const first = t.visit("/contractor-websites", "?utm_source=chatgpt.com", "https://chatgpt.com/");
+  assert.equal(first._landing, "/contractor-websites"); assert.equal(first._referrer, "https://chatgpt.com");
+  const later = t.visit("/about", "", "https://frameworkco.ca/contractor-websites");
+  assert.equal(later._landing, "/contractor-websites", "first touch stays"); assert.equal(later._referrer, "https://chatgpt.com");
+  assert.ok(!JSON.stringify(later).includes("?"), "no query string is ever stored in a path");
+  assert.equal(t.visit("/contact", "", "https://frameworkco.ca/about")._landing, "/contractor-websites", "internal navigation changes nothing");
+});
+
+test("attribution (browser): the latest campaign replaces the previous one completely, with its own landing page and referrer (the owner's chatgpt.com then owner-test case)", () => {
+  const t = tab();
+  t.visit("/contractor-websites", "?utm_source=chatgpt.com", "https://chatgpt.com/");
+  const second = t.visit("/contractor-websites", "?utm_source=owner-test&utm_medium=manual&utm_campaign=phase1-check", "");
+  assert.deepEqual(
+    { s: second.utm_source, m: second.utm_medium, c: second.utm_campaign, l: second._campaign_landing, r: second._campaign_referrer },
+    { s: "owner-test", m: "manual", c: "phase1-check", l: "/contractor-websites", r: undefined }, "no blending with the earlier campaign or its referrer");
+  assert.equal(second._landing, "/contractor-websites"); assert.equal(second._referrer, "https://chatgpt.com", "the original visit is still the original");
+  // a campaign that only has some fields does not inherit the earlier campaign's other fields
+  const third = t.visit("/services", "?utm_source=newsletter", "https://mail.example/");
+  assert.equal(third.utm_source, "newsletter"); assert.equal(third.utm_medium, undefined); assert.equal(third.utm_campaign, undefined);
+  assert.equal(third._campaign_landing, "/services"); assert.equal(third._campaign_referrer, "https://mail.example");
+  // a plain page view later does not disturb the campaign
+  assert.deepEqual(t.visit("/about", "", "https://frameworkco.ca/services").utm_source, "newsletter");
+  // reloading the same campaign link is harmless
+  assert.equal(t.visit("/services", "?utm_source=newsletter", "").utm_source, "newsletter");
+});
+
+test("attribution (browser): Google first, then a campaign link in the same tab, keeps both stories apart", () => {
+  const t = tab();
+  t.visit("/", "", "https://www.google.com/");
+  const a = t.visit("/services", "?gclid=abc123", "https://www.googleadservices.com/");
+  assert.equal(a._landing, "/"); assert.equal(a._referrer, "https://www.google.com");
+  assert.equal(a.gclid, "abc123"); assert.equal(a._campaign_landing, "/services"); assert.equal(a._campaign_referrer, "https://www.googleadservices.com");
+});
+
+test("attribution (browser): Global Privacy Control or Do Not Track records nothing and clears anything kept; the contact form sends an empty source", () => {
+  for (const flag of [{ globalPrivacyControl: true }, { doNotTrack: "1" }]) {
+    const t = tab(flag);
+    t.store.fw_attribution = '{"_landing":"/old","utm_source":"old"}';
+    assert.equal(t.visit("/contact", "?utm_source=x", "https://www.google.com/"), undefined, JSON.stringify(flag));
+    assert.deepEqual(t.store, {}, "nothing kept");
+  }
+  const main = readFileSync(new URL("../../assets/js/main.js", import.meta.url), "utf8");
+  assert.match(main, /var attribution = function \(\) \{\s*if \(navigator\.globalPrivacyControl === true[^]*?return \{\};/);
+  const assess = readFileSync(new URL("../../assets/js/assessment.js", import.meta.url), "utf8");
+  assert.match(assess, /var readAttribution = function \(\) \{\s*if \(navigator\.globalPrivacyControl === true[^]*?return \{\};/);
+  assert.ok(!/sessionStorage\.setItem/.test(assess), "the assessment form only reads: main.js is the single writer");
 });
 
 test("attribution: stored only in this tab's sessionStorage, sent only with the contact form, never to analytics", () => {
@@ -136,7 +209,6 @@ test("attribution: stored only in this tab's sessionStorage, sent only with the 
   assert.match(readFileSync(new URL("../../privacy.html", import.meta.url), "utf8"), /on any page of this website we keep campaign details/);
 });
 
-// ---- real host in the email; privacy signals ----
 test("the email names the host the enquiry was sent from: Staging says staging, Production says frameworkco.ca", async () => {
   const send = async (host) => {
     const f = provider();
@@ -152,31 +224,10 @@ test("the email names the host the enquiry was sent from: Staging says staging, 
   assert.match(buildContactEmail(validateContact(good()).data).text, /Sent from: frameworkco\.ca\/contact/, "default host is the live site");
 });
 
-test("privacy signals: Global Privacy Control or Do Not Track means nothing is recorded or sent, and the forms still work", () => {
-  for (const file of ["assets/js/main.js", "assets/js/assessment.js"]) {
-    const src = readFileSync(new URL("../../" + file, import.meta.url), "utf8");
-    assert.match(src, /navigator\.globalPrivacyControl === true \|\| navigator\.doNotTrack === "1"/, file);
-    assert.match(src, /removeItem\("fw_attribution"\)/, file + " clears anything already kept");
-  }
-  const main = readFileSync(new URL("../../assets/js/main.js", import.meta.url), "utf8");
-  assert.match(main, /var attribution = function \(\) \{\s*if \(navigator\.globalPrivacyControl === true[^]*?return \{\};/, "the contact form sends an empty source");
-  // behaviour: run the capture script in a fake browser
-  const run = (flags) => {
-    const store = { fw_attribution: '{"old":1}' };
-    const win = { location: { search: "?utm_source=x", pathname: "/a", origin: "https://frameworkco.ca" }, sessionStorage: { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: (k) => { delete store[k]; } } };
-    const nav = { ...flags };
-    const code = main.slice(0, main.indexOf("(function () {", main.indexOf("})();") ));
-    new Function("window", "navigator", "document", "URLSearchParams", "URL", code)(win, nav, { referrer: "https://www.google.com/" }, URLSearchParams, URL);
-    return store;
-  };
-  assert.deepEqual(run({ globalPrivacyControl: true }), {}, "GPC: cleared, nothing new");
-  assert.deepEqual(run({ doNotTrack: "1" }), {}, "DNT: cleared, nothing new");
-  const normal = JSON.parse(run({}).fw_attribution);
-  assert.equal(normal.utm_source, "x"); assert.equal(normal._referrer, "https://www.google.com");
-});
-
 test("privacy policy: retention names contact-form messages and source details; the privacy signal is described", () => {
   const html = readFileSync(new URL("../../privacy.html", import.meta.url), "utf8");
   assert.match(html, /Assessment inquiries, contact-form messages and related prospect information<\/strong> \(including contact enquiries by email, and the source details an enquiry carries/);
   assert.match(html, /If your browser sends a Global Privacy Control or Do Not Track signal, we do not record any of this/);
+  assert.match(html, /the first page of this website you opened \(its address without anything after a question mark\)/);
+  assert.match(html, /A newer campaign link replaces the earlier one/);
 });

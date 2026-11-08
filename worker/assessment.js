@@ -162,7 +162,7 @@ export function validateAssessment(body) {
     if (v) tracking[k] = v;
   }
   data.tracking = tracking;
-  data.landing = clean(b.landing).slice(0, 200);
+  data.landing = clean(b.landing).slice(0, 200).split(/[?#]/)[0]; // a page path only, never its query string
   data.referrer = clean(b.referrer).slice(0, 200);
 
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, data };
