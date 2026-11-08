@@ -135,3 +135,48 @@ test("attribution: stored only in this tab's sessionStorage, sent only with the 
   assert.ok(!/fwTrack\([^)]*attribution/.test(main));
   assert.match(readFileSync(new URL("../../privacy.html", import.meta.url), "utf8"), /on any page of this website we keep campaign details/);
 });
+
+// ---- real host in the email; privacy signals ----
+test("the email names the host the enquiry was sent from: Staging says staging, Production says frameworkco.ca", async () => {
+  const send = async (host) => {
+    const f = provider();
+    const r = new Request(`https://${host}/api/contact`, { method: "POST", headers: { "Content-Type": "application/json", Origin: `https://${host}` }, body: JSON.stringify(good({ attribution: { _landing: "/services" } })) });
+    assert.equal((await handleContactSubmit(r, ENV, { fetch: f })).status, 200);
+    return JSON.parse(f.calls[0].init.body).text;
+  };
+  const staging = await send("staging.frameworkco.ca");
+  assert.match(staging, /Sent from: staging\.frameworkco\.ca\/contact/); assert.match(staging, /First page they saw: staging\.frameworkco\.ca\/services/);
+  assert.ok(!staging.includes("Sent from: frameworkco.ca"));
+  const prod = await send("frameworkco.ca");
+  assert.match(prod, /Sent from: frameworkco\.ca\/contact/); assert.match(prod, /First page they saw: frameworkco\.ca\/services/);
+  assert.match(buildContactEmail(validateContact(good()).data).text, /Sent from: frameworkco\.ca\/contact/, "default host is the live site");
+});
+
+test("privacy signals: Global Privacy Control or Do Not Track means nothing is recorded or sent, and the forms still work", () => {
+  for (const file of ["assets/js/main.js", "assets/js/assessment.js"]) {
+    const src = readFileSync(new URL("../../" + file, import.meta.url), "utf8");
+    assert.match(src, /navigator\.globalPrivacyControl === true \|\| navigator\.doNotTrack === "1"/, file);
+    assert.match(src, /removeItem\("fw_attribution"\)/, file + " clears anything already kept");
+  }
+  const main = readFileSync(new URL("../../assets/js/main.js", import.meta.url), "utf8");
+  assert.match(main, /var attribution = function \(\) \{\s*if \(navigator\.globalPrivacyControl === true[^]*?return \{\};/, "the contact form sends an empty source");
+  // behaviour: run the capture script in a fake browser
+  const run = (flags) => {
+    const store = { fw_attribution: '{"old":1}' };
+    const win = { location: { search: "?utm_source=x", pathname: "/a", origin: "https://frameworkco.ca" }, sessionStorage: { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: (k) => { delete store[k]; } } };
+    const nav = { ...flags };
+    const code = main.slice(0, main.indexOf("(function () {", main.indexOf("})();") ));
+    new Function("window", "navigator", "document", "URLSearchParams", "URL", code)(win, nav, { referrer: "https://www.google.com/" }, URLSearchParams, URL);
+    return store;
+  };
+  assert.deepEqual(run({ globalPrivacyControl: true }), {}, "GPC: cleared, nothing new");
+  assert.deepEqual(run({ doNotTrack: "1" }), {}, "DNT: cleared, nothing new");
+  const normal = JSON.parse(run({}).fw_attribution);
+  assert.equal(normal.utm_source, "x"); assert.equal(normal._referrer, "https://www.google.com");
+});
+
+test("privacy policy: retention names contact-form messages and source details; the privacy signal is described", () => {
+  const html = readFileSync(new URL("../../privacy.html", import.meta.url), "utf8");
+  assert.match(html, /Assessment inquiries, contact-form messages and related prospect information<\/strong> \(including contact enquiries by email, and the source details an enquiry carries/);
+  assert.match(html, /If your browser sends a Global Privacy Control or Do Not Track signal, we do not record any of this/);
+});
