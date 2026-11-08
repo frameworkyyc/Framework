@@ -14,7 +14,7 @@ Status key: **ACTIVE** = running today · **BUILT, OFF** = implemented but disab
 |---|---|---|---|
 | Free Online Presence Assessment (`/assessment`) | Cloudflare D1 table `assessment_requests`, plus an email to hello@frameworkco.ca, plus a confirmation email to the applicant (via Resend) | business name, website, contact name, business email, city/province, industry; optional phone, services, service area, profile links, main concern, additional information; privacy acknowledgement (required, stored as yes/no); marketing opt-in (optional, stored as yes/no); request time; campaign parameters (`utm_source/medium/campaign/term/content`, `fbclid`, `gclid`); landing path; referring site (origin only); hashed IP; email delivery status/error | ACTIVE |
 | Client feedback (`/client-feedback`, private, noindex) | Cloudflare D1 table `feedback_responses` | ratings, written answers, optional revenue *range*, testimonial, testimonial permission (4 options), name/title/business (only when attribution allowed), logo permission, future services, comments | ACTIVE |
-| Contact (`/contact.html`) | Nothing is sent by the website. It opens the visitor's own email app (`mailto:`) | name, email, optional business, optional project type, message (composed in the visitor's email app) | ACTIVE |
+| Contact (`/contact`) | Email to hello@frameworkco.ca through the website (`POST /api/contact`, Resend). **Nothing is stored in a database** | name, email, optional business, optional project type, message; page sent from; how the visit began (campaign tags, landing page, referring site origin; see `fw_attribution`) | ACTIVE |
 | Client revenue figure (`client_revenue`) | Cloudflare D1, entered manually by an admin from what a client reported | client id + a revenue number. Only the combined total is exposed publicly (`/api/client-revenue`, homepage) | ACTIVE |
 
 ### Technical data and logs
@@ -32,7 +32,7 @@ Status key: **ACTIVE** = running today · **BUILT, OFF** = implemented but disab
 
 | Item | Type | Purpose | When set |
 |---|---|---|---|
-| `fw_attribution` | sessionStorage | campaign parameters, landing path and referrer origin for this visit, attached to a request only if the visitor submits one. **Set before any consent**, treated as first-party and not shared until submit (disclosed in the policy) | on loading `/assessment` |
+| `fw_attribution` | sessionStorage | campaign parameters, landing path and referrer origin for this visit, attached to a request only if the visitor submits one (assessment form or contact form). **Set before any consent**, treated as first-party and not shared until submit (disclosed in the policy) | on loading any page (`assets/js/main.js`) |
 | `fw_meta_consent` | localStorage (`granted`/`denied`) | remembers the advertising-measurement choice | only when the visitor chooses, and only when the Pixel is configured |
 
 ### Third parties
