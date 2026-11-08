@@ -141,11 +141,12 @@ test("notification email contains every field, timing, tracking and a copyable b
   assert.equal(n.subject, "New Assessment Request | Summit Concrete Ltd.");
   for (const needle of ["Summit Concrete Ltd.", "https://summitconcrete.ca/", "Alex Rivera", "alex@summitconcrete.ca", "Calgary, AB",
     "Concrete contractor", "(403) 555-0142", "Foundations, flatwork", "Calgary and area", "g.page/summit", "trouble finding us",
-    "Mostly referrals", "2026-10-20T20:03:00.000Z", "utm_source: instagram", "utm_campaign: assessment-oct", "/assessment?utm_source=instagram",
+    "Mostly referrals", "2026-10-20T20:03:00.000Z", "utm_source: instagram", "utm_campaign: assessment-oct", "Landing page: /assessment",
     "Yes (opted in)", "COPY INTO THE ASSESSMENT WORKFLOW"]) {
     assert.ok(n.text.includes(needle), "text missing: " + needle);
   }
   assert.ok(n.html.includes("Summit Concrete Ltd."));
+  assert.ok(!n.text.includes("Landing page: /assessment?"), "the landing page is a path only, never its query string");
 });
 
 test("notification escapes HTML and cannot inject subject headers", () => {

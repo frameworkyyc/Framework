@@ -1,25 +1,34 @@
 /* FRAMEWORK — site scripts */
 
-/* ---- How this visit began (campaign, landing page, referring site) ----
-   Kept in sessionStorage only (cleared when the tab closes) under the same key and shape the assessment form uses, and sent to Framework only if the
-   visitor submits the contact or assessment form, so an enquiry can be traced to where it came from. No cookie, nothing sent from here. */
+/* ---- How this visit began (original landing page, latest campaign, referring site) ----
+   Kept in sessionStorage only (cleared when the tab closes) under "fw_attribution", and sent to Framework only if the visitor submits the contact or
+   assessment form, so an enquiry can be traced to where it came from. No cookie, nothing sent from here. This is the only place it is written.
+   - Original visit (first touch, never replaced in this tab): the page path WITHOUT any query string, and the referring site's address (origin only).
+   - Latest campaign (utm_*, gclid, fbclid): a new campaign link REPLACES the previous campaign completely, together with its own landing page path
+     (again without query string) and its own referring site, so two campaigns are never blended.
+   A browser that sends Global Privacy Control or Do Not Track gets none of this: nothing is recorded and anything already kept is cleared. */
 (function () {
   "use strict";
-  var KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
-  // A browser that sends Global Privacy Control or Do Not Track gets none of this: nothing is recorded (and anything already kept is cleared). The forms still work.
+  var CAMPAIGN = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
   if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1" || window.doNotTrack === "1") {
     try { window.sessionStorage.removeItem("fw_attribution"); } catch (e) { /* storage blocked */ }
     return;
   }
   try {
     var saved = JSON.parse(window.sessionStorage.getItem("fw_attribution") || "{}") || {};
-    var params = new URLSearchParams(window.location.search), found = false;
-    KEYS.forEach(function (k) { var v = params.get(k); if (v) { saved[k] = v.slice(0, 150); found = true; } });
-    var ref = "";
+    var params = new URLSearchParams(window.location.search), campaign = {}, found = false;
+    CAMPAIGN.forEach(function (k) { var v = params.get(k); if (v) { campaign[k] = v.slice(0, 150); found = true; } });
+    var path = window.location.pathname.slice(0, 200), ref = "";
     try { ref = document.referrer ? new URL(document.referrer).origin : ""; } catch (e) { ref = ""; }
-    if (!saved._landing) saved._landing = (window.location.pathname + window.location.search).slice(0, 200);
-    if (!saved._referrer && ref && ref !== window.location.origin) saved._referrer = ref;
-    if (found || !window.sessionStorage.getItem("fw_attribution")) window.sessionStorage.setItem("fw_attribution", JSON.stringify(saved));
+    if (ref === window.location.origin) ref = "";
+    if (!saved._landing) { saved._landing = path; if (ref) saved._referrer = ref; }
+    if (found) {
+      CAMPAIGN.concat(["_campaign_landing", "_campaign_referrer"]).forEach(function (k) { delete saved[k]; });
+      Object.keys(campaign).forEach(function (k) { saved[k] = campaign[k]; });
+      saved._campaign_landing = path;
+      if (ref) saved._campaign_referrer = ref;
+    }
+    window.sessionStorage.setItem("fw_attribution", JSON.stringify(saved));
   } catch (e) { /* storage blocked (private mode): the enquiry simply carries no source */ }
 })();
 
