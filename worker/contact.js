@@ -24,12 +24,38 @@ const clean = (v, max, multiline = false) => {
   return (multiline ? s.replace(/[ \t]+\n/g, "\n") : s.replace(/\s+/g, " ")).trim().slice(0, max);
 };
 
+// Where the visit began (sent by the page from sessionStorage "fw_attribution"; see assets/js/main.js). Only these keys, short, control characters out.
+const ATTRIBUTION_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "fbclid", "_landing", "_referrer"];
+export function cleanAttribution(a) {
+  const out = {};
+  if (!a || typeof a !== "object" || Array.isArray(a)) return out;
+  for (const k of ATTRIBUTION_KEYS) {
+    const v = typeof a[k] === "string" ? clean(a[k], k === "_landing" ? 200 : 150) : "";
+    if (v) out[k] = v;
+  }
+  return out;
+}
+
+const SEARCH_ENGINE = /(^|\.)(google|bing|duckduckgo|yahoo|ecosia|brave|startpage|yandex|baidu|qwant)\./i;
+// A plain-language line for the email: how the visitor found the site. Campaign tags win; then a search engine; then another site; else unknown.
+export function describeSource(a) {
+  let host = "";
+  try { host = a._referrer ? new URL(a._referrer).hostname.replace(/^www\./, "") : ""; } catch { host = ""; }
+  if (a.utm_source || a.utm_medium || a.utm_campaign) return "Campaign: " + [a.utm_source, a.utm_medium, a.utm_campaign].filter(Boolean).join(" / ");
+  if (a.gclid) return "Google Ads click";
+  if (a.fbclid) return "Facebook or Instagram link";
+  if (host && SEARCH_ENGINE.test(host)) return "Search engine (" + host + "), organic unless it was an ad";
+  if (host) return "Link from " + host;
+  return "Direct visit or unknown (no referring site recorded)";
+}
+
 export function validateContact(body) {
   const b = body && typeof body === "object" ? body : {};
   const data = {
     name: clean(b.name, LIMITS.name), email: clean(b.email, 254).toLowerCase(), business: clean(b.business, LIMITS.business),
     project_type: clean(b.project_type, LIMITS.project_type), message: clean(b.message, LIMITS.message, true),
     page: clean(b.page, 100).replace(/[^\w\-/.]/g, ""),
+    attribution: cleanAttribution(b.attribution),
   };
   const errors = {};
   if (!data.name) errors.name = "required";
@@ -41,7 +67,8 @@ export function validateContact(body) {
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export function buildContactEmail(data, now = new Date()) {
-  const rows = [["Name", data.name], ["Email", data.email], ["Business", data.business || "—"], ["Project type", data.project_type || "—"], ["Sent from", data.page ? "frameworkco.ca" + data.page : "frameworkco.ca/contact"], ["Received", now.toISOString().replace("T", " ").slice(0, 16) + " UTC"]];
+  const a = data.attribution || {};
+  const rows = [["Name", data.name], ["Email", data.email], ["Business", data.business || "—"], ["Project type", data.project_type || "—"], ["Sent from", data.page ? "frameworkco.ca" + data.page : "frameworkco.ca/contact"], ["How they found us", describeSource(a)], ["First page they saw", a._landing ? "frameworkco.ca" + a._landing : "—"], ["Received", now.toISOString().replace("T", " ").slice(0, 16) + " UTC"]];
   const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n") + "\n\n" + data.message + "\n";
   const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#0a0a0a"><p><strong>New website enquiry</strong></p><table cellpadding="4" style="border-collapse:collapse">${rows
     .map(([k, v]) => `<tr><td style="color:#5c5c5c;padding-right:16px">${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table><p style="white-space:pre-wrap;border-left:3px solid #0a0a0a;padding-left:12px">${esc(data.message)}</p></div>`;

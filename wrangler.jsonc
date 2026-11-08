@@ -54,6 +54,8 @@
   "assets": {
     "directory": "./",
     "binding": "ASSETS",
+    // A missing page answers 404 with the designed /404.html (noindex) instead of an empty body.
+    "not_found_handling": "404-page",
     // The Worker runs for the API and for the private admin area (it checks the Cloudflare Access token before
     // serving anything under /admin), and for /card so its link-preview URLs match the environment. Every other public page is
     // still served straight from static assets. /portal and /portal/* belong to the client portal router (worker/portal/router.js): it

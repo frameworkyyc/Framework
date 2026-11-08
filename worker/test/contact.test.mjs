@@ -89,3 +89,49 @@ test("routing: POST /api/contact is public and handled by the Worker; other meth
   const bad = await worker.fetch(new Request("https://frameworkco.ca/api/contact", { method: "POST", headers: { "Content-Type": "application/json", Origin: "https://frameworkco.ca" }, body: "{}" }), env, {});
   assert.equal(bad.status, 422);
 });
+
+// ---- where the enquiry came from (SEO phase 1) ----
+import { cleanAttribution, describeSource } from "../contact.js";
+import { readFileSync } from "node:fs";
+
+test("attribution: only known short keys are kept, control characters are removed, and anything else is dropped", () => {
+  const a = cleanAttribution({ utm_source: "goo\u0007gle", utm_medium: "x".repeat(400), _landing: "/contractor-websites?utm_campaign=a", evil: "<script>", _referrer: "https://www.google.com", gclid: "5", utm_term: { a: 1 } });
+  assert.deepEqual(Object.keys(a).sort(), ["_landing", "_referrer", "gclid", "utm_medium", "utm_source"]);
+  assert.equal(a.utm_source, "goo gle"); assert.equal(a.utm_medium.length, 150); assert.equal(a.gclid, "5");
+  assert.deepEqual(cleanAttribution(null), {}); assert.deepEqual(cleanAttribution([1, 2]), {}); assert.deepEqual(cleanAttribution("x"), {});
+});
+
+test("attribution: the email says plainly how the visitor found the site", () => {
+  assert.equal(describeSource({ utm_source: "newsletter", utm_medium: "email", utm_campaign: "fall" }), "Campaign: newsletter / email / fall");
+  assert.match(describeSource({ _referrer: "https://www.google.com" }), /^Search engine \(google\.com\)/);
+  assert.match(describeSource({ _referrer: "https://ca.bing.com" }), /^Search engine \(ca\.bing\.com\)/);
+  assert.equal(describeSource({ _referrer: "https://www.homestars.com" }), "Link from homestars.com");
+  assert.equal(describeSource({ gclid: "abc" }), "Google Ads click");
+  assert.match(describeSource({}), /^Direct visit or unknown/);
+  assert.match(describeSource({ _referrer: "not a url" }), /^Direct visit or unknown/);
+  assert.match(describeSource({ _referrer: "https://notgoogle.example" }), /^Link from notgoogle\.example/);
+});
+
+test("attribution: an enquiry carrying it shows the source and first page in the email, escaped; one without still sends", async () => {
+  const f = provider();
+  const r = await handleContactSubmit(req(good({ attribution: { _referrer: "https://www.google.com", _landing: "/contractor-websites", utm_source: "<b>x</b>" } })), ENV, { fetch: f });
+  assert.equal(r.status, 200);
+  const sent = JSON.parse(f.calls[0].init.body);
+  assert.match(sent.text, /How they found us: Campaign: <b>x<\/b>/);
+  assert.match(sent.text, /First page they saw: frameworkco\.ca\/contractor-websites/);
+  assert.ok(!sent.html.includes("<b>x</b>") && sent.html.includes("&lt;b&gt;x&lt;/b&gt;"), "HTML email escapes it");
+  const g = provider();
+  assert.equal((await handleContactSubmit(req(good()), ENV, { fetch: g })).status, 200);
+  assert.match(JSON.parse(g.calls[0].init.body).text, /How they found us: Direct visit or unknown/);
+  const h = provider();
+  assert.equal((await handleContactSubmit(req(good({ attribution: "garbage" })), ENV, { fetch: h })).status, 200);
+});
+
+test("attribution: stored only in this tab's sessionStorage, sent only with the contact form, never to analytics", () => {
+  const main = readFileSync(new URL("../../assets/js/main.js", import.meta.url), "utf8");
+  assert.match(main, /sessionStorage\.setItem\("fw_attribution"/);
+  assert.ok(!/localStorage|document\.cookie/.test(main));
+  assert.match(main, /attribution: attribution\(\)/);
+  assert.ok(!/fwTrack\([^)]*attribution/.test(main));
+  assert.match(readFileSync(new URL("../../privacy.html", import.meta.url), "utf8"), /on any page of this website we keep campaign details/);
+});
