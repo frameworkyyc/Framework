@@ -18,13 +18,19 @@
   var turnstileBox = $("as-turnstile");
 
   /* ---------------------------------------------------------------- campaign attribution
-     Written once per visit by main.js (sessionStorage "fw_attribution"); this form only READS it when submitted. It stays empty for browsers that send
-     Global Privacy Control or Do Not Track. The advertising-measurement choice is handled entirely by consent.js. */
+     Written once per visit by main.js (local storage "fw_visit", shared by tabs, discarded after 30 minutes idle); this form only READS it when
+     submitted. It stays empty for browsers that send Global Privacy Control or Do Not Track. The advertising-measurement choice is handled entirely by consent.js. */
 
   var TRACKING_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
   var readAttribution = function () {
     if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1" || window.doNotTrack === "1") return {};
-    try { return JSON.parse(window.sessionStorage.getItem("fw_attribution") || "{}") || {}; } catch (e) { return {}; }
+    var st = [], rec = {};
+    try { st.push(window.localStorage); } catch (e) { /* blocked */ }
+    try { st.push(window.sessionStorage); } catch (e) { /* blocked */ }
+    for (var i = 0; i < st.length; i++) {
+      try { var v = JSON.parse(st[i].getItem("fw_visit") || "null"); if (v && typeof v === "object") { rec = v; break; } } catch (e) { /* next */ }
+    }
+    return Date.now() - (Number(rec._seen) || 0) <= 30 * 60 * 1000 ? rec : {};
   };
 
   /* ---------------------------------------------------------------- validation (mirrors the server) */

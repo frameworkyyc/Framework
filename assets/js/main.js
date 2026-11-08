@@ -1,21 +1,34 @@
 /* FRAMEWORK — site scripts */
 
 /* ---- How this visit began (original landing page, latest campaign, referring site) ----
-   Kept in sessionStorage only (cleared when the tab closes) under "fw_attribution", and sent to Framework only if the visitor submits the contact or
-   assessment form, so an enquiry can be traced to where it came from. No cookie, nothing sent from here. This is the only place it is written.
-   - Original visit (first touch, never replaced in this tab): the page path WITHOUT any query string, and the referring site's address (origin only).
+   One record per VISIT, shared by all tabs of this browser, kept in local storage under "fw_visit" and discarded after 30 minutes without activity on
+   this site (a visit ends when you stop browsing, not when a tab closes). It is sent to Framework only if the visitor submits the contact or assessment
+   form, so an enquiry can be traced to where it came from. No cookie, nothing sent from here. This is the only place it is written.
+   - Original visit (first touch, never replaced during the visit): the page path WITHOUT any query string, and the referring site's address (origin only).
    - Latest campaign (utm_*, gclid, fbclid): a new campaign link REPLACES the previous campaign completely, together with its own landing page path
      (again without query string) and its own referring site, so two campaigns are never blended.
-   A browser that sends Global Privacy Control or Do Not Track gets none of this: nothing is recorded and anything already kept is cleared. */
+   A browser that sends Global Privacy Control or Do Not Track gets none of this: nothing is recorded and anything already kept is cleared.
+   If local storage is blocked the visit falls back to this tab's session storage; if both are blocked the enquiry simply carries no source. */
 (function () {
   "use strict";
+  var KEY = "fw_visit", LEGACY = "fw_attribution", IDLE_MS = 30 * 60 * 1000;
   var CAMPAIGN = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
+  var areas = function () { var out = []; try { out.push(window.localStorage); } catch (e) { /* blocked */ } try { out.push(window.sessionStorage); } catch (e) { /* blocked */ } return out; };
   if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1" || window.doNotTrack === "1") {
-    try { window.sessionStorage.removeItem("fw_attribution"); } catch (e) { /* storage blocked */ }
+    areas().forEach(function (st) { try { st.removeItem(KEY); st.removeItem(LEGACY); } catch (e) { /* ignore */ } });
     return;
   }
+  var now = Date.now();
+  var read = function () {
+    var list = areas();
+    for (var i = 0; i < list.length; i++) {
+      try { var v = JSON.parse(list[i].getItem(KEY) || "null"); if (v && typeof v === "object") return v; } catch (e) { /* try the next */ }
+    }
+    return {};
+  };
   try {
-    var saved = JSON.parse(window.sessionStorage.getItem("fw_attribution") || "{}") || {};
+    var saved = read();
+    if (!(now - (Number(saved._seen) || 0) <= IDLE_MS)) saved = {}; // idle for more than 30 minutes (or unreadable): a new visit
     var params = new URLSearchParams(window.location.search), campaign = {}, found = false;
     CAMPAIGN.forEach(function (k) { var v = params.get(k); if (v) { campaign[k] = v.slice(0, 150); found = true; } });
     var path = window.location.pathname.slice(0, 200), ref = "";
@@ -28,8 +41,11 @@
       saved._campaign_landing = path;
       if (ref) saved._campaign_referrer = ref;
     }
-    window.sessionStorage.setItem("fw_attribution", JSON.stringify(saved));
-  } catch (e) { /* storage blocked (private mode): the enquiry simply carries no source */ }
+    saved._seen = now;
+    var text = JSON.stringify(saved), stored = false;
+    areas().forEach(function (st) { try { if (!stored) { st.setItem(KEY, text); stored = true; } } catch (e) { /* try the next */ } });
+    areas().forEach(function (st) { try { st.removeItem(LEGACY); } catch (e) { /* ignore */ } }); // the earlier per-tab record, if any
+  } catch (e) { /* the enquiry simply carries no source */ }
 })();
 
 (function () {
@@ -73,9 +89,18 @@
      Validates required fields, then sends the message through /api/contact (worker/contact.js). If sending fails the visitor is told so and given the email address. */
   var form = document.getElementById("contact-form");
   if (!form) return;
+  // The visit record for the form, without its bookkeeping. Empty for Global Privacy Control / Do Not Track, and for a visit idle for 30+ minutes.
   var attribution = function () {
     if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1" || window.doNotTrack === "1") return {};
-    try { return JSON.parse(window.sessionStorage.getItem("fw_attribution") || "{}") || {}; } catch (e) { return {}; }
+    var st = [], rec = {};
+    try { st.push(window.localStorage); } catch (e) { /* blocked */ }
+    try { st.push(window.sessionStorage); } catch (e) { /* blocked */ }
+    for (var i = 0; i < st.length; i++) {
+      try { var v = JSON.parse(st[i].getItem("fw_visit") || "null"); if (v && typeof v === "object") { rec = v; break; } } catch (e) { /* next */ }
+    }
+    if (!(Date.now() - (Number(rec._seen) || 0) <= 30 * 60 * 1000)) return {};
+    delete rec._seen;
+    return rec;
   };
 
   /* Arriving from a demo website ("Make it yours"): pre-fill the business name and say which demo they liked. */
