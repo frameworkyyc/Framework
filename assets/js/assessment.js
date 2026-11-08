@@ -28,6 +28,11 @@
 
   var TRACKING_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
   var attribution = (function () {
+    // Global Privacy Control or Do Not Track: record nothing (and clear anything kept); the form works the same without it.
+    if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1" || window.doNotTrack === "1") {
+      try { window.sessionStorage.removeItem("fw_attribution"); } catch (e) { /* storage blocked */ }
+      return {};
+    }
     var saved = {};
     try { saved = JSON.parse(store.sget("fw_attribution") || "{}") || {}; } catch (e) { saved = {}; }
     var params = new URLSearchParams(window.location.search);

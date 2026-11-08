@@ -6,6 +6,11 @@
 (function () {
   "use strict";
   var KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
+  // A browser that sends Global Privacy Control or Do Not Track gets none of this: nothing is recorded (and anything already kept is cleared). The forms still work.
+  if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1" || window.doNotTrack === "1") {
+    try { window.sessionStorage.removeItem("fw_attribution"); } catch (e) { /* storage blocked */ }
+    return;
+  }
   try {
     var saved = JSON.parse(window.sessionStorage.getItem("fw_attribution") || "{}") || {};
     var params = new URLSearchParams(window.location.search), found = false;
@@ -59,7 +64,10 @@
      Validates required fields, then sends the message through /api/contact (worker/contact.js). If sending fails the visitor is told so and given the email address. */
   var form = document.getElementById("contact-form");
   if (!form) return;
-  var attribution = function () { try { return JSON.parse(window.sessionStorage.getItem("fw_attribution") || "{}") || {}; } catch (e) { return {}; } };
+  var attribution = function () {
+    if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1" || window.doNotTrack === "1") return {};
+    try { return JSON.parse(window.sessionStorage.getItem("fw_attribution") || "{}") || {}; } catch (e) { return {}; }
+  };
 
   /* Arriving from a demo website ("Make it yours"): pre-fill the business name and say which demo they liked. */
   (function () {
