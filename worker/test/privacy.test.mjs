@@ -21,7 +21,7 @@ const policyText = text(policy);
 const portalExpected = portalPolicyAssertionsApply(policy);
 
 test("every public page has a Privacy Policy link in its footer", () => {
-  assert.deepEqual(PAGES.sort(), ["404.html", "about.html", "assessment.html", "card.html", "client-feedback.html", "contact.html", "contractor-websites.html", "index.html", "method.html", "portfolio.html", "privacy.html", "services.html"]);
+  assert.deepEqual(PAGES.sort(), ["404.html", "about.html", "assessment.html", "branding.html", "card.html", "client-feedback.html", "contact.html", "contractor-websites.html", "index.html", "local-seo.html", "method.html", "portfolio.html", "privacy.html", "services.html", "website-design.html"]);
   for (const page of PAGES) {
     // the business card has no site footer: it carries a single compact privacy link instead
     const footer = read(page).split(page === "card.html" ? '<footer class="card__foot">' : '<footer class="site-footer">')[1] || "";

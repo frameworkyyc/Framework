@@ -48,7 +48,7 @@ test("_redirects: the sitemap's canonical addresses are never redirected, and ev
     if (!canonical) continue;
     assert.ok(!sources.has(canonical), "canonical address redirected: " + canonical);
   }
-  for (const page of readdirSync(root).filter((f) => /^(about|assessment|contact|contractor-websites|method|portfolio|privacy|services)\.html$/.test(f))) {
+  for (const page of readdirSync(root).filter((f) => /^(about|assessment|contact|contractor-websites|method|portfolio|privacy|services|website-design|local-seo|branding)\.html$/.test(f))) {
     const clean = "/" + page.replace(/\.html$/, "");
     assert.ok(rules.some((r) => r.from === "/" + page && r.to === clean), page + " lacks its 301");
     assert.ok(rules.some((r) => r.from === clean + "/" && r.to === clean), clean + "/ lacks its 301");

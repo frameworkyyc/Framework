@@ -61,7 +61,7 @@ test("structured data: valid JSON-LD that describes only what is true (a Calgary
   assert.ok(biz && biz["@id"] === SITE + "/#business" && biz.name === "Framework" && biz.url === SITE + "/");
   assert.equal(biz.address.addressLocality, "Calgary"); assert.equal(biz.address.addressRegion, "AB");
   assert.ok(!biz.address.streetAddress, "no street address is invented");
-  assert.deepEqual(biz.areaServed.map((a) => a.name), ["Calgary", "Alberta", "Canada"]);
+  assert.deepEqual(biz.areaServed.map((a) => a.name), ["Calgary", "Airdrie", "Cochrane", "Okotoks", "Chestermere", "Alberta", "Canada"]);
   assert.ok(home.some((x) => x["@type"] === "WebSite"));
   for (const [route, file] of PUBLIC_PAGES) {
     const all = JSON.stringify(blocks(read(file)));
@@ -107,7 +107,7 @@ test("the contractor page: Calgary first, Alberta and Canada too, honest about s
   assert.ok(faq.mainEntity.length >= 5);
   for (const q of faq.mainEntity) { assert.ok(t.includes(q.name.replace(/&/g, "&")), "question visible: " + q.name); assert.ok(t.replace(/&#39;|&apos;/g, "'").includes(q.acceptedAnswer.text.replace(/&/g, "&")), "answer visible: " + q.name); }
   const svc = flat(blocks(h)).find((x) => x["@type"] === "Service");
-  assert.deepEqual(svc.areaServed.map((a) => a.name), ["Calgary", "Alberta", "Canada"]);
+  assert.deepEqual(svc.areaServed.map((a) => a.name), ["Calgary", "Airdrie", "Cochrane", "Okotoks", "Chestermere", "Alberta", "Canada"]);
   assert.ok(!/image|style="/.test(h.split("<main")[1].split("</main>")[0].match(/style="[^"]*"/g)?.join("") || ""), "no inline styles");
   assert.match(h, /href="\/contact" data-track="contact_cta"/); assert.match(h, /href="\/assessment" data-track="assessment_cta"/);
   assert.match(h, /<a class="nav__link" href="\/contractor-websites" aria-current="page">Contractors<\/a>/);
