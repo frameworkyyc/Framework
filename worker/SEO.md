@@ -13,6 +13,15 @@ Phase 1 (Staging) of the plan to make frameworkco.ca visible for contractor webs
 - **Analytics (Google Analytics 4):** built, consent-first, and **off** until you add a Measurement ID. See below.
 - **Privacy policy:** updated (effective date November 8, 2026) for the contact form and Google Analytics. **Review it before it goes to Production.**
 
+## Service pages (SEO phase 2)
+
+- **Pages:** `/website-design` (Website Design & Development), `/local-seo` (Local SEO), `/branding` (Branding). `/services` stays the hub and `/contractor-websites` the specialized contractor landing page; each page has its own main phrase and they link to each other (descriptive link text), from the homepage cards and hero, the hub, every footer and the contractor page.
+- **Built from existing components only** (`page-head`, `split`, `service`, `cells`, `cx-faq`, `cx-places`, the dark closing band): no new stylesheet, no images, no inline styles. Navigation is unchanged.
+- **Service area:** Calgary, Airdrie, Cochrane, Okotoks and Chestermere are named in each page's "Where we work" band and in the structured data (`areaServed`, also on the homepage and the contractor page). Wider Alberta and Canada appears only in that band and one FAQ answer, never in titles or headings, so Calgary targeting is not diluted.
+- **Structured data:** `Service` (provider = the business entity), `FAQPage` identical to the visible FAQ, `BreadcrumbList`. No offers, prices, ratings, reviews, phone or profiles.
+- **Only confirmed claims.** `worker/test/seo-service-pages.test.mjs` fails on prices, timelines, phone numbers, addresses, Google Ads management, recurring-report packages, ranking guarantees, award or count claims, review or rating claims, and filler marketing words, and pins the owner-confirmed statements (Cloudflare "where it suits the project", ownership "in your client agreement", Google Business Profile "where your business is eligible", "not paid advertising", "no standard turnaround", branding "determined by the scope of the project"). Change one on purpose, in the same commit as the page.
+- **Owner decisions still open (not published):** a stronger "we won't buy links or reviews" commitment, and any statement that checks Google's current rules on service-area addresses beyond the hedged wording now on the Local SEO page.
+
 ## Redirects, the 404 page and enquiry sources (SEO phase 2 groundwork)
 
 - **Permanent redirects:** `_redirects` sends each page's old addresses (`/about.html`, `/about/`, `/index.html`, `/card.html`) to the one clean address with a **301**. It lists exact pages only, never a folder (`/demos/` is a real folder; redirecting it would loop with the platform's own trailing-slash handling). `worker/test/seo-redirects.test.mjs` fails on any loop, chain, wildcard, missing target, or internal link to a redirected address. The `http` to `https` and `www` to `frameworkco.ca` redirects are Cloudflare zone settings, not part of this repository, and are changed only with the owner's approval.
