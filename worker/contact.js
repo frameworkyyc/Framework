@@ -66,9 +66,9 @@ export function validateContact(body) {
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-export function buildContactEmail(data, now = new Date()) {
+export function buildContactEmail(data, now = new Date(), host = "frameworkco.ca") {
   const a = data.attribution || {};
-  const rows = [["Name", data.name], ["Email", data.email], ["Business", data.business || "—"], ["Project type", data.project_type || "—"], ["Sent from", data.page ? "frameworkco.ca" + data.page : "frameworkco.ca/contact"], ["How they found us", describeSource(a)], ["First page they saw", a._landing ? "frameworkco.ca" + a._landing : "—"], ["Received", now.toISOString().replace("T", " ").slice(0, 16) + " UTC"]];
+  const rows = [["Name", data.name], ["Email", data.email], ["Business", data.business || "—"], ["Project type", data.project_type || "—"], ["Sent from", host + (data.page || "/contact")], ["How they found us", describeSource(a)], ["First page they saw", a._landing ? host + a._landing : "—"], ["Received", now.toISOString().replace("T", " ").slice(0, 16) + " UTC"]];
   const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n") + "\n\n" + data.message + "\n";
   const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#0a0a0a"><p><strong>New website enquiry</strong></p><table cellpadding="4" style="border-collapse:collapse">${rows
     .map(([k, v]) => `<tr><td style="color:#5c5c5c;padding-right:16px">${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table><p style="white-space:pre-wrap;border-left:3px solid #0a0a0a;padding-left:12px">${esc(data.message)}</p></div>`;
@@ -119,7 +119,7 @@ export async function handleContactSubmit(request, env, deps = {}) {
     } catch { /* a limiter fault must not block a genuine enquiry */ }
   }
 
-  const mail = buildContactEmail(data, now);
+  const mail = buildContactEmail(data, now, new URL(request.url).host); // the real host: Staging mail says staging, Production says frameworkco.ca
   // A retry of the same submission (double click, flaky network) is a harmless success at the provider: same idempotency key.
   const key = typeof body.submission_id === "string" && /^[\w-]{8,64}$/.test(body.submission_id) ? "contact-" + body.submission_id : undefined;
   const sent = await sendEmail(env, { to: notifyRecipient(env), replyTo: data.email, subject: mail.subject, text: mail.text, html: mail.html, idempotencyKey: key }, fetchImpl);
