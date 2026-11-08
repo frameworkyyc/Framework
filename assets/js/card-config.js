@@ -13,6 +13,10 @@ window.FRAMEWORK_CARD = {
   phone: "+16472153773", // international format
   email: "hello@frameworkco.ca",
 
+  // Apple Wallet. Leave "" until a real, Apple-signed pass has been built and committed (see worker/WALLET.md). The "Add to Apple
+  // Wallet" button stays hidden while this is empty. Once the pass exists, set it to "/api/card/wallet.pkpass".
+  walletUrl: "",
+
   // Full profile URLs (https://…). Leave "" to hide an icon.
   social: {
     instagram: "https://www.instagram.com/frameworkmethod",

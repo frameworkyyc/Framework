@@ -31,6 +31,7 @@ import { handleContactSubmit } from "./contact.js";
 import { handleDemoLink, handleDemoEvents } from "./demo-traffic.js";
 import { handleUnsubscribe, handleLeadsWebhook } from "./leads.js";
 import { handleCardPage } from "./card.js";
+import { WALLET_PASS_PATH, handleWalletPass } from "./card-wallet.js";
 import { handlePortal, portalNotFound } from "./portal/router.js";
 import { runScheduled } from "./portal/scheduled.js";
 
@@ -304,6 +305,8 @@ export default {
 
     // Digital business card: static page, link-preview URLs follow the host (worker/card.js).
     if (path === "/card") return handleCardPage(request, env);
+    // Apple Wallet pass for the card: a pre-signed static file, served only once it is ready (worker/card-wallet.js).
+    if (path === WALLET_PASS_PATH) return handleWalletPass(request, env);
 
     // Client portal. handlePortal answers only when PORTAL_ENABLED is exactly "1", the settings are valid and the request is on the
     // portal's own host. In every other case (Production, other hosts, portal off) each /portal path is an explicit, non-cacheable 404

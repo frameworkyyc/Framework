@@ -1,6 +1,7 @@
 /* Digital business card (/card): applies card-config.js, builds the contact file and QR code, and shares the link.
    The page's links work without this script; it adds Save Contact, Share and the QR code. Nothing here sends data
-   anywhere: no analytics, no cookies, no storage. */
+   anywhere: no analytics, no cookies, no storage. (The only extra request is the Apple Wallet readiness check below, to this site's own pass
+   address, and only when the Wallet button is configured.) */
 (function () {
   "use strict";
   var cfg = window.FRAMEWORK_CARD || {};
@@ -142,6 +143,25 @@
     var r = dialog.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeQr();
   });
+
+  /* ------------------------------------------------------------------ Add to Apple Wallet
+     Shown only when ALL of these hold, so nobody ever sees a button that does not work: a pass address is configured, this is an Apple
+     phone or tablet, Apple's badge image loaded, and the site's own pass address answers with a real pass file. */
+  var walletUrl = text(cfg.walletUrl);
+  var isApple = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  if (/^\/(?!\/)[^\s]*$/.test(walletUrl) && isApple) {
+    var badge = $("add-wallet-badge");
+    badge.addEventListener("load", function () {
+      fetch(walletUrl, { method: "HEAD", credentials: "omit" }).then(function (res) {
+        if (res.ok && /application\/vnd\.apple\.pkpass/i.test(res.headers.get("Content-Type") || "")) {
+          $("add-wallet").href = walletUrl;
+          $("add-wallet").hidden = false;
+          $("apple-credit").hidden = false;
+        }
+      }).catch(function () { /* stay hidden */ });
+    });
+    badge.src = "assets/img/wallet/add-to-apple-wallet.svg";
+  }
 
   /* ------------------------------------------------------------------ reveal the features that need this script */
   $("save-contact").hidden = false;

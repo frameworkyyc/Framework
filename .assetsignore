@@ -14,3 +14,11 @@ worker/
 migrations/
 PRIVACY-OPERATIONS.md
 scripts/
+wallet-secrets/
+*.p12
+*.pfx
+*.p8
+*.key
+*.pem
+*.cer
+*.certSigningRequest

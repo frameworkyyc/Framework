@@ -1,3 +1,13 @@
 .wrangler/
 .dev.vars
 node_modules/
+
+# Apple Wallet signing material must never be committed (keep it in a private folder outside the repo; see worker/WALLET.md)
+wallet-secrets/
+*.p12
+*.pfx
+*.p8
+*.key
+*.pem
+*.cer
+*.certSigningRequest
