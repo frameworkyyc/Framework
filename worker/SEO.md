@@ -13,6 +13,12 @@ Phase 1 (Staging) of the plan to make frameworkco.ca visible for contractor webs
 - **Analytics (Google Analytics 4):** built, consent-first, and **off** until you add a Measurement ID. See below.
 - **Privacy policy:** updated (effective date shown as November 6, 2026) for the contact form and Google Analytics. **Review it before it goes to Production.**
 
+## Redirects, the 404 page and enquiry sources (SEO phase 2 groundwork)
+
+- **Permanent redirects:** `_redirects` sends each page's old addresses (`/about.html`, `/about/`, `/index.html`, `/card.html`) to the one clean address with a **301**. It lists exact pages only, never a folder (`/demos/` is a real folder; redirecting it would loop with the platform's own trailing-slash handling). `worker/test/seo-redirects.test.mjs` fails on any loop, chain, wildcard, missing target, or internal link to a redirected address. The `http` to `https` and `www` to `frameworkco.ca` redirects are Cloudflare zone settings, not part of this repository, and are changed only with the owner's approval.
+- **404 page:** `assets.not_found_handling: "404-page"` in `wrangler.jsonc` makes any missing page answer status 404 with `404.html` (branded, `noindex`, `<base href="/">` so it works at any depth). `/api/*` and the Worker's own routes keep their JSON 404s.
+- **Where an enquiry came from:** `assets/js/main.js` keeps the visit's campaign tags, first page and referring site (origin only) in this tab's sessionStorage (`fw_attribution`, the assessment form's key and shape). The contact form sends it with the message and `worker/contact.js` adds "How they found us" and "First page they saw" to the email. Nothing new is stored, nothing goes to analytics. The privacy policy and `PRIVACY-OPERATIONS.md` describe it.
+
 ## You: Google Search Console (about 10 minutes)
 
 1. Open https://search.google.com/search-console and add a **Domain** property for `frameworkco.ca`.

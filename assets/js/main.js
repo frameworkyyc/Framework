@@ -1,4 +1,23 @@
 /* FRAMEWORK — site scripts */
+
+/* ---- How this visit began (campaign, landing page, referring site) ----
+   Kept in sessionStorage only (cleared when the tab closes) under the same key and shape the assessment form uses, and sent to Framework only if the
+   visitor submits the contact or assessment form, so an enquiry can be traced to where it came from. No cookie, nothing sent from here. */
+(function () {
+  "use strict";
+  var KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
+  try {
+    var saved = JSON.parse(window.sessionStorage.getItem("fw_attribution") || "{}") || {};
+    var params = new URLSearchParams(window.location.search), found = false;
+    KEYS.forEach(function (k) { var v = params.get(k); if (v) { saved[k] = v.slice(0, 150); found = true; } });
+    var ref = "";
+    try { ref = document.referrer ? new URL(document.referrer).origin : ""; } catch (e) { ref = ""; }
+    if (!saved._landing) saved._landing = (window.location.pathname + window.location.search).slice(0, 200);
+    if (!saved._referrer && ref && ref !== window.location.origin) saved._referrer = ref;
+    if (found || !window.sessionStorage.getItem("fw_attribution")) window.sessionStorage.setItem("fw_attribution", JSON.stringify(saved));
+  } catch (e) { /* storage blocked (private mode): the enquiry simply carries no source */ }
+})();
+
 (function () {
   "use strict";
 
@@ -40,6 +59,7 @@
      Validates required fields, then sends the message through /api/contact (worker/contact.js). If sending fails the visitor is told so and given the email address. */
   var form = document.getElementById("contact-form");
   if (!form) return;
+  var attribution = function () { try { return JSON.parse(window.sessionStorage.getItem("fw_attribution") || "{}") || {}; } catch (e) { return {}; } };
 
   /* Arriving from a demo website ("Make it yours"): pre-fill the business name and say which demo they liked. */
   (function () {
@@ -134,7 +154,7 @@
     window.fetch("/api/contact", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: val("name"), email: val("email"), business: val("business"), project_type: val("project_type"), message: val("message"),
-        hp: form.elements.hp ? form.elements.hp.value : "", turnstile_token: turnstileToken, elapsed_ms: Date.now() - loadedAt, submission_id: submissionId, page: window.location.pathname, journey: demoJourney() })
+        hp: form.elements.hp ? form.elements.hp.value : "", turnstile_token: turnstileToken, elapsed_ms: Date.now() - loadedAt, submission_id: submissionId, page: window.location.pathname, journey: demoJourney(), attribution: attribution() })
     }).then(function (r) {
       if (!r.ok) throw new Error("status " + r.status);
       form.hidden = true; success.hidden = false; success.focus();
