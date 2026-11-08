@@ -166,7 +166,7 @@ test("internal privacy operations file exists and is never served publicly", () 
 
 test("policy: client feedback retention, record types and deletion disclosure", () => {
   assert.match(policyText, /Client feedback: up to 24 months after our last meaningful interaction with the client/);
-  for (const phrase of ["authorized us to publish", "ongoing client relationship", "contractual or legal requirement", "Published testimonials", "Other business records", "Assessment inquiries and related prospect information"]) {
+  for (const phrase of ["authorized us to publish", "ongoing client relationship", "contractual or legal requirement", "Published testimonials", "Other business records", "Assessment inquiries, contact-form messages and related prospect information"]) {
     assert.ok(policyText.includes(phrase), phrase);
   }
   assert.match(policyText, /remove that record from our main database/);
