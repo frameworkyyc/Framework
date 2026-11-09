@@ -11,7 +11,7 @@ Phase 1 (Staging) of the plan to make frameworkco.ca visible for contractor webs
 - **Sitemap:** `sitemap.xml` lists the nine indexable pages by canonical address. Rebuild it with `node scripts/seo/update-sitemap.mjs` (dates come from git; a page with uncommitted changes gets today's date). `--check` fails if the list is out of date. Private pages (`/me`, `/card`, `/client-feedback`, `/portal`, `/admin`, `/demos`) are never listed and keep their `noindex`.
 - **Contact form:** now sends through the website (`POST /api/contact`, `worker/contact.js`) instead of opening the visitor's email program. It reuses the assessment form's email settings and spam protections (honeypot, minimum fill time, Cloudflare Turnstile when configured, the platform rate limiter). It stores nothing; the message arrives as an email to `ASSESSMENT_NOTIFY_TO` with the visitor as Reply-To. The visitor sees "Message sent" only when the email provider accepted it; otherwise the form stays filled and offers the email address.
 - **Analytics (Google Analytics 4):** built, consent-first, and **off** until you add a Measurement ID. See below.
-- **Privacy policy:** updated (effective date November 8, 2026) for the contact form and Google Analytics. **Review it before it goes to Production.**
+- **Privacy policy:** updated (effective date November 9, 2026) for the contact form and Google Analytics. **Review it before it goes to Production.**
 
 ## Staging and preview copies are noindex
 
