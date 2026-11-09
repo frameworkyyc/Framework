@@ -1,0 +1,69 @@
+/* Nexus by Framework: the /nexus showcase page. Same monochrome, ruled, sharp-cornered system as the rest of the site;
+   darker surfaces, a drawn four-tier diagram and status chips give the product its own character. Loaded on /nexus only. */
+.nx-hero { padding: clamp(72px, 10vw, 128px) 0 clamp(56px, 7vw, 96px); }
+.nx-hero .display { max-width: 13em; }
+.nx-hero .display span { color: #8e8e8e; display: block; }
+.nx-hero .lead { color: #d0d0d0; margin-top: 28px; }
+.nx-hero__tag { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.nx-shot { margin: clamp(48px, 6vw, 80px) 0 0; }
+.nx-shot .frame { display: block; border: 1px solid rgba(255, 255, 255, .4); background: #111; }
+.nx-shot img { display: block; width: 100%; height: auto; }
+.nx-shot figcaption, .nx-cap { margin-top: 10px; font-size: 12px; color: var(--stone); }
+.nx-light .nx-cap, .nx-light .nx-shot figcaption { color: var(--slate); }
+.nx-light .nx-shot .frame { border-color: var(--ink); }
+
+.nx-points { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(20px, 3vw, 40px); margin-top: 40px; }
+.nx-point { border-top: 1px solid var(--ink); padding-top: 18px; }
+.nx-point h3 { margin-bottom: 8px; }
+.nx-point p { color: var(--slate); margin: 0; }
+@media (max-width: 860px) { .nx-points { grid-template-columns: 1fr; } }
+
+.nx-tiers { display: grid; grid-template-columns: repeat(4, 1fr); margin: 40px 0 0; padding: 0; list-style: none; border: 1px solid var(--ink); background: var(--paper); }
+.nx-tiers li { padding: 22px 20px 24px; border-right: 1px solid var(--ink); counter-increment: tier; }
+.nx-tiers li:last-child { border-right: 0; }
+.nx-tiers .index { display: block; margin-bottom: 36px; }
+.nx-tiers strong { display: block; font-family: var(--font-display); font-size: 22px; letter-spacing: -.01em; margin-bottom: 6px; }
+.nx-tiers span:not(.index) { color: var(--slate); font-size: 15px; }
+@media (max-width: 860px) {
+  .nx-tiers { grid-template-columns: 1fr 1fr; }
+  .nx-tiers li:nth-child(2) { border-right: 0; }
+  .nx-tiers li:nth-child(-n+2) { border-bottom: 1px solid var(--ink); }
+  .nx-tiers .index { margin-bottom: 20px; }
+}
+@media (max-width: 480px) {
+  .nx-tiers { grid-template-columns: 1fr; }
+  .nx-tiers li { border-right: 0; border-bottom: 1px solid var(--ink); }
+  .nx-tiers li:last-child { border-bottom: 0; }
+}
+
+.nx-principle .display { max-width: 9em; }
+.nx-principle .lead { color: #d0d0d0; margin-top: 24px; }
+
+.nx-ledger { margin-top: 32px; }
+.nx-ledger h3 { display: flex; align-items: center; gap: 12px; margin: 40px 0 0; padding-bottom: 14px; border-bottom: 1px solid var(--ink); font-size: 22px; }
+.nx-ledger h3:first-child { margin-top: 0; }
+.nx-ledger ul { margin: 0; padding: 0; list-style: none; }
+.nx-ledger li { padding: 14px 0; border-bottom: 1px solid var(--hairline); }
+.nx-ledger li span { display: block; color: var(--slate); font-size: 15px; margin-top: 2px; }
+.nx-note { margin-top: 24px; font-size: 14px; color: var(--slate); max-width: 48em; }
+
+.nx-screens { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(20px, 3vw, 40px); margin-top: 40px; }
+.nx-screens figure { margin: 0; }
+.nx-screens img { display: block; width: 100%; height: auto; border: 1px solid var(--ink); background: #111; }
+.nx-phones { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(16px, 3vw, 32px); margin: clamp(32px, 4vw, 56px) auto 0; max-width: 760px; }
+.nx-phones figure { margin: 0; }
+.nx-phones img { display: block; width: 100%; height: auto; border: 1px solid var(--ink); }
+.nx-screens figcaption, .nx-phones figcaption { margin-top: 8px; font-size: 13px; color: var(--slate); }
+@media (max-width: 760px) { .nx-screens { grid-template-columns: 1fr; } }
+
+.nx-who { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--ink); }
+.nx-who li { padding: 16px 0; border-bottom: 1px solid var(--hairline); font-size: 18px; }
+
+.nx-faq { border-top: 1px solid var(--ink); margin-top: 32px; }
+.nx-faq details { border-bottom: 1px solid var(--hairline); }
+.nx-faq summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 0; cursor: pointer; font-family: var(--font-display); font-weight: 600; font-size: 20px; list-style: none; }
+.nx-faq summary::-webkit-details-marker { display: none; }
+.nx-faq summary::after { content: "+"; font-size: 24px; line-height: 1; }
+.nx-faq details[open] summary::after { content: "\2212"; }
+.nx-faq summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.nx-faq p { margin: 0 0 22px; color: var(--slate); max-width: 44em; }

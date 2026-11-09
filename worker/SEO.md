@@ -78,3 +78,10 @@ Claim or create the profile (category "Website designer" or "Web designer"; mark
 ## Checks that keep this honest
 
 `worker/test/seo.test.mjs` (titles, descriptions, canonicals, JSON-LD, sitemap, links, no prices or fake proof), `worker/test/contact.test.mjs` (the contact endpoint), and the Google Analytics guard in `worker/test/privacy.test.mjs` (off by default, consent first, no cookies of ours, no form contents).
+
+## Site structure after the redesign (Staging)
+- Navigation: Services (dropdown: Website Design & Development, SEO & Digital Marketing, Branding & Identity, Business Systems & Automation, Websites for Contractors), Work (`/portfolio`), Nexus (`/nexus`), About, Contact. `/method` stays live and is linked from Home, Services and About, not from the bar.
+- All URLs that existed stay as they were; `/business-systems` and `/nexus` are new and are in the sitemap (14 pages). `/local-seo` keeps its URL and indexed content; its menu label is "SEO & Digital Marketing".
+- Home and Branding titles are broadened to businesses in every industry; `/contractor-websites`, `/local-seo` and `/website-design` keep their contractor-focused wording.
+- `/nexus` carries no pricing, dates, customers or demo link. Feature labels (Available / Preview / Planned) come from the Nexus content ledger (`frameworkyyc/nexus-site`, `docs/CONTENT-ACCURACY.md`) and must be re-checked before release. Screenshots in `assets/img/nexus/` are demonstration data.
+- The homepage revenue band is unchanged: the figure is the rounded-down sum of `client_revenue` (see `worker/revenue.js`); nothing is hard-coded.

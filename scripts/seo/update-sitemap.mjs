@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 export const PUBLIC_PAGES = [
   ["/", "index.html"], ["/about", "about.html"], ["/services", "services.html"], ["/website-design", "website-design.html"], ["/local-seo", "local-seo.html"], ["/branding", "branding.html"], ["/contractor-websites", "contractor-websites.html"], ["/method", "method.html"],
-  ["/portfolio", "portfolio.html"], ["/contact", "contact.html"], ["/assessment", "assessment.html"], ["/privacy", "privacy.html"],
+  ["/business-systems", "business-systems.html"], ["/nexus", "nexus.html"], ["/portfolio", "portfolio.html"], ["/contact", "contact.html"], ["/assessment", "assessment.html"], ["/privacy", "privacy.html"],
 ];
 const SITE = "https://frameworkco.ca";
 const root = new URL("../../", import.meta.url);

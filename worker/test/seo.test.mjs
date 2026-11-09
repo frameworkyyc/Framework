@@ -84,6 +84,7 @@ test("the free assessment is linked from every public page, in the footer and in
   for (const [, file] of PUBLIC_PAGES.filter(([r]) => !["/assessment", "/privacy"].includes(r))) {
     const h = read(file);
     assert.match(h, /<a href="\/assessment" data-track="assessment_cta" data-track-location="footer">Free Assessment<\/a>/, file + " footer link");
+    if (file === "nexus.html") continue; // the product page carries the footer link; its call to action is the contact form
     assert.ok(/href="\/assessment"[^>]*data-track="assessment_cta"|data-track="assessment_cta"[^>]*href="\/assessment"/.test(strip(h)) && (h.match(/href="\/assessment"/g) || []).length >= 2, file + " has a prompt as well as the footer link");
   }
   assert.match(read("index.html"), /href="\/contractor-websites"/); // the home page links to the contractor page
@@ -110,7 +111,7 @@ test("the contractor page: Calgary first, Alberta and Canada too, honest about s
   assert.deepEqual(svc.areaServed.map((a) => a.name), ["Calgary", "Airdrie", "Cochrane", "Okotoks", "Chestermere", "Alberta", "Canada"]);
   assert.ok(!/image|style="/.test(h.split("<main")[1].split("</main>")[0].match(/style="[^"]*"/g)?.join("") || ""), "no inline styles");
   assert.match(h, /href="\/contact" data-track="contact_cta"/); assert.match(h, /href="\/assessment" data-track="assessment_cta"/);
-  assert.match(h, /<a class="nav__link" href="\/contractor-websites" aria-current="page">Contractors<\/a>/);
+  assert.match(h, /<a class="nav__link nav__link--section" href="\/services">Services<\/a>/); assert.match(h, /<li><a href="\/contractor-websites" aria-current="page">Websites for Contractors<\/a><\/li>/);
 });
 
 test("the public pages use no external script except the fonts, and analytics scripts load on every page", () => {

@@ -53,12 +53,21 @@
     <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
     <nav class="nav" id="site-nav" aria-label="Main">
       <ul class="nav__list">
-        <li><a class="nav__link" href="/">Home</a></li>
+        <li class="nav__item nav__item--menu">
+          <a class="nav__link" href="/services">Services</a>
+          <button class="nav__caret" type="button" aria-expanded="false" aria-controls="nav-services" aria-label="Services menu"></button>
+          <ul class="nav__menu" id="nav-services">
+            <li><a href="/services">All services</a></li>
+            <li><a href="/website-design">Website Design &amp; Development</a></li>
+            <li><a href="/local-seo">SEO &amp; Digital Marketing</a></li>
+            <li><a href="/branding">Branding &amp; Identity</a></li>
+            <li><a href="/business-systems">Business Systems &amp; Automation</a></li>
+            <li><a href="/contractor-websites">Websites for Contractors</a></li>
+          </ul>
+        </li>
+        <li><a class="nav__link" href="/portfolio">Work</a></li>
+        <li><a class="nav__link" href="/nexus">Nexus</a></li>
         <li><a class="nav__link" href="/about">About</a></li>
-        <li><a class="nav__link" href="/services">Services</a></li>
-        <li><a class="nav__link" href="/contractor-websites">Contractors</a></li>
-        <li><a class="nav__link" href="/method">The Method</a></li>
-        <li><a class="nav__link" href="/portfolio">Portfolio</a></li>
         <li><a class="nav__link" href="/contact" aria-current="page">Contact</a></li>
       </ul>
       <a class="nav__login" href="/portal">Client Login</a>
@@ -134,9 +143,6 @@
           <li><span class="index">02</span><div><strong>We schedule a call</strong><p>A short conversation to understand your goals.</p></div></li>
           <li><span class="index">03</span><div><strong>We begin with Discover</strong><p>The first stage of the Framework Method.</p></div></li>
         </ol>
-        <figure class="contact__image">
-          <img src="assets/img/brand-we-are-builders.jpg" alt="The Framework F mark over a steel structure at dusk, with the words We are builders" loading="lazy" width="941" height="1176">
-        </figure>
       </aside>
     </div>
   </section>
@@ -156,7 +162,8 @@
         <ul>
           <li><a href="/about">About</a></li>
           <li><a href="/method">The Method</a></li>
-          <li><a href="/portfolio">Portfolio</a></li>
+          <li><a href="/portfolio">Work</a></li>
+          <li><a href="/nexus">Nexus</a></li>
           <li><a href="/assessment" data-track="assessment_cta" data-track-location="footer">Free Assessment</a></li>
           <li><a href="/contact">Contact</a></li>
           <li><a href="/privacy">Privacy Policy</a></li>
@@ -165,12 +172,11 @@
       <div>
         <h4>Services</h4>
         <ul>
-          <li><a href="/services#strategy">Strategy</a></li>
-          <li><a href="/branding">Branding</a></li>
-          <li><a href="/website-design">Website Design</a></li>
-          <li><a href="/local-seo">Local SEO</a></li>
-          <li><a href="/contractor-websites">Contractor Websites</a></li>
-          <li><a href="/services#systems">Business Systems</a></li>
+          <li><a href="/website-design">Website Design &amp; Development</a></li>
+          <li><a href="/local-seo">SEO &amp; Digital Marketing</a></li>
+          <li><a href="/branding">Branding &amp; Identity</a></li>
+          <li><a href="/business-systems">Business Systems &amp; Automation</a></li>
+          <li><a href="/contractor-websites">Websites for Contractors</a></li>
         </ul>
       </div>
       <div>
