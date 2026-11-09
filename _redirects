@@ -1,0 +1,27 @@
+# Permanent (301) redirects from old or duplicate addresses to the one canonical, extensionless address of each page.
+# Cloudflare Workers static assets read this file. The hosts (www, http) are handled in Cloudflare, not here.
+# Only explicit pages are listed: never a directory (for example /demos/ is a real folder and must keep its trailing slash, or it would loop).
+/index.html / 301
+/about.html /about 301
+/assessment.html /assessment 301
+/contact.html /contact 301
+/contractor-websites.html /contractor-websites 301
+/method.html /method 301
+/portfolio.html /portfolio 301
+/privacy.html /privacy 301
+/services.html /services 301
+/website-design.html /website-design 301
+/local-seo.html /local-seo 301
+/branding.html /branding 301
+/card.html /card 301
+/about/ /about 301
+/assessment/ /assessment 301
+/contact/ /contact 301
+/contractor-websites/ /contractor-websites 301
+/method/ /method 301
+/portfolio/ /portfolio 301
+/privacy/ /privacy 301
+/services/ /services 301
+/website-design/ /website-design 301
+/local-seo/ /local-seo 301
+/branding/ /branding 301

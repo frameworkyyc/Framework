@@ -26,6 +26,7 @@ admin/                  Framework Admin front end (static app served only after 
 migrations/             Reference SQL for the feedback table (the Worker also creates it)
 wrangler.jsonc          Cloudflare config (static assets, Worker, D1 database)
 _headers                Security headers for the feedback page
+_redirects              Permanent (301) redirects from old .html and trailing-slash addresses to the clean ones
 assets/img/             Logo, favicons, social share image, photos
 CNAME               Custom domain for GitHub Pages
 sitemap.xml, robots.txt

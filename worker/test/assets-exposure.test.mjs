@@ -10,9 +10,10 @@ const root = new URL("../../", import.meta.url);
 
 // ---- the reviewed public surface (change these on purpose, in a reviewed commit) ----
 const APPROVED_ROOT_FILES = [
-  "404.html", "_headers", "about.html", "assessment.html", "card.html", "client-feedback.html", "contact.html", "contractor-websites.html",
-  "index.html", "me.html", "method.html", "portfolio.html", "privacy.html", "robots.txt", "services.html", "sitemap.xml",
+  "404.html", "_headers", "_redirects", "about.html", "assessment.html", "branding.html", "card.html", "client-feedback.html", "contact.html", "contractor-websites.html",
+  "index.html", "local-seo.html", "me.html", "method.html", "portfolio.html", "privacy.html", "robots.txt", "services.html", "sitemap.xml", "website-design.html",
 ];
+// _redirects is Cloudflare configuration like _headers: the platform reads it and does not serve it (checked: /_headers and /_redirects answer 404).
 const APPROVED_ROOT_DIRS = ["admin", "assets", "demos"]; // demos/: public sample websites for outreach (static HTML, CSS, JS only)
 const APPROVED_EXTENSIONS = ["webp", "css", "html", "jpg", "js", "png", "svg"]; // inside admin/ and assets/
 const MUST_STAY_IGNORED = [

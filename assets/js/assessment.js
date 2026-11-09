@@ -17,32 +17,21 @@
   var successBox = $("as-success");
   var turnstileBox = $("as-turnstile");
 
-  // Only sessionStorage is used here (campaign details for this visit). The advertising-measurement choice is handled
-  // entirely by consent.js.
-  var store = {
-    sget: function (k) { try { return window.sessionStorage.getItem(k); } catch (e) { return null; } },
-    sset: function (k, v) { try { window.sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } }
-  };
-
-  /* ---------------------------------------------------------------- campaign attribution */
+  /* ---------------------------------------------------------------- campaign attribution
+     Written once per visit by main.js (local storage "fw_visit", shared by tabs, discarded after 30 minutes idle); this form only READS it when
+     submitted. It stays empty for browsers that send Global Privacy Control or Do Not Track. The advertising-measurement choice is handled entirely by consent.js. */
 
   var TRACKING_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "fbclid", "gclid"];
-  var attribution = (function () {
-    var saved = {};
-    try { saved = JSON.parse(store.sget("fw_attribution") || "{}") || {}; } catch (e) { saved = {}; }
-    var params = new URLSearchParams(window.location.search);
-    var found = false;
-    TRACKING_KEYS.forEach(function (k) {
-      var v = params.get(k);
-      if (v) { saved[k] = v.slice(0, 150); found = true; }
-    });
-    var ref = "";
-    try { ref = document.referrer ? new URL(document.referrer).origin : ""; } catch (e) { ref = ""; }
-    if (!saved._landing) { saved._landing = (window.location.pathname + window.location.search).slice(0, 200); }
-    if (!saved._referrer && ref && ref !== window.location.origin) { saved._referrer = ref; }
-    if (found || !store.sget("fw_attribution")) store.sset("fw_attribution", JSON.stringify(saved));
-    return saved;
-  })();
+  var readAttribution = function () {
+    if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1" || window.doNotTrack === "1") return {};
+    var st = [], rec = {};
+    try { st.push(window.localStorage); } catch (e) { /* blocked */ }
+    try { st.push(window.sessionStorage); } catch (e) { /* blocked */ }
+    for (var i = 0; i < st.length; i++) {
+      try { var v = JSON.parse(st[i].getItem("fw_visit") || "null"); if (v && typeof v === "object") { rec = v; break; } } catch (e) { /* next */ }
+    }
+    return Date.now() - (Number(rec._seen) || 0) <= 30 * 60 * 1000 ? rec : {};
+  };
 
   /* ---------------------------------------------------------------- validation (mirrors the server) */
 
@@ -296,6 +285,7 @@
       return;
     }
 
+    var attribution = readAttribution();
     var payload = {
       business_name: value("business_name"),
       website: value("website"),

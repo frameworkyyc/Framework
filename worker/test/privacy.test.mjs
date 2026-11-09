@@ -21,7 +21,7 @@ const policyText = text(policy);
 const portalExpected = portalPolicyAssertionsApply(policy);
 
 test("every public page has a Privacy Policy link in its footer", () => {
-  assert.deepEqual(PAGES.sort(), ["404.html", "about.html", "assessment.html", "card.html", "client-feedback.html", "contact.html", "contractor-websites.html", "index.html", "method.html", "portfolio.html", "privacy.html", "services.html"]);
+  assert.deepEqual(PAGES.sort(), ["404.html", "about.html", "assessment.html", "branding.html", "card.html", "client-feedback.html", "contact.html", "contractor-websites.html", "index.html", "local-seo.html", "method.html", "portfolio.html", "privacy.html", "services.html", "website-design.html"]);
   for (const page of PAGES) {
     // the business card has no site footer: it carries a single compact privacy link instead
     const footer = read(page).split(page === "card.html" ? '<footer class="card__foot">' : '<footer class="site-footer">')[1] || "";
@@ -101,7 +101,16 @@ test("no cookies are set by site code, and localStorage is touched only by the c
   for (const f of readdirSync(new URL("assets/js/", root)).filter((n) => n.endsWith(".js"))) {
     const js = read("assets/js/" + f);
     assert.ok(!/document\.cookie/.test(js), f + " must not set cookies");
-    if (!["consent.js", "analytics.js"].includes(f)) assert.ok(!/localStorage/.test(js), f + " must not use localStorage");
+    if (!["consent.js", "analytics.js", "main.js", "assessment.js"].includes(f)) assert.ok(!/localStorage/.test(js), f + " must not use localStorage");
+  }
+  // Deliberate exception (visit record, disclosed in the privacy policy): main.js writes and assessment.js reads ONE local-storage record, "fw_visit"
+  // (discarded after 30 minutes idle). No other key, and no other site script, may use local storage.
+  for (const f of ["main.js", "assessment.js"]) {
+    const js = read("assets/js/" + f);
+    if (!/localStorage/.test(js)) continue;
+    const keys = new Set([...js.matchAll(/\.(?:getItem|setItem|removeItem)\("([^"]+)"/g)].map((m) => m[1]));
+    for (const k of keys) assert.ok(["fw_visit", "fw_attribution", "fw_demo", "fw_dj"].includes(k), f + " uses an unreviewed storage key: " + k);
+    assert.ok(keys.has("fw_visit"), f);
   }
   const w = read("worker/index.js") + read("worker/assessment.js") + read("worker/shared.js");
   assert.ok(!/Set-Cookie/i.test(w), "the Worker sets no cookies");
@@ -166,7 +175,7 @@ test("internal privacy operations file exists and is never served publicly", () 
 
 test("policy: client feedback retention, record types and deletion disclosure", () => {
   assert.match(policyText, /Client feedback: up to 24 months after our last meaningful interaction with the client/);
-  for (const phrase of ["authorized us to publish", "ongoing client relationship", "contractual or legal requirement", "Published testimonials", "Other business records", "Assessment inquiries and related prospect information"]) {
+  for (const phrase of ["authorized us to publish", "ongoing client relationship", "contractual or legal requirement", "Published testimonials", "Other business records", "Assessment inquiries, contact-form messages and related prospect information"]) {
     assert.ok(policyText.includes(phrase), phrase);
   }
   assert.match(policyText, /remove that record from our main database/);

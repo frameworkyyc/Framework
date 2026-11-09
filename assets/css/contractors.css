@@ -138,9 +138,15 @@ a:hover > .cx-arrow::after, .cx-arrow:hover::after { transform: translateX(5px);
 .cx-where__drawing { width: 100%; max-width: 520px; margin: 0; justify-self: center; }
 .cx-js .cx-where__drawing:not(.is-in) * { animation-play-state: paused; }
 .cx-places { margin-top: clamp(28px, 4vw, 48px); border-top: 1px solid rgba(255,255,255,0.25); }
-.cx-places li { display: grid; grid-template-columns: minmax(0, 9em) 1fr; gap: 20px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,0.25); }
+.cx-places li { display: grid; grid-template-columns: minmax(0, 16em) 1fr; gap: 20px; align-items: baseline; padding: 18px 0; border-bottom: 1px solid rgba(255,255,255,0.25); }
 .cx-places strong { font-family: var(--font-display); font-size: clamp(24px, 3vw, 38px); letter-spacing: -0.02em; }
 .cx-places span { color: #D4D4D4; }
+.cx-places + .muted { margin-top: 28px; color: #D4D4D4; }
+/* Communities served: a plain line of names, nothing else */
+.cx-area { display: flex; flex-wrap: wrap; gap: 6px clamp(20px, 3.4vw, 52px); margin-top: clamp(28px, 4vw, 48px); padding: clamp(20px, 3vw, 32px) 0; border-top: 1px solid rgba(255,255,255,0.25); border-bottom: 1px solid rgba(255,255,255,0.25); font-family: var(--font-display); font-weight: 600; font-size: clamp(26px, 4vw, 52px); letter-spacing: -0.02em; line-height: 1.15; }
+.cx-area + .muted { margin-top: 28px; color: #D4D4D4; }
+.cx-proof { align-self: center; }
+.cx-proof .muted { margin: 20px 0 16px; max-width: 34em; }
 
 /* ---------- FAQ ---------- */
 

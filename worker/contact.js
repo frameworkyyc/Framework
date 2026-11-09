@@ -24,12 +24,49 @@ const clean = (v, max, multiline = false) => {
   return (multiline ? s.replace(/[ \t]+\n/g, "\n") : s.replace(/\s+/g, " ")).trim().slice(0, max);
 };
 
+// Where the visit began (sent by the page from sessionStorage "fw_attribution"; see assets/js/main.js). Only these keys, short, control characters out.
+const ATTRIBUTION_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content", "gclid", "fbclid", "_landing", "_referrer", "_campaign_landing", "_campaign_referrer"];
+const PATH_KEYS = new Set(["_landing", "_campaign_landing"]);
+export function cleanAttribution(a) {
+  const out = {};
+  if (!a || typeof a !== "object" || Array.isArray(a)) return out;
+  for (const k of ATTRIBUTION_KEYS) {
+    let v = typeof a[k] === "string" ? clean(a[k], PATH_KEYS.has(k) ? 200 : 150) : "";
+    if (PATH_KEYS.has(k)) v = v.split(/[?#]/)[0]; // a page path never carries a query string, even from an older or altered page script
+    if (v) out[k] = v;
+  }
+  return out;
+}
+
+const SEARCH_ENGINE = /(^|\.)(google|bing|duckduckgo|yahoo|ecosia|brave|startpage|yandex|baidu|qwant)\./i;
+const hostOf = (origin) => { try { return origin ? new URL(origin).hostname.replace(/^www\./, "") : ""; } catch { return ""; } };
+
+// How the ORIGINAL visit in this tab began, from its referring site only (campaign tags are described separately).
+export function describeSource(a) {
+  const host = hostOf(a._referrer);
+  if (host && SEARCH_ENGINE.test(host)) return "Search engine (" + host + "), organic unless it was an ad";
+  if (host) return "Link from " + host;
+  return "Direct visit or unknown (no referring site recorded)";
+}
+
+// The latest campaign link followed in this tab, with the page it landed on. "None" when there was no campaign tag.
+export function describeCampaign(a, host = "frameworkco.ca") {
+  let what = "";
+  if (a.utm_source || a.utm_medium || a.utm_campaign) what = [a.utm_source, a.utm_medium, a.utm_campaign].filter(Boolean).join(" / ");
+  else if (a.gclid) what = "Google Ads click";
+  else if (a.fbclid) what = "Facebook or Instagram link";
+  if (!what) return "None";
+  const via = hostOf(a._campaign_referrer);
+  return what + (a._campaign_landing ? " (landed on " + host + a._campaign_landing + (via ? ", from " + via : "") + ")" : "");
+}
+
 export function validateContact(body) {
   const b = body && typeof body === "object" ? body : {};
   const data = {
     name: clean(b.name, LIMITS.name), email: clean(b.email, 254).toLowerCase(), business: clean(b.business, LIMITS.business),
     project_type: clean(b.project_type, LIMITS.project_type), message: clean(b.message, LIMITS.message, true),
     page: clean(b.page, 100).replace(/[^\w\-/.]/g, ""),
+    attribution: cleanAttribution(b.attribution),
   };
   const errors = {};
   if (!data.name) errors.name = "required";
@@ -40,8 +77,9 @@ export function validateContact(body) {
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-export function buildContactEmail(data, now = new Date()) {
-  const rows = [["Name", data.name], ["Email", data.email], ["Business", data.business || "—"], ["Project type", data.project_type || "—"], ["Sent from", data.page ? "frameworkco.ca" + data.page : "frameworkco.ca/contact"], ["Received", now.toISOString().replace("T", " ").slice(0, 16) + " UTC"]];
+export function buildContactEmail(data, now = new Date(), host = "frameworkco.ca") {
+  const a = data.attribution || {};
+  const rows = [["Name", data.name], ["Email", data.email], ["Business", data.business || "—"], ["Project type", data.project_type || "—"], ["Sent from", host + (data.page || "/contact")], ["How they found us", describeSource(a)], ["First page they saw", a._landing ? host + a._landing : "—"], ["Latest campaign", describeCampaign(a, host)], ["Received", now.toISOString().replace("T", " ").slice(0, 16) + " UTC"]];
   const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n") + "\n\n" + data.message + "\n";
   const html = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.5;color:#0a0a0a"><p><strong>New website enquiry</strong></p><table cellpadding="4" style="border-collapse:collapse">${rows
     .map(([k, v]) => `<tr><td style="color:#5c5c5c;padding-right:16px">${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table><p style="white-space:pre-wrap;border-left:3px solid #0a0a0a;padding-left:12px">${esc(data.message)}</p></div>`;
@@ -92,7 +130,7 @@ export async function handleContactSubmit(request, env, deps = {}) {
     } catch { /* a limiter fault must not block a genuine enquiry */ }
   }
 
-  const mail = buildContactEmail(data, now);
+  const mail = buildContactEmail(data, now, new URL(request.url).host); // the real host: Staging mail says staging, Production says frameworkco.ca
   // A retry of the same submission (double click, flaky network) is a harmless success at the provider: same idempotency key.
   const key = typeof body.submission_id === "string" && /^[\w-]{8,64}$/.test(body.submission_id) ? "contact-" + body.submission_id : undefined;
   const sent = await sendEmail(env, { to: notifyRecipient(env), replyTo: data.email, subject: mail.subject, text: mail.text, html: mail.html, idempotencyKey: key }, fetchImpl);
