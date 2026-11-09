@@ -1645,8 +1645,9 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 /* Specialization band */
 .special { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(32px, 6vw, 88px); align-items: center; }
 .special .lead { margin-top: 20px; }
-.special__caption { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--slate); }
-.special__media { display: grid; grid-template-columns: 2.2fr 1fr; gap: 16px; align-items: start; max-height: 520px; overflow: hidden; }
+.special__caption { margin: 10px 0 0; font-size: 13px; color: var(--slate); }
+.special__media { position: relative; }
+.special__badge { position: absolute; left: 0; bottom: 0; padding: 8px 12px; background: var(--ink); color: var(--paper); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
 .special__media img { width: 100%; height: auto; display: block; border: 1px solid var(--ink); }
 @media (max-width: 900px) { .special { grid-template-columns: 1fr; } }
 
@@ -1658,3 +1659,5 @@ img[src$="arch-concrete-corner.jpg"] { object-position: 50% 80%; }
 .example .text-link { align-self: flex-start; margin-top: auto; }
 @media (max-width: 860px) { .examples { grid-template-columns: 1fr; } }
 .section-note { margin: 32px 0 0; font-size: 16px; }
+
+.service__later { margin: 24px 0 0; color: var(--slate); font-size: 15px; }
