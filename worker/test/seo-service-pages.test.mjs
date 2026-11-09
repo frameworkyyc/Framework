@@ -49,7 +49,8 @@ test("service pages: every page names the primary action (assessment) and the se
 test("service pages: the approved service area is stated (Calgary, Airdrie, Cochrane, Okotoks, Chestermere) and wider Alberta/Canada appears only in the area band and FAQ, never in titles or headings", () => {
   for (const [slug, h] of Object.entries(html)) {
     const band = h.slice(h.indexOf('class="section section--ink cx-where"'), h.indexOf('class="section section--ink cta"'));
-    for (const c of CITIES) assert.ok(band.includes(`<strong>${c}</strong>`), `${slug} band lists ${c}`);
+    assert.deepEqual([...band.matchAll(/<li>([^<]+)<\/li>/g)].map((m) => m[1]), CITIES, `${slug} band lists exactly the approved communities, nothing else`);
+    assert.ok(!/<strong>|Served from/.test(band), "no filler rows in the area band");
     assert.match(band, /elsewhere in Alberta and across Canada/);
     const heads = [...h.matchAll(/<(title|h1|h2)[^>]*>([\s\S]*?)<\/\1>/g)].map((m) => decode(m[2]));
     for (const t of heads) assert.ok(!/Alberta|Canada/.test(t), `${slug} heading mentions the wider area: ${t}`);
@@ -179,7 +180,29 @@ test("design system: the new pages reuse the site's own components and add no st
     assert.ok(!/<img\b/.test(strip(h.slice(h.indexOf("<main"), h.indexOf("</main>")))) || true);
     const sheets = [...h.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
     assert.deepEqual(sheets.filter((s) => !s.startsWith("https://")), ["assets/css/styles.css", "/assets/css/contractors.css"]);
-    for (const cls of ["page-head", "display", "lead", "split", "service", "cells", "cx-faq", "cx-places", "section--ink"]) assert.ok(h.includes(cls), `${slug} uses ${cls}`);
+    for (const cls of ["page-head", "display", "lead", "split", "service", "cells", "cx-faq", "cx-area", "section--ink"]) assert.ok(h.includes(cls), `${slug} uses ${cls}`);
     assert.ok(!/<script(?![^>]*type="application\/ld\+json")[^>]*src="[^"]*"/.test(h.replace(/<script src="(?:assets|\/assets)\/js\/(?:main|analytics-config|analytics)\.js" defer><\/script>/g, "")), slug + " loads only the site's standard scripts");
   }
+});
+
+test("service pages: portfolio imagery is real, accurate and light: existing assets only, sized, lazy, described; branding is claimed only for Red E Corp.", () => {
+  for (const [slug, h] of Object.entries(html)) {
+    const main = h.slice(h.indexOf("<main"), h.indexOf("</main>"));
+    const imgs = [...main.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
+    for (const img of imgs) {
+      const src = attr(img, /src="([^"]+)"/);
+      assert.ok(existsSync(root + src.replace(/^\//, "")), `${slug}: ${src} exists`);
+      assert.match(src, /^\/assets\/img\/(aurora-hero\.jpg|red-e-site-home\.jpg)$/, `${slug}: only the approved project screenshots`);
+      assert.match(img, /\swidth="\d+"/); assert.match(img, /\sheight="\d+"/); assert.match(img, /loading="lazy"/); assert.match(img, /decoding="async"/);
+      assert.ok(attr(img, /alt="([^"]*)"/).length > 15, `${slug}: ${src} has real alt text`);
+    }
+    const size = imgs.reduce((n, i) => n + readFileSync(root + attr(i, /src="([^"]+)"/).replace(/^\//, "")).length, 0);
+    assert.ok(size < 300 * 1024, `${slug}: page imagery stays light (${size} bytes)`);
+  }
+  assert.equal([...html["local-seo"].matchAll(/<img\b/g)].length, 0, "local SEO shows no imagery: there are no search results to show, and none are implied");
+  const wd = html["website-design"], br = html.branding;
+  assert.ok(wd.includes("/assets/img/aurora-hero.jpg") && wd.includes("/assets/img/red-e-site-home.jpg"));
+  assert.ok(br.includes("/assets/img/red-e-site-home.jpg") && !/aurora|Aurora Surveys\b[^.]*\b(brand|identity)/.test(br.slice(br.indexOf("<main"), br.indexOf("</main>")).replace(/For Aurora Surveys we built around the notes[^<]*/, "")), "branding page does not suggest Framework branded Aurora Surveys");
+  assert.match(text(wd), /Aurora Surveys supplied its own identity/, "the website page says Aurora brought its own identity");
+  assert.match(br, /Brand system and website for an industrial, commercial and institutional project management company/);
 });
