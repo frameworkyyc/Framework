@@ -53,12 +53,21 @@
     <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
     <nav class="nav" id="site-nav" aria-label="Main">
       <ul class="nav__list">
-        <li><a class="nav__link" href="/">Home</a></li>
+        <li class="nav__item nav__item--menu">
+          <a class="nav__link" href="/services">Services</a>
+          <button class="nav__caret" type="button" aria-expanded="false" aria-controls="nav-services" aria-label="Services menu"></button>
+          <ul class="nav__menu" id="nav-services">
+            <li><a href="/services">All services</a></li>
+            <li><a href="/website-design">Website Design &amp; Development</a></li>
+            <li><a href="/local-seo">SEO &amp; Digital Marketing</a></li>
+            <li><a href="/branding">Branding &amp; Identity</a></li>
+            <li><a href="/business-systems">Business Systems &amp; Automation</a></li>
+            <li><a href="/contractor-websites">Websites for Contractors</a></li>
+          </ul>
+        </li>
+        <li><a class="nav__link" href="/portfolio">Work</a></li>
+        <li><a class="nav__link" href="/nexus">Nexus</a></li>
         <li><a class="nav__link" href="/about">About</a></li>
-        <li><a class="nav__link" href="/services">Services</a></li>
-        <li><a class="nav__link" href="/contractor-websites">Contractors</a></li>
-        <li><a class="nav__link" href="/method" aria-current="page">The Method</a></li>
-        <li><a class="nav__link" href="/portfolio">Portfolio</a></li>
         <li><a class="nav__link" href="/contact">Contact</a></li>
       </ul>
       <a class="nav__login" href="/portal">Client Login</a>
@@ -148,7 +157,8 @@
         <ul>
           <li><a href="/about">About</a></li>
           <li><a href="/method">The Method</a></li>
-          <li><a href="/portfolio">Portfolio</a></li>
+          <li><a href="/portfolio">Work</a></li>
+          <li><a href="/nexus">Nexus</a></li>
           <li><a href="/assessment" data-track="assessment_cta" data-track-location="footer">Free Assessment</a></li>
           <li><a href="/contact">Contact</a></li>
           <li><a href="/privacy">Privacy Policy</a></li>
@@ -157,12 +167,11 @@
       <div>
         <h4>Services</h4>
         <ul>
-          <li><a href="/services#strategy">Strategy</a></li>
-          <li><a href="/branding">Branding</a></li>
-          <li><a href="/website-design">Website Design</a></li>
-          <li><a href="/local-seo">Local SEO</a></li>
-          <li><a href="/contractor-websites">Contractor Websites</a></li>
-          <li><a href="/services#systems">Business Systems</a></li>
+          <li><a href="/website-design">Website Design &amp; Development</a></li>
+          <li><a href="/local-seo">SEO &amp; Digital Marketing</a></li>
+          <li><a href="/branding">Branding &amp; Identity</a></li>
+          <li><a href="/business-systems">Business Systems &amp; Automation</a></li>
+          <li><a href="/contractor-websites">Websites for Contractors</a></li>
         </ul>
       </div>
       <div>
