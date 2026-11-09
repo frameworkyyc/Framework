@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 520" role="img" aria-label="An illustrative search result for a local business">
+  <rect width="1400" height="520" fill="#F5F5F5"/>
+  <g stroke="#E0E0E0" stroke-width="1"><path d="M0 130H1400M0 260H1400M0 390H1400M175 0V520M350 0V520M525 0V520M700 0V520M875 0V520M1050 0V520M1225 0V520"/></g>
+  <rect x="150" y="70" width="1100" height="64" fill="#FFFFFF" stroke="#0A0A0A" stroke-width="2"/>
+  <text x="182" y="111" font-family="Helvetica Neue, Arial, sans-serif" font-size="26" fill="#5C5C5C">your service  +  your city</text>
+  <rect x="150" y="176" width="1100" height="270" fill="#FFFFFF" stroke="#0A0A0A" stroke-width="2"/>
+  <text x="182" y="222" font-family="Helvetica Neue, Arial, sans-serif" font-size="20" fill="#5C5C5C">yourbusiness.ca</text>
+  <text x="182" y="266" font-family="Helvetica Neue, Arial, sans-serif" font-size="30" font-weight="700" fill="#0A0A0A">Page title that says what you do and where</text>
+  <rect x="182" y="292" width="900" height="12" fill="#E0E0E0"/><rect x="182" y="318" width="760" height="12" fill="#E0E0E0"/>
+  <g font-family="Helvetica Neue, Arial, sans-serif" font-size="16" fill="#0A0A0A" letter-spacing="1.5">
+    <rect x="182" y="360" width="190" height="34" fill="none" stroke="#0A0A0A"/><text x="198" y="383">SERVICE PAGE</text>
+    <rect x="388" y="360" width="190" height="34" fill="none" stroke="#0A0A0A"/><text x="404" y="383">AREA SERVED</text>
+    <rect x="594" y="360" width="250" height="34" fill="none" stroke="#0A0A0A"/><text x="610" y="383">BUSINESS PROFILE</text>
+  </g>
+  <text x="1218" y="490" text-anchor="end" font-family="Helvetica Neue, Arial, sans-serif" font-size="14" fill="#5C5C5C">Illustration, not a real result</text>
+</svg>

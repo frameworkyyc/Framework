@@ -72,6 +72,44 @@
     });
   }
 
+  /* ---- Services menu: caret button opens it (desktop dropdown, mobile accordion); Escape or an outside click closes it ---- */
+  var menuItem = document.querySelector(".nav__item--menu");
+  var caret = menuItem && menuItem.querySelector(".nav__caret");
+  if (caret) {
+    var setMenu = function (open) {
+      menuItem.classList.toggle("is-open", open);
+      caret.setAttribute("aria-expanded", String(open));
+    };
+    caret.addEventListener("click", function () {
+      setMenu(caret.getAttribute("aria-expanded") !== "true");
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && menuItem.classList.contains("is-open")) {
+        var inside = menuItem.contains(document.activeElement);
+        setMenu(false);
+        if (inside) caret.focus();
+      }
+    });
+    document.addEventListener("click", function (e) {
+      if (!menuItem.contains(e.target)) setMenu(false);
+    });
+    var items = function () { return Array.prototype.slice.call(menuItem.querySelectorAll(".nav__menu a")); };
+    menuItem.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      var list = items();
+      var i = list.indexOf(document.activeElement);
+      if (i === -1 && e.key === "ArrowDown" && (document.activeElement === caret || document.activeElement === menuItem.querySelector(".nav__link"))) {
+        e.preventDefault(); setMenu(true); list[0].focus(); return;
+      }
+      if (i === -1) return;
+      e.preventDefault();
+      list[(i + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length].focus();
+    });
+    menuItem.addEventListener("focusout", function (e) {
+      if (e.relatedTarget && !menuItem.contains(e.relatedTarget)) setMenu(false);
+    });
+  }
+
   /* ---- Missing-image placeholder ----
      If a photo hasn't been added to /assets/img yet, show a blueprint
      grid with the filename instead of a broken-image icon. */
