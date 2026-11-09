@@ -108,3 +108,8 @@ Claim or create the profile (category "Website designer" or "Web designer"; mark
 - Home and Branding titles are broadened to businesses in every industry; `/contractor-websites`, `/local-seo` and `/website-design` keep their contractor-focused wording.
 - `/nexus` carries no pricing, dates, customers or demo link. Feature labels (Implemented / Preview / Planned; Implemented does not mean publicly available) come from the Nexus content ledger (`frameworkyyc/nexus-site`, `docs/CONTENT-ACCURACY.md`) and must be re-checked before release. Screenshots in `assets/img/nexus/` are demonstration data.
 - The homepage revenue band is unchanged: the figure is the rounded-down sum of `client_revenue` (see `worker/revenue.js`); nothing is hard-coded.
+
+## Homepage visual layer (Staging)
+- The homepage alone loads `assets/css/home.css` and `assets/js/home.js` (about 9 KB and 1 KB). Everything is visible without JavaScript and under `prefers-reduced-motion`; the script only adds a `js` class and reveals sections on scroll. The H1, title, description, canonical, structured data and every internal link are unchanged from the Production release.
+- The Nexus teaser uses only the existing Nexus identity (the tracked NEXUS wordmark and the N mark from the Nexus favicon), says "In Development", and links to `/nexus`, where the real screenshots and the status-labelled feature list live.
+- The revenue band is untouched: the figure is the rounded-down sum of `client_revenue` (`worker/revenue.js`), never hard-coded.
