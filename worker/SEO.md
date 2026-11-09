@@ -13,6 +13,10 @@ Phase 1 (Staging) of the plan to make frameworkco.ca visible for contractor webs
 - **Analytics (Google Analytics 4):** built, consent-first, and **off** until you add a Measurement ID. See below.
 - **Privacy policy:** updated (effective date shown as November 6, 2026) for the contact form and Google Analytics. **Review it before it goes to Production.**
 
+## Staging and preview copies are noindex
+
+`_headers` has two host-specific rules (`https://staging.frameworkco.ca/*` and `https://claude-:branch.frameworkco.ca/*`) that add `X-Robots-Tag: noindex` to every static response on those hosts. Because the rules name their host they cannot match `frameworkco.ca` or `www.frameworkco.ca`, so Production sends no robots header. `robots.txt` stays crawlable (no `Disallow`) so Google can read the header; the sitemap and every canonical list live-site addresses only. Not covered: per-commit hash preview hosts (`<hash>.frameworkco.ca`), because a one-label pattern would also match `www`; they are not linked anywhere public. Worker-generated pages (`/card`, `/portal`, `/admin`) set their own robots headers. `worker/test/seo-staging.test.mjs` checks all of this.
+
 ## Service pages (SEO phase 2)
 
 - **Pages:** `/website-design` (Website Design & Development), `/local-seo` (Local SEO), `/branding` (Branding). `/services` stays the hub and `/contractor-websites` the specialized contractor landing page; each page has its own main phrase and they link to each other (descriptive link text), from the homepage cards and hero, the hub, every footer and the contractor page.
