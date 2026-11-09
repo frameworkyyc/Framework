@@ -20,7 +20,7 @@ const html = Object.fromEntries(Object.entries(PAGES).map(([k, f]) => [k, read(f
 
 test("service pages: unique title (<=60) and description (120-160), extensionless canonical, matching social tags, one H1 with the main phrase", () => {
   const titles = new Set();
-  const expect = { "website-design": ["Website Design & Development in Calgary | Framework", /website design and development/i], "local-seo": ["Local SEO for Calgary Contractors and Trades | Framework", /local seo/i], branding: ["Branding for Contractors and Trades in Calgary | Framework", /branding/i] };
+  const expect = { "website-design": ["Website Design & Development in Calgary | Framework", /website design and development/i], "local-seo": ["Local SEO for Calgary Contractors and Trades | Framework", /local seo/i], branding: ["Branding & Identity in Calgary | Framework", /branding/i] };
   for (const [slug, h] of Object.entries(html)) {
     const title = attr(h, /<title>([^<]*)<\/title>/), desc = attr(h, /<meta name="description" content="([^"]*)"/);
     assert.equal(title, expect[slug][0]); assert.ok(title.length <= 60, slug + " title length " + title.length);
@@ -144,13 +144,13 @@ test("internal linking: every link on the new pages resolves, each page links to
 test("homepage: title leads with Calgary website design and keeps the contractor specialization; services named; no 'logo shop' line; schema carries the approved area", () => {
   const h = read("index.html");
   const title = attr(h, /<title>([^<]*)<\/title>/);
-  assert.equal(title, "Calgary Website Design for Contractors & Trades | Framework"); assert.ok(title.length <= 60);
+  assert.equal(title, "Calgary Website Design, SEO & Branding | Framework"); assert.ok(title.length <= 60);
   const desc = attr(h, /<meta name="description" content="([^"]*)"/);
-  assert.match(desc, /website design and development, branding and local SEO/); assert.match(desc, /contractors and trades/); assert.ok(desc.length >= 120 && desc.length <= 160);
+  assert.match(desc, /Calgary digital solutions company/); assert.match(desc, /websites, brands, SEO and business systems/); assert.match(desc, /contractors and trades/); assert.ok(desc.length >= 120 && desc.length <= 160);
   assert.equal(attr(h, /<meta property="og:title" content="([^"]*)"/), title);
   const hero = text(h.slice(h.indexOf('<p class="lead">'), h.indexOf('<div class="btn-row">'))).replace(/ ([,.?])/g, "$1");
-  assert.match(hero, /Framework is a Calgary studio for website design and development, branding and local SEO/);
-  assert.match(hero, /We start with strategy, so every page, logo and listing has a reason to exist/);
+  assert.match(hero, /Framework builds websites, brands and the digital systems behind growing businesses/);
+  assert.match(hero, /Strategy comes first, so everything we make has a reason to exist/);
   assert.ok(!/logo shop|marketing agency/i.test(text(h)), "the homepage no longer undercuts the services");
   const biz = graph(h).find((n) => n["@type"] === "ProfessionalService");
   assert.deepEqual(biz.areaServed.map((a) => a.name), [...CITIES, "Alberta", "Canada"]);
@@ -158,12 +158,14 @@ test("homepage: title leads with Calgary website design and keeps the contractor
   assert.ok(!/telephone|sameAs|aggregateRating|review/i.test(JSON.stringify(graph(h))));
 });
 
-test("services hub: title and description updated, 'Performance measurement' replaces 'Performance reporting', seven categories and anchors intact", () => {
+test("services hub: four approved offerings, each with the problem and what you get, linking to its page; Strategy and Growth are no longer services", () => {
   const h = read("services.html");
-  assert.equal(attr(h, /<title>([^<]*)<\/title>/), "Services: Website Design, Branding & Local SEO | Framework");
-  assert.match(h, /<li>Performance measurement<\/li>/); assert.ok(!/Performance reporting/.test(h));
-  for (const id of ["strategy", "branding", "website", "digital-presence", "systems", "automation", "growth"]) assert.ok(h.includes(`id="${id}"`), id);
-  assert.match(h, /Seven categories\. One coordinated system\./);
+  assert.equal(attr(h, /<title>([^<]*)<\/title>/), "Services: Websites, SEO, Branding & Systems | Framework");
+  for (const id of ["website", "seo", "branding", "systems"]) assert.ok(h.includes(`id="${id}"`), id);
+  for (const id of ["strategy", "digital-presence", "automation", "growth"]) assert.ok(!h.includes(`id="${id}"`), id + " is no longer a service");
+  for (const href of ["/website-design", "/local-seo", "/branding", "/business-systems", "/contractor-websites", "/method", "/assessment"]) assert.ok(h.includes(`href="${href}"`), href);
+  assert.equal((h.match(/class="service__label">The problem</g) || []).length, 4); assert.equal((h.match(/class="service__label">What you get</g) || []).length, 4);
+  assert.ok(!/Seven categories|AI Automation|Performance reporting/.test(h));
 });
 
 test("sitemap: lists the three new pages by canonical address; they are public pages", () => {

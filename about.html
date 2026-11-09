@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>About Framework: a Calgary studio for contractors and trades</title>
-<meta name="description" content="Framework builds businesses the way an architect builds structures: strategy first, design second, execution third. We focus on contractors and home services.">
+<title>About Framework: a Calgary digital solutions company</title>
+<meta name="description" content="Framework builds businesses like an architect builds structures: strategy, then design, then execution. For every industry, specializing in contractors.">
 <link rel="canonical" href="https://frameworkco.ca/about">
 <meta property="og:type" content="website">
-<meta property="og:title" content="About Framework: a Calgary studio for contractors and trades">
-<meta property="og:description" content="Framework builds businesses the way an architect builds structures: strategy first, design second, execution third. We focus on contractors and home services.">
+<meta property="og:title" content="About Framework: a Calgary digital solutions company">
+<meta property="og:description" content="Framework builds businesses like an architect builds structures: strategy, then design, then execution. For every industry, specializing in contractors.">
 <meta property="og:url" content="https://frameworkco.ca/about">
 <meta property="og:image" content="https://frameworkco.ca/assets/img/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -53,12 +53,21 @@
     <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
     <nav class="nav" id="site-nav" aria-label="Main">
       <ul class="nav__list">
-        <li><a class="nav__link" href="/">Home</a></li>
+        <li class="nav__item nav__item--menu">
+          <a class="nav__link" href="/services">Services</a>
+          <button class="nav__caret" type="button" aria-expanded="false" aria-controls="nav-services" aria-label="Services menu"></button>
+          <ul class="nav__menu" id="nav-services">
+            <li><a href="/services">All services</a></li>
+            <li><a href="/website-design">Website Design &amp; Development</a></li>
+            <li><a href="/local-seo">SEO &amp; Digital Marketing</a></li>
+            <li><a href="/branding">Branding &amp; Identity</a></li>
+            <li><a href="/business-systems">Business Systems &amp; Automation</a></li>
+            <li><a href="/contractor-websites">Websites for Contractors</a></li>
+          </ul>
+        </li>
+        <li><a class="nav__link" href="/portfolio">Work</a></li>
+        <li><a class="nav__link" href="/nexus">Nexus</a></li>
         <li><a class="nav__link" href="/about" aria-current="page">About</a></li>
-        <li><a class="nav__link" href="/services">Services</a></li>
-        <li><a class="nav__link" href="/contractor-websites">Contractors</a></li>
-        <li><a class="nav__link" href="/method">The Method</a></li>
-        <li><a class="nav__link" href="/portfolio">Portfolio</a></li>
         <li><a class="nav__link" href="/contact">Contact</a></li>
       </ul>
       <a class="nav__login" href="/portal">Client Login</a>
@@ -108,7 +117,7 @@
     <div class="container split">
       <div class="split__main">
         <span class="eyebrow">Our approach</span>
-        <h2 class="h2">Strategy first. Design second. Execution third.</h2>
+        <h2 class="h2">Why the order matters.</h2>
       </div>
       <div class="split__side">
         <p class="muted">An architect doesn't sketch a facade before understanding the foundation, the load, and the purpose of the building. We treat business the same way. Before a single logo option or wireframe is created, we define who the business serves, what makes it different, and what "success" needs to look like in twelve months.</p>
@@ -144,11 +153,11 @@
           <span class="eyebrow">Who we work with</span>
           <h2 class="h2">Businesses that build things — and the people who build businesses.</h2>
         </div>
-        <div class="split__side"><p class="muted">We work best with owners who value structure and long-term thinking over quick wins. Our primary focus is on industries where trust and professionalism directly affect whether a customer picks up the phone.</p></div>
+        <div class="split__side"><p class="muted">We work best with owners who value structure and long-term thinking over quick wins. We work with businesses across industries and specialize in contractors and trades, where trust and professionalism directly affect whether a customer picks up the phone.</p></div>
       </div>
       <div class="audience">
         <div class="audience__group">
-          <h3>Primary</h3>
+          <h3>Our specialization</h3>
           <ul>
             <li><span class="index">01</span>Construction Companies</li>
             <li><span class="index">02</span>Contractors &amp; Trades</li>
@@ -156,11 +165,11 @@
           </ul>
         </div>
         <div class="audience__group">
-          <h3>Secondary</h3>
+          <h3>Also</h3>
           <ul>
-            <li><span class="index">04</span>Entrepreneurs &amp; Startups</li>
-            <li><span class="index">05</span>Professional Service Businesses</li>
-            <li><span class="index">06</span>Small Businesses Rebranding</li>
+            <li><span class="index">04</span>Small &amp; Medium-Sized Businesses</li>
+            <li><span class="index">05</span>Entrepreneurs &amp; Startups</li>
+            <li><span class="index">06</span>Professional Service Businesses</li>
           </ul>
         </div>
       </div>
@@ -172,7 +181,7 @@
       <span class="eyebrow">Get started</span>
       <h2 class="h2">Let's talk about your business.</h2>
       <p>A short conversation is enough to tell us whether Framework is the right fit — and what building your foundation would look like.</p>
-      <div class="btn-row"><a class="btn btn--primary" href="/contact">Book a consultation</a></div>
+      <div class="btn-row"><a class="btn btn--primary" href="/contact">Start a project</a></div>
       <p class="cta__note">Not ready to talk yet? <a href="/assessment" data-track="assessment_cta" data-track-location="cta">Get a free online presence assessment</a>.</p>
     </div>
   </section>
@@ -192,7 +201,8 @@
         <ul>
           <li><a href="/about">About</a></li>
           <li><a href="/method">The Method</a></li>
-          <li><a href="/portfolio">Portfolio</a></li>
+          <li><a href="/portfolio">Work</a></li>
+          <li><a href="/nexus">Nexus</a></li>
           <li><a href="/assessment" data-track="assessment_cta" data-track-location="footer">Free Assessment</a></li>
           <li><a href="/contact">Contact</a></li>
           <li><a href="/privacy">Privacy Policy</a></li>
@@ -201,12 +211,11 @@
       <div>
         <h4>Services</h4>
         <ul>
-          <li><a href="/services#strategy">Strategy</a></li>
-          <li><a href="/branding">Branding</a></li>
-          <li><a href="/website-design">Website Design</a></li>
-          <li><a href="/local-seo">Local SEO</a></li>
-          <li><a href="/contractor-websites">Contractor Websites</a></li>
-          <li><a href="/services#systems">Business Systems</a></li>
+          <li><a href="/website-design">Website Design &amp; Development</a></li>
+          <li><a href="/local-seo">SEO &amp; Digital Marketing</a></li>
+          <li><a href="/branding">Branding &amp; Identity</a></li>
+          <li><a href="/business-systems">Business Systems &amp; Automation</a></li>
+          <li><a href="/contractor-websites">Websites for Contractors</a></li>
         </ul>
       </div>
       <div>
