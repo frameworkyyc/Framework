@@ -1,0 +1,117 @@
+/* Framework dark theme: one near-black system for every public page.
+   Tokens keep their original meaning (--ink = the strong colour, --paper = the page colour), swapped for dark:
+   --paper #090909 is the page, --mist #141414 the secondary surface, --ink the near-white text.
+   .section--ink bands keep the original "inverse" meaning, on the secondary surface. Loaded after styles.css. */
+:root {
+  --ink: #F3F3F3;
+  --paper: #090909;
+  --slate: #A6A6A6;
+  --stone: #8B8B8B;
+  --hairline: #262626;
+  --mist: #141414;
+  --tint: #141414;
+  --surface: #141414;
+  --surface-2: #1B1B1B;
+  --line: #262626;
+  --line-strong: #3B3B3B;
+  --light: #F3F3F3;
+  /* architectural gutter: the space between a framing line and the content it frames */
+  --frame-gap: 28px;
+  --frame-line: rgba(255, 255, 255, .09);
+  color-scheme: dark;
+}
+@media (max-width: 1023px) { :root { --frame-gap: 22px; } }
+@media (max-width: 699px) { :root { --frame-gap: 18px; } }
+html, body { background: var(--paper); color: var(--ink); }
+.section--ink { --ink: #141414; --paper: #F3F3F3; background: var(--ink); color: var(--paper); }
+meta[name="theme-color"] { color: #090909; }
+
+/* logo: reversed on dark (the mark is unchanged, tile and F swap) */
+.brand__mark rect { fill: #F3F3F3; }
+.brand__mark path { fill: #090909; }
+.site-footer .brand__mark rect { fill: #F3F3F3; }
+
+/* header: quiet, slightly translucent, with the same hairline */
+.site-header { background: rgba(9, 9, 9, .88); -webkit-backdrop-filter: saturate(1.2) blur(10px); backdrop-filter: saturate(1.2) blur(10px); border-bottom-color: var(--line); }
+@media (max-width: 960px) { .nav { background: var(--paper); } }
+
+/* navigation: every item shares one centre line and one baseline; the Services chevron sits on it */
+.nav__list { align-items: center; }
+.nav__list > li { display: flex; align-items: center; }
+.nav__link { display: inline-flex; align-items: center; line-height: 1.25; padding: 8px 0; }
+.nav__caret { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: 0; }
+.nav__menu { background: var(--surface); border-color: var(--line-strong); }
+.nav__menu a { color: var(--ink); border-bottom-color: var(--line); }
+.nav__menu a:hover, .nav__menu a:focus-visible { background: var(--surface-2); }
+.nav__login { border-bottom-color: var(--ink); }
+@media (max-width: 960px) {
+  .nav__list > li { display: block; }
+  .nav__item--menu { display: flex; }
+  .nav__link { display: block; padding: 18px 0; }
+  .nav__caret { width: 64px; height: auto; }
+}
+
+/* forms and surfaces on dark */
+.input, input, select, textarea { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
+.input::placeholder, textarea::placeholder { color: var(--stone); }
+option { background: #141414; color: #F3F3F3; }
+.btn--primary { background: var(--light); color: #090909; border-color: var(--light); }
+.btn--primary:hover { background: transparent; color: var(--light); }
+.btn--secondary { border-color: var(--line-strong); }
+.btn--secondary:hover { background: var(--light); color: #090909; border-color: var(--light); }
+.section--ink .btn--primary:hover { color: var(--paper); }
+.site-footer { background: var(--paper); border-top: 1px solid var(--line); }
+
+/* homepage: the inverted service tile becomes a lifted dark surface, with white linework */
+.svc--ink { background: var(--surface-2); color: var(--light); border-color: var(--line-strong); }
+.svc--ink .svc__ill, .svc--ink .svc__n { color: var(--light); }
+.svc--ink .svc__n { color: var(--stone); }
+.svc--ink .svc__p { color: #BDBDBD; }
+.svc--ink:hover { border-color: var(--light); }
+.svc--ink:focus-visible { outline: 2px solid var(--light); outline-offset: 3px; box-shadow: none; }
+.svc:focus-visible { outline-color: var(--light); }
+.rows--go .row:hover, .rows--go .row:focus-visible { background: linear-gradient(90deg, var(--surface), rgba(20, 20, 20, 0)); }
+
+/* architectural gutters: the framing lines sit --frame-gap outside the content edge (28px desktop, 22px tablet, 18px mobile).
+   Content, grid and container widths are unchanged; only the lines move. */
+.ruled::before, .ruled::after { background: var(--frame-line); }
+.ruled::before { left: calc((100% - min(var(--max), 100%)) / 2 + var(--gutter) - var(--frame-gap)); }
+.ruled::after { right: calc((100% - min(var(--max), 100%)) / 2 + var(--gutter) - var(--frame-gap)); }
+@media (max-width: 700px) { .ruled::before, .ruled::after { display: block; } }
+
+/* contact: three understated routes, then the form and the public details */
+.ct { padding-top: clamp(32px, 4vw, 56px); }
+.ct__cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); }
+.ct__card { position: relative; display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 240px; padding: clamp(20px, 2.4vw, 32px); background: var(--surface); border: 1px solid var(--line); color: var(--ink); text-decoration: none;
+  transition: border-color .25s ease, background-color .25s ease; }
+.ct__card::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .35s ease; background: radial-gradient(ellipse 80% 70% at 100% 100%, rgba(255, 255, 255, .07), transparent 70%); }
+.ct__card:hover, .ct__card:focus-visible { border-color: var(--line-strong); background: var(--surface-2); }
+.ct__card:hover::before, .ct__card:focus-visible::before { opacity: 1; }
+.ct__card:focus-visible { outline: 2px solid var(--light); outline-offset: 3px; }
+.ct__n { font-size: 12px; letter-spacing: .14em; color: var(--stone); }
+.ct__label { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--slate); }
+.ct__title { font-family: var(--font-display); font-weight: 600; font-size: clamp(24px, 2.4vw, 32px); line-height: 1.1; margin-top: auto; }
+.ct__text { color: var(--slate); font-size: 16px; line-height: 1.5; max-width: 22em; padding-right: 32px; }
+.ct__go { position: absolute; right: clamp(18px, 2vw, 28px); bottom: clamp(16px, 1.8vw, 24px); font-family: var(--font-display); font-size: 24px; line-height: 1; transition: transform .3s ease; }
+.ct__card:hover .ct__go, .ct__card:focus-visible .ct__go { transform: translateX(6px); }
+.ct__formhead { margin-bottom: 28px; }
+@media (max-width: 860px) { .ct__cards { grid-template-columns: 1fr; } .ct__card { min-height: 0; } .ct__title { margin-top: 12px; } }
+@media (prefers-reduced-motion: reduce) { .ct__card, .ct__card::before, .ct__go { transition: none; } }
+
+/* work page: each project sits in its own lit stage; the live demos stay untilted and interactive */
+.device-stage { isolation: isolate; --glow: 255, 255, 255; }
+.device-stage::before { content: ""; position: absolute; z-index: -1; inset: -14% -10% -10%; pointer-events: none;
+  background: radial-gradient(ellipse 55% 50% at 50% 55%, rgba(var(--glow), .16), transparent 72%); }
+.device-stage--aurora { --glow: 63, 214, 166; }
+#red-e-stage { --glow: 214, 58, 58; }
+.device--laptop { filter: drop-shadow(0 40px 50px rgba(0, 0, 0, .65)); }
+/* second composition (Red E Corp.): the phone leads on the left, the laptop sits to the right and lower */
+#red-e-stage .device--laptop { left: auto; right: 0; top: 4%; }
+#red-e-stage .device--phone { right: auto; left: 0; bottom: -4%; }
+.feature__visuals--gallery { position: relative; isolation: isolate; --glow: 226, 170, 72; }
+.feature__visuals--gallery::before { content: ""; position: absolute; z-index: -1; inset: -8%; pointer-events: none; background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(var(--glow), .12), transparent 72%); }
+.feature__visuals--gallery img { box-shadow: 0 30px 50px -24px rgba(0, 0, 0, .8); }
+@media (max-width: 700px) { #red-e-stage .device--laptop { left: 0; right: auto; top: 0; } #red-e-stage .device--phone { left: auto; right: 0; bottom: 0; } }
+
+/* the build-order drawing card sits in an ink band: keep it dark with white linework, like everything else */
+.section--ink .drawing { --ink: #F3F3F3; --paper: #0C0C0C; --hairline: #2A2A2A; }

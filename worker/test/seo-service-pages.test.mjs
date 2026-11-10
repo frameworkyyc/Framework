@@ -181,7 +181,7 @@ test("design system: the new pages reuse the site's own components and add no st
     assert.ok(!/<style[\s>]/.test(h) && !/\sstyle="/.test(h), slug + " has no inline styling");
     assert.ok(!/<img\b/.test(strip(h.slice(h.indexOf("<main"), h.indexOf("</main>")))) || true);
     const sheets = [...h.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(sheets.filter((s) => !s.startsWith("https://")), ["assets/css/styles.css", "/assets/css/contractors.css"]);
+    assert.deepEqual(sheets.filter((s) => !s.startsWith("https://")), ["assets/css/styles.css", "/assets/css/contractors.css", "assets/css/theme.css"]);
     for (const cls of ["page-head", "display", "lead", "split", "service", "cells", "cx-faq", "cx-area", "section--ink"]) assert.ok(h.includes(cls), `${slug} uses ${cls}`);
     assert.ok(!/<script(?![^>]*type="application\/ld\+json")[^>]*src="[^"]*"/.test(h.replace(/<script src="(?:assets|\/assets)\/js\/(?:main|analytics-config|analytics)\.js" defer><\/script>/g, "")), slug + " loads only the site's standard scripts");
   }
