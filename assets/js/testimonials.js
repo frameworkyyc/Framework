@@ -21,6 +21,7 @@
       if (on) { s.setAttribute("data-active", ""); s.removeAttribute("inert"); s.removeAttribute("aria-hidden"); }
       else { s.removeAttribute("data-active"); s.setAttribute("inert", ""); s.setAttribute("aria-hidden", "true"); }
     });
+    Array.prototype.forEach.call(box.querySelectorAll("details[open]"), function (d) { d.open = false; });
     cur.textContent = pad(index + 1);
     live.setAttribute("aria-live", announce ? "polite" : "off");
   }
@@ -52,6 +53,9 @@
   box.addEventListener("keydown", function (e) {
     if (e.key === "ArrowLeft") { show(index - 1, true); start(); }
     else if (e.key === "ArrowRight") { show(index + 1, true); start(); }
+  });
+  Array.prototype.forEach.call(box.querySelectorAll("details"), function (d) {
+    d.addEventListener("toggle", function () { held = d.open; if (d.open) stop(); else start(); });
   });
   document.addEventListener("visibilitychange", start);
   if ("IntersectionObserver" in window) {
