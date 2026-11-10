@@ -79,7 +79,7 @@ export async function leadsReady(db, now = Date.now()) {
   readyCache.set(db, { ready, at: now });
   return ready;
 }
-export const forgetLeadsReady = (db) => { if (db && typeof db === "object") readyCache.delete(db); forgetSeoReady(db); forgetTrackingReady(db); };
+export const forgetLeadsReady = (db) => { if (db && typeof db === "object") readyCache.delete(db); forgetSeoReady(db); forgetTrackingReady(db); forgetCallReady(db); };
 
 const seoCache = new WeakMap();
 /** Whether migration 0025 (the SEO columns on outreach_leads) is applied. Cached like leadsReady; until it is, every SEO feature stays dormant. */
@@ -117,6 +117,25 @@ export async function trackingReady(db, now = Date.now()) {
   return ready;
 }
 export const forgetTrackingReady = (db) => { if (db && typeof db === "object") trackingCache.delete(db); };
+
+export const CALL_MIGRATION = "0027_call_queue.sql";
+const callCache = new WeakMap();
+/** Whether migration 0027 (the call queue columns on outreach_leads) is applied. Cached like trackingReady; until it is, "Queue Call" stays dormant and everything else works as before. */
+export async function callQueueReady(db, now = Date.now()) {
+  if (!db || typeof db.prepare !== "function") return false;
+  const hit = callCache.get(db);
+  if (hit && now - hit.at < (hit.ready ? 300000 : 30000)) return hit.ready;
+  let ready = false;
+  try {
+    const row = await db.prepare("SELECT COUNT(*) AS n FROM pragma_table_info('outreach_leads') WHERE name IN ('call_on', 'call_note', 'call_queued_at')").first();
+    ready = !!row && Number(row.n) === 3;
+  } catch {
+    ready = false;
+  }
+  callCache.set(db, { ready, at: now });
+  return ready;
+}
+export const forgetCallReady = (db) => { if (db && typeof db === "object") callCache.delete(db); };
 
 /* ---------- Reason, dedupe key, contact eligibility ---------- */
 
@@ -948,9 +967,10 @@ export async function logContact(env, leadId, { method, note, follow_up_on } = {
   if (lead.status === "dismissed") return fail(409, "lead_dismissed");
   if (outreachOf(lead)) return fail(409, "already_contacted");
   const n = trackNote(note);
-  const detail = clean(detailFor(`Contacted by ${METHOD_WORD[method].toLowerCase()}.`, fu, n).replace(/\S+@\S+/g, "[address]"), 300);
+  const clearsCall = method === "phone" && !!lead.call_on && (await callQueueReady(db, Date.parse(at))); // making the call is what the queued call was for: it leaves the queue with the contact, in the same write
+  const detail = clean(detailFor(`Contacted by ${METHOD_WORD[method].toLowerCase()}.`, fu, n).replace(/\S+@\S+/g, "[address]") + (clearsCall ? " Queued call cleared." : ""), 300);
   const r = await db.batch([
-    db.prepare("UPDATE outreach_leads SET outreach_status = 'contacted', contact_method = ?, contacted_at = COALESCE(contacted_at, ?), last_contact_at = ?, follow_up_on = ?, outreach_note = ?, updated_at = ? WHERE id = ? AND outreach_status IS NULL AND status NOT IN ('dismissed', 'contacted', 'replied')").bind(method, at, at, fu, n, at, lead.id),
+    db.prepare(`UPDATE outreach_leads SET outreach_status = 'contacted', contact_method = ?, contacted_at = COALESCE(contacted_at, ?), last_contact_at = ?, follow_up_on = ?, outreach_note = ?${clearsCall ? ", call_on = NULL, call_note = NULL, call_queued_at = NULL" : ""}, updated_at = ? WHERE id = ? AND outreach_status IS NULL AND status NOT IN ('dismissed', 'contacted', 'replied')`).bind(method, at, at, fu, n, at, lead.id),
     db.prepare("INSERT INTO outreach_events (lead_id, at, type, detail) SELECT ?, ?, 'note', ? WHERE changes() = 1").bind(lead.id, at, detail), // only if the update above changed the lead (a second click at the same moment writes nothing)
   ]);
   if (!r[0].meta || r[0].meta.changes !== 1) return fail(409, "already_contacted");
@@ -979,6 +999,65 @@ export async function updateOutreach(env, leadId, { status, note, follow_up_on }
     eventStmt(db, lead.id, at, replied ? "replied" : "note", detailFor(replied ? "Marked as replied." : `Outreach status: ${OUTREACH_WORD[status]}.`, followUp, n)),
   ];
   await db.batch(stmts);
+  return { ok: true, lead: await getLead(db, leadId) };
+}
+
+/* ---------- Call queue: flag a lead to phone later, without contacting it (migration 0027) ---------- */
+
+/** The calendar day (YYYY-MM-DD) in Edmonton for an instant: the owner's "today". */
+export const edmontonDay = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton" }).format(new Date(iso));
+
+/** A queued call as the API shows it, or null. `overdue` = the day has passed; `today` = it is due today. Separate from outreach: it says nothing about whether the lead was contacted. */
+export function callOf(lead, atIso = new Date().toISOString()) {
+  if (!lead || !lead.call_on) return null;
+  const today = edmontonDay(atIso);
+  const days = Math.round((Date.parse(today + "T12:00:00Z") - Date.parse(lead.call_on + "T12:00:00Z")) / 86400000);
+  return { on: lead.call_on, note: lead.call_note || null, queued_at: lead.call_queued_at || null, overdue: lead.call_on < today, today: lead.call_on === today, days_overdue: days > 0 ? days : 0 };
+}
+
+/** A day to call: a real YYYY-MM-DD that is not before today (Edmonton). null when it is not. */
+export function callDate(value, atIso) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const t = Date.parse(value + "T00:00:00Z");
+  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== value) return null;
+  return value < edmontonDay(atIso) ? null : value;
+}
+
+/**
+ * "Queue Call" (and reschedule): flags a lead to phone on a day, with an optional reason. Nothing else about the lead changes: not its approval, not its outreach status
+ * or history, not its follow-up date. Not for a dismissed or opted-out lead. Queuing again moves the date and keeps when it was first queued.
+ */
+export async function queueCall(env, leadId, { call_on, note } = {}, ctx) {
+  const db = env.PORTAL_DB, at = ctx.at;
+  if (!(await callQueueReady(db, Date.parse(at)))) return fail(409, "not_set_up", { migration: CALL_MIGRATION });
+  const day = callDate(call_on, at);
+  if (!day) return fail(422, "validation_failed", { field: "call_on" });
+  if (note !== undefined && note !== null && typeof note !== "string") return fail(422, "validation_failed", { field: "note" });
+  const lead = await getLead(db, leadId);
+  if (!lead) return fail(404, "not_found");
+  if (isOptedOut(lead)) return fail(409, "opted_out");
+  if (lead.status === "dismissed") return fail(409, "lead_dismissed");
+  const n = trackNote(note);
+  const head = lead.call_on ? (lead.call_on === day ? `Call kept for ${day}.` : `Call rescheduled from ${lead.call_on} to ${day}.`) : `Call queued for ${day}.`;
+  const detail = clean([head, n ? `Note: ${n}` : ""].filter(Boolean).join(" ").replace(/\S+@\S+/g, "[address]"), 300);
+  await db.batch([
+    db.prepare("UPDATE outreach_leads SET call_on = ?, call_note = ?, call_queued_at = COALESCE(call_queued_at, ?), updated_at = ? WHERE id = ? AND status != 'dismissed'").bind(day, n, at, at, lead.id),
+    db.prepare("INSERT INTO outreach_events (lead_id, at, type, detail) SELECT ?, ?, 'note', ? WHERE changes() = 1").bind(lead.id, at, detail),
+  ]);
+  return { ok: true, lead: await getLead(db, leadId) };
+}
+
+/** Takes a lead out of the call queue (removed, or `done` when the call was made). Not in the queue already: nothing happens. Never changes the lead's status or outreach. */
+export async function clearCall(env, leadId, { done = false } = {}, ctx) {
+  const db = env.PORTAL_DB, at = ctx.at;
+  if (!(await callQueueReady(db, Date.parse(at)))) return fail(409, "not_set_up", { migration: CALL_MIGRATION });
+  const lead = await getLead(db, leadId);
+  if (!lead) return fail(404, "not_found");
+  if (!lead.call_on) return { ok: true, lead };
+  await db.batch([
+    db.prepare("UPDATE outreach_leads SET call_on = NULL, call_note = NULL, call_queued_at = NULL, updated_at = ? WHERE id = ? AND call_on IS NOT NULL").bind(at, lead.id),
+    db.prepare("INSERT INTO outreach_events (lead_id, at, type, detail) SELECT ?, ?, 'note', ? WHERE changes() = 1").bind(lead.id, at, done ? "Call made. Removed from the call queue." : "Removed from the call queue."),
+  ]);
   return { ok: true, lead: await getLead(db, leadId) };
 }
 

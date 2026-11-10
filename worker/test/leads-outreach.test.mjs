@@ -191,7 +191,7 @@ test("Admin UI: the button sits beside Approve and Dismiss, uses the existing pa
   const common = readFileSync(new URL("../../admin/assets/leads-common.js", import.meta.url), "utf8");
   for (const status of ["new", "approved", "ready"]) {
     const block = panel.slice(panel.indexOf(`l.status === "${status}"`), panel.indexOf("dismiss();", panel.indexOf(`l.status === "${status}"`)));
-    assert.match(block, /markContacted\(\);\s*$/, `Mark as Contacted comes right before Dismiss for ${status}`);
+    assert.match(block, /markContacted\(\); queueCall\(\);\s*$/, `Mark as Contacted, then Queue Call, then Dismiss for ${status}`);
   }
   assert.match(panel, /btn\("Mark as Contacted", "btn--secondary"/);
   assert.match(panel, /post\("\/contacted", r\)/); assert.match(out, /post\("\/outreach"/);
@@ -207,7 +207,7 @@ test("Admin UI: the contact-method options are one radio group of equal, fully c
   const out = readFileSync(new URL("../../admin/assets/lead-outreach.js", import.meta.url), "utf8");
   const css = readFileSync(new URL("../../admin/assets/admin.css", import.meta.url), "utf8");
   assert.match(out, /<?h\("fieldset", \{ class: "adm-field" \}, h\("legend", \{ text: "How did you contact them\?" \}\)/, "a fieldset with a legend names the group");
-  assert.match(out, /h\("label", \{ class: "ld-method" \}, h\("input", \{ type: "radio", name: "ld-method", value: id, required: true \}\)/, "each option is one label around its radio: the whole tile is the click target");
+  assert.match(out, /h\("label", \{ class: "ld-method" \}, h\("input", \{ type: "radio", name: "ld-method", value: id, required: true, checked: id === preset \? true : null \}\)/, "each option is one label around its radio: the whole tile is the click target");
   assert.ok(!/adm-choice/.test(out.slice(out.indexOf("markContactedDialog"), out.indexOf("const dueBadge"))), "no longer the generic choice style");
   const rule = (sel) => { const m = css.match(new RegExp("^" + sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " \\{([^}]*)\\}", "m")); return m ? m[1] : ""; };
   const tile = rule(".ld-oc-methods .ld-method");

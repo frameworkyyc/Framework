@@ -117,6 +117,7 @@ export function leadBrief(data, now = new Date()) {
     line("Follow-up date", o.follow_up_on ? text(o.follow_up_on, 10) : "", o.follow_up_on ? "Internal record" : ""),
     line("Outreach note", text(o.note, 300), "Internal record"));
   else L.push("- **Outreach status:** Not contacted yet");
+  if (l.call) L.push(line("Call queued", `${l.call.on}${l.call.overdue ? ` (overdue by ${l.call.days_overdue} day${l.call.days_overdue === 1 ? "" : "s"})` : l.call.today ? " (due today)" : ""}. A queued call is a reminder, not a contact`, "Internal record"), line("Why call", text(l.call.note, 300), "Internal record"));
   L.push(line("Notes", text(l.notes, 1500), "Internal record"), line("Note on the next step", text(l.next_action_note, 200), "Internal record"));
   L.push("", "### Contact history");
   if (events.length) events.forEach((e) => L.push(`- ${day(e.at)}: ${text(e.type, 30).replace(/_/g, " ")}${e.detail ? ` — ${text(e.detail, 300)}` : ""}`)); else L.push(`- ${NA}: nothing has happened with this lead yet.`);
