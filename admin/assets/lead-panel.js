@@ -6,6 +6,7 @@ import { h, api, errorState, confirmDialog, fmtDateTime, fmtDate } from "./ui.js
 import { badge, card, fold, navIcon, statCard } from "./kit.js";
 import { statusChip, outreachChip, view, SITE_WORDS, SITE_TONE, extLink, safeUrl, shortUrl, shortName, errText, copyText, iconLabel } from "./leads-common.js";
 import { pitchSection } from "./lead-pitch.js";
+import { leadBrief } from "./lead-brief.js";
 import { reviewScreen } from "./lead-review.js";
 import { markContactedDialog, outreachCard } from "./lead-outreach.js";
 import { swatch, pretty, fmt, when } from "./demo-traffic.js";
@@ -54,7 +55,7 @@ export async function render(id, ctx) {
       h("div", { class: "ld-ov__top" }, h("h1", { class: "adm-title", tabindex: "-1", text: shortName(l.name, l.city) }), statusChip(l), outreachChip(l.outreach)),
       h("p", { class: "ld-ov__meta" }, [l.trade, l.city].filter(Boolean).join(" · ")),
       links.length ? h("div", { class: "ld-links" }, links) : null,
-      bar.primary.length || bar.secondary.length ? h("div", { class: "adm-actions ld-acts" }, bar.primary, bar.secondary) : null,
+      h("div", { class: "adm-actions ld-acts" }, bar.primary, bar.secondary, bar.copy.button, bar.copy.say), bar.copy.manual,
       bar.hint ? h("p", { class: "ld-hint", role: "status", text: bar.hint }) : null);
   }
 
@@ -251,7 +252,24 @@ export async function render(id, ctx) {
       if (!l.contacted_at && !l.opted_out) btn("Reopen", "btn--primary", async () => { await post("/reopen"); await reload(); });
       else hint = l.opted_out ? "This business opted out, so it cannot be reopened." : "It was already contacted, so it cannot be reopened.";
     }
-    return { primary, secondary, hint };
+    return { primary, secondary, hint, copy: copyBrief() };
+  }
+
+  /* "Copy Lead Info": the whole prospect brief as Markdown, for pasting into ChatGPT. Built here from the lead already on screen (see lead-brief.js). */
+  function copyBrief() {
+    const label = h("span", { text: "Copy lead info" });
+    const button = h("button", { class: "btn btn--secondary ld-copybrief", type: "button" }, h("span", { class: "ld-ico" }, navIcon("copy"), label));
+    const say = h("span", { class: "ld-saved ld-copied", role: "status", "aria-live": "polite" });
+    const manual = h("textarea", { class: "input dt-link__manual", readonly: true, hidden: true, rows: "8", "aria-label": "Lead brief text" });
+    let timer = 0;
+    button.addEventListener("click", async () => {
+      const md = leadBrief(data);
+      window.clearTimeout(timer);
+      try { await navigator.clipboard.writeText(md); manual.hidden = true; say.textContent = "Copied"; }
+      catch { manual.hidden = false; manual.value = md; manual.focus(); manual.select(); say.textContent = "Copy the text below"; }
+      timer = window.setTimeout(() => { say.textContent = ""; }, 2500);
+    });
+    return { button, say, manual };
   }
 
   function openReview() {

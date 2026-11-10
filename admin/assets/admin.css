@@ -1181,6 +1181,7 @@ details[open] > .rk-fold__sum::after, details[open] > .rk-manage__sum::after { m
 .ld-links .adm-link { display: inline-flex; align-items: center; min-height: 40px; font-weight: 500; font-size: 15px; }
 .ld-acts { margin-top: var(--adm-space-2); }
 .ld-acts .btn { min-height: 44px; padding: 0 22px; font-size: 15px; }
+.ld-copied { align-self: center; min-width: 7ch; }
 .ld-sec { margin-top: clamp(24px, 4vw, 40px); }
 .ld-sec__title { margin: 0 0 var(--adm-space-2); font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--slate); }
 .ld-sub { margin: var(--adm-space-3) 0 var(--adm-space-1); font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--slate); }
