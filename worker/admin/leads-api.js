@@ -15,7 +15,7 @@ import {
   approveLead, dismissLead, reopenLead, markLead, addContact, confirmContact, draftMessage, draftFollowup, editMessage, approveMessage, unapproveMessage, previewSend, sendMessages,
 } from "../leads.js";
 import { emailConfig } from "../assessment.js";
-import { seoReady, markSiteWorking } from "../leads.js";
+import { seoReady, markSiteWorking, logContact, updateOutreach, outreachOf, trackingReady, TRACKING_MIGRATION, OUTREACH_STATUSES } from "../leads.js";
 import { scoreLead, parseAssessment, opportunityLevel } from "../seo-score.js";
 import { buildSeoReport, reportMarkdown, renderSeoPdf } from "../seo-report.js";
 
@@ -68,6 +68,7 @@ async function status(env, now) {
   await guard(async () => { forgetLeadsReady(db); out.ready = await leadsReady(db, now.getTime()); });
   await guard(async () => { out.setup.finder = await finderWaiting(env); });
   await guard(async () => { out.setup.tracking.ready = !!signingKey(env) && (await tablesReady(db, now.getTime())); });
+  await guard(async () => { out.setup.outreach_tracking = { ready: await trackingReady(db, now.getTime()), migration: TRACKING_MIGRATION }; });
   await guard(async () => { const c = emailConfig(env); out.setup.email = { configured: c.ok, from: c.ok ? c.from : null }; });
   await guard(async () => { const m = sendingMode(env); out.setup.sending = { mode: m.mode, test_recipient: maskEmail(m.test_recipient), blocked_reason: m.blocked ? m.blocked[1] : null }; });
   await guard(async () => { out.setup.mailing_address = !!mailingAddress(env); out.setup.sender_name = !!senderName(env); out.setup.webhook = { configured: webhookConfigured(env) }; });
@@ -84,6 +85,12 @@ async function list(url, env, now) {
   if (st !== "all" && !STATUSES.includes(st)) return bad("status");
   const q = clean(url.searchParams.get("q") || "", 100);
   if ((url.searchParams.get("q") || "").length > 200) return bad("q");
+  const oc = url.searchParams.get("outreach") || "";
+  if (oc && !["any", "none", ...OUTREACH_STATUSES].includes(oc)) return bad("outreach");
+  const tracking = await trackingReady(db, now.getTime());
+  const trackCols = tracking ? ", l.contact_method, l.last_contact_at, l.outreach_status, l.follow_up_on, l.outreach_note" : "";
+  /* where a lead stands in outreach: the logged status when there is one, else read from the lifecycle (emailed = Contacted, replied = Replied) */
+  const EFF = (tracking ? "COALESCE(l.outreach_status, " : "(") + "CASE l.status WHEN 'contacted' THEN 'contacted' WHEN 'replied' THEN 'replied' END)";
   const demo = await tablesReady(db, now.getTime());
   const D = (agg, extra = "") => `(SELECT ${agg} FROM demo_journeys j WHERE j.link_id = l.demo_link_id AND j.bot = 0${extra})`;
   const demoCols = demo ? `, ${D("COUNT(*)")} AS d_visits, ${D("COALESCE(SUM(j.demo_opens), 0)")} AS d_opens, (SELECT j.company FROM demo_journeys j WHERE j.link_id = l.demo_link_id AND j.bot = 0 AND j.company IS NOT NULL ORDER BY j.last_seen_at DESC LIMIT 1) AS d_company,
@@ -93,8 +100,9 @@ async function list(url, env, now) {
   const byOpportunity = seo && url.searchParams.get("sort") === "opportunity";
   const where = [], params = [];
   if (st !== "all") { where.push("l.status = ?"); params.push(st); }
+  if (oc === "any") where.push(`${EFF} IS NOT NULL`); else if (oc === "none") where.push(`${EFF} IS NULL`); else if (oc) { where.push(`${EFF} = ?`); params.push(oc); }
   if (q) { where.push("(l.name LIKE ? ESCAPE '\\' OR l.trade LIKE ? ESCAPE '\\' OR l.city LIKE ? ESCAPE '\\' OR l.website LIKE ? ESCAPE '\\')"); const p = `%${likeEscape(q)}%`; params.push(p, p, p, p); }
-  const rows = await all(db, `SELECT l.id, l.name, l.trade, l.city, l.status, l.reason, l.website, l.site_status, l.rating, l.review_count, l.updated_at, l.contacted_at, l.replied_at, l.dismiss_reason, l.demo_link_id${seoCols},
+  const rows = await all(db, `SELECT l.id, l.name, l.trade, l.city, l.status, l.reason, l.website, l.site_status, l.rating, l.review_count, l.updated_at, l.contacted_at, l.replied_at, l.dismiss_reason, l.demo_link_id${seoCols}${trackCols},
       EXISTS (SELECT 1 FROM outreach_contacts c WHERE c.lead_id = l.id AND c.type = 'email' AND c.eligibility = 'eligible' AND c.opted_out_at IS NULL AND NOT EXISTS (SELECT 1 FROM outreach_suppressions s WHERE s.email = lower(c.value))) AS has_eligible_email,
       EXISTS (SELECT 1 FROM outreach_contacts c WHERE c.lead_id = l.id AND c.type = 'email') AS has_email,
       (SELECT c.value FROM outreach_contacts c WHERE c.lead_id = l.id AND c.type = 'phone' ORDER BY c.id LIMIT 1) AS phone,
@@ -104,6 +112,8 @@ async function list(url, env, now) {
     FROM outreach_leads l ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY ${byOpportunity ? "l.seo_score IS NULL, l.seo_score DESC, " : ""}l.updated_at DESC, l.id LIMIT ${LIST_LIMIT}`, params);
   const counts = Object.fromEntries(STATUSES.map((s) => [s, 0]));
   for (const r of await all(db, "SELECT status, COUNT(*) AS n FROM outreach_leads GROUP BY status")) if (r.status in counts) counts[r.status] = r.n;
+  const outreachCounts = { any: 0, none: 0, ...Object.fromEntries(OUTREACH_STATUSES.map((x) => [x, 0])) };
+  for (const r of await all(db, `SELECT ${EFF} AS o, COUNT(*) AS n FROM outreach_leads l GROUP BY o`)) { if (r.o) { outreachCounts[r.o] = r.n; outreachCounts.any += r.n; } else outreachCounts.none += r.n; }
   const leads = rows.map((r) => {
     const optedOut = isOptedOut(r);
     const due = r.first_sent_at ? new Date(Date.parse(r.first_sent_at) + FOLLOWUP_DAYS * 86400000) : null;
@@ -114,11 +124,11 @@ async function list(url, env, now) {
       demo: demo && r.demo_link_id ? { visits: r.d_visits, opens: r.d_opens, company: r.d_company || null, enquired: r.d_enq > 0, last_activity: r.d_last || null } : null,
       next_action: nextAction(r, { hasEligible: flag(r.has_eligible_email), hasEmail: flag(r.has_email), msgStatus: r.msg_status, followup, followupLive: flag(r.followup_live) }),
       seo_score: seo && Number.isFinite(r.seo_score) ? r.seo_score : null, seo_level: seo ? opportunityLevel(Number.isFinite(r.seo_score) ? r.seo_score : null) : null, site_verified: seo && !!r.site_verified_at,
-      updated_at: r.updated_at, contacted_at: r.contacted_at, opted_out: optedOut,
+      updated_at: r.updated_at, contacted_at: r.contacted_at, opted_out: optedOut, outreach: outreachOf(r),
       source_note: r.reason && r.reason.includes(OLD_FINDER_NOTE) ? OLD_FINDER_NOTE : null,
     };
   });
-  return json({ counts, leads, limit: LIST_LIMIT, seo });
+  return json({ counts, outreach_counts: outreachCounts, leads, limit: LIST_LIMIT, seo, tracking });
 }
 
 /* ---------- One lead ---------- */
@@ -136,7 +146,7 @@ async function leadOut(env, lead, now) {
   const snap = parseAssessment(seoRaw);
   const sc = snap ? scoreLead(snap, lead) : null;
   const seo = sc ? { score: sc.score, level: opportunityLevel(sc.score), label: sc.label, coverage: sc.coverage, assessed_at: lead.seo_assessed_at || snap.assessedAt || null, components: sc.components.map(({ issues, ...c }) => c), report: seoView(lead) } : null;
-  return { ...rest, seo, opted_out: optedOut, next_action: nextAction(lead, { hasEligible: !!preferred, hasEmail: contacts.some((c) => c.type === "email"), msgStatus: msg && msg.status, followup, followupLive: !!live }) };
+  return { ...rest, seo, opted_out: optedOut, outreach: outreachOf(lead), next_action: nextAction(lead, { hasEligible: !!preferred, hasEmail: contacts.some((c) => c.type === "email"), msgStatus: msg && msg.status, followup, followupLive: !!live }) };
 }
 
 async function demoSection(env, lead, origin, includeBots, now) {
@@ -173,6 +183,7 @@ async function detail(url, env, id, origin, now) {
     approaches: APPROACHES,
     demo: await demoSection(env, lead, origin, url.searchParams.get("bots") === "1", now),
     timeline, sending: { mode: mode.mode, blocked_reason: mode.blocked ? mode.blocked[1] : null },
+    tracking: await trackingReady(db, now.getTime()),
   });
 }
 
@@ -324,6 +335,16 @@ async function siteWorking(body, env, id, ctx) {
   return r.ok ? json({ lead: await leadOut(env, r.lead, new Date(ctx.at)) }) : failure({ ...r, status: r.error === "not_found" ? 404 : 409 });
 }
 
+/** POST /leads/:id/contacted { method, note?, follow_up_on? }: "Mark as Contacted". POST /leads/:id/outreach { status, note?, follow_up_on? }: Replied, Interested, Not interested, Follow-up needed. */
+async function outreachAction(action, body, env, id, ctx) {
+  if (body.note !== undefined && body.note !== null && (typeof body.note !== "string" || body.note.length > 1000)) return bad("note");
+  if (body.follow_up_on !== undefined && body.follow_up_on !== null && typeof body.follow_up_on !== "string") return bad("follow_up_on");
+  const r = action === "contacted"
+    ? await logContact(env, id, { method: body.method, note: body.note, follow_up_on: body.follow_up_on }, ctx)
+    : await updateOutreach(env, id, { status: body.status, note: body.note, follow_up_on: body.follow_up_on }, ctx);
+  return leadResult(env, r, ctx);
+}
+
 export async function handleLeadsApi(request, env, principal, path, deps = {}) {
   const m = path.match(/^\/leads(\/.*)?$/);
   if (!m) return null;
@@ -332,7 +353,7 @@ export async function handleLeadsApi(request, env, principal, path, deps = {}) {
   if (!env.PORTAL_DB) return sub === "/status" && method === "GET" ? status(env, now) : json({ error: "database_unavailable" }, 503);
   try {
     if (sub === "/status") return method === "GET" ? await status(env, now) : notAllowed("GET");
-    const lead = sub.match(/^\/([^/]+)(?:\/(approve|dismiss|reopen|draft|followup|status|contacts|message|site-working|seo-report|seo-report\.pdf)(?:\/(\d+|approve|unapprove))?)?$/);
+    const lead = sub.match(/^\/([^/]+)(?:\/(approve|dismiss|reopen|draft|followup|status|contacts|message|site-working|contacted|outreach|seo-report|seo-report\.pdf)(?:\/(\d+|approve|unapprove))?)?$/);
     const fixed = sub.match(/^\/(sync|list|bulk|recheck-sites|send\/preview|send)$/);
     if (!fixed && !(lead && LEAD_ID.test(lead[1]))) return json({ error: "not_found" }, 404);
     if (!(await leadsReady(env.PORTAL_DB, now.getTime()))) return json({ error: "not_set_up", migration: MIGRATION }, 409);
@@ -384,6 +405,7 @@ export async function handleLeadsApi(request, env, principal, path, deps = {}) {
       return r.ok ? json({ contact: publicContact(r.contact) }) : failure(r);
     }
     if (action === "site-working") return await siteWorking(body, env, id, ctx);
+    if (action === "contacted" || action === "outreach") return await outreachAction(action, body, env, id, ctx);
     return await leadAction(action, body, env, principal, id, ctx);
   } catch (err) {
     console.error("admin leads api error:", err && err.message);
