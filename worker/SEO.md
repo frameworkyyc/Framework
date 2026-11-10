@@ -108,3 +108,31 @@ Claim or create the profile (category "Website designer" or "Web designer"; mark
 - Home and Branding titles are broadened to businesses in every industry; `/contractor-websites`, `/local-seo` and `/website-design` keep their contractor-focused wording.
 - `/nexus` carries no pricing, dates, customers or demo link. Feature labels (Implemented / Preview / Planned; Implemented does not mean publicly available) come from the Nexus content ledger (`frameworkyyc/nexus-site`, `docs/CONTENT-ACCURACY.md`) and must be re-checked before release. Screenshots in `assets/img/nexus/` are demonstration data.
 - The homepage revenue band is unchanged: the figure is the rounded-down sum of `client_revenue` (see `worker/revenue.js`); nothing is hard-coded.
+
+## Homepage visual layer (Staging)
+- The homepage alone loads `assets/css/home.css` and `assets/js/home.js` (about 9 KB and 1 KB). Everything is visible without JavaScript and under `prefers-reduced-motion`; the script only adds a `js` class and reveals sections on scroll. The H1, title, description, canonical, structured data and every internal link are unchanged from the Production release.
+- The Nexus teaser uses only the existing Nexus identity (the tracked NEXUS wordmark and the N mark from the Nexus favicon), says "In Development", and links to `/nexus`, where the real screenshots and the status-labelled feature list live.
+- The revenue band is untouched: the figure is the rounded-down sum of `client_revenue` (`worker/revenue.js`), never hard-coded.
+
+## Illustration system and homepage showcase (Staging)
+- **Linework illustrations:** four original isometric technical drawings (website, SEO, branding, systems) in `assets/img/ill/{website,seo,branding,systems}-{light,dark}.svg`, for presentations and marketing. The homepage inlines the same drawings (so CSS can animate them); their shared rules (`.ill`, `.lyr`, `.dr`, `.dim`, `.hl`) are at the end of `assets/css/home.css`. They are drawn in `currentColor`, so one drawing works light on dark and dark on light. Layers part and the highlighted pathway draws on scroll; both are static under `prefers-reduced-motion` and without JavaScript.
+- **Work previews:** `assets/img/work/*-desktop.webp` and `*-mobile.webp` are screenshots rendered from the current `main` branch of each client's repository (Aurora `af3a48e`, Red E Corp. `8d77985`, Eagle's Nest `2fa9b30`), 1440x900 and a 390px phone view. Replace them from the live sites when their addresses are confirmed.
+- **Structure:** `.ruled` sections draw thin vertical lines at the content edges; eyebrows carry numbers (`data-n`). The Method list is an ordered list of the six real stages (Discover, Define, Design, Build, Launch, Grow).
+
+## Dark theme and showcases (Staging)
+- `assets/css/theme.css` is the one dark layer for every public page: near-black `#090909` page, `#141414` secondary surfaces, `#262626` rules, near-white text. It keeps the token names (`--ink` is the strong colour) and swaps their values; `.section--ink` re-flips locally so inverse bands become a `#141414` surface.
+- `--frame-gap` (28px desktop, 22px tablet, 18px mobile) is the space between the vertical framing lines (`.ruled`) and the content they frame.
+- Titles, meta, canonicals, structured data, sitemap and redirects are unchanged. The Contact page H1 is now "How can we help?" (the title and meta are unchanged); the three route cards link to the existing form (`#start`), the client portal and `hello@frameworkco.ca`.
+- Work and Nexus previews are real captures only (`assets/img/work/*`, `assets/img/nexus/*`); project text and links stay HTML.
+
+## Homepage testimonials (Staging)
+- A compact banner directly after Selected Work: heading left, one quote at a time right, thin ruled lines, no logos or screenshots (about 385px tall on desktop and 410px on mobile, down from about 918px and 901px).
+- Three quotes from the admin feedback records, each reviewed and carrying testimonial permission ("Yes, attributed to my business only") and logo permission ("Yes"): Aurora Surveys, Eagle's Nest Resort, Red E Corp. Attribution is the business name only, as granted, with a link to the project.
+- Each headline is a verbatim sentence of the approved quote; the full original sits in a "Read the full testimonial" disclosure (Aurora's quote is already complete, so it has none). `worker/test/home-testimonials.test.mjs` pins the wording.
+- `assets/js/testimonials.js`: cross-fade, previous/next, 01 / 03 count, Pause/Play, 9 s rotation, paused on hover/focus/expanded quote/hidden tab/off-screen, no rotation under reduced motion. Without JavaScript all three are listed in the page, so the text is always crawlable. No review structured data is added.
+
+## Combined client revenue band (Staging)
+- The homepage band shows a stated floor of $3,000,000+ (`data-floor="3000000"` on the band in `index.html`). This is an editorial statement of Framework's combined client base, not a database row; the feedback records and `client_revenue` are unchanged, and no records were created.
+- `assets/js/results.js` shows the larger of the floor and the `/api/client-revenue` total, and the floor alone when the API returns nothing or fails, so the band no longer disappears when the database has no figures. The counter animation is unchanged (reduced motion shows the final figure).
+- Disclaimer: "Combined annual revenue of Framework clients. Not revenue generated by Framework."
+- To change the figure, edit the one attribute. Keep the supporting source for the number on file, since the feedback records alone support a lower figure.
