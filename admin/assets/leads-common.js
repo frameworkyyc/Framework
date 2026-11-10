@@ -9,7 +9,7 @@ const TONE = { new: "pending", approved: "pending", ready: "warn", contacted: "o
 export const statusChip = (lead) => badge(lead.opted_out ? "Opted out" : statusWord(lead.status), lead.opted_out ? "bad" : TONE[lead.status] || "");
 
 /** The list filter the person last chose, so Back from a lead returns to the same list. */
-export const view = { status: null, q: "", outreach: "" };
+export const view = { status: null, q: "", outreach: "", callq: false };
 
 /** Outreach: how a lead was contacted by hand and where it stands (Admin -> Leads, migration 0026). The lifecycle status above is the approval; this is separate. */
 export const METHODS = Object.freeze([["text", "Text"], ["email", "Email"], ["phone", "Phone"], ["facebook", "Facebook"], ["other", "Other"]]);
@@ -19,6 +19,11 @@ const OUTREACH_TONE = { contacted: "ok", replied: "ok", interested: "ok", not_in
 export const dayWord = (day) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day || "")); return m ? new Intl.DateTimeFormat("en-CA", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12))) : String(day || ""); };
 /** The Contacted indicator: the status, and how it was contacted. `full` adds nothing visual but keeps one place to change it. */
 export const outreachChip = (o) => (o ? badge(o.method_word && o.status === "contacted" ? `Contacted · ${o.method_word}` : o.status_word, OUTREACH_TONE[o.status] || "") : null);
+
+/** Call queue (migration 0027): a lead flagged to phone later. A subtle yellow "Pending · Call" next to the status; separate from approval and outreach. */
+export const callChip = (call) => (call ? badge("Pending · Call", "warn") : null);
+/** "Overdue · 2 days" (red), "Due today" (yellow) or nothing for a call still ahead. */
+export const callDue = (call) => (!call ? null : call.overdue ? badge(`Overdue · ${call.days_overdue} day${call.days_overdue === 1 ? "" : "s"}`, "bad") : call.today ? badge("Due today", "warn") : null);
 
 export const SITE_WORDS = { none: "No website", social_only: "Facebook page only", offline: "Website is offline", broken: "Reported offline, not confirmed", unverified: "Not verified (may be protected)", online: "Website is online", outdated: "Outdated website", ok: "Website looks fine" };
 /** Chip tone per website status: only a confirmed offline site is a warning; "not verified" and "not confirmed" are neutral, never alarming. */
@@ -82,6 +87,8 @@ const CODES = {
 export function errText(err) {
   const code = (err && (err.code || (err.data && err.data.error))) || "error";
   if (code === "not_set_up" && err && err.data && err.data.migration === "0026_outreach_tracking.sql") return "Outreach tracking isn’t set up yet: migration 0026 is waiting for approval.";
+  if (code === "not_set_up" && err && err.data && err.data.migration === "0027_call_queue.sql") return "The call queue isn’t set up yet: migration 0027 is waiting for approval.";
+  if (code === "validation_failed" && err && err.data && err.data.field === "call_on") return "Pick today or a later day to call.";
   return CODES[code] || `That didn’t complete (${String(code).replace(/_/g, " ")}). Nothing was changed.`;
 }
 export const codeText = (code) => (code ? CODES[code] || String(code).replace(/_/g, " ") : "Failed");

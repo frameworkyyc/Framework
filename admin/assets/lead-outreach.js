@@ -9,16 +9,16 @@ import { OUTREACH, METHODS, outreachChip, errText, dayWord } from "./leads-commo
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Edmonton" }); // YYYY-MM-DD
 
 /** The "Mark as Contacted" form in a dialog. Resolves { method, note, follow_up_on } or null when cancelled. */
-export function markContactedDialog(lead) {
+export function markContactedDialog(lead, { method: preset } = {}) {
   return new Promise((resolve) => {
     const err = h("p", { class: "adm-field__error", role: "alert", hidden: true });
-    const radios = METHODS.map(([id, label]) => h("label", { class: "ld-method" }, h("input", { type: "radio", name: "ld-method", value: id, required: true }), h("span", { text: label })));
+    const radios = METHODS.map(([id, label]) => h("label", { class: "ld-method" }, h("input", { type: "radio", name: "ld-method", value: id, required: true, checked: id === preset ? true : null }), h("span", { text: label })));
     const note = h("textarea", { class: "input", id: "ld-oc-note", rows: "3", maxlength: "200", placeholder: "What was said, who you spoke to (optional)" });
     const when = h("input", { class: "input", id: "ld-oc-when", type: "date", min: today() });
     const dialog = h("dialog", { class: "adm-dialog ld-ocdlg", "aria-labelledby": "ld-oc-title" },
       h("form", { method: "dialog" },
         h("h2", { id: "ld-oc-title", text: "Mark as Contacted" }),
-        h("p", { text: `${lead.name}. Their approval and all their details stay as they are.` }),
+        h("p", { text: `${lead.name}. Their approval and all their details stay as they are.` + (lead.call ? " Choosing Phone also clears their queued call." : "") }),
         h("fieldset", { class: "adm-field" }, h("legend", { text: "How did you contact them?" }), h("div", { class: "ld-oc-methods" }, radios)),
         h("div", { class: "adm-field" }, h("label", { for: "ld-oc-note", text: "Notes (optional)" }), note),
         h("div", { class: "adm-field" }, h("label", { for: "ld-oc-when", text: "Follow up on (optional)" }), when, h("p", { class: "adm-field__hint", text: "The date and time you contacted them are recorded automatically." })),

@@ -4,11 +4,12 @@
 
 import { h, api, errorState, confirmDialog, fmtDateTime, fmtDate } from "./ui.js";
 import { badge, card, fold, navIcon, statCard } from "./kit.js";
-import { statusChip, outreachChip, view, SITE_WORDS, SITE_TONE, extLink, safeUrl, shortUrl, shortName, errText, copyText, iconLabel } from "./leads-common.js";
+import { statusChip, outreachChip, callChip, callDue, dayWord, view, SITE_WORDS, SITE_TONE, extLink, safeUrl, shortUrl, shortName, errText, copyText, iconLabel } from "./leads-common.js";
 import { pitchSection } from "./lead-pitch.js";
 import { leadBrief } from "./lead-brief.js";
 import { reviewScreen } from "./lead-review.js";
 import { markContactedDialog, outreachCard } from "./lead-outreach.js";
+import { queueCallDialog, callCard } from "./lead-call.js";
 import { swatch, pretty, fmt, when } from "./demo-traffic.js";
 
 const EVENT_WORD = { imported: "Found by the finder", approved: "Approved", dismissed: "Dismissed", reopened: "Reopened", draft: "Draft written", edited: "Draft edited", email_approved: "Email approved", email_unapproved: "Email unapproved",
@@ -52,8 +53,9 @@ export async function render(id, ctx) {
     const l = data.lead;
     const links = [l.website ? extLink(l.website, siteHost(l.website), "adm-link") : null, extLink(l.maps_url, "Google Maps", "adm-link")].filter(Boolean);
     return h("header", { class: "ld-ov" },
-      h("div", { class: "ld-ov__top" }, h("h1", { class: "adm-title", tabindex: "-1", text: shortName(l.name, l.city) }), statusChip(l), outreachChip(l.outreach)),
+      h("div", { class: "ld-ov__top" }, h("h1", { class: "adm-title", tabindex: "-1", text: shortName(l.name, l.city) }), statusChip(l), outreachChip(l.outreach), callChip(l.call)),
       h("p", { class: "ld-ov__meta" }, [l.trade, l.city].filter(Boolean).join(" · ")),
+      l.call ? h("p", { class: "ld-ov__call" }, "Call " + dayWord(l.call.on), " ", callDue(l.call)) : null,
       links.length ? h("div", { class: "ld-links" }, links) : null,
       h("div", { class: "adm-actions ld-acts" }, bar.primary, bar.secondary, bar.copy.button, bar.copy.say), bar.copy.manual,
       bar.hint ? h("p", { class: "ld-hint", role: "status", text: bar.hint }) : null);
@@ -199,7 +201,7 @@ export async function render(id, ctx) {
   /** Outreach: contacts always; the pitch once there is a draft to work on; the demo link once it exists. */
   function outreach() {
     const l = data.lead, d = data.demo || {};
-    return h("div", { class: "ld-out" }, outreachCard({ lead: l, tracking: data.tracking !== false, post, reload, notify: ctx.notify }), contacts(), l.status === "new" ? null : pitchSection({ data, reload, ctl }), d.link ? demo() : null);
+    return h("div", { class: "ld-out" }, callCard({ lead: l, ready: data.call_queue !== false, reschedule: rescheduleCall, remove: removeCall, made: callMade }), outreachCard({ lead: l, tracking: data.tracking !== false, post, reload, notify: ctx.notify }), contacts(), l.status === "new" ? null : pitchSection({ data, reload, ctl }), d.link ? demo() : null);
   }
 
   function actionBar() {
@@ -221,20 +223,32 @@ export async function render(id, ctx) {
       if (data.tracking === false) { b.disabled = true; hint = hint || "Mark as Contacted is waiting for migration 0026 to be approved."; }
     };
 
+    /* "Queue Call": flag them to phone later (default tomorrow). It is a reminder, not a contact: approval and outreach are left alone. Once queued, "Call made" is the action. */
+    const queueCall = () => {
+      if (l.opted_out || l.status === "dismissed" || l.status === "won") return;
+      if (l.call) { btn("Call made", "btn--secondary", async (x) => { await callMade(); x.disabled = false; }); return; }
+      const b = btn("Queue Call", "btn--secondary", async (x) => {
+        const r = await queueCallDialog({ names: l.name });
+        if (!r) { x.disabled = false; return; }
+        try { await post("/call", r); ctx.notify("Call queued for " + dayWord(r.call_on) + "."); await reload(); } catch (e) { x.disabled = false; ctx.notify(errText(e)); }
+      });
+      if (data.call_queue === false) { b.disabled = true; hint = (hint ? hint + " " : "") + "Queue Call is waiting for migration 0027 to be approved."; }
+    };
+
     if (l.status === "new") {
       btn("Approve", "btn--primary", async () => { await post("/approve"); await reload(); });
-      markContacted();
+      markContacted(); queueCall();
       dismiss();
     } else if (l.status === "approved") {
       const b = btn("Approve email", "btn--primary", async () => { if (ctl.pitch && ctl.pitch.dirty()) await ctl.pitch.save(); await post("/message/approve"); await reload(); });
       if (!m) { b.disabled = true; hint = "Create a draft email first (see Pitch below)."; }
       else if (m.blockers.length) { b.disabled = true; hint = m.blockers.join(" "); }
-      markContacted();
+      markContacted(); queueCall();
       dismiss();
     } else if (l.status === "ready") {
       btn("Review & send", "btn--primary", async (b) => { openReview(); b.disabled = false; });
       btn("Edit", "btn--secondary", async (b) => { const s = document.getElementById("ld-pitch-section"); if (s) s.scrollIntoView(); const f = document.getElementById("ld-subject"); if (f) f.focus({ preventScroll: true }); b.disabled = false; });
-      markContacted();
+      markContacted(); queueCall();
       dismiss();
     } else if (l.status === "contacted") {
       btn("Mark replied", "btn--primary", confirmed({ title: "Mark this lead as replied?", body: "Use this when they have answered you. It moves to Replied.", details: [["Business", l.name]], confirmLabel: "Mark replied" }, async () => { await post("/status", { status: "replied" }); await reload(); }));
@@ -245,14 +259,43 @@ export async function render(id, ctx) {
         const fb = btn("Draft follow-up", "btn--secondary", async () => { await post("/followup"); await reload(); });
         if (Date.now() < due) { fb.disabled = true; hint = "A follow-up can be drafted from " + fmt(when, new Date(due).toISOString()) + "."; }
       }
+      queueCall();
       btn("Opt-out", "btn--secondary", confirmed({ title: "Record an opt-out?", body: "They asked not to be contacted. All of their addresses are blocked and the lead is dismissed. This cannot be undone.", details: [["Business", l.name]], confirmLabel: "Record opt-out" }, async () => { await post("/status", { status: "optout" }); await reload(); }));
     } else if (l.status === "replied") {
       btn("Mark won", "btn--primary", confirmed({ title: "Mark this lead as won?", body: "They are now a client. This moves to Won.", details: [["Business", l.name]], confirmLabel: "Mark won" }, async () => { await post("/status", { status: "won" }); await reload(); }));
+      queueCall();
     } else if (l.status === "dismissed") {
       if (!l.contacted_at && !l.opted_out) btn("Reopen", "btn--primary", async () => { await post("/reopen"); await reload(); });
       else hint = l.opted_out ? "This business opted out, so it cannot be reopened." : "It was already contacted, so it cannot be reopened.";
     }
     return { primary, secondary, hint, copy: copyBrief() };
+  }
+
+  /* The queued call: reschedule it, remove it, or record that the call was made. */
+  async function rescheduleCall() {
+    const l = data.lead;
+    const r = await queueCallDialog({ title: "Reschedule call", names: l.name, current: l.call, confirmLabel: "Reschedule" });
+    if (!r) return;
+    try { await post("/call", r); ctx.notify("Call moved to " + dayWord(r.call_on) + "."); await reload(); } catch (e) { ctx.notify(errText(e)); }
+  }
+  async function removeCall() {
+    const l = data.lead;
+    if (!(await confirmDialog({ title: "Remove from the call queue?", body: "They are not marked as contacted. Their approval and outreach stay as they are.", details: [["Business", l.name]], confirmLabel: "Remove from queue" }))) return;
+    try { await post("/call-clear", {}); ctx.notify("Removed from the call queue."); await reload(); } catch (e) { ctx.notify(errText(e)); }
+  }
+  /* "Call made": a lead not contacted yet goes through Mark as Contacted with Phone ready (which clears the call); one already contacted just leaves the queue */
+  async function callMade() {
+    const l = data.lead;
+    try {
+      if (l.outreach) {
+        if (!(await confirmDialog({ title: "Call made?", body: "It leaves the call queue. Its outreach history is not changed.", details: [["Business", l.name]], confirmLabel: "Call made" }))) return;
+        await post("/call-clear", { done: true }); ctx.notify("Call recorded. Removed from the queue."); await reload();
+      } else {
+        const r = await markContactedDialog(l, { method: "phone" });
+        if (!r) return;
+        await post("/contacted", r); ctx.notify(r.method === "phone" ? "Marked as contacted by phone. Call cleared." : "Marked as contacted. The queued call is still waiting."); await reload();
+      }
+    } catch (e) { ctx.notify(errText(e)); }
   }
 
   /* "Copy Lead Info": the whole prospect brief as Markdown, for pasting into ChatGPT. Built here from the lead already on screen (see lead-brief.js). */

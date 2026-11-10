@@ -3,7 +3,8 @@
 
 import { h, api, errorState, stateBlock, confirmDialog } from "./ui.js";
 import { badge, emptyState, fold, navIcon } from "./kit.js";
-import { STATUSES, statusWord, view, shortName, leadsTabs, errText, OUTREACH, outreachChip, dayWord } from "./leads-common.js";
+import { STATUSES, statusWord, view, shortName, leadsTabs, errText, OUTREACH, outreachChip, callChip, callDue, dayWord } from "./leads-common.js";
+import { queueCallDialog } from "./lead-call.js";
 import { reviewScreen } from "./lead-review.js";
 
 export async function render(ctx) {
@@ -59,7 +60,8 @@ function leadRow(l, { selectable, selected, onToggle, showStatus }) {
     box,
     h("a", { class: "ld-row__link", href: "/admin/leads/" + encodeURIComponent(l.id), "data-link": "" },
       h("span", { class: "ld-row__main" }, h("span", { class: "ld-row__name", text: shortName(l.name, l.city) }), h("span", { class: "ld-row__meta", text: meta }),
-        l.outreach ? h("span", { class: "ld-row__out" }, outreachChip(l.outreach), l.outreach.follow_up_on ? h("span", { class: "ld-row__meta", text: "Follow up " + dayWord(l.outreach.follow_up_on) }) : null) : null),
+        l.outreach ? h("span", { class: "ld-row__out" }, outreachChip(l.outreach), l.outreach.follow_up_on ? h("span", { class: "ld-row__meta", text: "Follow up " + dayWord(l.outreach.follow_up_on) }) : null) : null,
+        l.call ? h("span", { class: "ld-row__out" }, callChip(l.call), h("span", { class: "ld-row__meta", text: "Call " + dayWord(l.call.on) }), callDue(l.call)) : null),
       h("span", { class: "ld-row__score ld-row__score--" + (scored ? l.seo_level : "none") }, h("span", { class: "rk-sr", text: "SEO opportunity score " }), h("span", { text: scored ? String(l.seo_score) : "–" })),
       navIcon("chevron")));
 }
@@ -68,7 +70,7 @@ function leadRow(l, { selectable, selected, onToggle, showStatus }) {
 
 function renderList(ctx) {
   const selected = new Set();
-  let st = null, data = null, status = null, q = view.q || "", outreach = view.outreach || "", loadToken = 0;
+  let st = null, data = null, status = null, q = view.q || "", outreach = view.outreach || "", callQ = !!view.callq, loadToken = 0;
   const initial = ctx.url.searchParams.get("status");
   if (initial && (initial === "all" || STATUSES.some(([id]) => id === initial))) status = initial;
   else status = view.status;
@@ -80,7 +82,7 @@ function renderList(ctx) {
   search.addEventListener("input", () => { window.clearTimeout(timer); timer = window.setTimeout(() => { q = search.value.trim(); view.q = q; selected.clear(); loadList(); }, 250); });
   /* Outreach: contacted leads stay in the list and can be found by where they stand (any status of the lead; choosing one shows All leads) */
   const outSel = h("select", { class: "input ld-outsel", id: "ld-outsel", "aria-label": "Filter by outreach status" });
-  outSel.addEventListener("change", () => { outreach = outSel.value; view.outreach = outreach; if (outreach) { status = "all"; view.status = "all"; } selected.clear(); drawFilter(); loadList(); });
+  outSel.addEventListener("change", () => { outreach = outSel.value; view.outreach = outreach; if (outreach) { status = "all"; view.status = "all"; callQ = false; view.callq = false; } selected.clear(); drawFilter(); loadList(); });
   const filterBox = h("div", null, segBox, h("div", { class: "ld-filters" }, search, outSel));
   const listBox = h("div");
   const barBox = h("div", { class: "ld-barbox" });
@@ -136,23 +138,25 @@ function renderList(ctx) {
   function drawFilter() {
     const counts = (data && data.counts) || {};
     const total = Object.values(counts).reduce((a, b) => a + (Number(b) || 0), 0);
-    const btn = (id, label, n) => h("button", { class: "ld-seg__btn", type: "button", "aria-pressed": status === id ? "true" : "false", onclick: () => choose(id) }, label, n === null ? null : h("span", { class: "ld-seg__n", text: String(n) }));
+    const btn = (id, label, n) => h("button", { class: "ld-seg__btn", type: "button", "aria-pressed": status === id && !callQ ? "true" : "false", onclick: () => choose(id) }, label, n === null ? null : h("span", { class: "ld-seg__n", text: String(n) }));
+    const cc = (data && data.call_counts) || {};
+    const callBtn = data && data.call_queue ? h("button", { class: "ld-seg__btn ld-seg__btn--call", type: "button", "aria-pressed": callQ ? "true" : "false", title: cc.overdue ? `${cc.overdue} overdue` : null, onclick: () => choose("callq") }, "Call Queue", h("span", { class: "ld-seg__n", text: String(Number(cc.queued) || 0) })) : null;
     segBox.replaceChildren(h("div", { class: "ld-seg", role: "group", "aria-label": "Filter by status" },
-      STATUSES.map(([id, label]) => btn(id, label, Number(counts[id]) || 0)), btn("all", "All", total)));
+      STATUSES.map(([id, label]) => btn(id, label, Number(counts[id]) || 0)), btn("all", "All", total), callBtn));
     const oc = (data && data.outreach_counts) || {};
     const opt = (v, label, n) => h("option", { value: v, selected: outreach === v ? true : null }, n === undefined ? label : `${label} (${Number(n) || 0})`);
     outSel.replaceChildren(opt("", "All outreach"), opt("any", "Contacted (any status)", oc.any), opt("none", "Not contacted yet", oc.none), ...OUTREACH.map(([id, label]) => opt(id, label, oc[id])));
     outSel.value = outreach;
   }
 
-  function choose(id) { status = id; view.status = id; outreach = ""; view.outreach = ""; selected.clear(); drawFilter(); loadList(); }
+  function choose(id) { callQ = id === "callq"; view.callq = callQ; status = callQ ? "all" : id; view.status = status; outreach = ""; view.outreach = ""; selected.clear(); drawFilter(); loadList(); }
 
   /* list */
   async function loadList() {
     const token = ++loadToken;
     if (!data) listBox.replaceChildren(stateBlock({ title: "Loading leads…" }));
     try {
-      const qs = `status=${encodeURIComponent(status || "new")}` + (q ? `&q=${encodeURIComponent(q)}` : "") + (outreach ? `&outreach=${encodeURIComponent(outreach)}` : "") + "&sort=opportunity";
+      const qs = `status=${encodeURIComponent(status || "new")}` + (q ? `&q=${encodeURIComponent(q)}` : "") + (outreach ? `&outreach=${encodeURIComponent(outreach)}` : "") + (callQ ? "&call=queued" : "") + "&sort=opportunity";
       let r = await api("/leads/list?" + qs);
       if (token !== loadToken) return;
       if (!status) { // first load: New if it has any, else Approved or Ready to send, else All
@@ -169,9 +173,9 @@ function renderList(ctx) {
 
   function drawList() {
     const leads = data.leads || [];
-    const selectable = Boolean(BULK[status]);
+    const selectable = Boolean(BULK[status]) || callQ;
     if (!leads.length) {
-      listBox.replaceChildren(outreach && !q ? emptyState({ title: "No leads match that outreach filter", body: "Mark a lead as contacted from its page and it appears here." }) : q ? emptyState({ title: "No leads match that search", body: "Try a different name, trade or city." })
+      listBox.replaceChildren(callQ && !q ? emptyState({ title: "No calls queued", body: "Use Queue Call on a lead to flag it to phone later. It stays a reminder: it does not mark the lead as contacted." }) : outreach && !q ? emptyState({ title: "No leads match that outreach filter", body: "Mark a lead as contacted from its page and it appears here." }) : q ? emptyState({ title: "No leads match that search", body: "Try a different name, trade or city." })
         : emptyState({ title: status === "all" ? "No leads yet" : `Nothing in ${status === "ready" ? "Ready to send" : statusWord(status)}`, body: status === "new" || status === "all" ? "New candidates appear here as the finder discovers them. Tap “Check for new candidates”." : "Leads move here as you work through them." }));
       return;
     }
@@ -182,10 +186,10 @@ function renderList(ctx) {
   }
 
   /* bulk bar */
-  async function bulk(action, ids) {
+  async function bulk(action, ids, extra = {}) {
     const done = { ok: 0, bad: [] };
     for (let i = 0; i < ids.length; i += 50) {
-      const r = await api("/leads/bulk", { method: "POST", body: { action, ids: ids.slice(i, i + 50) } });
+      const r = await api("/leads/bulk", { method: "POST", body: { action, ids: ids.slice(i, i + 50), ...extra } });
       (r.results || []).forEach((x) => (x.ok ? (done.ok += 1) : done.bad.push(x.error || "failed")));
     }
     return done;
@@ -193,11 +197,29 @@ function renderList(ctx) {
 
   function drawBar() {
     const n = selected.size;
-    if (!n || !BULK[status]) { barBox.replaceChildren(); return; }
+    if (!n || (!BULK[status] && !callQ)) { barBox.replaceChildren(); return; }
     const ids = [...selected];
     const acts = [];
     const busy = (btn, fn) => async () => { btn.disabled = true; try { await fn(); } finally { btn.disabled = false; } };
-    if (status === "new") {
+    /* Queue Call for everything ticked: one date and note for all of them. Nothing about their approval or outreach changes. */
+    const queueMany = (label, title) => {
+      const b = h("button", { class: "btn btn--secondary", type: "button" }, label);
+      b.addEventListener("click", busy(b, async () => {
+        const r = await queueCallDialog({ title, names: plural(n, "lead"), confirmLabel: title });
+        if (!r) return;
+        try { const d = await bulk("queue_call", ids, r); ctx.notify(`Call queued for ${plural(d.ok, "lead")} on ${dayWord(r.call_on)}.` + (d.bad.length ? ` ${d.bad.length} could not be queued.` : "")); selected.clear(); await loadList(); }
+        catch (err) { ctx.notify(errText(err)); }
+      }));
+      return b;
+    };
+    if (callQ) {
+      const remove = h("button", { class: "btn btn--secondary", type: "button" }, "Remove from queue");
+      remove.addEventListener("click", busy(remove, async () => {
+        if (!(await confirmDialog({ title: `Remove ${plural(n, "lead")} from the call queue?`, body: "They are not marked as contacted. Their approval and outreach stay as they are.", confirmLabel: "Remove from queue" }))) return;
+        try { const d = await bulk("clear_call", ids); ctx.notify(`Removed ${plural(d.ok, "lead")} from the call queue.`); selected.clear(); await loadList(); } catch (err) { ctx.notify(errText(err)); }
+      }));
+      acts.push(queueMany("Reschedule selected", "Reschedule call"), remove);
+    } else if (status === "new") {
       const approve = h("button", { class: "btn btn--primary", type: "button" }, "Approve selected");
       approve.addEventListener("click", busy(approve, async () => {
         try { const d = await bulk("approve", ids); ctx.notify(`Approved ${plural(d.ok, "lead")}.` + (d.bad.length ? ` ${d.bad.length} could not be approved.` : "")); selected.clear(); await loadList(); }
@@ -210,9 +232,11 @@ function renderList(ctx) {
         catch (err) { ctx.notify(errText(err)); }
       }));
       acts.push(approve, dismiss);
+      if (data && data.call_queue) acts.push(queueMany("Queue Call", "Queue Call"));
     } else {
       const label = status === "approved" ? "Review emails" : "Review & send";
       acts.push(h("button", { class: "btn btn--primary", type: "button", onclick: () => openReview(ids, status === "approved" ? "approve" : "send") }, label));
+      if (data && data.call_queue) acts.push(queueMany("Queue Call", "Queue Call"));
     }
     barBox.replaceChildren(h("div", { class: "ld-bulk", role: "region", "aria-label": "Selected leads" },
       h("span", { class: "ld-bulk__n", text: `${n} selected` }), h("div", { class: "ld-bulk__acts" }, acts),
