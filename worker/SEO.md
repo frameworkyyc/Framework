@@ -126,6 +126,7 @@ Claim or create the profile (category "Website designer" or "Web designer"; mark
 - Work and Nexus previews are real captures only (`assets/img/work/*`, `assets/img/nexus/*`); project text and links stay HTML.
 
 ## Homepage testimonials (Staging)
-- Three quotes from the admin feedback records, each reviewed and carrying testimonial permission ("Yes, attributed to my business only") and logo permission ("Yes"): Aurora Surveys, Eagle's Nest Resort, Red E Corp. Attribution is the business name only, as granted. Quotes are verbatim; `worker/test/home-testimonials.test.mjs` pins them.
-- Logos live in `assets/img/clients/` (from each client's own site repo). Eagle's Nest's logo is dark on cream, so it sits on its own cream plate.
-- `assets/js/testimonials.js`: one slide at a time (cross-fade), previous/next, 01 / 03 count, Pause/Play button, 9 s rotation, paused on hover/focus/hidden tab/off-screen, no rotation under reduced motion. Without JavaScript all three are listed in the page, so the text is always crawlable. No review structured data is added.
+- A compact banner directly after Selected Work: heading left, one quote at a time right, thin ruled lines, no logos or screenshots (about 385px tall on desktop and 410px on mobile, down from about 918px and 901px).
+- Three quotes from the admin feedback records, each reviewed and carrying testimonial permission ("Yes, attributed to my business only") and logo permission ("Yes"): Aurora Surveys, Eagle's Nest Resort, Red E Corp. Attribution is the business name only, as granted, with a link to the project.
+- Each headline is a verbatim sentence of the approved quote; the full original sits in a "Read the full testimonial" disclosure (Aurora's quote is already complete, so it has none). `worker/test/home-testimonials.test.mjs` pins the wording.
+- `assets/js/testimonials.js`: cross-fade, previous/next, 01 / 03 count, Pause/Play, 9 s rotation, paused on hover/focus/expanded quote/hidden tab/off-screen, no rotation under reduced motion. Without JavaScript all three are listed in the page, so the text is always crawlable. No review structured data is added.
