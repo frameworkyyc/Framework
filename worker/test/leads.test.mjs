@@ -55,7 +55,7 @@ function finderDb() {
 }
 
 function world({ migrated = true, finder = true, env = {} } = {}) {
-  const db = openPortalDb({ skip: migrated ? ["0025_seo_leads.sql"] : ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql"] });
+  const db = openPortalDb({ skip: migrated ? ["0025_seo_leads.sql"] : ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql"] });
   const f = finder ? finderDb() : null;
   const w = { db, raw: db.raw, f, calls: [], clock: new Date(NOW), delay: 0 };
   w.fetch = async (url, init) => {
@@ -809,7 +809,7 @@ test("list: counts per status, filters by status and text, the row shape, and se
   assert.deepEqual(all.counts, { new: 1, approved: 1, ready: 0, contacted: 0, replied: 0, won: 0, dismissed: 1 });
   assert.equal(all.limit, 300); assert.equal(all.leads.length, 3);
   const row = all.leads.find((l) => l.id === summit);
-  assert.deepEqual(Object.keys(row).sort(), ["city", "demo", "has_eligible_email", "has_email", "id", "contacted_at", "name", "next_action", "opted_out", "phone", "rating", "reason", "review_count", "seo_level", "seo_score", "site_status", "site_verified", "source_note", "status", "trade", "updated_at", "website"].sort());
+  assert.deepEqual(Object.keys(row).sort(), ["city", "demo", "has_eligible_email", "has_email", "id", "contacted_at", "name", "next_action", "opted_out", "outreach", "phone", "rating", "reason", "review_count", "seo_level", "seo_score", "site_status", "site_verified", "source_note", "status", "trade", "updated_at", "website"].sort());
   assert.equal(row.has_eligible_email, true); assert.equal(row.phone, "403-555-0100"); assert.deepEqual(row.demo, { visits: 0, opens: 0, company: null, enquired: false, last_activity: null });
   assert.equal(row.next_action, "Review the draft and approve the email"); assert.equal(row.opted_out, false);
   assert.equal(all.leads.find((l) => l.id === alpha).next_action, "Dismissed: Retired");
@@ -847,7 +847,7 @@ test("the lead panel's demo section reuses the tracking link's journeys: bots ar
   const row = (await w.api("GET", "/leads/list")).body.leads[0];
   assert.deepEqual(row.demo, { visits: 2, opens: 3, company: "Summit Fencing Ltd", enquired: true, last_activity: "2026-11-06T08:00:00.000Z" });
   // the shape of the whole panel
-  assert.deepEqual(Object.keys(detail).sort(), ["approaches", "contacts", "demo", "lead", "message", "messages", "sending", "timeline"]);
+  assert.deepEqual(Object.keys(detail).sort(), ["approaches", "contacts", "demo", "lead", "message", "messages", "sending", "timeline", "tracking"]);
   assert.deepEqual(Object.keys(detail.message).sort(), ["approach", "blockers", "body", "contact_id", "content_hash", "delivered_at", "error", "footer", "id", "is_test", "kind", "sent_at", "status", "subject", "to_email"]);
   assert.ok(detail.lead.next_action && detail.lead.opted_out === false && detail.lead.reason && "notes" in detail.lead);
   assert.deepEqual(Object.keys(detail.contacts[0]).sort(), ["eligibility", "eligibility_note", "id", "opted_out_at", "source", "source_url", "type", "value"]);
@@ -918,14 +918,14 @@ test("status reports exactly what is and is not configured, and never throws", a
   let s = (await w.api("GET", "/leads/status")).body;
   assert.deepEqual(s, {
     ready: true, migration: "0024_leads.sql",
-    setup: { finder: { connected: true, waiting: 2 }, tracking: { ready: true }, email: { configured: true, from: "Framework <hello@frameworkco.ca>" }, sending: { mode: "live", test_recipient: null, blocked_reason: null }, mailing_address: true, sender_name: true, webhook: { configured: true }, replies: "manual" },
+    setup: { finder: { connected: true, waiting: 2 }, tracking: { ready: true }, outreach_tracking: { ready: true, migration: "0026_outreach_tracking.sql" }, email: { configured: true, from: "Framework <hello@frameworkco.ca>" }, sending: { mode: "live", test_recipient: null, blocked_reason: null }, mailing_address: true, sender_name: true, webhook: { configured: true }, replies: "manual" },
   });
   await w.api("POST", "/leads/sync");
   assert.equal((await w.api("GET", "/leads/status")).body.setup.finder.waiting, 0);
   // everything missing
   const bare = world({ finder: false, env: { DEMO_LINK_SECRET: undefined, RESEND_API_KEY: undefined, LEADS_SENDING: undefined, LEADS_MAILING_ADDRESS: undefined, LEADS_SENDER_NAME: undefined, RESEND_WEBHOOK_SECRET: undefined } });
   s = (await bare.api("GET", "/leads/status")).body;
-  assert.deepEqual(s.setup, { finder: { connected: false, waiting: 0 }, tracking: { ready: false }, email: { configured: false, from: null }, sending: { mode: "off", test_recipient: null, blocked_reason: s.setup.sending.blocked_reason }, mailing_address: false, sender_name: false, webhook: { configured: false }, replies: "manual" });
+  assert.deepEqual(s.setup, { finder: { connected: false, waiting: 0 }, tracking: { ready: false }, outreach_tracking: { ready: true, migration: "0026_outreach_tracking.sql" }, email: { configured: false, from: null }, sending: { mode: "off", test_recipient: null, blocked_reason: s.setup.sending.blocked_reason }, mailing_address: false, sender_name: false, webhook: { configured: false }, replies: "manual" });
   assert.match(s.setup.sending.blocked_reason, /awaiting setup/);
   // test mode, masked recipient; a pepper alone is enough for tracking
   const t = world({ env: { DEMO_LINK_SECRET: undefined, PORTAL_SESSION_PEPPER: PEPPER, LEADS_TEST_RECIPIENT: "hello@frameworkco.ca", LEADS_MAILING_ADDRESS: undefined } });

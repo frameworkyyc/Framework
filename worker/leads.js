@@ -79,7 +79,7 @@ export async function leadsReady(db, now = Date.now()) {
   readyCache.set(db, { ready, at: now });
   return ready;
 }
-export const forgetLeadsReady = (db) => { if (db && typeof db === "object") readyCache.delete(db); forgetSeoReady(db); };
+export const forgetLeadsReady = (db) => { if (db && typeof db === "object") readyCache.delete(db); forgetSeoReady(db); forgetTrackingReady(db); };
 
 const seoCache = new WeakMap();
 /** Whether migration 0025 (the SEO columns on outreach_leads) is applied. Cached like leadsReady; until it is, every SEO feature stays dormant. */
@@ -98,6 +98,25 @@ export async function seoReady(db, now = Date.now()) {
   return ready;
 }
 export const forgetSeoReady = (db) => { if (db && typeof db === "object") seoCache.delete(db); };
+
+export const TRACKING_MIGRATION = "0026_outreach_tracking.sql";
+const trackingCache = new WeakMap();
+/** Whether migration 0026 (the outreach tracking columns on outreach_leads) is applied. Cached like seoReady; until it is, "Mark as Contacted" stays dormant and everything else works as before. */
+export async function trackingReady(db, now = Date.now()) {
+  if (!db || typeof db.prepare !== "function") return false;
+  const hit = trackingCache.get(db);
+  if (hit && now - hit.at < (hit.ready ? 300000 : 30000)) return hit.ready;
+  let ready = false;
+  try {
+    const row = await db.prepare("SELECT COUNT(*) AS n FROM pragma_table_info('outreach_leads') WHERE name IN ('contact_method', 'last_contact_at', 'outreach_status', 'follow_up_on', 'outreach_note')").first();
+    ready = !!row && Number(row.n) === 5;
+  } catch {
+    ready = false;
+  }
+  trackingCache.set(db, { ready, at: now });
+  return ready;
+}
+export const forgetTrackingReady = (db) => { if (db && typeof db === "object") trackingCache.delete(db); };
 
 /* ---------- Reason, dedupe key, contact eligibility ---------- */
 
@@ -873,6 +892,93 @@ export async function markLead(env, leadId, status, ctx) {
     if (!["contacted", "replied"].includes(lead.status)) return fail(409, "invalid_transition");
     await db.batch([db.prepare("UPDATE outreach_leads SET status = 'won', won_at = ?, updated_at = ? WHERE id = ? AND status IN ('contacted', 'replied')").bind(at, at, lead.id), eventStmt(db, lead.id, at, "won", "Marked as won")]);
   } else return fail(422, "validation_failed", { field: "status" });
+  return { ok: true, lead: await getLead(db, leadId) };
+}
+
+/* ---------- Outreach tracking: contacting a lead by hand (text, phone, Facebook, ...) and following it up ---------- */
+
+export const CONTACT_METHODS = ["text", "email", "phone", "facebook", "other"];
+export const OUTREACH_STATUSES = ["contacted", "replied", "interested", "not_interested", "follow_up"];
+const METHOD_WORD = { text: "Text", email: "Email", phone: "Phone", facebook: "Facebook", other: "Other" };
+const OUTREACH_WORD = { contacted: "Contacted", replied: "Replied", interested: "Interested", not_interested: "Not interested", follow_up: "Follow-up needed" };
+
+/**
+ * Where a lead stands in outreach, or null when it has not been contacted. A manually logged contact (migration 0026) wins; otherwise it is read from the
+ * lifecycle, so a lead emailed from here already shows as Contacted (method Email) or Replied without anything having been written for it.
+ */
+export function outreachOf(lead) {
+  const derived = lead.status === "contacted" ? "contacted" : lead.status === "replied" ? "replied" : null;
+  const status = lead.outreach_status || derived;
+  if (!status) return null;
+  return {
+    status, status_word: OUTREACH_WORD[status],
+    method: lead.contact_method || (lead.contacted_at ? "email" : null), method_word: METHOD_WORD[lead.contact_method || (lead.contacted_at ? "email" : "")] || null,
+    contacted_at: lead.contacted_at || null, last_contact_at: lead.last_contact_at || lead.contacted_at || null,
+    follow_up_on: lead.follow_up_on || null, note: lead.outreach_note || null, replied_at: lead.replied_at || null,
+  };
+}
+
+/** A follow-up date (YYYY-MM-DD): empty clears it; anything that is not a real date, or is more than a day in the past, is invalid (undefined). */
+export function followUpDate(value, atIso) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const t = Date.parse(value + "T00:00:00Z");
+  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== value) return undefined;
+  return t < Date.parse(atIso.slice(0, 10) + "T00:00:00Z") - 86400000 ? undefined : value;
+}
+
+const trackNote = (v) => { const n = clean(v, 200); return n || null; };
+const detailFor = (head, followUp, note) => [head, followUp ? `Follow up ${followUp}.` : "", note ? `Note: ${note}` : ""].filter(Boolean).join(" ");
+
+/**
+ * "Mark as Contacted": the owner reached this lead by hand. Records how (text, email, phone, Facebook, other), the moment (now), an optional note and follow-up date,
+ * sets the outreach status to Contacted and adds a timeline entry. The lead's lifecycle status (its approval) and everything else on it are left exactly as they were.
+ * Only a lead that has not been contacted yet; after that, updateOutreach moves it on.
+ */
+export async function logContact(env, leadId, { method, note, follow_up_on } = {}, ctx) {
+  const db = env.PORTAL_DB, at = ctx.at;
+  if (!(await trackingReady(db, Date.parse(at)))) return fail(409, "not_set_up", { migration: TRACKING_MIGRATION });
+  if (!CONTACT_METHODS.includes(method)) return fail(422, "validation_failed", { field: "method" });
+  const fu = followUpDate(follow_up_on, at);
+  if (fu === undefined) return fail(422, "validation_failed", { field: "follow_up_on" });
+  if (note !== undefined && note !== null && typeof note !== "string") return fail(422, "validation_failed", { field: "note" });
+  const lead = await getLead(db, leadId);
+  if (!lead) return fail(404, "not_found");
+  if (isOptedOut(lead)) return fail(409, "opted_out");
+  if (lead.status === "dismissed") return fail(409, "lead_dismissed");
+  if (outreachOf(lead)) return fail(409, "already_contacted");
+  const n = trackNote(note);
+  const detail = clean(detailFor(`Contacted by ${METHOD_WORD[method].toLowerCase()}.`, fu, n).replace(/\S+@\S+/g, "[address]"), 300);
+  const r = await db.batch([
+    db.prepare("UPDATE outreach_leads SET outreach_status = 'contacted', contact_method = ?, contacted_at = COALESCE(contacted_at, ?), last_contact_at = ?, follow_up_on = ?, outreach_note = ?, updated_at = ? WHERE id = ? AND outreach_status IS NULL AND status NOT IN ('dismissed', 'contacted', 'replied')").bind(method, at, at, fu, n, at, lead.id),
+    db.prepare("INSERT INTO outreach_events (lead_id, at, type, detail) SELECT ?, ?, 'note', ? WHERE changes() = 1").bind(lead.id, at, detail), // only if the update above changed the lead (a second click at the same moment writes nothing)
+  ]);
+  if (!r[0].meta || r[0].meta.changes !== 1) return fail(409, "already_contacted");
+  return { ok: true, lead: await getLead(db, leadId) };
+}
+
+/** Moves a contacted lead on: Replied, Interested, Not interested or Follow-up needed, with an optional note and follow-up date (not kept for Not interested). */
+export async function updateOutreach(env, leadId, { status, note, follow_up_on } = {}, ctx) {
+  const db = env.PORTAL_DB, at = ctx.at;
+  if (!(await trackingReady(db, Date.parse(at)))) return fail(409, "not_set_up", { migration: TRACKING_MIGRATION });
+  if (!OUTREACH_STATUSES.includes(status)) return fail(422, "validation_failed", { field: "status" });
+  const fu = followUpDate(follow_up_on, at);
+  if (fu === undefined) return fail(422, "validation_failed", { field: "follow_up_on" });
+  if (note !== undefined && note !== null && typeof note !== "string") return fail(422, "validation_failed", { field: "note" });
+  const lead = await getLead(db, leadId);
+  if (!lead) return fail(404, "not_found");
+  if (isOptedOut(lead)) return fail(409, "opted_out");
+  const cur = outreachOf(lead);
+  if (!cur) return fail(409, "not_contacted");
+  const n = trackNote(note);
+  const followUp = status === "not_interested" ? null : fu;
+  const replied = status === "replied";
+  const stmts = [
+    db.prepare(`UPDATE outreach_leads SET outreach_status = ?, follow_up_on = ?, outreach_note = COALESCE(?, outreach_note), replied_at = CASE WHEN ? = 1 THEN COALESCE(replied_at, ?) ELSE replied_at END, status = CASE WHEN ? = 1 AND status = 'contacted' THEN 'replied' ELSE status END, updated_at = ? WHERE id = ?`)
+      .bind(status, followUp, n, replied ? 1 : 0, at, replied ? 1 : 0, at, lead.id),
+    eventStmt(db, lead.id, at, replied ? "replied" : "note", detailFor(replied ? "Marked as replied." : `Outreach status: ${OUTREACH_WORD[status]}.`, followUp, n)),
+  ];
+  await db.batch(stmts);
   return { ok: true, lead: await getLead(db, leadId) };
 }
 
