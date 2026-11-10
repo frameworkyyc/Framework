@@ -1,5 +1,5 @@
--- 0026 (outreach tracking): "Mark as Contacted" in Admin -> Leads. PROPOSED: not applied anywhere. Staging only after review and approval;
--- Production only through the manual "Portal Production D1 migration" workflow, after its own approval. Needs 0024 (outreach_leads).
+-- 0026 (outreach tracking): "Mark as Contacted" in Admin -> Leads. Applied to Staging. Not applied to Production:
+-- only through the manual "Portal Production D1 migration" workflow, after its own approval. Needs 0024 (outreach_leads).
 --
 -- Five additive, nullable columns on outreach_leads. No new table, nothing existing changes: every lead, its approval status, contacts, emails,
 -- notes and timeline are kept exactly as they are. Existing leads read as before (a lead emailed from Admin already shows as Contacted, method Email,
@@ -10,7 +10,7 @@
 --                    (the lifecycle status decides: emailed = Contacted, replied = Replied). The lifecycle status (the approval) is never rewritten by it.
 --   follow_up_on     the day to follow up (YYYY-MM-DD), optional
 --   outreach_note    the latest note about the contact (the timeline keeps every note, address-free)
--- Until this is applied the "Mark as Contacted" action stays dormant (the button explains why) and the rest of Leads works exactly as before.
+-- Until it is applied (it is not on Production yet) the "Mark as Contacted" action stays dormant (the button explains why) and the rest of Leads works exactly as before.
 ALTER TABLE outreach_leads ADD COLUMN contact_method TEXT CHECK (contact_method IS NULL OR contact_method IN ('text', 'email', 'phone', 'facebook', 'other'));
 ALTER TABLE outreach_leads ADD COLUMN last_contact_at TEXT;
 ALTER TABLE outreach_leads ADD COLUMN outreach_status TEXT CHECK (outreach_status IS NULL OR outreach_status IN ('contacted', 'replied', 'interested', 'not_interested', 'follow_up'));

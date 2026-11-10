@@ -12,7 +12,7 @@ const MIG = "0026_outreach_tracking.sql";
 let seq = 0;
 
 function world({ tracking = true } = {}) {
-  const db = openPortalDb({ skip: ["0025_seo_leads.sql"], proposed: tracking ? [MIG] : [] });
+  const db = openPortalDb({ skip: tracking ? ["0025_seo_leads.sql"] : ["0025_seo_leads.sql", MIG] });
   const w = { db, raw: db.raw, env: { PORTAL_DB: db, DEMO_LINK_SECRET: "s".repeat(40) }, clock: NOW };
   w.q = (sql, ...p) => db.raw.prepare(sql).all(...p).map((r) => ({ ...r }));
   w.lead = (o = {}) => {
@@ -34,10 +34,10 @@ function world({ tracking = true } = {}) {
   return w;
 }
 
-test("migration 0026 is proposed (not applied), additive, and gates the feature like the SEO columns", async () => {
-  assert.ok(existsSync(new URL("../../migrations/portal-proposed/" + MIG, import.meta.url)));
-  assert.ok(!existsSync(new URL("../../migrations/portal/" + MIG, import.meta.url)), "not in the applied directory");
-  const sql = readFileSync(new URL("../../migrations/portal-proposed/" + MIG, import.meta.url), "utf8");
+test("migration 0026 is applied to Staging (in migrations/portal), additive, and gates the feature like the SEO columns", async () => {
+  assert.ok(existsSync(new URL("../../migrations/portal/" + MIG, import.meta.url)));
+  assert.ok(!existsSync(new URL("../../migrations/portal-proposed/" + MIG, import.meta.url)), "no longer waiting in the proposal folder");
+  const sql = readFileSync(new URL("../../migrations/portal/" + MIG, import.meta.url), "utf8");
   assert.equal([...sql.matchAll(/ALTER TABLE outreach_leads ADD COLUMN/g)].length, 5);
   assert.ok(!/DROP|DELETE|UPDATE|CREATE TABLE/i.test(sql.replace(/--.*$/gm, "")), "additive only");
   const w = world();
@@ -168,7 +168,7 @@ test("until migration 0026 is applied: the action says so, nothing is written, a
   const d = await w.api("GET", `/leads/${id}`); assert.equal(d.status, 200); assert.equal(d.body.tracking, false);
   const s = await w.api("GET", "/leads/status"); assert.deepEqual(s.body.setup.outreach_tracking, { ready: false, migration: MIG });
   // applying it later is noticed without a redeploy
-  w.raw.exec(readFileSync(new URL("../../migrations/portal-proposed/" + MIG, import.meta.url), "utf8")); forgetLeadsReady(w.db);
+  w.raw.exec(readFileSync(new URL("../../migrations/portal/" + MIG, import.meta.url), "utf8")); forgetLeadsReady(w.db);
   assert.equal((await w.api("POST", `/leads/${id}/contacted`, { method: "text" })).status, 200);
 });
 
