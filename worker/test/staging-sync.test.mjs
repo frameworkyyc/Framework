@@ -12,7 +12,7 @@ import { buildPlan, compareSchemas, readSchema, renderReport } from "../../scrip
 import { applyPlan } from "../../scripts/ops/staging-sync/apply.mjs";
 import { preflight } from "../../scripts/ops/staging-sync/cli.mjs";
 
-const PROD_SKIP = ["0014_brand_requirements.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql", "0018_discovery.sql", "0020_requests.sql", "0021_demo_traffic.sql", "0022_seo_keywords.sql", "0023_client_service_links.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql"];
+const PROD_SKIP = ["0014_brand_requirements.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql", "0018_discovery.sql", "0020_requests.sql", "0021_demo_traffic.sql", "0022_seo_keywords.sql", "0023_client_service_links.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql", "0027_call_queue.sql"];
 const sha = (b) => createHash("sha256").update(b).digest("hex");
 const ORG_A = "11111111-1111-4111-8111-111111111111", ORG_B = "22222222-2222-4222-8222-222222222222", ORG_C = "33333333-3333-4333-8333-333333333333";
 const USER_P = "99999999-9999-4999-8999-999999999999";

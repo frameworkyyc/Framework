@@ -23,7 +23,7 @@ const humanHeaders = (ua = CHROME) => ({ "User-Agent": ua, "Accept-Language": "e
 
 /** A fake D1 that records every bound parameter and every SQL text, so tests can prove what is (not) stored. */
 function world({ migrated = true, env = {} } = {}) {
-  const db = openPortalDb({ skip: migrated ? ["0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql"] : ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql"] });
+  const db = openPortalDb({ skip: migrated ? ["0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql", "0027_call_queue.sql"] : ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql", "0027_call_queue.sql"] });
   const bound = [];
   const prepare = db.prepare.bind(db);
   db.prepare = (sql) => { const s = prepare(sql); const bind = s.bind; s.bind = (...p) => { bound.push({ sql, p }); return bind(...p); }; return s; };
