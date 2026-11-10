@@ -124,3 +124,8 @@ Claim or create the profile (category "Website designer" or "Web designer"; mark
 - `--frame-gap` (28px desktop, 22px tablet, 18px mobile) is the space between the vertical framing lines (`.ruled`) and the content they frame.
 - Titles, meta, canonicals, structured data, sitemap and redirects are unchanged. The Contact page H1 is now "How can we help?" (the title and meta are unchanged); the three route cards link to the existing form (`#start`), the client portal and `hello@frameworkco.ca`.
 - Work and Nexus previews are real captures only (`assets/img/work/*`, `assets/img/nexus/*`); project text and links stay HTML.
+
+## Homepage testimonials (Staging)
+- Three quotes from the admin feedback records, each reviewed and carrying testimonial permission ("Yes, attributed to my business only") and logo permission ("Yes"): Aurora Surveys, Eagle's Nest Resort, Red E Corp. Attribution is the business name only, as granted. Quotes are verbatim; `worker/test/home-testimonials.test.mjs` pins them.
+- Logos live in `assets/img/clients/` (from each client's own site repo). Eagle's Nest's logo is dark on cream, so it sits on its own cream plate.
+- `assets/js/testimonials.js`: one slide at a time (cross-fade), previous/next, 01 / 03 count, Pause/Play button, 9 s rotation, paused on hover/focus/hidden tab/off-screen, no rotation under reduced motion. Without JavaScript all three are listed in the page, so the text is always crawlable. No review structured data is added.
