@@ -9,7 +9,16 @@ const TONE = { new: "pending", approved: "pending", ready: "warn", contacted: "o
 export const statusChip = (lead) => badge(lead.opted_out ? "Opted out" : statusWord(lead.status), lead.opted_out ? "bad" : TONE[lead.status] || "");
 
 /** The list filter the person last chose, so Back from a lead returns to the same list. */
-export const view = { status: null, q: "" };
+export const view = { status: null, q: "", outreach: "" };
+
+/** Outreach: how a lead was contacted by hand and where it stands (Admin -> Leads, migration 0026). The lifecycle status above is the approval; this is separate. */
+export const METHODS = Object.freeze([["text", "Text"], ["email", "Email"], ["phone", "Phone"], ["facebook", "Facebook"], ["other", "Other"]]);
+export const OUTREACH = Object.freeze([["contacted", "Contacted"], ["replied", "Replied"], ["interested", "Interested"], ["not_interested", "Not interested"], ["follow_up", "Follow-up needed"]]);
+const OUTREACH_TONE = { contacted: "ok", replied: "ok", interested: "ok", not_interested: "", follow_up: "warn" };
+/** A calendar day (YYYY-MM-DD) as words, with no time zone shift: "Nov 13, 2026". */
+export const dayWord = (day) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day || "")); return m ? new Intl.DateTimeFormat("en-CA", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12))) : String(day || ""); };
+/** The Contacted indicator: the status, and how it was contacted. `full` adds nothing visual but keeps one place to change it. */
+export const outreachChip = (o) => (o ? badge(o.method_word && o.status === "contacted" ? `Contacted · ${o.method_word}` : o.status_word, OUTREACH_TONE[o.status] || "") : null);
 
 export const SITE_WORDS = { none: "No website", social_only: "Facebook page only", offline: "Website is offline", broken: "Reported offline, not confirmed", unverified: "Not verified (may be protected)", online: "Website is online", outdated: "Outdated website", ok: "Website looks fine" };
 /** Chip tone per website status: only a confirmed offline site is a warning; "not verified" and "not confirmed" are neutral, never alarming. */
@@ -55,6 +64,10 @@ const CODES = {
   session: "Your session has ended. Reload the page to sign in again.",
   denied: "This account isn’t allowed to do that.",
   not_found: "That lead or message no longer exists.",
+  already_contacted: "This lead was already marked as contacted. Reload to see it.",
+  lead_dismissed: "A dismissed lead can’t be marked as contacted. Reopen it first.",
+  opted_out: "This business opted out, so it can’t be contacted.",
+  not_contacted: "Mark the lead as contacted first.",
   no_eligible_email: "There is no email address you can send to yet.",
   hash_mismatch: "The email changed after you reviewed it. Review it again.",
   not_approved: "The email isn’t approved.",
@@ -68,6 +81,7 @@ const CODES = {
 /** Plain wording for a failure code from the API (never raw server text). */
 export function errText(err) {
   const code = (err && (err.code || (err.data && err.data.error))) || "error";
+  if (code === "not_set_up" && err && err.data && err.data.migration === "0026_outreach_tracking.sql") return "Outreach tracking isn’t set up yet: migration 0026 is waiting for approval.";
   return CODES[code] || `That didn’t complete (${String(code).replace(/_/g, " ")}). Nothing was changed.`;
 }
 export const codeText = (code) => (code ? CODES[code] || String(code).replace(/_/g, " ") : "Failed");

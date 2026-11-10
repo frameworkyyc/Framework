@@ -1348,3 +1348,29 @@ details[open] > .rk-fold__sum::after, details[open] > .rk-manage__sum::after { m
 .ld-msgs li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 10px 0; border-bottom: 1px solid var(--hairline); font-size: 14px; }
 .ld-msgs .adm-chip { margin: 0; } .ld-msgs__subj { font-weight: 600; flex: 1 1 200px; overflow-wrap: anywhere; }
 .ld-notes { width: 100%; min-height: 8em; font-size: 16px; }
+
+/* Leads: outreach tracking (Mark as Contacted, the Contacted indicator, the outreach filter) */
+.ld-filters { display: flex; flex-wrap: wrap; gap: var(--adm-space-3); align-items: flex-start; }
+.ld-filters .ld-search { margin: 0; flex: 1 1 260px; }
+.ld-outsel { flex: 0 1 260px; min-height: 48px; margin: 0 0 var(--adm-space-3); }
+.ld-row__out { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; }
+.ld-row__out .adm-chip { margin: 0; }
+.ld-ochead { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--adm-space-3); margin-bottom: var(--adm-space-3); }
+.ld-ochead .adm-chip { margin: 0; }
+.ld-ocfacts { margin-bottom: var(--adm-space-4, 20px); }
+.ld-ocform { max-width: 520px; }
+/* Contact method: five equal tiles in one radio group. The whole tile is the label, so the whole tile is the click target.
+   Three clearly different states: hover (a darker border), selected (a light fill and an ink border), keyboard focus (a 2px ring outside the tile).
+   Scoped under the group so it outranks the generic `.adm-field label` rule. */
+.ld-oc-methods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.ld-oc-methods .ld-method { position: relative; display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 14px; box-sizing: border-box; border: 1px solid var(--hairline); border-radius: 0; background: var(--paper); color: var(--ink); font-size: 15px; font-weight: 500; line-height: 1.2; cursor: pointer; transition: border-color .15s ease, background-color .15s ease; }
+.ld-oc-methods .ld-method input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--ink); cursor: pointer; }
+.ld-oc-methods .ld-method input:focus-visible { outline: none; }
+.ld-oc-methods .ld-method:hover { border-color: var(--slate); }
+.ld-oc-methods .ld-method:has(input:checked) { border-color: var(--ink); background: var(--mist); }
+.ld-oc-methods .ld-method:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+@media (max-width: 480px) { .ld-oc-methods { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .ld-oc-methods .ld-method { transition: none; } }
+.ld-ocdlg legend { font-weight: 600; margin-bottom: 4px; padding: 0; }
+.ld-ocdlg .adm-field { margin-top: 16px; }
+.ld-ocdlg textarea { min-height: 84px; }
