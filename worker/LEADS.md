@@ -33,7 +33,7 @@ A **Copy lead info** button sits in the action bar of every lead. It copies a Ma
 
 A queued call is a reminder, not a contact. It is kept apart from the approval (`status`) and from outreach (`outreach_status`, `contact_method`, `last_contact_at`, `follow_up_on`), and none of those is touched by queueing, rescheduling or removing. **Call made** opens Mark as Contacted with Phone ready; contacting by Phone clears the queued call in the same write (another method keeps it queued). A lead already contacted (for example by email) can still be queued; **Call made** then only removes it from the queue and leaves its outreach history alone. Every change adds an address-free timeline note.
 
-Data: three nullable columns on `outreach_leads` (`call_on`, `call_note`, `call_queued_at`) from **proposed migration 0027** (`migrations/portal-proposed/0027_call_queue.sql`). Until it is applied the Call Queue is dormant (the button says so, the filter is hidden) and the rest of Leads works as before. API: `POST /leads/:id/call { call_on, note? }`, `POST /leads/:id/call-clear { done? }`, bulk actions `queue_call` and `clear_call`, list filter `call=queued` and `call_counts`.
+Data: three nullable columns on `outreach_leads` (`call_on`, `call_note`, `call_queued_at`) from **migration 0027** (`migrations/portal/0027_call_queue.sql`, applied to Staging; Production only through the manual workflow, after approval). Until it is applied the Call Queue is dormant (the button says so, the filter is hidden) and the rest of Leads works as before. API: `POST /leads/:id/call { call_on, note? }`, `POST /leads/:id/call-clear { done? }`, bulk actions `queue_call` and `clear_call`, list filter `call=queued` and `call_counts`.
 
 ## What is recorded
 

@@ -1,5 +1,5 @@
--- 0027 (call queue): "Queue Call" in Admin -> Leads. PROPOSED. Not applied anywhere: show it for review, then Staging only after approval;
--- Production only through the manual "Portal Production D1 migration" workflow, after its own approval. Needs 0024 (outreach_leads).
+-- 0027 (call queue): "Queue Call" in Admin -> Leads. Applied to Staging. Not applied to Production:
+-- only through the manual "Portal Production D1 migration" workflow, after its own approval. Needs 0024 (outreach_leads).
 --
 -- Three additive, nullable columns on outreach_leads, and one partial index. No new table, nothing existing changes: every lead, its approval status,
 -- its outreach status and history (0026), contacts, emails, notes and timeline stay exactly as they are. A queued call is a reminder to phone a lead later;
@@ -7,7 +7,7 @@
 --   call_on         the day to phone the lead (YYYY-MM-DD, America/Edmonton). NULL = not in the call queue
 --   call_note       why the owner wants to call (optional, up to 300 characters)
 --   call_queued_at  when it was first queued (kept when rescheduled)
--- Until it is applied the Call Queue stays dormant: the Queue Call button explains why and the rest of Leads works exactly as before.
+-- Until it is applied (it is not on Production yet) the Call Queue stays dormant: the Queue Call button explains why and the rest of Leads works exactly as before.
 ALTER TABLE outreach_leads ADD COLUMN call_on TEXT CHECK (call_on IS NULL OR length(call_on) = 10);
 ALTER TABLE outreach_leads ADD COLUMN call_note TEXT CHECK (call_note IS NULL OR length(call_note) <= 300);
 ALTER TABLE outreach_leads ADD COLUMN call_queued_at TEXT;

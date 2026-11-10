@@ -47,6 +47,7 @@ export const STAGES = Object.freeze([
   { file: "0024_leads.sql", tables: ["outreach_contacts", "outreach_events", "outreach_leads", "outreach_messages", "outreach_suppressions"], indexes: ["idx_outreach_contacts_lead", "idx_outreach_events_lead", "idx_outreach_leads_source_ref", "idx_outreach_leads_status", "idx_outreach_leads_updated", "idx_outreach_messages_lead", "idx_outreach_messages_live", "idx_outreach_messages_provider"] }, // five tables for the Leads workspace; needs 0021 (demo_links)
   { file: "0025_seo_leads.sql", tables: [], indexes: ["idx_outreach_leads_seo"] }, // four nullable columns on outreach_leads and one index; needs 0024
   { file: "0026_outreach_tracking.sql", tables: [], indexes: ["idx_outreach_leads_outreach"] }, // five nullable columns on outreach_leads and one index (Mark as Contacted); needs 0024. Applied to Staging; Production only through this workflow, after approval
+  { file: "0027_call_queue.sql", tables: [], indexes: ["idx_outreach_leads_call"] }, // three nullable columns on outreach_leads and one partial index (Call Queue); needs 0024. Applied to Staging; Production only through this workflow, after approval
 ]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",
