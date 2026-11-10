@@ -55,7 +55,7 @@ function finderDb() {
 }
 
 function world({ migrated = true, finder = true, env = {} } = {}) {
-  const db = openPortalDb({ skip: migrated ? ["0025_seo_leads.sql"] : ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql"] });
+  const db = openPortalDb({ skip: migrated ? ["0025_seo_leads.sql"] : ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql", "0027_call_queue.sql"] });
   const f = finder ? finderDb() : null;
   const w = { db, raw: db.raw, f, calls: [], clock: new Date(NOW), delay: 0 };
   w.fetch = async (url, init) => {
@@ -918,14 +918,14 @@ test("status reports exactly what is and is not configured, and never throws", a
   let s = (await w.api("GET", "/leads/status")).body;
   assert.deepEqual(s, {
     ready: true, migration: "0024_leads.sql",
-    setup: { finder: { connected: true, waiting: 2 }, tracking: { ready: true }, outreach_tracking: { ready: true, migration: "0026_outreach_tracking.sql" }, call_queue: { ready: false, migration: "0027_call_queue.sql" }, email: { configured: true, from: "Framework <hello@frameworkco.ca>" }, sending: { mode: "live", test_recipient: null, blocked_reason: null }, mailing_address: true, sender_name: true, webhook: { configured: true }, replies: "manual" },
+    setup: { finder: { connected: true, waiting: 2 }, tracking: { ready: true }, outreach_tracking: { ready: true, migration: "0026_outreach_tracking.sql" }, call_queue: { ready: true, migration: "0027_call_queue.sql" }, email: { configured: true, from: "Framework <hello@frameworkco.ca>" }, sending: { mode: "live", test_recipient: null, blocked_reason: null }, mailing_address: true, sender_name: true, webhook: { configured: true }, replies: "manual" },
   });
   await w.api("POST", "/leads/sync");
   assert.equal((await w.api("GET", "/leads/status")).body.setup.finder.waiting, 0);
   // everything missing
   const bare = world({ finder: false, env: { DEMO_LINK_SECRET: undefined, RESEND_API_KEY: undefined, LEADS_SENDING: undefined, LEADS_MAILING_ADDRESS: undefined, LEADS_SENDER_NAME: undefined, RESEND_WEBHOOK_SECRET: undefined } });
   s = (await bare.api("GET", "/leads/status")).body;
-  assert.deepEqual(s.setup, { finder: { connected: false, waiting: 0 }, tracking: { ready: false }, outreach_tracking: { ready: true, migration: "0026_outreach_tracking.sql" }, call_queue: { ready: false, migration: "0027_call_queue.sql" }, email: { configured: false, from: null }, sending: { mode: "off", test_recipient: null, blocked_reason: s.setup.sending.blocked_reason }, mailing_address: false, sender_name: false, webhook: { configured: false }, replies: "manual" });
+  assert.deepEqual(s.setup, { finder: { connected: false, waiting: 0 }, tracking: { ready: false }, outreach_tracking: { ready: true, migration: "0026_outreach_tracking.sql" }, call_queue: { ready: true, migration: "0027_call_queue.sql" }, email: { configured: false, from: null }, sending: { mode: "off", test_recipient: null, blocked_reason: s.setup.sending.blocked_reason }, mailing_address: false, sender_name: false, webhook: { configured: false }, replies: "manual" });
   assert.match(s.setup.sending.blocked_reason, /awaiting setup/);
   // test mode, masked recipient; a pepper alone is enough for tracking
   const t = world({ env: { DEMO_LINK_SECRET: undefined, PORTAL_SESSION_PEPPER: PEPPER, LEADS_TEST_RECIPIENT: "hello@frameworkco.ca", LEADS_MAILING_ADDRESS: undefined } });

@@ -1,4 +1,4 @@
-// Call Queue (proposed migration 0027): flag a lead to phone later WITHOUT contacting it. Separate from approval and outreach.
+// Call Queue (migration 0027, applied to Staging): flag a lead to phone later WITHOUT contacting it. Separate from approval and outreach.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
@@ -12,7 +12,7 @@ const MIG = "0027_call_queue.sql";
 let seq = 0;
 
 function world({ call = true } = {}) {
-  const db = openPortalDb({ skip: ["0025_seo_leads.sql"], proposed: call ? [MIG] : [] });
+  const db = openPortalDb({ skip: ["0025_seo_leads.sql", ...(call ? [] : [MIG])] });
   const w = { db, raw: db.raw, env: { PORTAL_DB: db, DEMO_LINK_SECRET: "s".repeat(40) } };
   w.q = (sql, ...p) => db.raw.prepare(sql).all(...p).map((r) => ({ ...r }));
   w.lead = (o = {}) => {
@@ -34,10 +34,10 @@ function world({ call = true } = {}) {
   return w;
 }
 
-test("migration 0027 is PROPOSED (not applied), additive, and only adds the three call columns and an index", async () => {
-  assert.ok(existsSync(new URL("../../migrations/portal-proposed/" + MIG, import.meta.url)));
-  assert.ok(!existsSync(new URL("../../migrations/portal/" + MIG, import.meta.url)), "waits in the proposal folder until approved");
-  const sql = readFileSync(new URL("../../migrations/portal-proposed/" + MIG, import.meta.url), "utf8");
+test("migration 0027 is applied to Staging (in migrations/portal), additive, and only adds the three call columns and an index", async () => {
+  assert.ok(existsSync(new URL("../../migrations/portal/" + MIG, import.meta.url)));
+  assert.ok(!existsSync(new URL("../../migrations/portal-proposed/" + MIG, import.meta.url)), "no longer waiting in the proposal folder");
+  const sql = readFileSync(new URL("../../migrations/portal/" + MIG, import.meta.url), "utf8");
   assert.equal([...sql.matchAll(/ALTER TABLE outreach_leads ADD COLUMN (\w+)/g)].map((m) => m[1]).join(), "call_on,call_note,call_queued_at");
   assert.ok(!/DROP|DELETE|UPDATE|CREATE TABLE/i.test(sql.replace(/--.*$/gm, "")), "additive only");
   const w = world();
