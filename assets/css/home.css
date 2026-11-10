@@ -66,32 +66,39 @@
 @media (max-width: 700px) { .also { grid-template-columns: 1fr; } .also p, .also p + p { padding: 20px 0 0; border-left: 0; } .also p + p { margin-top: 20px; border-top: 1px solid var(--hairline); } }
 
 /* ---------- Nexus teaser: a minimal product introduction ---------- */
-.nx { position: relative; overflow: hidden; padding: clamp(72px, 9vw, 132px) 0 clamp(64px, 8vw, 112px); background: radial-gradient(ellipse 70% 60% at 78% 55%, rgba(120, 140, 255, .13), transparent 70%), #101010; }
-.nx .container { position: relative; }
-.nx__head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; margin-bottom: clamp(28px, 4vw, 56px); }
-.nx__word { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(22px, 2.4vw, 30px); letter-spacing: .32em; text-transform: uppercase; color: var(--stone); }
-.nx__body { display: grid; grid-template-columns: minmax(0, 4.4fr) minmax(0, 7.6fr); gap: clamp(32px, 5vw, 80px); align-items: center; }
-.nx .h2 { max-width: 11em; margin-bottom: 18px; }
-.nx .lead { color: #CFCFCF; max-width: 28em; }
-.nx__note { margin: 22px 0 0; font-size: 14px; color: var(--stone); }
-.nx__stage { margin: 0; position: relative; aspect-ratio: 16 / 11; perspective: 1800px; }
-.nx__stage figcaption { position: absolute; left: 0; bottom: -28px; font-size: 12px; color: var(--stone); }
-.nx__shot { position: absolute; overflow: hidden; border: 1px solid rgba(255, 255, 255, .14); background: #0A0A0A; transform: var(--t); box-shadow: 0 50px 90px -30px rgba(0, 0, 0, .95), 0 0 80px -30px rgba(120, 140, 255, .45); }
-.nx__shot img { display: block; width: 100%; height: auto; }
-.nx__shot--a { left: 18%; top: 0; width: 70%; --t: rotateY(-14deg) rotateX(4deg) rotateZ(1deg); opacity: .7; z-index: 1; }
-.nx__shot--b { left: 6%; top: 14%; width: 70%; --t: rotateY(-14deg) rotateX(4deg) rotateZ(1deg); z-index: 2; }
-.nx__shot--c { left: 30%; top: 40%; width: 62%; --t: rotateY(-14deg) rotateX(4deg) rotateZ(1deg); z-index: 3; }
-.nx__shot--m { right: 1%; top: 6%; width: 17%; --t: rotateY(-10deg) rotateZ(3deg); z-index: 4; }
-.js .nx__shot { opacity: 0; translate: 0 40px; transition: translate 1.1s cubic-bezier(.2, .7, .2, 1), opacity 1.1s ease; }
-.js .nx__shot--b { transition-delay: .12s; } .js .nx__shot--c { transition-delay: .24s; } .js .nx__shot--m { transition-delay: .36s; }
-.js .nx__stage.is-in .nx__shot { opacity: 1; translate: 0 0; } .js .nx__stage.is-in .nx__shot--a { opacity: .7; }
+.nx { position: relative; overflow: hidden; padding: clamp(64px, 8vw, 120px) 0 clamp(56px, 7vw, 104px); background: #101010; }
+.nx::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 55% 38% at 50% 78%, rgba(120, 140, 255, .09), transparent 72%); }
+.nx .container { position: relative; z-index: 1; }
+.nx__head { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; margin-bottom: clamp(24px, 3.5vw, 48px); }
+.nx__word { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(18px, 1.8vw, 24px); letter-spacing: .32em; text-transform: uppercase; color: var(--stone); }
+.nx__body { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(28px, 5vw, 80px); align-items: end; }
+.nx__title { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: clamp(36px, 5.4vw, 76px); line-height: 1.02; letter-spacing: -.03em; max-width: 9.5em; }
+.nx .lead { color: #CFCFCF; max-width: 26em; margin: 0; }
+.nx .btn-row { margin-top: 24px; }
+.nx__note { margin: 18px 0 0; font-size: 14px; color: var(--stone); }
+/* a large, flat interface that belongs to the page: thin border, a hairline of light along the top edge, and a bottom that dissolves into the section */
+.nx__app { margin: clamp(40px, 6vw, 80px) 0 0; }
+.nx__frame { position: relative; border: 1px solid var(--line-strong); border-bottom: 0; background: #0A0A0A; overflow: hidden; aspect-ratio: 16 / 8.6;
+  -webkit-mask-image: linear-gradient(180deg, #000 62%, transparent 100%); mask-image: linear-gradient(180deg, #000 62%, transparent 100%); }
+.nx__frame::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; z-index: 2; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent); }
+.nx__frame img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+.nx__tiles { list-style: none; margin: clamp(18px, 2.4vw, 32px) 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 20px); }
+.nx__tile { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid var(--line); background: #0A0A0A; transition: border-color .3s ease; }
+.nx__tile::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 55%, rgba(16, 16, 16, .7)); }
+.nx__tile img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.nx__tiles li:hover .nx__tile { border-color: var(--line-strong); }
+.nx__tiles span { display: block; margin-top: 10px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); }
+.nx__app figcaption { margin-top: 18px; font-size: 12px; color: var(--stone); }
 @media (max-width: 900px) {
-  .nx__body { grid-template-columns: 1fr; }
-  .nx__stage { margin-bottom: 32px; }
-  .nx__shot--a { display: none; }
-  .nx__shot--b { left: 0; top: 4%; width: 78%; } .nx__shot--c { left: 22%; top: 38%; width: 70%; } .nx__shot--m { right: 0; top: 0; width: 20%; }
+  .nx__body { grid-template-columns: 1fr; align-items: start; row-gap: 24px; }
+  .nx__title { max-width: 10em; }
+  .nx__frame { aspect-ratio: 16 / 10; }
 }
-@media (prefers-reduced-motion: reduce) { .js .nx__shot { opacity: 1 !important; translate: 0 0 !important; transition: none !important; } .js .nx__stage .nx__shot--a { opacity: .7 !important; } }
+@media (max-width: 700px) {
+  .nx__frame { aspect-ratio: auto; max-height: 520px; -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent 100%); mask-image: linear-gradient(180deg, #000 70%, transparent 100%); }
+  .nx__frame img { height: auto; }
+  .nx__tiles { display: none; }
+}
 
 /* ---------- Method on white with a quiet drafting grid ---------- */
 .method-sec { position: relative; }
