@@ -202,3 +202,20 @@ test("Admin UI: the button sits beside Approve and Dismiss, uses the existing pa
   for (const s of ["Contacted", "Replied", "Interested", "Not interested", "Follow-up needed"]) assert.ok(common.includes(`"${s}"]`), s);
   assert.match(list, /ld-outsel/); assert.match(list, /outreach=\$\{encodeURIComponent\(outreach\)\}/);
 });
+
+test("Admin UI: the contact-method options are one radio group of equal, fully clickable tiles with distinct hover, selected and keyboard-focus states", () => {
+  const out = readFileSync(new URL("../../admin/assets/lead-outreach.js", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../../admin/assets/admin.css", import.meta.url), "utf8");
+  assert.match(out, /<?h\("fieldset", \{ class: "adm-field" \}, h\("legend", \{ text: "How did you contact them\?" \}\)/, "a fieldset with a legend names the group");
+  assert.match(out, /h\("label", \{ class: "ld-method" \}, h\("input", \{ type: "radio", name: "ld-method", value: id, required: true \}\)/, "each option is one label around its radio: the whole tile is the click target");
+  assert.ok(!/adm-choice/.test(out.slice(out.indexOf("markContactedDialog"), out.indexOf("const dueBadge"))), "no longer the generic choice style");
+  const rule = (sel) => { const m = css.match(new RegExp("^" + sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + " \\{([^}]*)\\}", "m")); return m ? m[1] : ""; };
+  const tile = rule(".ld-oc-methods .ld-method");
+  assert.match(tile, /min-height: 48px/); assert.match(tile, /border: 1px solid var\(--hairline\)/); assert.match(tile, /border-radius: 0/); assert.match(tile, /cursor: pointer/); assert.match(tile, /font-weight: 500/, "constant weight: nothing shifts when selected");
+  assert.match(rule(".ld-oc-methods .ld-method:hover"), /border-color: var\(--slate\)/);
+  assert.match(rule(".ld-oc-methods .ld-method:has(input:checked)"), /border-color: var\(--ink\); background: var\(--mist\)/, "selected: a thin ink border and a light fill");
+  assert.match(rule(".ld-oc-methods .ld-method:has(input:focus-visible)"), /outline: 2px solid var\(--ink\); outline-offset: 2px/, "keyboard focus: a ring outside the tile, only for the keyboard");
+  assert.match(rule(".ld-oc-methods .ld-method input:focus-visible"), /outline: none/, "one focus ring, not two");
+  assert.match(css, /\.ld-oc-methods \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/); assert.match(css, /@media \(max-width: 480px\) \{ \.ld-oc-methods \{ grid-template-columns: repeat\(2/);
+  assert.match(css, /prefers-reduced-motion: reduce\) \{ \.ld-oc-methods \.ld-method \{ transition: none/);
+});
