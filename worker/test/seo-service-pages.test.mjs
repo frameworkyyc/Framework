@@ -149,8 +149,8 @@ test("homepage: title leads with Calgary website design and keeps the contractor
   assert.match(desc, /Calgary digital solutions company/); assert.match(desc, /websites, brands, SEO and business systems/); assert.match(desc, /contractors and trades/); assert.ok(desc.length >= 120 && desc.length <= 160);
   assert.equal(attr(h, /<meta property="og:title" content="([^"]*)"/), title);
   const hero = text(h.slice(h.indexOf('<p class="lead">'), h.indexOf('<div class="btn-row">'))).replace(/ ([,.?])/g, "$1");
-  assert.match(hero, /Framework builds websites, brands and the digital systems behind growing businesses/);
-  assert.match(hero, /Strategy comes first, so everything we make has a reason to exist/);
+  assert.match(hero, /Framework is a Calgary digital solutions company/); assert.match(hero, /websites, brands and digital systems for growing businesses in every industry/);
+  assert.match(hero, /specializing in contractors and trades/);
   assert.ok(!/logo shop|marketing agency/i.test(text(h)), "the homepage no longer undercuts the services");
   const biz = graph(h).find((n) => n["@type"] === "ProfessionalService");
   assert.deepEqual(biz.areaServed.map((a) => a.name), [...CITIES, "Alberta", "Canada"]);
@@ -181,7 +181,7 @@ test("design system: the new pages reuse the site's own components and add no st
     assert.ok(!/<style[\s>]/.test(h) && !/\sstyle="/.test(h), slug + " has no inline styling");
     assert.ok(!/<img\b/.test(strip(h.slice(h.indexOf("<main"), h.indexOf("</main>")))) || true);
     const sheets = [...h.matchAll(/<link rel="stylesheet" href="([^"]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(sheets.filter((s) => !s.startsWith("https://")), ["assets/css/styles.css", "/assets/css/contractors.css"]);
+    assert.deepEqual(sheets.filter((s) => !s.startsWith("https://")), ["assets/css/styles.css", "/assets/css/contractors.css", "assets/css/theme.css"]);
     for (const cls of ["page-head", "display", "lead", "split", "service", "cells", "cx-faq", "cx-area", "section--ink"]) assert.ok(h.includes(cls), `${slug} uses ${cls}`);
     assert.ok(!/<script(?![^>]*type="application\/ld\+json")[^>]*src="[^"]*"/.test(h.replace(/<script src="(?:assets|\/assets)\/js\/(?:main|analytics-config|analytics)\.js" defer><\/script>/g, "")), slug + " loads only the site's standard scripts");
   }

@@ -12,7 +12,7 @@
 <meta property="og:url" content="https://frameworkco.ca/contact">
 <meta property="og:image" content="https://frameworkco.ca/assets/img/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#FFFFFF">
+<meta name="theme-color" content="#090909">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
@@ -20,6 +20,7 @@
 <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@600,700&f[]=general-sans@400,500,600&display=swap">
 <link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/theme.css">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -79,15 +80,44 @@
   <section class="page-head">
     <div class="container">
       <span class="eyebrow">Contact</span>
-      <h1 class="display">Let's build your foundation.</h1>
+      <h1 class="display">How can we help?</h1>
       <p class="lead">Tell us about your business. We'll follow up within one to two business days to schedule a first conversation.</p>
       <p class="muted page-head__note">Not ready for a conversation? Start with a <a class="link" href="/assessment" data-track="assessment_cta" data-track-location="contact">free online presence assessment</a> instead.</p>
     </div>
   </section>
 
-  <section class="section">
+  <section class="section ct" aria-label="Ways to reach Framework">
+    <div class="container">
+      <ul class="ct__cards">
+        <li><a class="ct__card" href="#start">
+          <span class="ct__n">01</span>
+          <span class="ct__label">Sales</span>
+          <span class="ct__title">Start a project</span>
+          <span class="ct__text">Planning a website, brand or business system? Tell us about it.</span>
+          <span class="ct__go" aria-hidden="true">→</span>
+        </a></li>
+        <li><a class="ct__card" href="/portal">
+          <span class="ct__n">02</span>
+          <span class="ct__label">Support</span>
+          <span class="ct__title">Get support</span>
+          <span class="ct__text">Current clients: sign in to your client portal to send a request.</span>
+          <span class="ct__go" aria-hidden="true">→</span>
+        </a></li>
+        <li><a class="ct__card" href="mailto:hello@frameworkco.ca">
+          <span class="ct__n">03</span>
+          <span class="ct__label">General enquiries</span>
+          <span class="ct__title">Get in touch</span>
+          <span class="ct__text">Anything else, by email. hello@frameworkco.ca</span>
+          <span class="ct__go" aria-hidden="true">→</span>
+        </a></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="start" aria-labelledby="start-title">
     <div class="container contact">
       <div class="contact__form">
+        <h2 class="h2 ct__formhead" id="start-title">Start a project</h2>
         <form id="contact-form" data-mailto="hello@frameworkco.ca" novalidate>
           <div class="field">
             <label for="name">Full name</label>

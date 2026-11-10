@@ -2,7 +2,8 @@
    Asks the Worker for the one combined total (/api/client-revenue) and, when it returns one, reveals the band and
    counts the figure up from $0 the first time the band scrolls into view (once per page load).
    The API gives { total: "$2.5M+", value: 2500000 }. `value` is what we count to; if it is missing we fall back to
-   showing `total` as plain text. The band is in the page from the start, laid out at its final size but empty and
+   showing `total` as plain text. The band may also carry data-floor (the stated combined figure): the larger of the floor
+   and the database total is shown, and the floor alone when the API has nothing or fails. The band is in the page from the start, laid out at its final size but empty and
    inert (.is-loading), so nothing below it moves while the request is in flight. No total, an error or a timeout:
    the band is hidden outright (no gap). Individual client figures never reach the browser.
    Reduced motion: the finished figure is shown straight away. */
@@ -52,6 +53,30 @@
     block.removeAttribute("inert");
   };
 
+  // The page's own floor (data-floor on the band, in CAD): the figure Framework states for its combined client base.
+  // It is an editorial statement, not a database row. If the database total ever exceeds it, the larger figure is shown.
+  var floor = Number(block.getAttribute("data-floor"));
+  if (!isFinite(floor) || floor <= 0 || floor >= 1e12) floor = 0;
+
+  var present = function (finalText, target) {
+    ghost.textContent = finalText;
+    spoken.textContent = finalText;
+    live.textContent = target !== null && !reduced ? format(0) : finalText;
+    figure.style.setProperty("--len", String(finalText.length));
+    reveal();
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (entries) {
+        if (!entries[entries.length - 1].isIntersecting) return;
+        io.disconnect();
+        run(target, finalText);
+      }, { threshold: 0.3 });
+      io.observe(block);
+    } else {
+      run(target, finalText);
+    }
+  };
+  var fallback = function () { if (floor) present(format(floor), Math.floor(floor)); else remove(); }; // no database figure: use the floor, or no band
+
   var controller = "AbortController" in window ? new AbortController() : null;
   var timer = window.setTimeout(function () { if (controller) controller.abort(); }, TIMEOUT);
 
@@ -59,29 +84,12 @@
     .then(function (res) { if (!res.ok) throw new Error("client-revenue " + res.status); return res.json(); })
     .then(function (data) {
       window.clearTimeout(timer);
-      if (!data || typeof data.total !== "string" || !data.total) { remove(); return; } // nothing to show
+      if (!data || typeof data.total !== "string" || !data.total) { fallback(); return; } // nothing from the database
 
       var value = data.value;
       var counting = typeof value === "number" && isFinite(value) && value > 0 && value < 1e12;
-      var finalText = counting ? format(value) : data.total;
-      var target = counting ? Math.floor(value) : null;
-
-      ghost.textContent = finalText;
-      spoken.textContent = finalText;
-      live.textContent = counting && !reduced ? format(0) : finalText;
-      figure.style.setProperty("--len", String(finalText.length));
-      reveal();
-
-      if ("IntersectionObserver" in window) {
-        var io = new IntersectionObserver(function (entries) {
-          if (!entries[entries.length - 1].isIntersecting) return;
-          io.disconnect();
-          run(target, finalText);
-        }, { threshold: 0.3 });
-        io.observe(block);
-      } else {
-        run(target, finalText);
-      }
+      if (floor && (!counting || value < floor)) { fallback(); return; } // the stated floor is higher than the database total
+      present(counting ? format(value) : data.total, counting ? Math.floor(value) : null);
     })
-    .catch(function () { window.clearTimeout(timer); remove(); /* unavailable: no band, no gap */ });
+    .catch(function () { window.clearTimeout(timer); fallback(); /* unavailable: the floor, or no band and no gap */ });
 })();
