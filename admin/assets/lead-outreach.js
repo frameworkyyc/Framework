@@ -12,7 +12,7 @@ const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/
 export function markContactedDialog(lead) {
   return new Promise((resolve) => {
     const err = h("p", { class: "adm-field__error", role: "alert", hidden: true });
-    const radios = METHODS.map(([id, label]) => h("label", { class: "adm-choice" }, h("input", { type: "radio", name: "ld-method", value: id, required: true }), h("span", { text: label })));
+    const radios = METHODS.map(([id, label]) => h("label", { class: "ld-method" }, h("input", { type: "radio", name: "ld-method", value: id, required: true }), h("span", { text: label })));
     const note = h("textarea", { class: "input", id: "ld-oc-note", rows: "3", maxlength: "200", placeholder: "What was said, who you spoke to (optional)" });
     const when = h("input", { class: "input", id: "ld-oc-when", type: "date", min: today() });
     const dialog = h("dialog", { class: "adm-dialog ld-ocdlg", "aria-labelledby": "ld-oc-title" },
