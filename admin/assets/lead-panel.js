@@ -4,9 +4,10 @@
 
 import { h, api, errorState, confirmDialog, fmtDateTime, fmtDate } from "./ui.js";
 import { badge, card, fold, navIcon, statCard } from "./kit.js";
-import { statusChip, view, SITE_WORDS, SITE_TONE, extLink, safeUrl, shortUrl, shortName, errText, copyText, iconLabel } from "./leads-common.js";
+import { statusChip, outreachChip, view, SITE_WORDS, SITE_TONE, extLink, safeUrl, shortUrl, shortName, errText, copyText, iconLabel } from "./leads-common.js";
 import { pitchSection } from "./lead-pitch.js";
 import { reviewScreen } from "./lead-review.js";
+import { markContactedDialog, outreachCard } from "./lead-outreach.js";
 import { swatch, pretty, fmt, when } from "./demo-traffic.js";
 
 const EVENT_WORD = { imported: "Found by the finder", approved: "Approved", dismissed: "Dismissed", reopened: "Reopened", draft: "Draft written", edited: "Draft edited", email_approved: "Email approved", email_unapproved: "Email unapproved",
@@ -50,7 +51,7 @@ export async function render(id, ctx) {
     const l = data.lead;
     const links = [l.website ? extLink(l.website, siteHost(l.website), "adm-link") : null, extLink(l.maps_url, "Google Maps", "adm-link")].filter(Boolean);
     return h("header", { class: "ld-ov" },
-      h("div", { class: "ld-ov__top" }, h("h1", { class: "adm-title", tabindex: "-1", text: shortName(l.name, l.city) }), statusChip(l)),
+      h("div", { class: "ld-ov__top" }, h("h1", { class: "adm-title", tabindex: "-1", text: shortName(l.name, l.city) }), statusChip(l), outreachChip(l.outreach)),
       h("p", { class: "ld-ov__meta" }, [l.trade, l.city].filter(Boolean).join(" · ")),
       links.length ? h("div", { class: "ld-links" }, links) : null,
       bar.primary.length || bar.secondary.length ? h("div", { class: "adm-actions ld-acts" }, bar.primary, bar.secondary) : null,
@@ -197,7 +198,7 @@ export async function render(id, ctx) {
   /** Outreach: contacts always; the pitch once there is a draft to work on; the demo link once it exists. */
   function outreach() {
     const l = data.lead, d = data.demo || {};
-    return h("div", { class: "ld-out" }, contacts(), l.status === "new" ? null : pitchSection({ data, reload, ctl }), d.link ? demo() : null);
+    return h("div", { class: "ld-out" }, outreachCard({ lead: l, tracking: data.tracking !== false, post, reload, notify: ctx.notify }), contacts(), l.status === "new" ? null : pitchSection({ data, reload, ctl }), d.link ? demo() : null);
   }
 
   function actionBar() {
@@ -208,17 +209,31 @@ export async function render(id, ctx) {
     const confirmed = (opts, fn) => async (b) => { if (await confirmDialog(opts)) await fn(); else b.disabled = false; };
     const dismiss = () => btn("Dismiss", "btn--secondary", confirmed({ title: "Dismiss this lead?", body: "It leaves your working lists and won’t be contacted. You can reopen it later if it was never contacted.", details: [["Business", l.name]], confirmLabel: "Dismiss lead" }, async () => { await post("/dismiss"); await reload(); }));
 
+    /* "Mark as Contacted": you reached them yourself (text, phone, Facebook...). Their approval is left as it is. Not for a lead already contacted, dismissed or opted out. */
+    const markContacted = () => {
+      if (l.outreach || l.opted_out) return;
+      const b = btn("Mark as Contacted", "btn--secondary", async (x) => {
+        const r = await markContactedDialog(l);
+        if (!r) { x.disabled = false; return; }
+        try { await post("/contacted", r); ctx.notify("Marked as contacted."); await reload(); } catch (e) { x.disabled = false; ctx.notify(errText(e)); }
+      });
+      if (data.tracking === false) { b.disabled = true; hint = hint || "Mark as Contacted is waiting for migration 0026 to be approved."; }
+    };
+
     if (l.status === "new") {
       btn("Approve", "btn--primary", async () => { await post("/approve"); await reload(); });
+      markContacted();
       dismiss();
     } else if (l.status === "approved") {
       const b = btn("Approve email", "btn--primary", async () => { if (ctl.pitch && ctl.pitch.dirty()) await ctl.pitch.save(); await post("/message/approve"); await reload(); });
       if (!m) { b.disabled = true; hint = "Create a draft email first (see Pitch below)."; }
       else if (m.blockers.length) { b.disabled = true; hint = m.blockers.join(" "); }
+      markContacted();
       dismiss();
     } else if (l.status === "ready") {
       btn("Review & send", "btn--primary", async (b) => { openReview(); b.disabled = false; });
       btn("Edit", "btn--secondary", async (b) => { const s = document.getElementById("ld-pitch-section"); if (s) s.scrollIntoView(); const f = document.getElementById("ld-subject"); if (f) f.focus({ preventScroll: true }); b.disabled = false; });
+      markContacted();
       dismiss();
     } else if (l.status === "contacted") {
       btn("Mark replied", "btn--primary", confirmed({ title: "Mark this lead as replied?", body: "Use this when they have answered you. It moves to Replied.", details: [["Business", l.name]], confirmLabel: "Mark replied" }, async () => { await post("/status", { status: "replied" }); await reload(); }));
