@@ -140,3 +140,8 @@ Claim or create the profile (category "Website designer" or "Web designer"; mark
 ## Homepage Nexus showcase (Staging)
 - Flat, Linear-style: small eyebrow and wordmark, headline left and text + CTA right, then one large flat Nexus overview capture (thin border, a hairline of light along the top edge, bottom dissolving into the section) with three flat tiles beneath (Progress, Fleet, Reports). On phones the real mobile overview capture is used and the tiles are hidden.
 - Messaging, CTA to `/nexus`, development disclaimer and the "demonstration data" caption are unchanged. No angled, floating or 3D mockups; reveals are plain fades that are skipped under reduced motion. `worker/test/home-nexus-section.test.mjs` pins this.
+
+## About page (Staging)
+- Founder-led, first-person story: hero (scaffold elevation line drawing), the founder story in three chapters with a scroll-filling rail, experience by the numbers (10,000+ hours counted up once, a decade, four sectors) with the training and tickets as a spec table and sector glyphs, four major projects (Keeyask, Gordie Howe, NextStar, REEF) each with a line drawing and "My involvement", a six-row "on site / at Framework" map, the existing principles and audience blocks, and the CTA.
+- Title, meta description, canonical and breadcrumb data are unchanged. One h1; each section has an h2 and its items are h3s. Illustrations are inline, decorative (`aria-hidden`) SVG paths drawn on by CSS; `assets/js/about.js` only reveals and counts, and is skipped under reduced motion (everything then simply shows).
+- The project facts and credentials are exactly those the founder supplied. The projects are labelled as personal field work, not Framework client projects. `worker/test/about-page.test.mjs` pins this.
