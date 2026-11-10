@@ -49,3 +49,15 @@ test("about: illustrations are inline, decorative and animation-safe; no inline 
   assert.match(html, /<script src="assets\/js\/about\.js" defer><\/script>/);
   assert.ok(/data-count="10000"/.test(main) && />10,000\+</.test(main), "the count-up element reads 10,000+ without JavaScript");
 });
+
+test("about hero: on desktop it is sized from the viewport below the header, nothing is clipped, short screens fall back, and tablet/mobile keep the original sizing", () => {
+  const hero = css.slice(css.indexOf(".ab-hero {"), css.indexOf(".ab-hero__facts strong"));
+  assert.match(hero, /@media \(min-width: 901px\) \{[\s\S]*min-height: calc\(100svh - var\(--header-h\) - 1px\)/, "viewport-aware, below the header");
+  assert.match(hero, /max-height: calc\(100svh - var\(--header-h\)/, "the drawing is sized from the height that is left");
+  assert.match(hero, /font-size: clamp\(38px, min\(4\.6vw, 8\.2svh\), 72px\)/, "headline scales with height too");
+  assert.match(hero, /@media \(min-width: 901px\) and \(max-height: 520px\) \{[\s\S]*min-height: 0/, "short-screen fallback");
+  assert.ok(!/overflow:\s*hidden/.test(hero), "the hero does not hide overflow");
+  const base = hero.slice(0, hero.indexOf("@media"));
+  assert.match(base, /padding: clamp\(56px, 8vw, 112px\) 0 clamp\(48px, 7vw, 96px\)/, "tablet and mobile keep the original spacing");
+  assert.ok(!/svh/.test(base), "no viewport-height sizing below desktop");
+});
