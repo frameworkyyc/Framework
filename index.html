@@ -303,27 +303,34 @@
     </div>
   </section>
 
-  <section class="section section--ink nx" aria-labelledby="nexus-title" id="nexus-feature">
+  <section class="section section--ink nx ruled" aria-labelledby="nexus-title" id="nexus-feature">
     <div class="container">
-      <div class="nx__head">
+      <div class="nx__head" data-reveal>
         <span class="eyebrow">A Framework Product · In Development</span>
         <p class="nx__word" aria-hidden="true">Nexus</p>
       </div>
       <div class="nx__body">
-        <div class="nx__copy">
-          <h2 class="h2" id="nexus-title">Project management. Reimagined.</h2>
+        <h2 class="nx__title" id="nexus-title" data-reveal>Project management. Reimagined.</h2>
+        <div class="nx__copy" data-reveal="1">
           <p class="lead">Meet Nexus. A new way to bring construction projects, people and progress together.</p>
           <div class="btn-row"><a class="btn btn--primary" href="/nexus">Discover Nexus <span aria-hidden="true">→</span></a></div>
           <p class="nx__note">Nexus is under development. Public availability has not been announced.</p>
         </div>
-        <figure class="nx__stage" data-reveal>
-          <div class="nx__shot nx__shot--a"><img src="assets/img/nexus/progress.webp" alt="The Nexus progress view: schedule completion across a project, shown with demonstration data" width="2000" height="1250" loading="lazy"></div>
-          <div class="nx__shot nx__shot--b"><img src="assets/img/nexus/overview.webp" alt="The Nexus project overview dashboard, shown with demonstration data" width="2000" height="1250" loading="lazy"></div>
-          <div class="nx__shot nx__shot--c"><img src="assets/img/nexus/fleet.webp" alt="The Nexus fleet view, shown with demonstration data" width="2000" height="1250" loading="lazy"></div>
-          <div class="nx__shot nx__shot--m"><img src="assets/img/nexus/m-overview.webp" alt="The Nexus overview on a phone, shown with demonstration data" width="780" height="1688" loading="lazy"></div>
-          <figcaption>Nexus interface, in development. Demonstration data.</figcaption>
-        </figure>
       </div>
+      <figure class="nx__app" data-reveal="2">
+        <div class="nx__frame">
+          <picture>
+            <source media="(max-width: 700px)" srcset="assets/img/nexus/m-overview.webp" width="780" height="1688">
+            <img src="assets/img/nexus/overview.webp" alt="The Nexus project overview dashboard: the command centre with alerts, project progress and fleet status, shown with demonstration data" width="2000" height="1250" loading="lazy" decoding="async">
+          </picture>
+        </div>
+        <ul class="nx__tiles">
+          <li data-reveal="1"><div class="nx__tile"><img src="assets/img/nexus/progress.webp" alt="The Nexus progress view: schedule completion across a project, shown with demonstration data" width="2000" height="1250" loading="lazy" decoding="async"></div><span>Progress</span></li>
+          <li data-reveal="2"><div class="nx__tile"><img src="assets/img/nexus/fleet.webp" alt="The Nexus fleet view: equipment availability and where each unit is working, shown with demonstration data" width="2000" height="1250" loading="lazy" decoding="async"></div><span>Fleet</span></li>
+          <li data-reveal="3"><div class="nx__tile"><img src="assets/img/nexus/reports.webp" alt="The Nexus reports view, shown with demonstration data" width="2000" height="1250" loading="lazy" decoding="async"></div><span>Reports</span></li>
+        </ul>
+        <figcaption>Nexus interface, in development. Demonstration data.</figcaption>
+      </figure>
     </div>
   </section>
 
