@@ -62,6 +62,7 @@ Posts are listed in **publishing order** (post 01 goes out first and ends up low
           "eyebrow": "HOW WE WORK",
           "headline": "Most businesses\nstart with a logo.",
           "support": "Six stages. The same sequence for every client.",
+          "brand": "omit, unless the logo is part of the concept: { \"element\": \"mark\", \"reason\": \"...\" }",
           "visual": {
             "source": "none | site | higgsfield",
             "ref": "@site/assets/img/drafting.jpg",
@@ -87,6 +88,7 @@ Posts are listed in **publishing order** (post 01 goes out first and ends up low
 Check it with `node social/engine/fw.mjs validate social/batches/<batch-id>`. It fails unless the batch is exactly 9 posts (one 3×3 grid block), on missing checks, unknown values, and two consecutive covers in the same layout family; it warns when the goal mix drifts from about 5 attract / 3 trust / 1 convert, when every post has the same format, when categories are too few, or when three dark covers run together.
 
 Rules that bind every agent:
+- No automatic branding: no Framework logo, wordmark or URL as a corner mark, footer or watermark on any slide. Branding only as an intentional part of a concept (`brand` with a `reason`).
 - Facts come only from `social/brand/facts.md` or the site pages it lists. A post that needs anything else carries `needs_confirmation` with the question for the owner.
 - Text written in the brief is final copy. The Creative Director may change line breaks or trim words to fit (and logs it in `assets.json`), never the meaning. The cover *composition* is the Creative Director's call within the planned category.
 - Credits are spent only by the Creative Director, only within the budget recorded in `approval.md`.

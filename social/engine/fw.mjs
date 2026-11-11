@@ -82,6 +82,18 @@ const FIT_SCRIPT = async () => {
     if (img.naturalWidth < need * 0.8) out.warnings.push(`low-resolution image: ${img.naturalWidth}px wide shown at ~${Math.round(need)}px (${decodeURIComponent(img.src).split("/").pop()})`);
   }
   if (!faces.every((f) => document.fonts.check(f))) out.errors.push("brand fonts did not load");
+  // Branding audit for fw check: every brand element and every piece of text naming Framework or its URL, with its position.
+  const rect = (r) => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
+  out.brand = [...document.querySelectorAll("[data-brand]")].map((e) => ({ kind: e.dataset.brand, ...rect(e.getBoundingClientRect()) }));
+  out.marks = [...document.querySelectorAll("svg")].filter((e) => !e.closest("[data-brand]")).map((e) => ({ kind: "svg", ...rect(e.getBoundingClientRect()) }));
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  out.names = [];
+  for (let n; (n = walker.nextNode()); ) {
+    const t = n.textContent;
+    if (!/frameworkco\.ca|\bframework\b/i.test(t) || n.parentElement.closest("[data-brand], .btn")) continue; // a CTA button naming the site is content, not a watermark
+    const r = document.createRange(); r.selectNodeContents(n);
+    out.names.push({ text: t.trim().slice(0, 60), ...rect(r.getBoundingClientRect()) });
+  }
   return out;
 };
 
@@ -104,6 +116,7 @@ async function renderPost(browser, postDir) {
   const report = [];
   for (const [i, s] of slides.entries()) {
     if (!TEMPLATES.includes(s.template)) throw new Error(`${postDir} slide ${i + 1}: unknown template "${s.template}"`);
+    if ("footer" in s) throw new Error(`${postDir} slide ${i + 1}: "footer" no longer exists (no branded footers); put a citation in "source"`);
     if (s.image && !existsSync(resolveAsset(s.image, postDir))) throw new Error(`${postDir} slide ${i + 1}: image not found: ${s.image}`);
     const n = i + 1, total = slides.length;
     const ctx = { n, total, isLast: n === total || spec.format !== "carousel", counter: spec.format === "carousel" ? `${String(n).padStart(2, "0")} / ${String(total).padStart(2, "0")}` : "", w, h, postDir: resolve(postDir), fontsCss: FONTS_CSS, slideCss: SLIDE_CSS };
@@ -118,6 +131,7 @@ async function renderPost(browser, postDir) {
   }
   await page.close();
   rmSync(build, { recursive: true, force: true });
+  writeFileSync(join(outDir, "render.json"), JSON.stringify({ size: [w, h], slides: report.map(({ slide, file, brand, marks, names }) => ({ slide, file, brand, marks, names })) }, null, 1));
   return { post: basename(postDir), size: `${w}x${h}`, slides: report };
 }
 
@@ -245,6 +259,30 @@ function lintCaption(text, platform) {
   if (platform === "facebook" && tags.length > 2) issues.push(`${tags.length} hashtags on Facebook (keep 0-2)`);
   return issues;
 }
+// Branding QC (owner rule, 2026-11-11): no automatic logos, wordmarks, URLs or branded footers. Framework branding appears only
+// where the concept calls for it (spec brand.reason), large and inside the composition, never as a corner stamp or footer strip.
+function brandingIssues(d, spec, w, h) {
+  const out = [], rp = join(d, "slides", "render.json");
+  spec.slides.forEach((s, i) => {
+    if ("footer" in s) out.push(`slide ${i + 1}: "footer" field (branded footers are retired; use "source" for citations)`);
+    if (s.brand && !(s.brand.reason && String(s.brand.reason).trim().length >= 12)) out.push(`slide ${i + 1}: brand without a reason (branding must be an intentional part of the concept)`);
+  });
+  if (!existsSync(rp)) return [...out, "no branding audit (slides/render.json): re-render with the current engine"];
+  const r = readJson(rp);
+  const corner = (b) => (b.y + b.h > h * 0.82 || b.y < h * 0.12) && (b.x < w * 0.3 || b.x + b.w > w * 0.7);
+  for (const sl of r.slides) {
+    const at = `slide ${sl.slide}`;
+    for (const b of [...(sl.brand || []), ...(sl.marks || [])]) {
+      if (b.kind === "svg") out.push(`${at}: logo graphic outside an intentional brand element`);
+      else if (Math.max(b.w, b.h) < 160) out.push(`${at}: ${b.kind} is ${Math.max(b.w, b.h)}px: too small to be a deliberate brand moment (looks like a watermark)`);
+      else if (corner(b) && Math.max(b.w, b.h) < w * 0.25) out.push(`${at}: ${b.kind} sits in a corner like a watermark`);
+    }
+    for (const t of sl.names || []) if (t.y + t.h > h * 0.88 && t.h < 60) out.push(`${at}: "${t.text}" along the bottom edge reads as a branded footer or URL watermark`);
+  }
+  const branded = r.slides.filter((sl) => (sl.brand || []).length).length;
+  if (branded > 1) out.push(`brand element on ${branded} slides: an intentional brand moment appears once per post at most`);
+  return out;
+}
 function check(batch) {
   let fail = 0, warn = 0;
   const say = (lvl, m) => { console.log(`${lvl} ${m}`); lvl === "FAIL" ? fail++ : lvl === "WARN" ? warn++ : 0; };
@@ -260,6 +298,7 @@ function check(batch) {
     else if (pngs.length !== spec.slides.length) say("FAIL", `${id}: ${pngs.length} PNGs for ${spec.slides.length} slides (run render)`);
     for (const f of pngs) { const s = pngSize(join(d, "slides", f)); if (s.w !== w || s.h !== h) say("FAIL", `${id}/${f}: ${s.w}x${s.h}, expected ${w}x${h}`); }
     if (spec.slides.some((s) => s.image && /^https?:/.test(s.image))) say("FAIL", `${id}: remote image URL in spec (download it into images/ first)`);
+    for (const m of brandingIssues(d, spec, w, h)) say("FAIL", `${id}: ${m}`);
     for (const [file, platform] of [["caption-instagram.txt", "instagram"], ["caption-facebook.txt", "facebook"], ["alt-text.txt", "alt"]]) {
       const p = join(d, file);
       if (!existsSync(p)) { say("FAIL", `${id}: missing ${file}`); continue; }

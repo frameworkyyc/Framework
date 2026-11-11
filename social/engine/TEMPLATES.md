@@ -9,7 +9,7 @@
 - `size`: default `1080x1350` (4:5 feed). `1080x1080` also works.
 
 ## One system, many compositions
-The **constants** keep the feed recognisable: Switzer and General Sans, ink/paper/greys, the eyebrow, hairlines, sharp corners and the Framework mark (drawn by the engine, never recoloured). The **layout family** changes the silhouette. A family is `template` + `layout` (e.g. `type:giant`, `photo:caption`, `plate`). The grid check (`fw grid`) refuses two neighbouring covers in the same family.
+The **constants** keep the feed recognisable: Switzer and General Sans, ink/paper/greys, the eyebrow, hairlines and sharp corners. The **layout family** changes the silhouette. A family is `template` + `layout` (e.g. `type:giant`, `photo:caption`, `plate`). The grid check (`fw grid`) refuses two neighbouring covers in the same family.
 
 **Covers** (slide 1) should make someone stop: pick the family that fits the idea and differs from the neighbours. **Interior slides** stay consistent for reading: `point`, `list`, `compare`, `diagram`, `quote`, `statement`, `cta`.
 
@@ -35,10 +35,18 @@ The **constants** keep the feed recognisable: Switzer and General Sans, ink/pape
 | `image` | `@site/assets/img/x.jpg` (repo image) or `images/x.png` (this post's folder). Never a URL |
 | `imageFocus` | CSS object-position, e.g. `"50% 30%"` |
 | `imageTreatment` | `mono` (default), `muted`, `none`. Colour (`muted`/`none`) only inside portfolio, photography or conceptual imagery when it improves the composition |
-| `footer` | overrides the bottom-right text (default `→` mid-carousel, `frameworkco.ca` at the end) |
+| `source` | citation for a fact on the slide, printed small under the content ("Source: …") |
+| `brand` | **intentional branding only**: `{ "element": "mark" \| "lockup", "size": 240, "reason": "why the logo belongs to this concept" }`. Rendered large (160px minimum) inside the composition on `statement`, `type`, `minimal` and `cta`. Refused without a reason |
 | `headlineSize`, `supportSize`, `giantSize`, `itemsSize`… | starting px. The fitter shrinks text to fit (down to 72%) and reports it |
 
 Inline markup in any text: `{{muted text}}` (grey), `**semibold**`. Quotes and apostrophes are set typographically. No italics, no emoji.
+
+## Branding (owner rule, 2026-11-11)
+Framework branding never appears automatically: no logo, wordmark or website URL in corners, along the bottom, as a footer strip or as a watermark, and no logo added just to say who made the post. Branding appears only when it is an intentional part of the concept (the logo on a product or stationery mockup, signage, packaging, a branding showcase, a post about Framework's own identity, a deliberate logo-led composition). Removed branding is never replaced by another repeated decorative element.
+- No template places the mark, wordmark or `frameworkco.ca` anywhere by default; there is no footer.
+- To brand a slide on purpose, set `brand` with a `reason`. At most one branded slide per post. A logo inside a photograph or mockup (Higgsfield or real) is part of the image, not a stamp.
+- A website URL may appear only as content: a CTA button (`button`) or a sentence. Never as a signature.
+- `fw render` writes `slides/render.json` (every brand element and every "Framework"/URL text with its position). `fw check` fails a post with a brand element under 160px, a mark in a corner, a name or URL along the bottom edge, a brand without a reason, a retired `footer` field, or brand elements on more than one slide.
 
 ## Templates
 | Template | Layouts / extra fields |
@@ -56,7 +64,7 @@ Inline markup in any text: `{{muted text}}` (grey), `**semibold**`. Quotes and a
 | `list` | numbered rows (3–6): `items: [{title, desc}]` |
 | `compare` | `leftLabel`, `rightLabel`, `rows: [[l, r]]` (2–4 rows) |
 | `quote` | `quote`, `name`, `role`: verbatim, real, attributed |
-| `cta` | closing slide: mark, headline, `button` |
+| `cta` | closing slide: headline, support, `button` (no logo unless `brand` is set on purpose) |
 | `reel` | transparent overlay for a Reel (`fw reel`) |
 
 ## Image slots and Higgsfield aspect ratios

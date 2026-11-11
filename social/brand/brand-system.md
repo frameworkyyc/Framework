@@ -64,7 +64,8 @@ Buttons: Primary = ink fill, paper semibold text, no border, 0px corners. Second
 
 ## [social] Feed identity: one system, many compositions
 The owner's goal: the Instagram grid should read like a curated design-studio portfolio, not a template run. Reference accounts (art direction only, never copied): Obrazur for range and variety, held inside Framework's minimal, architectural identity.
-- **Constant (recognition):** the two typefaces, the near-monochrome palette, the eyebrow + headline pattern, hairlines, sharp corners, and the Framework mark and wordmark drawn by the engine.
+- **Constant (recognition):** the two typefaces, the near-monochrome palette, the eyebrow + headline pattern, hairlines, sharp corners and the quality of the compositions. Recognition comes from the design system, not from a stamped logo.
+- **[social] Owner rule (2026-11-11), no watermarks:** Framework branding never appears automatically: no logo, wordmark or website URL in corners, along the bottom, as a footer strip or as a watermark, and no logo added just to say who made the post. Branding appears only when it is an intentional part of the concept (the logo on a product or stationery mockup, signage, packaging, a branding showcase, a post about Framework's own identity, a deliberate logo-led composition). Removed branding is never replaced by another repeated decorative element. Reference: Reputeforge and Obrazur carry no repeated logos or branded footers.
 - **Variable (variety):** layout family, headline position and scale, light/dark/mid tone, photography vs typography vs graphic, density vs negative space.
 - **Six visual categories** to mix across every batch: editorial typography, architectural photography, portfolio showcases, conceptual artwork, educational graphics, minimalist compositions.
 - **Batches are 3×3 blocks:** every batch is exactly 9 posts, so the profile grows in whole rows and each block is designed as one composition.

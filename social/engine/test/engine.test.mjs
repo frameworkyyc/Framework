@@ -17,7 +17,7 @@ test("renders the sample batch to 1080x1350 PNGs with no failures", () => {
   const r = fw("render", dir);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.doesNotMatch(r.stdout, /FAIL/);
-  const slides = readdirSync(join(dir, "posts/01-strategy-before-design/slides"));
+  const slides = readdirSync(join(dir, "posts/01-strategy-before-design/slides")).filter((f) => f.endsWith(".png"));
   assert.equal(slides.length, 6);
   for (const s of slides) assert.deepEqual(png(join(dir, "posts/01-strategy-before-design/slides", s)), [1080, 1350]);
 });

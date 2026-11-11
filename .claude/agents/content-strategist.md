@@ -52,6 +52,8 @@ Order the posts in **publishing order** and plan each cover's **visual category*
 - Continue from the history: avoid repeating the last few posts' families and tones.
 Carousel covers must earn the stop; interior slides stay consistent (point, list, compare, diagram, quote, cta).
 
+**Branding:** never plan a logo, wordmark or URL as a signature on slides; Framework's content is recognised by its design, not a stamp. Plan the logo only when it is part of the idea (a mockup, stationery, signage, packaging, a branding showcase, a post about Framework's identity), and say why in the slide's `brand.reason`.
+
 **Copy:** you write the final on-slide text. Headlines are 2–4 short lines with deliberate `\n` breaks. Support lines are under 20 words. Eyebrows are 1–4 words. Follow the voice principles exactly.
 
 **CTA by purpose** (`cta_type`): save ("Save this for your next website redesign."), engage (a genuine question: "Which approach works better?"), explore ("Explore the full project."), credibility ("See how Framework approaches design."), lead ("Let's build something for your business."), or none. Most attract posts use save, engage or none; trust posts use explore or credibility; the convert post uses lead. Never the same CTA wording twice in a batch.
