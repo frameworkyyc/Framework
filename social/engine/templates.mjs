@@ -88,11 +88,11 @@ const T = {
   split(s, ctx) {
     return `<div class="split-wrap${s.side === "right" ? " right" : ""}" style="--cols:${esc(s.cols || "1fr 1fr")}">${photo(s, ctx.postDir)}<div class="split-text"><div class="top-row"><span class="eyebrow">${s.eyebrow ? "— " + md(s.eyebrow) : ""}</span><span class="counter">${ctx.counter}</span></div><main class="body end" data-fit-box><div class="stack">${headline(s, 76, "h2")}${support(s, 30)}</div></main><div style="height:40px;flex:none"></div><span class="lockup">${markFor(ctx.theme)}<span class="wordmark">Framework</span></span></div></div>`;
   },
-  // Portfolio: real client work on a quiet stage (theme mist or ink suits it). image = desktop view; image2 = optional phone view; tags = disciplines.
+  // Portfolio: real client work on a quiet stage (theme mist or ink suits it). image = desktop view; image2 = optional phone view (image2Side "right" default | "left"); tags = disciplines.
   showcase(s, ctx) {
     const main = resolveAsset(s.image, ctx.postDir), second = resolveAsset(s.image2, ctx.postDir);
     const treat = treatment(s, "none");
-    const stage = `<div class="stage ${treat}" style="height:${s.imageHeight || 640}px;--fit:${s.imageFit === "contain" ? "contain" : "cover"};--focus:${esc(s.imageFocus || "50% 0%")}"><div class="main" style="height:${s.imageHeight || 640}px"><img src="${main ? fileUrl(main) : ""}" alt=""></div>${second ? `<div class="second"><img src="${fileUrl(second)}" alt=""></div>` : ""}</div>`;
+    const stage = `<div class="stage ${treat}" style="height:${s.imageHeight || 640}px;--fit:${s.imageFit === "contain" ? "contain" : "cover"};--focus:${esc(s.imageFocus || "50% 0%")}"><div class="main" style="height:${s.imageHeight || 640}px"><img src="${main ? fileUrl(main) : ""}" alt=""></div>${second ? `<div class="second${s.image2Side === "left" ? " left" : ""}"><img src="${fileUrl(second)}" alt=""></div>` : ""}</div>`;
     const tags = (s.tags || []).length ? `<div class="tags">${s.tags.map((t) => `<span>${md(t)}</span>`).join("")}</div>` : "";
     return `${chromeTop(s, ctx)}<main class="body" data-fit-box>${stage}<div class="spacer" style="min-height:${second ? 104 : 48}px"></div><div class="stack">${headline(s, 72, "h2")}${support(s, 30)}${tags}</div></main>${chromeBottom(s, ctx)}`;
   },
