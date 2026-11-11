@@ -54,6 +54,9 @@ export const EXCLUDED = {
   demo_links: "tracking-link ids and private prospect labels; per environment",
   demo_journeys: "anonymous visitor journeys; per environment",
   demo_events: "anonymous visitor events; per environment",
+  // Website Analytics (migration 0028): which analytics site and Search Console property each website reads, and cached provider answers. Configured per environment (a site tag is entered in Admin for the environment that reads it); never copied.
+  website_analytics: "per-environment analytics site and Search Console property settings; not part of this refresh",
+  website_analytics_cache: "cached provider answers; per environment, rebuilt on demand",
   outreach_leads: "prospects, notes and approvals; never copied to Staging",
   outreach_contacts: "prospect email addresses and phone numbers; never copied to Staging",
   outreach_suppressions: "opt-outs and bounces; must never be mixed between environments",

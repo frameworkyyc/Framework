@@ -18,16 +18,18 @@ Search Console cannot answer "where do I rank for *fences and decks* in *Calgary
 - Admin records checks per keyword (Admin, Websites, SEO details, Keyword rankings): date, position 1 to 200 or empty for "not found in the results checked", optional page. A check cannot be dated in the future. Mistaken checks can be removed. Everything is audited.
 - Migration **0022_seo_keywords.sql** (two additive tables) is applied to Staging; Production only by the manual workflow. Without it the page says keyword tracking is being set up and shows no form; the rest of SEO works.
 
-## Google Search Console: the practical architecture (not built, needs approval)
+> **Update:** live Search Console figures (and Cloudflare Web Analytics traffic) are now built as the separate Analytics page under each website, read on demand through the APIs and cached, not imported into `website_seo_metrics`. See `WEBSITE-ANALYTICS.md`. The section below is the earlier plan for a monthly import and is kept for reference.
 
-Recommended first step: a **service account** that each client adds as a *Restricted* user on their Search Console property.
-1. Framework creates one Google Cloud project, enables the Search Console API, creates a service account. No cost.
-2. The service account's JSON key is stored as a Worker secret (for example `GSC_SERVICE_ACCOUNT_JSON`). Never in the repository.
-3. For each website the client adds the service account's email under Search Console, Settings, Users and permissions (read-only). Framework records the property (for example `sc-domain:example.com`): this needs one small migration (a property column on `websites` or a `seo_connections` table).
+## Google Search Console: how it is connected (built for Website Analytics; see WEBSITE-ANALYTICS.md)
+
+Framework signs in to Google **once, as a dedicated Google account**, with an OAuth refresh token (scope `webmasters.readonly`). No service account key is used: the organisation policy `iam.managed.disableServiceAccountKeyCreation` blocks them, and a refresh token is the simplest secure alternative.
+1. Framework uses one Google Cloud project with the Search Console API on and an OAuth client. No cost.
+2. The OAuth client id and secret and the refresh token are Worker secrets (`GSC_OAUTH_CLIENT_ID`, `GSC_OAUTH_CLIENT_SECRET`, `GSC_OAUTH_REFRESH_TOKEN`). Never in the repository.
+3. For each website the client adds that Google account under Search Console, Settings, Users and permissions as a *Restricted* (read-only) user. Framework records the property (for example `sc-domain:example.com`): this needs one small migration (a property column on `websites` or a `seo_connections` table).
 4. A scheduled Worker (Cron Trigger, no extra cost) calls `searchanalytics.query` once a month (or weekly) and upserts a row into `website_seo_metrics` with `source = 'search_console'`, `published = 1`. The dashboard already renders it and labels it.
 5. Search Console data lags by about two to three days and only covers verified properties. A client without a Search Console property needs one created and verified first (a DNS record or an HTML tag).
 
-Later alternative: per-client Google OAuth ("Connect with Google"), which is better self-service but needs Google's OAuth consent-screen verification and encrypted refresh-token storage.
+Later alternative: per-client Google OAuth ("Connect with Google"), which is better self-service but needs Google's OAuth consent-screen verification and encrypted refresh-token storage in the database.
 
 ## Location-specific rank tracking: options and cost (not built, needs approval)
 

@@ -153,7 +153,10 @@
       // every email goes ONLY to that address (subject prefixed "[TEST for ...]"), is recorded as a test and never changes a lead's status. Staging can therefore never email a real business.
       // Production would need its own reviewed change (no test recipient, plus LEADS_MAILING_ADDRESS). Setup and the checklist: worker/LEADS.md.
       "LEADS_SENDING": "1",
-      "LEADS_TEST_RECIPIENT": "hello@frameworkco.ca"
+      "LEADS_TEST_RECIPIENT": "hello@frameworkco.ca",
+      // Website Analytics (STAGING ONLY): the Cloudflare account that holds the Web Analytics sites. The account id is an identifier, not a secret (it is already in this repository and in every dashboard link).
+      // It must live here: set only in the dashboard, the next deploy deletes it and the client Analytics page then says traffic is "not connected". The API token CF_ANALYTICS_API_TOKEN is a secret and stays in Cloudflare.
+      "CF_ANALYTICS_ACCOUNT_ID": "8d8d61851e9e56969b4a6bf9a985e9a4"
     },
     "d1_databases": [
       {

@@ -14,6 +14,7 @@ import * as brandingLive from "./branding-live.js";
 import * as servicesLive from "./services-live.js";
 import * as websiteLive from "./website-live.js";
 import { frameSources } from "./website-preview.js";
+import { analyticsPage } from "./analytics/view.js";
 import { brandingEnabled, servicesEnabled, websiteEnabled, requestsEnabled } from "./config.js";
 import { requestsNav, activeKey } from "./requests/nav.js";
 import { unifiedHome as requestsUnifiedHome } from "./requests/views.js";
@@ -196,18 +197,23 @@ export async function brandingUploadsPage(ctx, a, o = {}) {
 }
 
 /** The Website section: `sites` is every website Framework published for this organization (the empty list is the "no website" state); `one` is a single website's own page. */
-export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null, milestones = [], seo = null } = {}) {
+export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null, milestones = [], seo = null, analytics = false } = {}) {
   const vm = liveModel(ctx, a, {});
   const single = one || (sites.length === 1 ? sites[0] : null);
   // The live preview needs the page to be allowed to frame that one website: its verified origins go into THIS response's CSP only (frame-src); no other page and no global policy changes.
   const frameSrc = single ? frameSources(preview) : [];
-  const extra = { management, milestones, seo, services: services ? { ...services, csrf: await csrfFor(ctx.cfg, a.session) } : null };
+  const extra = { management, milestones, seo, analytics, services: services ? { ...services, csrf: await csrfFor(ctx.cfg, a.session) } : null };
   return shell(ctx, a, { title: one ? one.name : "Website", active: "home", body: one ? websiteLive.websiteDetail(vm, one, preview, extra) : websiteLive.websiteOverview(vm, sites, preview, extra), vm, ref: "website", frameSrc });
 }
 /** SEO & Search Visibility: a subsection of one website (not a main navigation item). `seo` is only what Admin has published. */
 export async function websiteSeoPage(ctx, a, site, seo) {
   const vm = liveModel(ctx, a, {});
   return shell(ctx, a, { title: `SEO & Search Visibility: ${site.name}`, active: "home", body: websiteLive.seoPage(vm, site, seo), vm, ref: "website" });
+}
+/** Analytics: traffic (Cloudflare Web Analytics) and search performance (Google Search Console) for one website; `model` is analytics/service.js loadAnalytics. */
+export async function websiteAnalyticsPage(ctx, a, site, model) {
+  const vm = liveModel(ctx, a, {});
+  return shell(ctx, a, { title: `Analytics: ${site.name}`, active: "home", body: analyticsPage(vm, site, model), vm, ref: "website", script: "/assets/js/portal-analytics.js", styles: ["/assets/css/portal-requests.css", "/assets/css/portal-analytics.css"] });
 }
 /** Change and support requests about a website: the existing support workflow (same statuses, thread and attachments), under the Website section. */
 export async function websiteRequestsPage(ctx, a, items) {
