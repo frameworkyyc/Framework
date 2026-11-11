@@ -430,8 +430,9 @@ function historyCmd(sub, arg2) {
 // Figma cannot render the brand fonts in automated runs and limits exports on the current plan, so it holds the finished
 // slides for review, arrangement and comments; the engine stays the renderer. Flow: manifest -> upload_assets(count) -> upload -> layout -> use_figma.
 const FIGMA_CFG = join(REPO_ROOT, "social", "figma.json");
+// FW_POST=03 limits manifest/upload to one post (re-publishing a corrected post); its nodes replace that post's entries in figma.json.
 function figmaFiles(batch) {
-  return postDirs(batch).flatMap((d) => (existsSync(join(d, "slides")) ? readdirSync(join(d, "slides")).filter((f) => /^\d+\.png$|^reel-cover\.png$/.test(f)).sort().map((f) => ({ post: basename(d), slide: f.replace(".png", ""), file: join(d, "slides", f) })) : []));
+  return postDirs(batch).filter((d) => !process.env.FW_POST || basename(d).startsWith(process.env.FW_POST)).flatMap((d) => (existsSync(join(d, "slides")) ? readdirSync(join(d, "slides")).filter((f) => /^\d+\.png$|^reel-cover\.png$/.test(f)).sort().map((f) => ({ post: basename(d), slide: f.replace(".png", ""), file: join(d, "slides", f) })) : []));
 }
 function figmaCmd(sub, batchArg, urlsArg) {
   const batch = resolve(batchArg || die("usage: fw.mjs figma manifest|upload|layout <batch> [urls-file]")), name = basename(batch);
@@ -447,7 +448,9 @@ function figmaCmd(sub, batchArg, urlsArg) {
       if (!res.success) die(`upload failed for ${f.post}/${f.slide}: ${JSON.stringify(res)}`);
       return { post: f.post, slide: f.slide, nodeId: res.placedOnNodeId };
     });
-    writeFileSync(join(batch, "figma.json"), JSON.stringify({ batch: name, fileKey: cfg.fileKey, nodes }, null, 1));
+    const prev = process.env.FW_POST && existsSync(join(batch, "figma.json")) ? readJson(join(batch, "figma.json")) : null;
+    const merged = prev ? { ...prev, nodes: [...prev.nodes.filter((n) => !nodes.some((m) => m.post === n.post)), ...nodes].sort((a, b) => (a.post + a.slide).localeCompare(b.post + b.slide)), replaced: prev.nodes.filter((n) => nodes.some((m) => m.post === n.post)) } : { batch: name, fileKey: cfg.fileKey, nodes };
+    writeFileSync(join(batch, "figma.json"), JSON.stringify(merged, null, 1));
     console.log(`ok   ${nodes.length} slides uploaded to ${cfg.url}`);
   } else if (sub === "layout") {
     const f = readJson(join(batch, "figma.json"));

@@ -48,7 +48,7 @@ Inline markup in any text: `{{muted text}}` (grey), `**semibold**`. Quotes and a
 | `photo` | full-bleed photo. Default: solid panel with eyebrow, headline, support. `layout: "caption"`: small label block, maximum image |
 | `plate` | architecture-monograph page: framed photo (`imageHeight`, default 600), `figure` caption (default "Fig. 01") |
 | `split` | photo full height + text column. `side: "left"`/`"right"`, `cols: "1.15fr 1fr"` |
-| `showcase` | portfolio stage: `image` (desktop view), `image2` (phone view, optional), `tags: ["Website", "Brand"]`, `imageHeight` (default 640); colour on by default |
+| `showcase` | portfolio stage: `image` (desktop view), `image2` (phone view, optional; `image2Side: "left"` moves it), `tags: ["Website", "Brand"]`, `imageHeight` (default 640); colour on by default |
 | `diagram` | `kind: "flow"` (`items: [{title, desc}]`, `active: 3` fills a step) or `kind: "bars"` (`items: [{label, value, display}]`, `source`) |
 | `cover` | eyebrow + big headline anchored low; optional photo band (`image`, `imageHeight`) |
 | `statement` | one big idea; `align: "end"` anchors it low |
