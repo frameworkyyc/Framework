@@ -66,7 +66,7 @@ Read `social/brand/art-direction.md` first. A canvas slide is a stack of layers 
 | `svg` | `src` (e.g. `@site/assets/img/red-e-crest.svg`), `x y w h`: crisp vector marks at any size |
 | `brand` | Framework's mark, only with `reason` (branding rule) |
 
-Client typefaces: add `"fonts": [{ "family": "Barlow Semi Condensed", "src": "images/barlow-600.woff2", "weight": 600 }]` at the top of `spec.json` (download the woff2 from the `@fontsource` npm package with `npm pack`). Authentic website captures: `fw capture <url> <out.jpg> [desktop|mobile] [full]` into `social/assets/clients/<client>/` (2880px desktop, 1170px-wide mobile).
+Client typefaces: add `"fonts": [{ "family": "Barlow Semi Condensed", "src": "images/barlow-600.woff2", "weight": 600 }]` at the top of `spec.json` (download the woff2 from the `@fontsource` npm package with `npm pack`). Already available: `social/assets/clients/red-e/fonts/` (Barlow Semi Condensed 400–700; Red E's body face Inter is installed system-wide) and `social/assets/clients/aurora/fonts/` (Noto Sans, Noto Serif, Noto Sans Mono 400–700), each with its open font licence. Authentic website captures: `fw capture <url> <out.jpg> [desktop|mobile] [full]` into `social/assets/clients/<client>/` (2880px desktop, 1170px-wide mobile).
 
 ## Templates
 | Template | Layouts / extra fields |
