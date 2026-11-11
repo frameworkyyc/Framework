@@ -9,7 +9,7 @@ const text = (p) => read(p).toString("utf8");
 test("Overview: the Recent activity section is gone; the other sections stay", () => {
   const ov = text("admin/assets/overview.js");
   assert.ok(!/Recent activity|activitySection|adm-act\b/.test(ov));
-  for (const kept of ["Recent feedback", "invoiceSection(d && d.invoices)", "clientSection(d && d.clients)", "Support requests", "requestsSection"]) assert.ok(ov.includes(kept), kept);
+  for (const kept of ["Recent feedback", "invoiceSection(d && d.invoices)", "Support requests", "requestsSection"]) assert.ok(ov.includes(kept), kept);
 });
 
 test("Home Screen: the Admin page names the app Framework Admin and uses the same Framework logo as the digital business card", () => {
@@ -29,4 +29,12 @@ test("Sidebar: no empty trailing nav group, and the footer adds no second divide
   const foot = css.match(/^\.adm-side__foot \{([^}]*)\}/m)[1];
   assert.ok(!/border/.test(foot) && !/padding-top/.test(foot), "the last nav row's rule is the one divider");
   assert.match(css, /^\.adm-nav__link \{[^}]*border-bottom: 1px solid var\(--hairline\)/m, "every nav row, the last included, ends in the same rule");
+});
+
+test("Overview: the Clients section (with Business Profile completion) is gone; client information stays on the Clients page, and an odd card out takes the full width", () => {
+  const ov = text("admin/assets/overview.js");
+  assert.ok(!/clientSection|adm-cl\b|Business Profile completion|"All clients"/.test(ov));
+  assert.match(ov, /cl\.withoutAccess/, "'Needs attention' still points at clients with nobody signed in or invited");
+  assert.match(ov, /function columns\(cells\)/); assert.match(ov, /single\.length % 2 === 1/);
+  assert.match(ov, /columns\(\[requestsEl, requestsEl \? null : supportSection\(d && d\.support\), invoiceSection\(d && d\.invoices\)\]\.filter\(Boolean\)\)/);
 });
