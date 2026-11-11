@@ -7,6 +7,7 @@ import { h, api, confirmDialog, errorState, fmtDate } from "./ui.js";
 import { chip } from "./client-dashboard.js";
 import { fold } from "./kit.js";
 import { seoPanel } from "./website-seo.js";
+import { analyticsPanel } from "./website-analytics.js";
 
 const STATUS = { existing: "Existing website", in_development: "In development", live: "Live" };
 const PHASE = { "": "None", awaiting_feedback: "Awaiting client feedback (in development)", awaiting_approval: "Awaiting approval (in development)", maintenance: "Maintenance (live)" };
@@ -238,7 +239,7 @@ export async function render(orgId, ctx) {
     const key = "ws-" + site.id;
     return h("details", { class: "adm-acc adm-ws", id: key, open: opened.has(key) ? true : null, ontoggle: (ev) => { if (ev.target.open) opened.add(key); else opened.delete(key); } },
       h("summary", { class: "adm-acc__sum" }, h("span", { class: "adm-acc__title", text: site.name }), h("span", { class: "adm-acc__meta" }, chips)),
-      h("div", { class: "adm-acc__body" }, h("p", null, summary), archived ? null : siteForm(site), archived ? null : milestonesBlock(site), archived ? null : seoPanel({ base, site, canWrite, say }), archived ? null : previewBlock(site), archived ? null : packageBlock(site), archived ? null : screenshotBlock(site), actions));
+      h("div", { class: "adm-acc__body" }, h("p", null, summary), archived ? null : siteForm(site), archived ? null : milestonesBlock(site), archived ? null : seoPanel({ base, site, canWrite, say }), archived ? null : analyticsPanel({ base, site, canWrite, say }), archived ? null : previewBlock(site), archived ? null : packageBlock(site), archived ? null : screenshotBlock(site), actions));
   }
 
   function draw() {

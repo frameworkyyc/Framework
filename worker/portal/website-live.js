@@ -12,6 +12,7 @@ import { ESTIMATE_NOTE } from "./branding-pricing.js";
 import { stageOf, milestoneProgress } from "./website-stage.js";
 import { serviceCatalogue } from "./service-catalogue.js";
 import { SEO_STATUS_LABEL } from "./repo/website-seo.js";
+import { analyticsTeaser } from "./analytics/view.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const isWebUrl = (u) => typeof u === "string" && /^https?:\/\/[^\s"'<>]+$/.test(u);
@@ -99,7 +100,7 @@ function seoTeaser(vm, s, seo) {
 function detailBody(vm, s, preview, extra = {}) {
   return `<div class="ws__badges">${statusChip(s)}${managedChip(s)}</div>
 <p class="lead ws__lead">${e(statement(s))}</p>
-${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${management(vm, s, extra.management)}${serviceCatalogue(vm, extra.services)}`;
+${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${extra.analytics ? analyticsTeaser(vm, s) : ""}${management(vm, s, extra.management)}${serviceCatalogue(vm, extra.services)}`;
 }
 
 /* ------------------------------------------------------------------ Website management and Additional Services */

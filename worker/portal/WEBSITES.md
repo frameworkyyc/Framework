@@ -28,3 +28,6 @@ Migration 0012 is applied to the Staging database (approved, verified); Producti
 3. Milestones and progress (Admin editor, client timeline).
 4. Change requests and feedback on the existing Client Services request infrastructure, independent of `PORTAL_SERVICES`; the service offers for design, redesign, SEO and maintenance.
 5. Files and handover documents.
+
+## Analytics (proposed migration 0028, dormant)
+Each website has an Analytics page (Cloudflare Web Analytics traffic and Google Search Console search performance, read through their APIs and cached). See `WEBSITE-ANALYTICS.md` for the design, the credentials and the owner checklist.

@@ -29,6 +29,9 @@ import { listProjects, getProject } from "./repo/projects.js";
 import { listActivity } from "./repo/activity.js";
 import { validateSlug, validateName } from "./repo/validate.js";
 import { UUID } from "./repo/common.js";
+import { analyticsReady } from "./repo/website-analytics.js";
+import { loadAnalytics } from "./analytics/service.js";
+import { DEFAULT_RANGE } from "./analytics/ranges.js";
 import { getProfileAnswers, saveProfileStep, getStepRevision } from "./repo/business-profile.js";
 import { hasPriorVisit } from "./repo/visits.js";
 import { stepById, PROFILE_STEPS, MULTI_SEP } from "./profile-schema.js";
@@ -575,6 +578,13 @@ const WEBSITE_ROUTES = [
       return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
     },
   },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/analytics$/, action: "website.view", run: async (ctx, a, id) => {
+      if (!UUID.test(id)) return notFoundPage(ctx);
+      const org = a.membership.organizationId;
+      const site = await getClientWebsite(ctx.db, org, id); // another organization's, unpublished and archived websites are all "not found"
+      const model = site ? await loadAnalytics({ env: ctx.env, db: ctx.db, organizationId: org, websiteId: id, range: viewFilters(ctx.url).range || DEFAULT_RANGE, now: ctx.now, fetch: ctx.fetch }) : null;
+      return site && model ? pages.websiteAnalyticsPage(ctx, a, site, model) : notFoundPage(ctx); // null model: analytics is not available on this database yet
+    } },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/seo$/, action: "website.view", run: async (ctx, a, id) => {
       if (!UUID.test(id)) return notFoundPage(ctx);
       const site = await getClientWebsite(ctx.db, a.membership.organizationId, id);
@@ -592,7 +602,7 @@ const WEBSITE_ROUTES = [
 /** What one website's page adds to its basics: its real milestones (for the progress bar) and its published SEO information. Both are scoped to the member's own organization. */
 async function siteExtras(ctx, a, site) {
   const org = a.membership.organizationId;
-  return { milestones: await listClientMilestones(ctx.db, org, site.id), seo: await getSeoForClient(ctx.db, org, site.id) };
+  return { milestones: await listClientMilestones(ctx.db, org, site.id), seo: await getSeoForClient(ctx.db, org, site.id), analytics: await analyticsReady(ctx.db, ctx.now.getTime()) };
 }
 
 /** On the list of several websites: only the link to the website requests (each website's own page has its management actions). */
