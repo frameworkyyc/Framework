@@ -18,6 +18,8 @@ Search Console cannot answer "where do I rank for *fences and decks* in *Calgary
 - Admin records checks per keyword (Admin, Websites, SEO details, Keyword rankings): date, position 1 to 200 or empty for "not found in the results checked", optional page. A check cannot be dated in the future. Mistaken checks can be removed. Everything is audited.
 - Migration **0022_seo_keywords.sql** (two additive tables) is applied to Staging; Production only by the manual workflow. Without it the page says keyword tracking is being set up and shows no form; the rest of SEO works.
 
+> **Update:** live Search Console figures (and Cloudflare Web Analytics traffic) are now built as the separate Analytics page under each website, read on demand through the APIs and cached, not imported into `website_seo_metrics`. See `WEBSITE-ANALYTICS.md`. The section below is the earlier plan for a monthly import and is kept for reference.
+
 ## Google Search Console: the practical architecture (not built, needs approval)
 
 Recommended first step: a **service account** that each client adds as a *Restricted* user on their Search Console property.
