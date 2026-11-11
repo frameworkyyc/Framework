@@ -176,21 +176,12 @@ function invoiceSection(inv) {
   return section("adm-inv", "Invoices", rows.length ? h("ul", { class: "adm-feed" }, rows) : empty(inv.outstandingCount ? "Nothing is past due and no drafts are waiting." : "No invoices are outstanding."), ["/admin/clients", "Clients"]);
 }
 
-function clientSection(cl) {
-  if (!cl) return null;
-  const lines = [];
-  if (cl.profile && cl.profile.total) lines.push(row("Business Profile completion", `${cl.profile.avgPercent}% on average · ${cl.profile.incomplete} of ${cl.profile.total} not finished`));
-  for (const c of cl.withoutAccess) lines.push(row(c.name, "Nobody has access yet", `/admin/clients/${enc(c.id)}`));
-  if (cl.lapsedInvitations) lines.push(row(plural(cl.lapsedInvitations, "expired invitation"), "Resend or replace from the client's page"));
-  return section("adm-cl", "Clients", lines.length ? h("ul", { class: "adm-feed" }, lines) : empty("No clients yet. Add the first one under Clients."), ["/admin/clients", "All clients"]);
-}
-
-function activitySection(items) {
-  if (!items) return null;
-  const body = items.length
-    ? h("ul", { class: "adm-feed rk-timeline" }, items.map((a) => row(a.orgName ? `${a.label}: ${a.orgName}` : a.label, ago(a.at), a.organizationId ? `/admin/clients/${enc(a.organizationId)}` : null)))
-    : empty("Nothing has happened yet.");
-  return section("adm-act", "Recent activity", body);
+/** The two-column block. A card left alone on its row (an odd one out) takes the full width, so there is never an empty half. null when there is nothing to show. */
+function columns(cells) {
+  if (!cells.length) return null;
+  const single = cells.filter((c) => !c.classList.contains("adm-dash__sec--wide"));
+  if (single.length % 2 === 1) single[single.length - 1].classList.add("adm-dash__sec--wide");
+  return h("div", { class: "adm-dash__cols" }, ...cells);
 }
 
 export async function render() {
@@ -210,7 +201,7 @@ export async function render() {
     ...[
       attentionSection(attentionItems({ dash: d, services: svc, assess, feedback })),
       kpiGrid({ dash: d, feedback, requestsCard }),
-      h("div", { class: "adm-dash__cols" }, ...[requestsEl, requestsEl ? null : supportSection(d && d.support), invoiceSection(d && d.invoices), clientSection(d && d.clients), activitySection(d && d.activity)].filter(Boolean)),
+      columns([requestsEl, requestsEl ? null : supportSection(d && d.support), invoiceSection(d && d.invoices)].filter(Boolean)),
       recent ? section("adm-recent", "Recent feedback", recent, feedback.recent.length ? ["/admin/feedback", "All feedback"] : null) : null,
     ].filter(Boolean),
   );
