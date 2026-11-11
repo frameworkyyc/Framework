@@ -29,7 +29,11 @@ The **constants** keep the feed recognisable: Switzer and General Sans, ink/pape
 | `theme` | `paper` (default), `ink` (default for `cta`), `mist` |
 | `category` | overrides the default visual category of the family (e.g. `conceptual-artwork`) |
 | `grid` | `true` draws the 90px hairline grid behind the slide |
-| `eyebrow` | shown as `— LABEL`. Short: 1–4 words |
+| `eyebrow` | optional `— LABEL` at the top, with no rule. Use only where it orients the reader; never on every slide |
+| `header` | `true` brings back the ruled header (eyebrow + hairline) for a deliberate specification look. No slide numbers: Instagram shows its own |
+| `clientColour` | required whenever a slide uses colours outside Framework's palette: the reason (e.g. "Red E Corp.'s brand palette") |
+| `intentionalSpace` | the reason a type-only slide is mostly empty (a deliberate pause); otherwise `fw check` warns |
+| `plainLanguageOk` | rare: why a specialist term must stay on the slide |
 | `headline` | `\n` = deliberate line break. 2–4 short lines |
 | `support` | one or two short sentences |
 | `image` | `@site/assets/img/x.jpg` (repo image) or `images/x.png` (this post's folder). Never a URL |
@@ -48,6 +52,22 @@ Framework branding never appears automatically: no logo, wordmark or website URL
 - A website URL may appear only as content: a CTA button (`button`) or a sentence. Never as a signature.
 - `fw render` writes `slides/render.json` (every brand element and every "Framework"/URL text with its position). `fw check` fails a post with a brand element under 160px, a mark in a corner, a name or URL along the bottom edge, a brand without a reason, a retired `footer` field, or brand elements on more than one slide.
 
+## canvas: free compositions (the default for covers, portfolio and visual storytelling)
+Read `social/brand/art-direction.md` first. A canvas slide is a stack of layers placed in canvas pixels (`x`, `y`, `w`, `h`; numbers or `"50%"`), later layers on top. Layers may bleed off the edge (they are clipped by the canvas). Set `layout` to the composition's name (`hero-bleed`, `device-pair`, `detail-crop`, `colour-system`, `type-specimen`, `frame-break`, `annotated`, `statement`…): it is the layout family for the grid check. Set `background` (a hex or `theme`).
+
+| Layer `type` | Fields |
+|---|---|
+| `image` | `src`, `x y w h`, `fit` (`cover`/`contain`), `focus` ("50% 30%"), `crop` `{x, y, w, h}` as 0–1 fractions to zoom into a detail, `treatment` (`mono`/`muted`/none = original colour), `mask` (`circle`, `arch`), `rotate`, `opacity` |
+| `laptop`, `phone` | `src` (a screenshot), `x y w`, `scroll` 0–1 down a tall capture, `tilt` `{x, y, z}` degrees, `shadow` (default on; `false` to remove). Real device frames from the website; a soft shadow is allowed on device and print mockups only |
+| `browser` | `src`, `x y w h`, `url` (shown in the bar), `scroll`, `shadow` |
+| `text` | `text` (markup as elsewhere), `x y w` (`h` makes it a fit box), `font` (`display` Switzer, `body` General Sans, or a family from `spec.fonts`), `size`, `weight`, `leading`, `tracking` (em), `color`, `align`, `uppercase`, `bleed: true` if it may run off the canvas. Display text must keep its written line breaks |
+| `rect` | `x y w h`, `fill`, `stroke` (1px): frames, colour fields, rules where they help |
+| `swatch` | `x y w h`, `color`, `name`, `label` (defaults to the hex): colour-system slides |
+| `svg` | `src` (e.g. `@site/assets/img/red-e-crest.svg`), `x y w h`: crisp vector marks at any size |
+| `brand` | Framework's mark, only with `reason` (branding rule) |
+
+Client typefaces: add `"fonts": [{ "family": "Barlow Semi Condensed", "src": "images/barlow-600.woff2", "weight": 600 }]` at the top of `spec.json` (download the woff2 from the `@fontsource` npm package with `npm pack`). Already available: `social/assets/clients/red-e/fonts/` (Barlow Semi Condensed 400–700; Red E's body face Inter is installed system-wide) and `social/assets/clients/aurora/fonts/` (Noto Sans, Noto Serif, Noto Sans Mono 400–700), each with its open font licence. Authentic website captures: `fw capture <url> <out.jpg> [desktop|mobile] [full]` into `social/assets/clients/<client>/` (2880px desktop, 1170px-wide mobile).
+
 ## Templates
 | Template | Layouts / extra fields |
 |---|---|
@@ -60,7 +80,7 @@ Framework branding never appears automatically: no logo, wordmark or website URL
 | `diagram` | `kind: "flow"` (`items: [{title, desc}]`, `active: 3` fills a step) or `kind: "bars"` (`items: [{label, value, display}]`, `source`) |
 | `cover` | eyebrow + big headline anchored low; optional photo band (`image`, `imageHeight`) |
 | `statement` | one big idea; `align: "end"` anchors it low |
-| `point` | carousel interior: big grey index, title, `body`, optional photo band |
+| `point` | carousel interior: title, `body`, optional photo band; a large grey `index` only if set |
 | `list` | numbered rows (3–6): `items: [{title, desc}]` |
 | `compare` | `leftLabel`, `rightLabel`, `rows: [[l, r]]` (2–4 rows) |
 | `quote` | `quote`, `name`, `role`: verbatim, real, attributed |

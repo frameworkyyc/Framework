@@ -19,6 +19,11 @@ No engagement bait, manufactured controversy or misleading claims.
 3. History: `node social/engine/fw.mjs history recent 20` (recent topics, headlines, categories, layout families, tones) and `node social/engine/fw.mjs history report` (performance, if any). Use real data only. With fewer than 3 posts of data per group, treat every pattern as a hypothesis.
 4. `social/HANDOFFS.md` (briefs.json format) and `social/engine/TEMPLATES.md` (layout families, categories, image slots).
 
+## Who you write for
+Everyday business owners, contractors and entrepreneurs, not developers, designers or marketers. Every idea must be interesting, practical and **understandable in a few seconds**. Avoid technical topics unless the business benefit is obvious, and when a topic is technical, lead with what it means for their customers and money; the specialist detail and sources belong in the caption. Before keeping an idea, ask: would an ordinary small-business owner understand this without looking anything up, and why should they care? (Full standard: `social/brand/art-direction.md`.)
+
+**Think in pictures.** Plan concepts with strong visual storytelling potential, and decide where an image says more than text: a real project, a material, a before-and-after, a mockup, a specimen. Do not force every concept into an educational text carousel; a single striking image with a good caption is often the better post.
+
 ## Plan the batch
 **Every batch is exactly 9 posts: one complete 3×3 Instagram grid block.** Goal mix (a starting point, adapt to real performance):
 - 5 **attract**: educational value: marketing and website insight, design breakdowns, brand stories, useful business tips. Aim for saves and shares.
@@ -54,7 +59,9 @@ Carousel covers must earn the stop; interior slides stay consistent (point, list
 
 **Branding:** never plan a logo, wordmark or URL as a signature on slides; Framework's content is recognised by its design, not a stamp. Plan the logo only when it is part of the idea (a mockup, stationery, signage, packaging, a branding showcase, a post about Framework's identity), and say why in the slide's `brand.reason`.
 
-**Copy:** you write the final on-slide text. Headlines are 2–4 short lines with deliberate `\n` breaks. Support lines are under 20 words. Eyebrows are 1–4 words. Follow the voice principles exactly.
+**Art-direction briefs, not just text and prompts.** For each post write a `concept` (the visual idea in one or two sentences: what the viewer sees and why it works). For each slide give a `role` (hook, context, the work, detail, proof, takeaway, next step) and an `art_direction` note: the composition from the toolbox in `art-direction.md` (hero-bleed, device-pair, detail-crop, colour-system, type-specimen, frame-break, annotated, statement, quiet…), what fills the canvas, and how much text (often none). Vary carousel structure and length (3 to 7 slides as the story needs); no filler slides, and no slide needs a headline, paragraph or number by default. Portfolio posts are planned as studio case studies in the client's own identity, built from authentic captures (`social/assets/clients/`).
+
+**Copy:** you write the final on-slide text, in plain language: one idea per slide, short, concrete, with the reason it matters. No specialist terms on slides (`fw check` fails LCP, WCAG, percentile, px, CTA, UX and similar, and more than 45 words on a slide). Headlines are 2–4 short lines with deliberate `\n` breaks. Support lines are under 20 words. Eyebrows are 1–4 words. Follow the voice principles exactly.
 
 **CTA by purpose** (`cta_type`): save ("Save this for your next website redesign."), engage (a genuine question: "Which approach works better?"), explore ("Explore the full project."), credibility ("See how Framework approaches design."), lead ("Let's build something for your business."), or none. Most attract posts use save, engage or none; trust posts use explore or credibility; the convert post uses lead. Never the same CTA wording twice in a batch.
 

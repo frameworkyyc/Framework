@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { resolve, isAbsolute } from "node:path";
 
 export const REPO_ROOT = resolve(new URL("../../", import.meta.url).pathname);
-export const TEMPLATES = ["cover", "type", "minimal", "photo", "plate", "split", "showcase", "diagram", "statement", "point", "list", "compare", "quote", "cta", "reel"];
+export const TEMPLATES = ["canvas", "cover", "type", "minimal", "photo", "plate", "split", "showcase", "diagram", "statement", "point", "list", "compare", "quote", "cta", "reel"];
 
 // Visual categories (feed art direction) and the default category of each layout family. A spec may override with "category".
 export const CATEGORIES = ["editorial-typography", "architectural-photography", "portfolio", "conceptual-artwork", "educational-graphic", "minimalist"];
@@ -13,6 +13,12 @@ export const familyOf = (s) => s.template + (s.layout ? ":" + s.layout : "");
 export function categoryOf(s) {
   if (s.category) return s.category;
   const t = s.template;
+  if (t === "canvas") {
+    const kinds = (s.layers || []).map((l) => l.type);
+    if (kinds.some((k) => ["laptop", "phone", "browser", "swatch"].includes(k))) return "portfolio";
+    if (kinds.includes("image")) return "architectural-photography";
+    return "editorial-typography";
+  }
   if (t === "minimal") return "minimalist";
   if (t === "showcase") return "portfolio";
   if (["diagram", "list", "compare", "point"].includes(t)) return "educational-graphic";
@@ -20,7 +26,8 @@ export function categoryOf(s) {
   return "editorial-typography";
 }
 /** Whether a slide's dominant visual is a photograph or artwork (vs. type and graphics). */
-export const isImagery = (s) => ["photo", "plate", "split", "showcase", "reel"].includes(s.template) || (s.template === "cover" && !!s.image);
+export const isImagery = (s) => ["photo", "plate", "split", "showcase", "reel"].includes(s.template) || (s.template === "cover" && !!s.image) ||
+  (s.template === "canvas" && (s.layers || []).some((l) => ["image", "laptop", "phone", "browser"].includes(l.type)));
 
 const MARK = (sq, f) =>
   `<svg viewBox="0 0 1092 1092" aria-hidden="true"><rect width="1092" height="1092" fill="${sq}"/><path fill="${f}" d="M302 245H815V347H411V741L302 851Z"/><path fill="${f}" d="M435 517L512 440H815V545H534V842H435Z"/></svg>`;
@@ -52,8 +59,11 @@ function photo(s, postDir, { cls = "", height, def } = {}) {
   return `<figure class="photo ${treat} ${cls}" style="${style}"><img src="${fileUrl(src)}" alt=""></figure>`;
 }
 
-function chromeTop(s, ctx) {
-  return `<header class="top"><span class="eyebrow">${s.eyebrow ? "— " + md(s.eyebrow) : ""}</span><span class="counter">${ctx.counter}</span></header>`;
+// No automatic slide furniture: no counter (Instagram shows its own), no header rule unless a slide asks for it (header: true),
+// and an eyebrow label only where the slide sets one.
+function chromeTop(s) {
+  if (s.header) return `<header class="top"><span class="eyebrow">${s.eyebrow ? "— " + md(s.eyebrow) : ""}</span></header>`;
+  return s.eyebrow ? `<header class="top plain"><span class="eyebrow">— ${md(s.eyebrow)}</span></header>` : "";
 }
 // No automatic branding. The Framework mark, wordmark or URL never appear as a footer, corner stamp or watermark.
 // Branding is an intentional creative element: a slide opts in with brand: { element: "mark" | "lockup", reason: "why it belongs to the concept" },
@@ -72,7 +82,63 @@ const fs = (px) => `style="--fs:${px}px"`;
 const headline = (s, def, cls = "h1") => (s.headline ? `<h1 class="${cls}" data-fit ${fs(s.headlineSize || def)}>${md(s.headline)}</h1>` : "");
 const support = (s, def = 34) => (s.support ? `<p class="support" data-fit ${fs(s.supportSize || def)}>${md(s.support)}</p>` : "");
 
+
+// ---------- canvas: free, art-directed composition (TEMPLATES.md, "canvas") ----------
+// Layers are placed in canvas pixels (x, y, w, h; numbers or "50%"), may bleed off the edge and overlap (later layers on top).
+const px = (v) => (v == null ? "" : typeof v === "number" ? `${v}px` : esc(v));
+const pos = (l) => [`left:${px(l.x ?? 0)}`, `top:${px(l.y ?? 0)}`, l.w != null ? `width:${px(l.w)}` : "", l.h != null ? `height:${px(l.h)}` : "", l.rotate ? `transform:rotate(${Number(l.rotate)}deg)` : "", l.opacity != null ? `opacity:${Number(l.opacity)}` : "", l.z != null ? `z-index:${Number(l.z)}` : ""].filter(Boolean).join(";");
+const FONTS = { display: "'Switzer'", body: "'General Sans'" };
+const MASKS = { circle: "mask-circle", arch: "mask-arch", none: "" };
+const cssColor = (c) => (/^#[0-9a-f]{3,8}$/i.test(c || "") ? c : null);
+import { readFileSync as readFile } from "node:fs";
+const LAYERS = {
+  image(l, ctx) {
+    const src = resolveAsset(l.src, ctx.postDir);
+    // crop: zoom into part of the source ({x, y, w, h} as fractions 0-1) for close-up details.
+    const c = l.crop, crop = c ? `width:${100 / c.w}%;height:${100 / c.h}%;left:${(-c.x / c.w) * 100}%;top:${(-c.y / c.h) * 100}%;position:absolute;object-fit:cover` : "";
+    const treat = l.treatment === "mono" ? "mono" : l.treatment === "muted" ? "muted-photo" : "";
+    return `<div class="layer img ${treat} ${MASKS[l.mask] || ""}" style="${pos(l)};--fit:${l.fit === "contain" ? "contain" : "cover"};--focus:${esc(l.focus || "50% 50%")}"><img src="${src ? fileUrl(src) : ""}" alt="" style="${crop}"></div>`;
+  },
+  // Real device frames from the website (assets/img/device-*.png); the screenshot sits in the screen opening. scroll: 0-1 down a tall capture.
+  laptop: (l, ctx) => device("laptop", l, ctx),
+  phone: (l, ctx) => device("phone", l, ctx),
+  browser(l, ctx) {
+    const src = resolveAsset(l.src, ctx.postDir);
+    return `<div class="layer browser${l.shadow ? " shadow" : ""}" style="${pos(l)}"><div class="bar"><i></i><i></i><i></i><span>${md(l.url || "")}</span></div><div class="page"><img src="${src ? fileUrl(src) : ""}" alt="" style="object-position:50% ${Math.round((l.scroll || 0) * 100)}%"></div></div>`;
+  },
+  text(l) {
+    const display = (l.font || "display") === "display";
+    const fam = FONTS[l.font || "display"] || `'${esc(l.font).replace(/'/g, "")}'`;
+    const style = [pos(l), `font-family:${fam}`, `font-size:${Number(l.size || (display ? 96 : 32))}px`, `font-weight:${Number(l.weight || (display ? 700 : 400))}`,
+      `line-height:${Number(l.leading || (display ? 0.98 : 1.45))}`, `letter-spacing:${l.tracking != null ? Number(l.tracking) + "em" : display ? "-0.02em" : "0"}`,
+      cssColor(l.color) ? `color:${l.color}` : "", l.align ? `text-align:${esc(l.align)}` : "", l.uppercase ? "text-transform:uppercase" : ""].filter(Boolean).join(";");
+    return `<div class="layer ct${display ? " ct-head" : ""}" data-fit${l.h != null ? " data-fit-box" : ""}${l.bleed ? " data-bleed" : ""} style="${style}">${md(l.text)}</div>`;
+  },
+  rect: (l) => `<div class="layer" style="${pos(l)};${cssColor(l.fill) ? `background:${l.fill};` : ""}${cssColor(l.stroke) ? `outline:1px solid ${l.stroke};outline-offset:-1px;` : ""}"></div>`,
+  swatch(l) {
+    const c = cssColor(l.color) || "#000000", lum = parseInt(c.slice(1, 3), 16) * 0.299 + parseInt(c.slice(3, 5), 16) * 0.587 + parseInt(c.slice(5, 7), 16) * 0.114;
+    return `<div class="layer swatch" style="${pos(l)};background:${c};color:${lum > 150 ? "#0A0A0A" : "#FFFFFF"}"><span>${md(l.name || "")}</span><span>${md(l.label ?? c.toUpperCase())}</span></div>`;
+  },
+  svg(l, ctx) {
+    const src = resolveAsset(l.src, ctx.postDir);
+    const raw = src ? readFile(src, "utf8").replace(/<\?xml[^>]*>/, "").replace(/<svg/, '<svg preserveAspectRatio="xMidYMid meet" width="100%" height="100%"') : "";
+    return `<div class="layer svg" style="${pos(l)}">${raw}</div>`;
+  },
+  brand(l, ctx) { return `<div class="layer" style="${pos(l)}">${brandBlock({ brand: { element: l.element, size: l.size, reason: l.reason } }, ctx)}</div>`; },
+};
+function device(kind, l, ctx) {
+  const src = resolveAsset(l.src, ctx.postDir), frame = resolve(REPO_ROOT, `assets/img/device-${kind === "laptop" ? "macbook" : "iphone"}.png`);
+  const tilt = l.tilt ? `transform:perspective(2400px) rotateX(${Number(l.tilt.x || 0)}deg) rotateY(${Number(l.tilt.y || 0)}deg) rotateZ(${Number(l.tilt.z || 0)}deg);` : "";
+  // A soft contact shadow is allowed on physical-object mockups only (devices, print), never on Framework type or graphics.
+  return `<div class="layer device ${kind}${l.shadow === false ? "" : " shadow"}" style="${pos({ ...l, h: undefined })};${tilt}"><div class="screen"><img src="${src ? fileUrl(src) : ""}" alt="" data-scroll="${Number(l.scroll || 0)}" style="object-position:50% ${Math.round((l.scroll || 0) * 100)}%"></div><img class="frame" src="${fileUrl(frame)}" alt=""></div>`;
+}
+
 const T = {
+  // Free composition: full-bleed imagery, devices, layered type. Name the composition in "layout" (it is the layout family).
+  canvas(s, ctx) {
+    const bg = cssColor(s.background) || (s.theme === "ink" ? "#0A0A0A" : s.theme === "mist" ? "#F5F5F5" : "#FFFFFF");
+    return `<div class="canvas" style="background:${bg}">${(s.layers || []).map((l) => { const f = LAYERS[l.type]; if (!f) throw new Error(`unknown canvas layer type "${l.type}"`); return f(l, ctx); }).join("")}</div>`;
+  },
   // Editorial typography poster. layout: "bottom" (default) | "top" | "giant" (one oversized word, optional bleed) | "split" (headline top-left, headline2 bottom-right).
   type(s, ctx) {
     const L = s.layout || "bottom", right = s.align === "right" ? " align-right" : "";
@@ -95,7 +161,7 @@ const T = {
   },
   // Asymmetric split: photograph full height on one side, text column on the other. side: "left" (default) | "right"; cols e.g. "1.15fr 1fr".
   split(s, ctx) {
-    return `<div class="split-wrap${s.side === "right" ? " right" : ""}" style="--cols:${esc(s.cols || "1fr 1fr")}">${photo(s, ctx.postDir)}<div class="split-text"><div class="top-row"><span class="eyebrow">${s.eyebrow ? "— " + md(s.eyebrow) : ""}</span><span class="counter">${ctx.counter}</span></div><main class="body end" data-fit-box><div class="stack">${headline(s, 76, "h2")}${support(s, 30)}</div></main></div></div>`;
+    return `<div class="split-wrap${s.side === "right" ? " right" : ""}" style="--cols:${esc(s.cols || "1fr 1fr")}">${photo(s, ctx.postDir)}<div class="split-text"><div class="top-row"><span class="eyebrow">${s.eyebrow ? "— " + md(s.eyebrow) : ""}</span></div><main class="body end" data-fit-box><div class="stack">${headline(s, 76, "h2")}${support(s, 30)}</div></main></div></div>`;
   },
   // Portfolio: real client work on a quiet stage (theme mist or ink suits it). image = desktop view; image2 = optional phone view (image2Side "right" default | "left"); tags = disciplines.
   showcase(s, ctx) {
@@ -124,10 +190,8 @@ const T = {
     const src = resolveAsset(s.image, ctx.postDir);
     const treat = treatment(s);
     if (s.layout === "caption") return `<div class="full-photo ${treat}" style="--focus:${esc(s.imageFocus || "50% 50%")}"><img src="${src ? fileUrl(src) : ""}" alt=""></div>
-      ${ctx.counter ? `<div class="tag"><span class="counter">${ctx.counter}</span></div>` : ""}
       <section class="label-block" data-fit-box data-max-h="${Math.round(ctx.h * 0.42)}">${s.eyebrow ? `<div class="eyebrow">— ${md(s.eyebrow)}</div>` : ""}${headline(s, 56, "h2")}${support(s, 26)}</section>`;
     return `<div class="full-photo ${treat}" style="--focus:${esc(s.imageFocus || "50% 50%")}"><img src="${src ? fileUrl(src) : ""}" alt=""></div>
-      ${ctx.counter ? `<div class="tag"><span class="counter">${ctx.counter}</span></div>` : ""}
       <section class="panel" data-fit-box data-max-h="${Math.round(ctx.h * 0.5)}"><div class="panel-body">${s.eyebrow ? `<div class="eyebrow">— ${md(s.eyebrow)}</div>` : ""}${headline(s, 80, "h2")}${support(s, 30)}</div></section>`;
   },
   // One large statement. Pairs well with grid:true and theme ink as punctuation.
@@ -136,9 +200,9 @@ const T = {
   },
   // Carousel inner slide: big grey index, title, body, optional photo band.
   point(s, ctx) {
-    const idx = s.index ?? String(ctx.n).padStart(2, "0");
+    const idx = s.index || "";
     const band = s.image ? photo(s, ctx.postDir, { height: s.imageHeight || 420 }) : "";
-    return `${chromeTop(s, ctx)}<main class="body" data-fit-box><div class="index-big">${md(idx)}</div><div class="spacer"></div>${band ? band + '<div style="height:48px;flex:none"></div>' : ""}<div class="stack">${headline(s, 72, "h2")}${s.body ? `<p class="body-text" data-fit ${fs(s.bodySize || 34)}>${md(s.body)}</p>` : ""}${sourceNote(s)}</div></main>`;
+    return `${chromeTop(s, ctx)}<main class="body" data-fit-box>${idx ? `<div class="index-big">${md(idx)}</div>` : ""}<div class="spacer"></div>${band ? band + '<div style="height:48px;flex:none"></div>' : ""}<div class="stack">${headline(s, 72, "h2")}${s.body ? `<p class="body-text" data-fit ${fs(s.bodySize || 34)}>${md(s.body)}</p>` : ""}${sourceNote(s)}</div></main>`;
   },
   // Title plus numbered rows separated by hairlines. items: [{title, desc?}] or strings.
   list(s, ctx) {
@@ -172,5 +236,5 @@ export function slideHtml(slide, ctx) {
   const full = { ...ctx, theme };
   const cls = ["slide", theme, slide.grid ? "grid" : "", slide.template === "reel" ? "reel" : ""].join(" ");
   return `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${fileUrl(ctx.fontsCss)}"><link rel="stylesheet" href="${fileUrl(ctx.slideCss)}">
-<style>:root{--w:${ctx.w}px;--h:${ctx.h}px}</style></head><body><div class="${cls}">${tpl(slide, full)}</div></body></html>`;
+<style>:root{--w:${ctx.w}px;--h:${ctx.h}px}${ctx.fontFaces || ""}</style></head><body><div class="${cls}">${tpl(slide, full)}</div></body></html>`;
 }
