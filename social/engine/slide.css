@@ -15,19 +15,19 @@ body { font-family: "General Sans", sans-serif; -webkit-font-smoothing: antialia
   background-size: 90px 90px; background-position: -1px -1px; }
 .slide > * { position: relative; }
 
-/* Chrome: ruled header and footer, like a drawing's title block. */
+/* Chrome: a ruled header (eyebrow + carousel counter). No footer: Framework branding is never stamped on slides (TEMPLATES.md, "Branding"). */
 .top { flex: none; height: 136px; padding: 0 var(--m); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--rule); background: var(--bg); }
-.bottom { flex: none; height: 112px; padding: 0 var(--m); display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--rule); background: var(--bg); }
 .eyebrow { font: 600 24px/1 "General Sans"; letter-spacing: .16em; text-transform: uppercase; color: var(--label); }
 .counter { font: 600 24px/1 "Switzer"; letter-spacing: .06em; color: var(--label); font-variant-numeric: tabular-nums; }
-.lockup { display: flex; align-items: center; gap: 18px; }
-.lockup svg { width: 40px; height: 40px; display: block; }
-.wordmark { font: 600 20px/1 "General Sans"; letter-spacing: .30em; margin-right: -.30em; text-transform: uppercase; color: var(--fg); }
-.foot-right { font: 500 22px/1 "General Sans"; color: var(--muted); letter-spacing: .02em; }
-.foot-right.arrow { font: 600 30px/1 "Switzer"; color: var(--fg); }
+/* Intentional branding only (brand: {element, reason}): large, inside the composition. */
+.brand-mark svg { width: var(--bs, 200px); height: var(--bs, 200px); display: block; }
+.brand-lockup { display: flex; align-items: center; gap: calc(var(--bs, 200px) * .2); }
+.brand-lockup svg { width: var(--bs, 200px); height: var(--bs, 200px); display: block; }
+.brand-lockup .wordmark { font: 600 calc(var(--bs, 200px) * .3)/1 "General Sans"; letter-spacing: .30em; margin-right: -.30em; text-transform: uppercase; color: var(--fg); }
+.brand-mark, .brand-lockup { flex: none; margin-bottom: 56px; }
 
 /* Body: the fit box. */
-.body { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 64px var(--m); display: flex; flex-direction: column; }
+.body { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 64px var(--m) 88px; display: flex; flex-direction: column; }
 .end { justify-content: flex-end; }
 .center { justify-content: center; }
 .stack > * + * { margin-top: 36px; }
@@ -53,7 +53,7 @@ figure.photo img { display: block; width: 100%; height: 100%; object-fit: var(--
 .full-photo { position: absolute; inset: 0; width: 100%; height: 100%; }
 .full-photo img { width: 100%; height: 100%; object-fit: cover; object-position: var(--focus, 50% 50%); display: block; }
 .panel { position: absolute; left: 0; right: 0; bottom: 0; background: var(--bg); }
-.panel .panel-body { padding: 60px var(--m) 52px; }
+.panel .panel-body { padding: 60px var(--m) 80px; }
 .panel .panel-body > * + * { margin-top: 28px; }
 .tag { position: absolute; top: 0; right: 0; background: var(--bg); padding: 30px 40px; }
 .tag-left { position: absolute; top: 0; left: 0; background: var(--bg); padding: 30px 40px; }
@@ -80,7 +80,6 @@ figure.photo img { display: block; width: 100%; height: 100%; object-fit: var(--
 .attrib .role { font: 400 26px/1.3 "General Sans"; color: var(--muted); }
 
 /* Call to action. Ink slide: secondary button (1px paper border). Paper slide: primary (ink fill). */
-.mark-big svg { width: 132px; height: 132px; display: block; }
 .btn { display: inline-flex; align-items: center; gap: 18px; align-self: flex-start; font: 600 30px/1 "General Sans"; padding: 28px 38px; }
 .ink .btn { border: 1px solid var(--paper); color: var(--paper); }
 .paper .btn, .mist .btn { background: var(--ink); color: var(--paper); }
@@ -88,7 +87,6 @@ figure.photo img { display: block; width: 100%; height: 100%; object-fit: var(--
 /* Reel overlay: transparent canvas, ink panel kept clear of Instagram's bottom UI. */
 .reel { background: transparent; }
 .reel .panel .panel-body { padding: 64px var(--m) 330px; }
-.reel .tag-left { padding: 40px var(--m); }
 
 /* ===== Layout families for feed variety (TEMPLATES.md). Same tokens, different silhouettes. ===== */
 
@@ -119,7 +117,6 @@ figure.photo img { display: block; width: 100%; height: 100%; object-fit: var(--
 /* photo, layout caption: maximum image, small solid label */
 .label-block { position: absolute; left: 0; bottom: 0; background: var(--bg); padding: 44px 56px 40px var(--m); max-width: 820px; }
 .label-block > * + * { margin-top: 22px; }
-.label-block .lockup { margin-top: 34px; }
 
 /* showcase: portfolio work on a quiet stage */
 .stage { position: relative; flex: none; }
@@ -156,4 +153,4 @@ figure.photo img { display: block; width: 100%; height: 100%; object-fit: var(--
 .bars .v { font: 600 1em/1.2 "Switzer"; font-variant-numeric: tabular-nums; }
 .bars .track { grid-column: 1 / -1; height: 18px; background: var(--rule); }
 .bars .fill { height: 100%; background: var(--fg); }
-.src-note { font: 400 20px/1.3 "General Sans"; color: var(--label); margin-top: 18px; }
+.src-note { font: 400 22px/1.35 "General Sans"; color: var(--label); margin-top: 28px; flex: none; }

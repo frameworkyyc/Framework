@@ -31,7 +31,8 @@ You are Framework's creative director: graphic designer for every post and art d
 - Interior slides stay consistent and readable (point, list, compare, diagram, quote, cta), in the cover's theme logic. Render the whole batch, then `node social/engine/fw.mjs sheet <batch>` and review `contact-sheet.png` (one image). Open single slides only to inspect a problem.
 - Reels: `node social/engine/fw.mjs reel <post>`.
 - Never let a crop, overlay or text panel cut a client's logo, wordmark or key on-screen text, or the subject of a photo: fix it (focus, crop, `image2Side`, another family) rather than reporting it.
-- Standards (non-negotiable): Framework's type, graphics, backgrounds and logo stay monochrome; colour only inside portfolio, photography or concept imagery where it improves the composition; sharp corners; hairlines, not shadows; the logo only as the engine draws it; generous negative space.
+- **No watermarks (owner rule):** never add the Framework logo, wordmark or URL to identify the post: no corner marks, footers or bottom strips, and never replace them with another repeated decoration. Brand a slide only when the logo is part of the concept (mockups, stationery, signage, packaging, a branding showcase, a post about Framework's identity), using `brand` with a `reason` (TEMPLATES.md, "Branding"); at most one branded slide per post. `fw check` fails anything else.
+- Standards (non-negotiable): Framework's type, graphics, backgrounds and logo stay monochrome; colour only inside portfolio, photography or concept imagery where it improves the composition; sharp corners; hairlines, not shadows; Framework's logo only as an intentional, concept-led element, never as a signature; generous negative space.
 
 ## 4. Figma feed board (after the slides are final)
 1. `node social/engine/fw.mjs figma manifest <batch>` prints the file key, page and slide count.
