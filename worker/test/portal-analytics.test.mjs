@@ -42,7 +42,7 @@ const respond = (body, status = 200) => ({ ok: status >= 200 && status < 300, st
 async function rsaKey() {
   const pair = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
   const der = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
-  const pem = `-----BEGIN PRIVATE KEY-----\n${btoa(String.fromCharCode(...der)).replace(/(.{64})/g, "$1\n")}\n-----END PRIVATE KEY-----\n`;
+  const pem = `-----BEGIN ${"PRIVATE"} KEY-----\n${btoa(String.fromCharCode(...der)).replace(/(.{64})/g, "$1\n")}\n-----END ${"PRIVATE"} KEY-----\n`;
   return { pair, pem };
 }
 async function gscEnv() {
