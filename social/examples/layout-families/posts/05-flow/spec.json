@@ -1,0 +1,40 @@
+{
+ "id": "05",
+ "slug": "flow",
+ "format": "single",
+ "slides": [
+  {
+   "template": "diagram",
+   "kind": "flow",
+   "eyebrow": "The Framework Method",
+   "headline": "Six stages.\nOne order.",
+   "active": 3,
+   "items": [
+    {
+     "title": "Discover",
+     "desc": "Business, market, goals"
+    },
+    {
+     "title": "Define",
+     "desc": "Strategy and positioning"
+    },
+    {
+     "title": "Design",
+     "desc": "Identity and website"
+    },
+    {
+     "title": "Build",
+     "desc": "Structurally sound"
+    },
+    {
+     "title": "Launch",
+     "desc": "Live, with SEO in place"
+    },
+    {
+     "title": "Grow",
+     "desc": "We stay involved"
+    }
+   ]
+  }
+ ]
+}

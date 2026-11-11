@@ -19,6 +19,7 @@ const APPROVED_EXTENSIONS = ["webp", "css", "html", "jpg", "js", "png", "svg"]; 
 const MUST_STAY_IGNORED = [
   ".node-version", ".assetsignore", ".gitignore", ".dev.vars", ".git/", ".github/", ".wrangler/", "node_modules/",
   "wrangler.jsonc", "README.md", "CNAME", "PRIVACY-OPERATIONS.md", "worker/", "migrations/", "scripts/",
+  ".claude/", "social/", // Claude Code agents and the social content workspace (brand PDF, engine, production notes): never public
 ];
 
 /** The subset of .gitignore syntax .assetsignore uses here: "name", "name/", and * ? globs without a slash in the middle. Anything else fails loudly. */

@@ -22,3 +22,5 @@ wallet-secrets/
 *.pem
 *.cer
 *.certSigningRequest
+.claude/
+social/

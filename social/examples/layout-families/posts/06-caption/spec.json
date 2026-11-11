@@ -1,0 +1,16 @@
+{
+ "id": "06",
+ "slug": "caption",
+ "format": "single",
+ "slides": [
+  {
+   "template": "photo",
+   "layout": "caption",
+   "theme": "paper",
+   "eyebrow": "Field notes",
+   "image": "@site/assets/img/tower-crane.jpg",
+   "imageFocus": "50% 40%",
+   "headline": "Foundations go in\nbefore walls go up."
+  }
+ ]
+}

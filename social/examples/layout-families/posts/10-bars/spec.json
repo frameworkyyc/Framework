@@ -1,0 +1,32 @@
+{
+ "id": "10",
+ "slug": "bars",
+ "format": "single",
+ "slides": [
+  {
+   "template": "diagram",
+   "kind": "bars",
+   "theme": "paper",
+   "eyebrow": "Example only",
+   "headline": "Where a visit\nturns into a call.",
+   "items": [
+    {
+     "label": "Visits",
+     "value": 100,
+     "display": "100"
+    },
+    {
+     "label": "Reached contact page",
+     "value": 24,
+     "display": "24"
+    },
+    {
+     "label": "Called or wrote",
+     "value": 6,
+     "display": "6"
+    }
+   ],
+   "source": "Illustrative numbers for the template test"
+  }
+ ]
+}

@@ -1,0 +1,16 @@
+{
+ "id": "02",
+ "slug": "plate",
+ "format": "single",
+ "slides": [
+  {
+   "template": "plate",
+   "theme": "paper",
+   "eyebrow": "Material study",
+   "image": "@site/assets/img/arch-concrete-corner.jpg",
+   "imageFocus": "50% 30%",
+   "headline": "Structure is\nthe decoration.",
+   "support": "Why the best brands look built, not styled."
+  }
+ ]
+}
