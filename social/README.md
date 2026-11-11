@@ -1,10 +1,10 @@
 # Framework social content team
 
-A three-agent production line for Instagram and Facebook that runs inside Claude Code. Ask, for example, "Generate my next 10 Instagram and Facebook posts" (or `/social-batch 10`). The main session acts as **Content Director** and follows `.claude/skills/social-batch/SKILL.md`:
+A three-agent production line for Instagram and Facebook that runs inside Claude Code. Ask, for example, "Generate our next Instagram and Facebook posts" (or `/social-batch`). Every batch is exactly 9 posts: one complete 3×3 Instagram grid block. The main session acts as **Content Director** and follows `.claude/skills/social-batch/SKILL.md`:
 
 ```
 owner request
-  → 01 content-strategist (Opus)   goals 60/30/10, six-question test, feed plan → plan.md + briefs.json
+  → 01 content-strategist (Opus)   9 posts: 5 attract / 3 trust / 1 convert, six-question test, 3×3 grid plan → plan.md + briefs.json
   → owner approves plan and credit budget          ← the only stop
   → 02 creative-director (Sonnet)  Higgsfield images → engine layouts → grid preview vs. published feed → slides/*.png → Figma feed board
   → 03 social-copywriter (Sonnet)  captions by purpose (attract / trust / convert), alt text

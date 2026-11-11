@@ -67,6 +67,7 @@ The owner's goal: the Instagram grid should read like a curated design-studio po
 - **Constant (recognition):** the two typefaces, the near-monochrome palette, the eyebrow + headline pattern, hairlines, sharp corners, and the Framework mark and wordmark drawn by the engine.
 - **Variable (variety):** layout family, headline position and scale, light/dark/mid tone, photography vs typography vs graphic, density vs negative space.
 - **Six visual categories** to mix across every batch: editorial typography, architectural photography, portfolio showcases, conceptual artwork, educational graphics, minimalist compositions.
+- **Batches are 3×3 blocks:** every batch is exactly 9 posts, so the profile grows in whole rows and each block is designed as one composition.
 - **Grid rules:** alternate light and dark; balance imagery with type; never place two covers of the same layout family side by side (in the grid or in publishing order); no grid row of three in one tone; check every batch against the posts already published.
 - **Covers vs interiors:** a cover earns attention and may break the pattern; interior carousel slides stay consistent for readability.
 

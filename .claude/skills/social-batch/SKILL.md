@@ -1,6 +1,6 @@
 ---
 name: social-batch
-description: Run Framework's social content team. Use when the owner asks for social posts (e.g. "Generate my next 10 Instagram and Facebook posts", "make 5 carousels about branding", "/social-batch 10") or shares post performance numbers to record. Coordinates the content-strategist, creative-director and social-copywriter agents, with one approval gate (plan and credits), feed-level quality control, the Figma feed board, the content history and a packaged export.
+description: Run Framework's social content team. Use when the owner asks for social posts (e.g. "Generate my next Instagram and Facebook posts", "make the next grid", "/social-batch") or shares post performance numbers to record. Coordinates the content-strategist, creative-director and social-copywriter agents, with one approval gate (plan and credits), feed-level quality control, the Figma feed board, the content history and a packaged export.
 ---
 
 # Social batch: Content Director playbook
@@ -15,10 +15,12 @@ The team optimises for three outcomes, in this order of weight per batch: **foll
 1. `social/brand/Framework-AI-Content-Brand-System.pdf` must exist. If it is missing, ask the owner for the PDF and stop.
 2. `node social/engine/fw.mjs fonts`: must report cached fonts (needs `api.fontshare.com` and `cdn.fontshare.com`).
 3. Higgsfield `balance`. If the tools are missing, the connector is not connected: say so, and continue only if the owner accepts site imagery and type-led posts.
-4. Create `social/batches/<YYYY-MM-DD>-<short-slug>/` (e.g. `2026-11-12-ig-fb-10`).
+4. Create `social/batches/<YYYY-MM-DD>-<short-slug>/` (e.g. `2026-11-12-grid-01`).
+
+**Batch size: always exactly 9 posts**, one complete 3×3 Instagram grid block, so the profile grows in whole rows. If the owner asks for a different number, confirm before planning; validation fails on anything but 9.
 
 ## 1. Plan (Agent 01)
-Spawn `content-strategist` with: the batch path, post count, platforms, today's date and season, the owner's direction verbatim, and the credit balance. Wait. Then run `node social/engine/fw.mjs validate <batch>` (it must print `ok`).
+Spawn `content-strategist` with: the batch path, platforms, today's date and season, the owner's direction verbatim, and the credit balance. Wait. Then run `node social/engine/fw.mjs validate <batch>` (it must print `ok`).
 
 ## 2. Approval gate: the only stop
 1. Price the visuals without spending: for each distinct `{model, aspect_ratio, params}` in briefs.json, call Higgsfield `generate_image` with `get_cost: true` (or `generate_video` for Reels). Total = Σ cost × count, plus about 25% for at most one regeneration per slot.
@@ -38,9 +40,9 @@ Spawn `social-copywriter` with the batch path. Wait.
 ## 5. Quality control: you
 Run the checks, then judge:
 1. `node social/engine/fw.mjs check <batch>`: 0 fail. `node social/engine/fw.mjs grid <batch>`: 0 fail.
-2. **Feed** (read `grid-preview.png` and `grid-report.md` once): Does the grid look like a curated studio portfolio continuing the existing feed? Light and dark alternate; photography, typography, graphics and mockups are balanced; no similar covers side by side; headline positions and scales vary; detail is balanced with negative space; colour appears only inside imagery and only where it helps; logo and type are unmistakably Framework; quality is even across all posts.
+2. **Feed** (read `grid-preview.png` and `grid-report.md` once): judge the 3×3 block in actual Instagram display order (newest top-left), row by row and column by column, on top of the previous block. Does the grid look like a curated studio portfolio continuing the existing feed? Light and dark alternate; photography, typography, graphics and mockups are balanced; no similar covers side by side; headline positions and scales vary; detail is balanced with negative space; colour appears only inside imagery and only where it helps; logo and type are unmistakably Framework; quality is even across all posts.
 3. **Posts** (read `contact-sheet.png` once): covers stop the scroll; interiors are consistent and legible; nothing cropped, crowded or off-palette; images free of AI artefacts and text.
-4. **Strategy** (read the briefs' `checks` and the captions): every post passes the six questions (interesting to a stranger, real value, save/share/follow-worthy, credible, clear role, different from recent posts); the goal mix is about 60/30/10 or the deviation is explained; each CTA fits its post's purpose and none repeats; no engagement bait.
+4. **Strategy** (read the briefs' `checks` and the captions): every post passes the six questions (interesting to a stranger, real value, save/share/follow-worthy, credible, clear role, different from recent posts); the goal mix is about 5 attract / 3 trust / 1 convert or the deviation is explained; formats mix carousels, single-image posts and showcases; each CTA fits its post's purpose and none repeats; no engagement bait.
 5. **Words** (read every spec.json `headline`, `support`, `body` and `items`, and every caption file): spelling (Canadian), grammar, accuracy against `social/brand/facts.md`, no fabricated claims, no AI-advertising tone, Instagram and Facebook versions distinct where useful, hashtags only where they help.
 6. Corrections: SendMessage the responsible agent with exact, numbered fixes (post, slide or file, what to change). At most two rounds; then fix trivial issues yourself and note the rest. If visuals change after the Figma upload, ask the creative director to re-publish the changed posts.
 7. Write `<batch>/qc.md`: checks run, results, corrections, credits spent.

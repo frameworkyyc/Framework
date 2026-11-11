@@ -42,14 +42,20 @@ test("briefs validation requires goals, categories, CTA types and the six checks
   const d = tmp();
   const post = (id, extra = {}) => ({ id, slug: "post-" + id, goal: "attract", visual_category: "editorial-typography", format: "single", objective: "o", audience: "a", key_message: "k", cta_type: "save", cta: "Save this.",
     checks: { interesting: "x", value: "x", save_share_follow: "x", credibility: "x", role: "x", different: "x" }, slides: [{ template: "type", layout: "giant", headline: "H" }], ...extra });
-  writeFileSync(join(d, "briefs.json"), JSON.stringify({ posts: [post("01"), post("02", { slides: [{ template: "minimal", headline: "H" }], visual_category: "minimalist" })] }));
-  assert.equal(fw(["validate", d]).status, 0);
+  // A valid batch: exactly 9 posts (one 3x3 grid block), 5 attract / 3 trust / 1 convert, covers alternating between two families.
+  const nine = Array.from({ length: 9 }, (_, i) => post(String(i + 1).padStart(2, "0"), {
+    goal: i < 5 ? "attract" : i < 8 ? "trust" : "convert", format: i % 2 ? "carousel" : "single",
+    ...(i % 2 ? { slides: [{ template: "minimal", headline: "H" }, { template: "point", headline: "P" }, { template: "cta", headline: "C" }], visual_category: "minimalist" } : {}) }));
+  writeFileSync(join(d, "briefs.json"), JSON.stringify({ posts: nine }));
+  const ok = fw(["validate", d]);
+  assert.equal(ok.status, 0, ok.stdout);
   writeFileSync(join(d, "briefs.json"), JSON.stringify({ posts: [post("01"), post("02", { checks: { interesting: "x" }, goal: "promo" })] }));
   const bad = fw(["validate", d]);
   assert.equal(bad.status, 1);
   assert.match(bad.stdout, /checks\.value unanswered/);
   assert.match(bad.stdout, /goal must be one of/);
   assert.match(bad.stdout, /same layout family/);
+  assert.match(bad.stdout, /exactly 9 posts/);
 });
 
 test("history records a batch with cover thumbnails and reports no conclusions without data", () => {
