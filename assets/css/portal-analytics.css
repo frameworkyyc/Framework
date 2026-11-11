@@ -1,0 +1,44 @@
+/* Website analytics (client portal /website/:id/analytics). Loaded after portal-requests.css, whose sd-* KPI tiles, tags and set-up panels it reuses. No inline styles anywhere:
+   chart geometry is SVG attributes, everything else is here. Two lines on one chart differ by dash as well as shade (never colour alone). */
+.an-ranges ul { list-style: none; margin: var(--space-3) 0 var(--space-2); padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.an-range { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border: 1px solid var(--ink); font-weight: 600; text-decoration: none; color: var(--ink); background: var(--paper); }
+.an-range[aria-current="page"] { background: var(--ink); color: var(--paper); }
+.an-range:hover { background: var(--mist); } .an-range[aria-current="page"]:hover { background: var(--ink); }
+.an-range:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.an-card { margin-top: var(--space-4); }
+.an-card > .h2 { margin: 0 0 6px; }
+.sd-kpis--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sd-kpis--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.an-fig { margin: var(--space-3) 0 0; min-width: 0; }
+.an-chart { display: block; background: var(--mist); position: relative; }
+.an-chart:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.an-svg { display: block; width: 100%; height: auto; max-width: 100%; }
+.an-line { stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.an-line--0 { stroke: var(--ink); }
+.an-line--1 { stroke: var(--slate); stroke-dasharray: 6 4; }
+.an-hit { fill: transparent; }
+.an-cursor { stroke: var(--slate); stroke-width: 1; opacity: 0; pointer-events: none; }
+.an-cursor.is-on { opacity: 1; }
+.an-legend { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; }
+.an-key { display: inline-block; width: 22px; height: 0; margin-right: 6px; vertical-align: middle; border-top: 3px solid var(--ink); }
+.an-key--1 { border-top: 3px dashed var(--slate); }
+.an-read { margin: 6px 0 0; min-height: 1.5em; font-weight: 600; }
+.an-axis { display: flex; justify-content: space-between; margin: 2px 0 0; }
+.an-table { margin-top: var(--space-2); }
+.an-table summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.an-table summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.an-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-4); margin-top: var(--space-3); }
+.an-cols > * { min-width: 0; }
+.an-h { margin: var(--space-3) 0 4px; font-family: var(--font-display); font-weight: 600; font-size: 18px; }
+.an-cols .an-h { margin-top: 0; }
+.an-bars { list-style: none; margin: var(--space-2) 0 0; padding: 0; border-top: 1px solid var(--ink); }
+.an-bars__row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(60px, 1fr) minmax(0, auto); gap: 4px var(--space-2); align-items: center; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+.an-bars__l { overflow-wrap: anywhere; font-weight: 600; }
+.an-bars__v { font-size: 13px; color: var(--slate); text-align: right; white-space: nowrap; }
+.an-share { display: block; width: 100%; height: 8px; }
+.an-share__bg { fill: var(--mist); } .an-share__fg { fill: var(--ink); }
+.an-path { font-weight: 600; overflow-wrap: anywhere; word-break: break-all; }
+.an-foot { margin-top: var(--space-3); max-width: 50em; }
+@media (max-width: 900px) { .sd-kpis--four { grid-template-columns: repeat(2, minmax(0, 1fr)); } .an-cols { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) { .sd-kpis--two, .sd-kpis--four { grid-template-columns: minmax(0, 1fr); } .an-bars__row { grid-template-columns: minmax(0, 1fr) auto; } .an-bars__row .an-share { grid-column: 1 / -1; order: 3; } }
+@media (prefers-reduced-motion: reduce) { .an-cursor { transition: none; } }
