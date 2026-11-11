@@ -1,0 +1,16 @@
+{
+ "id": "01",
+ "slug": "giant",
+ "format": "single",
+ "slides": [
+  {
+   "template": "type",
+   "layout": "giant",
+   "giant": "Plan.",
+   "bleed": false,
+   "eyebrow": "Strategy first",
+   "headline": "Most businesses start\nwith a logo.",
+   "support": "We start with a plan. Six stages, the same order, every client."
+  }
+ ]
+}

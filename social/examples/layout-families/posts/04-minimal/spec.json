@@ -1,0 +1,14 @@
+{
+ "id": "04",
+ "slug": "minimal",
+ "format": "single",
+ "slides": [
+  {
+   "template": "minimal",
+   "theme": "ink",
+   "position": "bottom-left",
+   "eyebrow": "Note",
+   "headline": "A framework isn\u2019t finished at launch."
+  }
+ ]
+}
