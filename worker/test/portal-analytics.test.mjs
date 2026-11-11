@@ -39,20 +39,12 @@ const CF_ANSWER = (over = {}) => ({ data: { viewer: { accounts: [{
   ...over }] } }, errors: null });
 const respond = (body, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 
-async function rsaKey() {
-  const pair = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
-  const der = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
-  const pem = `-----BEGIN ${"PRIVATE"} KEY-----\n${btoa(String.fromCharCode(...der)).replace(/(.{64})/g, "$1\n")}\n-----END ${"PRIVATE"} KEY-----\n`;
-  return { pair, pem };
-}
-async function gscEnv() {
-  const k = await rsaKey();
-  return { k, env: { GSC_SERVICE_ACCOUNT_JSON: JSON.stringify({ type: "service_account", client_email: "reports@framework-analytics.iam.gserviceaccount.com", private_key: k.pem }) } };
-}
-function gscFetch(calls, { status = 200, rows } = {}) {
+const GSC_ENV = { GSC_OAUTH_CLIENT_ID: "1234567890-abc.apps.googleusercontent.com", GSC_OAUTH_CLIENT_SECRET: "GOCSPX-test-client-secret", GSC_OAUTH_REFRESH_TOKEN: "1//0gTestRefreshTokenValue-1234567890" };
+async function gscEnv() { return { env: { ...GSC_ENV } }; }
+function gscFetch(calls, { status = 200, rows, tokenStatus = 200 } = {}) {
   return async (url, init) => {
     calls.push({ url: String(url), init });
-    if (String(url).startsWith("https://oauth2.googleapis.com/token")) return respond({ access_token: "ya29.token", expires_in: 3600 });
+    if (String(url).startsWith("https://oauth2.googleapis.com/token")) return tokenStatus === 200 ? respond({ access_token: "ya29.token", expires_in: 3600 }) : respond({ error: "invalid_grant", error_description: "Token has been expired or revoked." }, tokenStatus);
     const body = JSON.parse(init.body);
     if (status !== 200) return respond({}, status);
     if (body.dimensions) return respond({ rows: rows || [{ keys: ["2026-11-08"], clicks: 3, impressions: 90, ctr: 0.0333, position: 12.4 }, { keys: ["2026-11-09"], clicks: 5, impressions: 110, ctr: 0.0454, position: 10.2 }] });
@@ -118,20 +110,18 @@ test("Cloudflare: errors become short codes and never carry the token, site tag 
 });
 
 /* ---------- Google Search Console ---------- */
-test("Search Console: a signed service-account assertion (RS256), read-only scope, then Google's own totals for both periods and the daily series", async () => {
+test("Search Console: the refresh token is exchanged for a read-only access token, then Google's own totals for both periods and the daily series", async () => {
   gsc.forgetTokens();
-  const { k, env } = await gscEnv(), calls = [];
+  const { env } = await gscEnv(), calls = [];
   const creds = gsc.credentials(env);
-  const jwt = await gsc.signAssertion(creds, NOW);
-  const [h, c, s] = jwt.split(".");
-  const dec = (x) => JSON.parse(atob(x.replace(/-/g, "+").replace(/_/g, "/")));
-  assert.deepEqual(dec(h), { alg: "RS256", typ: "JWT" });
-  assert.deepEqual(dec(c), { iss: "reports@framework-analytics.iam.gserviceaccount.com", scope: "https://www.googleapis.com/auth/webmasters.readonly", aud: "https://oauth2.googleapis.com/token", iat: Math.floor(NOW.getTime() / 1000), exp: Math.floor(NOW.getTime() / 1000) + 3600 });
-  const sig = Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (ch) => ch.charCodeAt(0));
-  assert.equal(await crypto.subtle.verify("RSASSA-PKCS1-v1_5", k.pair.publicKey, sig, new TextEncoder().encode(`${h}.${c}`)), true, "the signature verifies with the matching public key");
   const period = periods("2026-11-09", 30);
   const out = await gsc.fetchSearchConsole({ creds, property: PROP, period, fetch: gscFetch(calls), now: NOW });
-  assert.equal(calls.filter((x) => x.url.startsWith("https://oauth2")).length, 1);
+  const tokenCalls = calls.filter((x) => x.url.startsWith("https://oauth2"));
+  assert.equal(tokenCalls.length, 1);
+  const form = new URLSearchParams(tokenCalls[0].init.body);
+  assert.deepEqual([...form.keys()].sort(), ["client_id", "client_secret", "grant_type", "refresh_token"]);
+  assert.equal(form.get("grant_type"), "refresh_token"); assert.equal(form.get("client_id"), GSC_ENV.GSC_OAUTH_CLIENT_ID); assert.equal(form.get("refresh_token"), GSC_ENV.GSC_OAUTH_REFRESH_TOKEN);
+  assert.equal(tokenCalls[0].init.method, "POST"); assert.equal(tokenCalls[0].url, "https://oauth2.googleapis.com/token", "no secret in the address");
   const q = calls.filter((x) => x.url.includes("searchAnalytics"));
   assert.equal(q.length, 3);
   assert.ok(q.every((x) => x.url.startsWith(`https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(PROP)}/searchAnalytics/query`) && x.init.headers.Authorization === "Bearer ya29.token"));
@@ -140,17 +130,63 @@ test("Search Console: a signed service-account assertion (RS256), read-only scop
   assert.deepEqual(out.series.find((d) => d.date === "2026-11-01"), { date: "2026-11-01", clicks: 0, impressions: 0, ctr: null, position: null }, "no impressions: no position is invented");
   await gsc.fetchSearchConsole({ creds, property: PROP, period, fetch: gscFetch(calls), now: NOW });
   assert.equal(calls.filter((x) => x.url.startsWith("https://oauth2")).length, 1, "the access token is reused");
+  await gsc.fetchSearchConsole({ creds, property: PROP, period, fetch: gscFetch(calls), now: new Date(NOW.getTime() + 51 * 60000) });
+  assert.equal(calls.filter((x) => x.url.startsWith("https://oauth2")).length, 2, "after 50 minutes the refresh token is exchanged again");
 });
 
-test("Search Console: errors become short codes without secrets; a property with no data is zeros, not a made-up average", async () => {
+test("Search Console: credentials need all three settings; a service account key file is no longer read", () => {
+  assert.deepEqual(gsc.credentials(GSC_ENV), { clientId: GSC_ENV.GSC_OAUTH_CLIENT_ID, clientSecret: GSC_ENV.GSC_OAUTH_CLIENT_SECRET, refreshToken: GSC_ENV.GSC_OAUTH_REFRESH_TOKEN });
+  for (const k of Object.keys(GSC_ENV)) assert.equal(gsc.credentials({ ...GSC_ENV, [k]: "" }), null, k + " missing means not set up");
+  assert.equal(gsc.credentials({ ...GSC_ENV, GSC_OAUTH_REFRESH_TOKEN: "has a space in it 12345678901" }), null);
+  assert.equal(gsc.credentials({}), null); assert.equal(gsc.credentials(undefined), null);
+  assert.equal(gsc.credentials({ GSC_SERVICE_ACCOUNT_JSON: JSON.stringify({ type: "service_account", client_email: "a@b.iam.gserviceaccount.com" }) }), null, "the old key-file setting does nothing");
+});
+
+test("Search Console: expiry and revocation become reconnect_needed (and are not cached); other errors become short codes without secrets; no data is zeros, not a made-up average", async () => {
   gsc.forgetTokens();
-  const { env } = await gscEnv(), creds = gsc.credentials(env), period = periods("2026-11-09", 7);
-  const code = async (status) => { gsc.forgetTokens(); try { await gsc.fetchSearchConsole({ creds, property: PROP, period, fetch: gscFetch([], { status }), now: NOW }); return "ok"; } catch (e) { assert.ok(!/PRIVATE|ya29|BEGIN/.test(e.message)); return e.message; } };
-  assert.equal(await code(403), "unauthorized"); assert.equal(await code(404), "property_not_found"); assert.equal(await code(429), "rate_limited"); assert.equal(await code(500), "query_failed");
+  const creds = gsc.credentials(GSC_ENV), period = periods("2026-11-09", 7);
+  const code = async (opts) => { gsc.forgetTokens(); try { await gsc.fetchSearchConsole({ creds, property: PROP, period, fetch: gscFetch([], opts), now: NOW }); return "ok"; } catch (e) { assert.ok(!/GOCSPX|ya29|1\/\/0g|refresh|invalid_grant|expired/i.test(e.message), "no secret or Google text in an error"); return e.message; } };
+  assert.equal(await code({ tokenStatus: 400 }), "reconnect_needed", "invalid_grant: the refresh token was revoked or has expired");
+  assert.equal(await code({ tokenStatus: 401 }), "reconnect_needed", "invalid_client: wrong client settings");
+  assert.equal(await code({ tokenStatus: 503 }), "unreachable");
+  assert.equal(await code({ status: 403 }), "no_access", "the Google account is not a user on this property");
+  assert.equal(await code({ status: 404 }), "property_not_found"); assert.equal(await code({ status: 429 }), "rate_limited"); assert.equal(await code({ status: 500 }), "query_failed");
+  assert.equal(await code({ status: 401 }), "reconnect_needed", "an access token Google refuses");
+  assert.equal(await gsc.fetchSearchConsole({ creds, property: PROP, period, fetch: async () => { throw new Error("offline GOCSPX-test-client-secret"); }, now: NOW }).catch((e) => e.message), "unreachable");
+  // a refused token is dropped, so the next read exchanges the refresh token again (and works once the secret has been replaced)
+  gsc.forgetTokens();
+  const calls = [];
+  await gsc.fetchSearchConsole({ creds, property: PROP, period, fetch: gscFetch(calls, { status: 401 }), now: NOW }).catch(() => {});
+  await gsc.fetchSearchConsole({ creds, property: PROP, period, fetch: gscFetch(calls), now: NOW });
+  assert.equal(calls.filter((x) => x.url.startsWith("https://oauth2")).length, 2, "a 401 clears the cached access token");
   gsc.forgetTokens();
   const none = await gsc.fetchSearchConsole({ creds, property: PROP, period, fetch: async (u) => (String(u).startsWith("https://oauth2") ? respond({ access_token: "t" }) : respond({})), now: NOW });
   assert.deepEqual(none.totals, { clicks: 0, impressions: 0, ctr: null, position: null });
-  assert.equal(gsc.credentials({ GSC_SERVICE_ACCOUNT_JSON: "{not json" }), null); assert.equal(gsc.credentials({ GSC_SERVICE_ACCOUNT_JSON: JSON.stringify({ type: "authorized_user" }) }), null);
+  gsc.forgetTokens();
+  await assert.rejects(gsc.fetchSearchConsole({ creds, property: PROP, period, fetch: async () => respond({}), now: NOW }), /reconnect_needed/, "an answer without an access token");
+});
+
+test("service: a revoked Google sign-in shows reconnect_needed (or the last good figures, marked stale) and Admin's test says so; Cloudflare is unaffected", async () => {
+  gsc.forgetTokens();
+  const w = world();
+  await store.saveConfig(w.db, ORG_A, SITE_A, { cf_site_tag: TAG, gsc_property: PROP }, "o", { now: NOW });
+  const env = { ...ENV, ...GSC_ENV };
+  const call = (fetch, now = NOW) => loadAnalytics({ env, db: w.db, organizationId: ORG_A, websiteId: SITE_A, range: 7, now, fetch });
+  const both = (opts) => async (url, init) => (String(url).includes("cloudflare.com") ? respond(CF_ANSWER()) : gscFetch([], opts)(url, init));
+  let m = await call(both({ tokenStatus: 400 }));
+  assert.equal(m.sources.search_console.state, "error"); assert.equal(m.sources.search_console.code, "reconnect_needed"); assert.equal(m.sources.cloudflare.state, "ok", "Cloudflare keeps working");
+  gsc.forgetTokens();
+  m = await call(both({}));
+  assert.equal(m.sources.search_console.state, "ok");
+  gsc.forgetTokens();
+  m = await call(both({ tokenStatus: 400 }), new Date(NOW.getTime() + TTL_MS.search_console + 60000));
+  assert.equal(m.sources.search_console.state, "stale"); assert.equal(m.sources.search_console.code, "reconnect_needed"); assert.equal(m.sources.search_console.data.totals.clicks, 60, "the last good figures, with their time");
+  gsc.forgetTokens();
+  assert.deepEqual(await testSource({ env, source: "search_console", ref: PROP, fetch: gscFetch([], { tokenStatus: 400 }), now: NOW }), { ok: false, code: "reconnect_needed" });
+  gsc.forgetTokens();
+  assert.deepEqual(await testSource({ env, source: "search_console", ref: PROP, fetch: gscFetch([], { status: 403 }), now: NOW }), { ok: false, code: "no_access" });
+  gsc.forgetTokens();
+  assert.deepEqual(await testSource({ env, source: "search_console", ref: PROP, fetch: gscFetch([]), now: NOW }), { ok: true, through: "2026-11-09" });
 });
 
 /* ---------- settings and cache (data layer) ---------- */
@@ -268,9 +304,10 @@ test("Admin API: read, save, validate, test; credentials never returned; writes 
   gsc.forgetTokens();
   const w = world(), { env: gEnv } = await gscEnv();
   const path = `/clients/${ORG_A}/websites/${SITE_A}/analytics`;
-  let r = await adminCall(w, "GET", path, undefined, { env: { ...ENV, ...gEnv } }); const j = await r.json();
-  assert.equal(r.status, 200); assert.equal(j.available, true); assert.deepEqual(j.platform, { cloudflare: true, search_console: true }); assert.equal(j.service_account_email, "reports@framework-analytics.iam.gserviceaccount.com");
-  assert.ok(!JSON.stringify(j).match(/cf-token|PRIVATE|BEGIN|private_key/), "no credential in the answer");
+  let r = await adminCall(w, "GET", path, undefined, { env: { ...ENV, ...gEnv, GSC_ACCOUNT_EMAIL: "analytics@frameworkco.ca" } }); const j = await r.json();
+  assert.equal(r.status, 200); assert.equal(j.available, true); assert.deepEqual(j.platform, { cloudflare: true, search_console: true }); assert.equal(j.google_account, "analytics@frameworkco.ca"); assert.equal("service_account_email" in j, false);
+  assert.ok(!JSON.stringify(j).match(/cf-token|GOCSPX|1\/\/0g|refresh|client_secret/i), "no credential in the answer");
+  assert.equal((await (await adminCall(w, "GET", path, undefined, { env: { ...ENV, ...gEnv, GSC_ACCOUNT_EMAIL: "<script>x" } })).json()).google_account, null, "only a plain email address is ever shown");
   r = await adminCall(w, "POST", path, { cf_site_tag: TAG, gsc_property: PROP }); assert.equal(r.status, 200);
   assert.equal((await adminCall(w, "POST", path, { cf_site_tag: "bad" })).status, 422);
   assert.equal((await adminCall(w, "POST", path, { gsc_property: "bad" })).status, 422);
@@ -303,7 +340,8 @@ test("wiring: the client route sits under the website page behind website.view a
   assert.match(src("worker/admin/router.js"), /handleWebsiteAnalyticsApi/);
   assert.match(src("admin/assets/websites.js"), /analyticsPanel\(\{ base, site, canWrite, say \}\)/);
   assert.match(src("worker/portal/website-live.js"), /extra\.analytics \? analyticsTeaser\(vm, s\) : ""/);
-  for (const f of ["worker/portal/analytics/view.js", "worker/portal/analytics/service.js", "admin/assets/website-analytics.js"]) assert.ok(!/CF_ANALYTICS_API_TOKEN|GSC_SERVICE_ACCOUNT_JSON/.test(src(f)), f + " never touches the secrets");
+  for (const f of ["worker/portal/analytics/view.js", "worker/portal/analytics/service.js", "admin/assets/website-analytics.js"]) assert.ok(!/CF_ANALYTICS_API_TOKEN|GSC_OAUTH_|GSC_SERVICE_ACCOUNT/.test(src(f)), f + " never touches the secrets");
+  for (const f of ["worker/portal/analytics/search-console.js", "worker/portal/analytics/service.js", "worker/portal/admin-website-analytics.js"]) assert.ok(!/GSC_SERVICE_ACCOUNT|private_key|RSASSA|importKey|signAssertion/.test(src(f)), f + " has no service account key code");
   const js = src("assets/js/portal-analytics.js"), css = src("assets/css/portal-analytics.css");
   assert.ok(!/fetch\(|XMLHttpRequest|localStorage|document\.cookie|innerHTML|eval\(/.test(js), "the read-out script fetches and stores nothing");
   assert.ok(!/@import|url\(/.test(css));

@@ -1,6 +1,6 @@
 /* Framework Admin — Analytics settings of one website, inside the website's card on /admin/clients/:id/website. Admin records WHICH Cloudflare Web Analytics site (its site tag) and WHICH
-   Google Search Console property the client's Analytics page reads, and can test each. No credentials are entered or shown here: the Cloudflare API token and the Google service account
-   key are Worker secrets (see worker/portal/WEBSITE-ANALYTICS.md); this panel only says whether the server has them. Server text is never inserted as HTML. */
+   Google Search Console property the client's Analytics page reads, and can test each. No credentials are entered or shown here: the Cloudflare API token and the Google sign-in (OAuth client and refresh token)
+   are Worker secrets (see worker/portal/WEBSITE-ANALYTICS.md); this panel only says whether the server has them. Server text is never inserted as HTML. */
 import { h, api } from "./ui.js";
 
 const ERROR = {
@@ -12,7 +12,9 @@ const ERROR = {
 const errorText = (err) => ERROR[err && err.code] || "That didn’t work and nothing was changed. Try again, and reload the page if it keeps happening.";
 const TEST = {
   not_enabled: "The server doesn’t have this source’s credentials yet, so it can’t be read for anyone.", not_connected: "Save a site tag or property first.",
-  unauthorized: "Access was refused. For Cloudflare, check the API token and account. For Search Console, add the service account email as a user on this property.",
+  unauthorized: "Cloudflare refused access. Check the API token (Account Analytics: Read) and the account ID.",
+  reconnect_needed: "Google no longer accepts Framework’s sign-in (it was revoked or has expired). Framework’s Google connection has to be set up again; the steps are in WEBSITE-ANALYTICS.md.",
+  no_access: "Google refused this property. Add the connected Google account as a Restricted user on it in Search Console, and check the Search Console API is on in the Google Cloud project.",
   property_not_found: "Google doesn’t know that property. Check it matches Search Console exactly.", rate_limited: "The source is busy. Try again in a few minutes.",
   unreachable: "The source couldn’t be reached just now. Try again.", query_failed: "The source answered but the request failed. Try again, and check the setting.",
 };
@@ -62,7 +64,7 @@ export function analyticsPanel({ base, site, canWrite, say }) {
       field(pre + "-tag", "Site tag", tag, "In Cloudflare: Analytics & Logs, Web Analytics, the site, then its tag. The website must carry the Web Analytics snippet."),
       w ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => test("cloudflare") }, "Test Cloudflare")) : null,
       h("div", { class: "adm-field" }, h("p", null, h("strong", { text: SRC.search_console + " " }), state(d.platform.search_console))),
-      field(pre + "-prop", "Search Console property", prop, d.service_account_email ? `Add ${d.service_account_email} as a Restricted (read-only) user on this property in Search Console first.` : "The service account isn’t set up on the server yet, so there is no email to add."),
+      field(pre + "-prop", "Search Console property", prop, d.google_account ? `Add ${d.google_account} as a Restricted (read-only) user on this property in Search Console first.` : d.platform.search_console ? "Add the Google account Framework signed in with as a Restricted (read-only) user on this property in Search Console first." : "Google sign-in isn’t set up on the server yet."),
       w ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: () => test("search_console") }, "Test Search Console")) : null,
       w ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--primary adm-small", type: "button", onclick: () => run(() => api(url, { method: "POST", body: { cf_site_tag: tag.value.trim(), gsc_property: prop.value.trim() } }), "Analytics settings saved.") }, "Save analytics settings")) : null,
     );
