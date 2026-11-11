@@ -1,5 +1,5 @@
 // Website analytics in the client portal: Cloudflare Web Analytics (traffic) and Google Search Console (search performance), per website, read through their APIs, cached,
-// private to the client's own organization, never invented. Migration 0028 is PROPOSED (not applied anywhere): everything is dormant until it is.
+// private to the client's own organization, never invented. Migration 0028 is applied to Staging only: everything is dormant until it is.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
@@ -21,7 +21,7 @@ const ACCOUNT = "fedcba9876543210fedcba9876543210";
 const UUID0 = "00000000-0000-4000-8000-000000000000";
 
 function world({ migrated = true } = {}) {
-  const db = openPortalDb({ proposed: migrated ? [MIG] : [] });
+  const db = openPortalDb({ skip: migrated ? [] : [MIG] });
   const run = (sql, ...p) => db.raw.prepare(sql).run(...p);
   for (const [org, slug] of [[ORG_A, "alpha"], [ORG_B, "bravo"]]) run("INSERT INTO organizations (id, slug, name, status, created_at, updated_at) VALUES (?, ?, ?, 'active', ?, ?)", org, slug, slug.toUpperCase(), NOW.toISOString(), NOW.toISOString());
   for (const [id, org, name] of [[SITE_A, ORG_A, "Alpha Fencing"], [SITE_B, ORG_B, "Bravo Decks"]]) run("INSERT INTO websites (id, organization_id, name, url, origin, status, managed_by_framework, published, sort_order, created_at, updated_at, updated_by) VALUES (?, ?, ?, 'https://example.com', 'framework', 'live', 1, 1, 0, ?, ?, 'test')", id, org, name, NOW.toISOString(), NOW.toISOString());
@@ -61,10 +61,10 @@ function gscFetch(calls, { status = 200, rows } = {}) {
 }
 
 /* ---------- migration ---------- */
-test("migration 0028 is PROPOSED (not applied), additive, stores no credentials, and ties every row to a website of its organization", () => {
-  assert.ok(existsSync(new URL("../../migrations/portal-proposed/" + MIG, import.meta.url)));
-  assert.ok(!existsSync(new URL("../../migrations/portal/" + MIG, import.meta.url)));
-  const sql = readFileSync(new URL("../../migrations/portal-proposed/" + MIG, import.meta.url), "utf8").replace(/--.*$/gm, "");
+test("migration 0028 is applied to Staging (not Production), additive, stores no credentials, and ties every row to a website of its organization", () => {
+  assert.ok(existsSync(new URL("../../migrations/portal/" + MIG, import.meta.url)));
+  assert.ok(!existsSync(new URL("../../migrations/portal-proposed/" + MIG, import.meta.url)));
+  const sql = readFileSync(new URL("../../migrations/portal/" + MIG, import.meta.url), "utf8").replace(/--.*$/gm, "");
   assert.equal([...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).join(), "website_analytics,website_analytics_cache");
   assert.ok(!/\b(DROP|DELETE FROM|UPDATE|ALTER)\b/i.test(sql.replace(/ON DELETE RESTRICT/g, "")), "additive only");
   assert.ok(!/token|secret|password|private_key|api_key/i.test(sql), "no credential column");
@@ -316,7 +316,7 @@ import * as sitesRepo from "../portal/repo/websites.js";
 import { PORTAL_CSP_WITH_SCRIPT } from "../portal/http.js";
 
 async function routed({ migrated = true, creds = false } = {}) {
-  const w = await makeWorld({ proposed: migrated ? [MIG] : [] });
+  const w = await makeWorld({ skip: migrated ? [] : [MIG] });
   w.env.PORTAL_WEBSITE = "1";
   if (creds) Object.assign(w.env, ENV);
   const alpha = await w.org("alpha", "Alpha Co"), beta = await w.org("beta", "Beta Co");
