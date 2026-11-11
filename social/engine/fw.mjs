@@ -92,6 +92,16 @@ const FIT_SCRIPT = async () => {
     if (img.naturalWidth < need * 0.8) out.warnings.push(`low-resolution image: ${img.naturalWidth}px wide shown at ~${Math.round(need)}px (${decodeURIComponent(img.src).split("/").pop()})`);
   }
   if (!faces.every((f) => document.fonts.check(f))) out.errors.push("brand fonts did not load");
+  // Legibility on a phone: a 1080px slide shows at about a third of its size, so slide text under 24px is too small to read.
+  const small = new Set();
+  const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n; (n = tw.nextNode()); ) {
+    const el = n.parentElement;
+    if (!n.textContent.trim() || el.closest(".browser .bar, .src-note, [data-brand]")) continue;
+    const fs = parseFloat(getComputedStyle(el).fontSize);
+    if (fs < 24 && el.getBoundingClientRect().width > 0) small.add(`${Math.round(fs)}px "${n.textContent.trim().slice(0, 30)}"`);
+  }
+  if (small.size) out.warnings.push(`text under 24px is hard to read on a phone: ${[...small].slice(0, 4).join("; ")}`);
   for (const t of document.querySelectorAll(".layer.ct:not([data-bleed])")) {
     const r = t.getBoundingClientRect();
     if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) out.errors.push(`text runs off the canvas: "${t.textContent.trim().slice(0, 40)}" (set bleed: true if intended)`);
