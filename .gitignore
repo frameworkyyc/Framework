@@ -1,3 +1,8 @@
 .wrangler/
 .dev.vars
 node_modules/
+
+# Social content production (social/README.md): batches leave as a zip; fonts are cached per machine.
+social/batches/
+social/engine/.fonts/
+social/**/.build/
