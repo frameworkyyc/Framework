@@ -555,6 +555,8 @@ function figmaCmd(sub, batchArg, urlsArg) {
     console.log(`// use_figma script for fileKey ${f.fileKey} (skillNames "resource:figma-use"). Returns the section id.
 const page = await figma.getNodeByIdAsync(${JSON.stringify(cfg.pageId)}); await figma.setCurrentPageAsync(page);
 await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
+// Re-publishing a batch replaces its earlier section in place.
+const old = page.children.find((n) => n.type === "SECTION" && n.name === ${JSON.stringify("Batch " + name)}); const oldY = old ? old.y : null; if (old) old.remove();
 const G = 60, W = 1080, H = 1350, posts = ${JSON.stringify(posts)}, nodes = ${JSON.stringify(f.nodes)}, covers = ${JSON.stringify(covers)};
 const bottom = page.children.reduce((m, n) => Math.max(m, n.type === "SECTION" ? n.y + n.height : 0), 0);
 const label = (t, x, y, size) => { const n = figma.createText(); n.fontName = { family: "Inter", style: "Semi Bold" }; n.characters = t; n.fontSize = size; n.x = x; n.y = y; return n; };
@@ -573,7 +575,7 @@ for (const p of posts) {
 y = maxY + G;
 for (const k of kids) sec.appendChild(k);
 const width = Math.max(...kids.map((k) => k.x + k.width)) + G;
-sec.resizeWithoutConstraints(width, y); sec.x = 0; sec.y = bottom + 400;
+sec.resizeWithoutConstraints(width, y); sec.x = 0; sec.y = oldY ?? bottom + 400;
 return { sectionId: sec.id, posts: posts.length, slides: nodes.length };`);
   } else if (sub === "replace") {
     // After FW_POST=NN figma upload: swap that post's old slides (and its grid tile) in the batch section for the new uploads, matched by layer name.
