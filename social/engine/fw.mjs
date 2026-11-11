@@ -323,7 +323,7 @@ function batchCovers(batch) {
   const posts = postDirs(batch).map((d) => {
     const spec = readJson(join(d, "spec.json")), s0 = spec.slides[0] || {};
     const cover = ["01.png", "reel-cover.png"].map((f) => join(d, "slides", f)).find(existsSync);
-    const head = String(s0.giant ? `${s0.giant} ${s0.headline || ""}` : s0.headline || s0.quote || "").replace(/\{\{|\}\}|\*\*/g, "").replace(/\s*\n\s*/g, " ").trim();
+    const head = String([s0.giant, s0.headline || s0.quote, s0.headline2].filter(Boolean).join(" ")).replace(/\{\{|\}\}|\*\*/g, "").replace(/\s*\n\s*/g, " ").trim();
     return { id: basename(d), dir: d, cover, family: familyOf(s0), category: categoryOf(s0), imagery: isImagery(s0), format: spec.format, headline: head };
   });
   const stats = imageStats(posts.filter((p) => p.cover).map((p) => p.cover));
@@ -449,7 +449,7 @@ function figmaCmd(sub, batchArg, urlsArg) {
       return { post: f.post, slide: f.slide, nodeId: res.placedOnNodeId };
     });
     const prev = process.env.FW_POST && existsSync(join(batch, "figma.json")) ? readJson(join(batch, "figma.json")) : null;
-    const merged = prev ? { ...prev, nodes: [...prev.nodes.filter((n) => !nodes.some((m) => m.post === n.post)), ...nodes].sort((a, b) => (a.post + a.slide).localeCompare(b.post + b.slide)), replaced: prev.nodes.filter((n) => nodes.some((m) => m.post === n.post)) } : { batch: name, fileKey: cfg.fileKey, nodes };
+    const merged = prev ? { ...prev, nodes: [...(prev.nodes || []).filter((n) => !nodes.some((m) => m.post === n.post)), ...nodes].sort((a, b) => (a.post + a.slide).localeCompare(b.post + b.slide)), replaced: (prev.nodes || []).filter((n) => nodes.some((m) => m.post === n.post)) } : { batch: name, fileKey: cfg.fileKey, nodes };
     writeFileSync(join(batch, "figma.json"), JSON.stringify(merged, null, 1));
     console.log(`ok   ${nodes.length} slides uploaded to ${cfg.url}`);
   } else if (sub === "layout") {
@@ -466,7 +466,7 @@ const label = (t, x, y, size) => { const n = figma.createText(); n.fontName = { 
 const sec = figma.createSection(); sec.name = ${JSON.stringify("Batch " + name)}; page.appendChild(sec);
 const kids = [label(${JSON.stringify(name + " · profile preview (newest first)")}, G, G, 64)];
 let y = G + 140;
-for (const [i, id] of [...covers].reverse().entries()) { const src = await figma.getNodeByIdAsync(id); const c = src.clone(); c.x = G + (i % 3) * (W + 12); c.y = y + Math.floor(i / 3) * (H + 12); kids.push(c); }
+for (const [i, id] of [...covers].reverse().entries()) { const src = await figma.getNodeByIdAsync(id); const c = src.clone(); c.name = "grid · " + src.name; c.x = G + (i % 3) * (W + 12); c.y = y + Math.floor(i / 3) * (H + 12); kids.push(c); }
 // Posts as columns to the right of the grid: label on top, slides stacked in order.
 let x = G + 3 * (W + 12) + 300; const top = G + 140; let maxY = top + Math.ceil(covers.length / 3) * (H + 12);
 for (const p of posts) {
@@ -480,7 +480,31 @@ for (const k of kids) sec.appendChild(k);
 const width = Math.max(...kids.map((k) => k.x + k.width)) + G;
 sec.resizeWithoutConstraints(width, y); sec.x = 0; sec.y = bottom + 400;
 return { sectionId: sec.id, posts: posts.length, slides: nodes.length };`);
-  } else die("usage: fw.mjs figma manifest|upload|layout <batch> [urls-file]");
+  } else if (sub === "replace") {
+    // After FW_POST=NN figma upload: swap that post's old slides (and its grid tile) in the batch section for the new uploads, matched by layer name.
+    const post = process.env.FW_POST || die("set FW_POST=NN to name the post to replace");
+    console.log(`// use_figma script for fileKey ${cfg.fileKey} (skillNames "resource:figma-use"): replace post ${post} in section "Batch ${name}".
+const page = await figma.getNodeByIdAsync(${JSON.stringify(cfg.pageId)}); await figma.setCurrentPageAsync(page);
+const sec = page.children.find((n) => n.type === "SECTION" && n.name === ${JSON.stringify("Batch " + name)});
+if (!sec) throw new Error("batch section not found");
+const key = (n) => n.name.replace(/[.]png$/, "").replace(/^grid · /, "");
+const want = ${JSON.stringify(name + "--")};
+const isPost = (n) => key(n).startsWith(want) && key(n).slice(want.length).startsWith(${JSON.stringify(post)});
+const fresh = page.children.filter((n) => n.type !== "SECTION" && isPost(n));
+const old = sec.children.filter((n) => isPost(n));
+if (!fresh.length) throw new Error("no new uploads for this post on the page");
+const swapped = [];
+for (const n of fresh) {
+  // The post's column sits right of the profile grid, so of two same-named nodes the left one is the grid tile.
+  const same = old.filter((x) => !x.removed && key(x) === key(n)).sort((a, b) => a.x - b.x);
+  const o = same[same.length - 1];
+  if (!o) continue;
+  const g = same.length > 1 ? same[0] : null;
+  sec.appendChild(n); n.x = o.x; n.y = o.y; swapped.push([o.id, n.id]); o.remove();
+  if (g && key(n).endsWith("--01")) { const c = n.clone(); c.name = "grid · " + n.name; sec.appendChild(c); c.x = g.x; c.y = g.y; swapped.push([g.id, c.id]); g.remove(); }
+}
+return { swapped, unmatched: fresh.filter((n) => !swapped.some((s) => s[1] === n.id)).map((n) => n.name) };`);
+  } else die("usage: fw.mjs figma manifest|upload|layout|replace <batch> [urls-file]");
 }
 
 // ---------- main ----------

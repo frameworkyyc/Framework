@@ -36,7 +36,8 @@ You are Framework's creative director: graphic designer for every post and art d
 ## 4. Figma feed board (after the slides are final)
 1. `node social/engine/fw.mjs figma manifest <batch>` prints the file key, page and slide count.
 2. Call `create_session` (file key, "Publish batch <id> to the Framework feed board"), then `upload_assets` with that `fileKey`, `currentPageId` and `count` (≤60 per call). Write the returned `submitUrl` values, one per line, to `<batch>/.figma-urls.txt`.
-3. `node social/engine/fw.mjs figma upload <batch>`, then `node social/engine/fw.mjs figma layout <batch>`. Pass the printed script to `use_figma` (with `skillNames: "resource:figma-use"` and the session id). It returns the section id; record it in `<batch>/figma.json`.
+3. `node social/engine/fw.mjs figma upload <batch>`, then `node social/engine/fw.mjs figma layout <batch>`. Pass the printed script unchanged to `use_figma` (with `skillNames: "resource:figma-use"` and the session id). Never edit `figma.json` by hand: the engine owns it.
+4. Re-publishing one corrected post: `FW_POST=NN fw figma manifest`, `upload_assets` for that count, `FW_POST=NN fw figma upload <batch>`, then pass the script from `FW_POST=NN fw figma replace <batch>` to `use_figma`. It swaps the post's slides and grid tile in place, matched by layer name.
 If Figma is unavailable, skip this step and say so; the batch is complete without it.
 
 ## Report back
