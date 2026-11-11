@@ -2,14 +2,15 @@
 // Framework social engine: deterministic typography, layout, export and checks. No AI calls and no credits are spent here.
 //   node social/engine/fw.mjs fonts                      fetch Switzer + General Sans from Fontshare into a local cache (once per machine)
 //   node social/engine/fw.mjs validate <batch>           check briefs.json (the strategist's handoff)
-//   node social/engine/fw.mjs render <post-dir|batch>    spec.json -> slides/NN.png (1080x1350 default); fails on overflow or missing images
+//   node social/engine/fw.mjs render <post-dir|batch>    spec.json -> slides/NN.png (1080x1350 default); panoramas -> one composition cut into slides;
+//                                                        reels with "motion" -> frame-by-frame slides/reel.mp4 + reel-cover.png + storyboard.png
 //   node social/engine/fw.mjs reel <post-dir>            clip + reel overlay -> slides/reel.mp4 + slides/reel-cover.png (ffmpeg)
 //   node social/engine/fw.mjs sheet <batch>              one contact-sheet PNG of every slide, for review at low token cost
 //   node social/engine/fw.mjs check <batch>              completeness, dimensions, caption and brand-voice lint
 //   node social/engine/fw.mjs grid <batch>               Instagram profile preview (3:4 grid crops, newest first, after published history) + feed checks
 //   node social/engine/fw.mjs package <batch>            export/ folder + zip of finished posts with captions alongside
 //   node social/engine/fw.mjs capture <url> <out.jpg> [desktop|mobile] [full]   authentic client-site screenshot at 2x/3x for mockups
-//   node social/engine/fw.mjs history add <batch> | recent [n] | report    content history (social/history/posts.csv) and performance summary
+//   node social/engine/fw.mjs history add <batch> | archive <batch> [why] | recent [n] | report    content history (social/history/posts.csv) and performance summary
 //   node social/engine/fw.mjs figma manifest|upload|layout <batch> [urls]  push finished slides to the Figma feed board (see SKILL.md)
 import { createRequire } from "node:module";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, copyFileSync, rmSync } from "node:fs";
@@ -106,6 +107,18 @@ const FIT_SCRIPT = async () => {
     const r = t.getBoundingClientRect();
     if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) out.errors.push(`text runs off the canvas: "${t.textContent.trim().slice(0, 40)}" (set bleed: true if intended)`);
   }
+  // Panoramic carousels: one composition split into slides. Text must sit wholly inside one slide, clear of every seam.
+  const panel = Number(document.body.dataset.panel || 0);
+  const inked = (t) => { const g = document.createRange(); g.selectNodeContents(t); return g.getBoundingClientRect(); }; // the text itself, not its box
+  if (panel) for (const t of document.querySelectorAll(".layer.ct")) {
+    const r = inked(t);
+    for (let x = panel; x < innerWidth; x += panel) if (r.left < x + 64 && r.right > x - 64) out.errors.push(`text crosses or touches the seam between slides ${x / panel} and ${x / panel + 1}: "${t.textContent.trim().slice(0, 40)}" (keep 64px clear)`);
+  }
+  // Reels (9:16): Instagram's buttons and caption cover the bottom and right edge, and the profile grid shows only the middle 3:4 of the cover.
+  if (innerHeight === 1920) for (const t of document.querySelectorAll(".layer.ct")) {
+    const r = inked(t), txt = t.textContent.trim().slice(0, 40);
+    if (r.bottom > 1600 || r.top < 120 || r.right > 960) out.warnings.push(`reel text outside the safe area (Instagram's buttons and caption cover the bottom and right): "${txt}"`);
+  }
   // Branding audit for fw check: every brand element and every piece of text naming Framework or its URL, with its position.
   const rect = (r) => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
   out.brand = [...document.querySelectorAll("[data-brand]")].map((e) => ({ kind: e.dataset.brand, ...rect(e.getBoundingClientRect()) }));
@@ -127,16 +140,49 @@ async function withBrowser(fn) {
   try { return await fn(browser); } finally { await browser.close(); }
 }
 
+// Motion: turn every [data-anim] layer's keyframes ([{t, opacity, x, y, scale, rotate, blur, clip, ease}]) into paused Web Animations,
+// so each video frame is an exact, repeatable render at a given time (no real-time playback, no dropped frames).
+const MOTION_SCRIPT = (duration) => {
+  const REST = { opacity: 1, x: 0, y: 0, scale: 1, rotate: 0, blur: 0, clip: "inset(0% 0% 0% 0%)" };
+  window.__fwAnims = [];
+  for (const el of document.querySelectorAll("[data-anim]")) {
+    const steps = JSON.parse(el.dataset.anim).map((k) => ({ ...k, t: Math.min(Math.max(Number(k.t) || 0, 0), duration) })).sort((p, q) => p.t - q.t);
+    const props = Object.keys(REST).filter((k) => steps.some((st) => st[k] != null));
+    const at = (i, k) => { for (let j = i; j >= 0; j--) if (steps[j][k] != null) return steps[j][k]; for (let j = i; j < steps.length; j++) if (steps[j][k] != null) return steps[j][k]; return REST[k]; };
+    const full = steps.map((st, i) => Object.fromEntries([["t", st.t], ["ease", st.ease], ...Object.keys(REST).map((k) => [k, props.includes(k) ? at(i, k) : REST[k]])]));
+    if (full[0].t > 0) full.unshift({ ...full[0], t: 0 });
+    if (full.at(-1).t < duration) full.push({ ...full.at(-1), t: duration, ease: undefined });
+    const frames = full.map((v) => {
+      const f = { offset: v.t / duration, easing: v.ease || "cubic-bezier(.2,.7,.1,1)" }, has = (k) => props.includes(k);
+      if (has("opacity")) f.opacity = v.opacity;
+      if (has("x") || has("y")) f.translate = `${v.x}px ${v.y}px`;
+      if (has("scale")) f.scale = String(v.scale);
+      if (has("rotate")) f.rotate = `${v.rotate}deg`;
+      if (has("blur")) f.filter = `blur(${v.blur}px)`;
+      if (has("clip")) f.clipPath = v.clip;
+      return f;
+    });
+    const anim = el.animate(frames, { duration: duration * 1000, fill: "both" });
+    anim.pause(); window.__fwAnims.push(anim);
+  }
+  window.__fwSeek = (t) => { for (const a of window.__fwAnims) a.currentTime = t * 1000; };
+  return window.__fwAnims.length;
+};
+
 async function renderPost(browser, postDir) {
   const specPath = join(postDir, "spec.json");
   if (!existsSync(specPath)) throw new Error(`${postDir}: no spec.json`);
   const spec = readJson(specPath);
   const { w, h } = sizeOf(spec);
+  const panels = spec.format === "panorama" ? Number(spec.panels) : 0, motion = spec.format === "reel" && spec.motion ? spec.motion : null;
+  if (spec.format === "panorama" && !(panels >= 2 && panels <= 10)) throw new Error(`${postDir}: a panorama needs "panels" (2-10)`);
   const slides = (spec.slides || []).filter((s) => spec.format === "reel" || s.template !== "reel");
   if (!slides.length) throw new Error(`${postDir}: spec has no slides`);
+  if ((panels || motion) && (slides.length !== 1 || slides[0].template !== "canvas")) throw new Error(`${postDir}: a ${panels ? "panorama" : "motion reel"} is one "canvas" slide (the whole composition)`);
   const outDir = join(postDir, "slides"), build = join(postDir, ".build");
-  rmSync(outDir, { recursive: true, force: true }); mkdirSync(outDir, { recursive: true }); mkdirSync(build, { recursive: true });
-  const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 1 });
+  rmSync(outDir, { recursive: true, force: true }); mkdirSync(outDir, { recursive: true }); rmSync(build, { recursive: true, force: true }); mkdirSync(build, { recursive: true });
+  const cw = panels ? w * panels : w;
+  const page = await browser.newPage({ viewport: { width: cw, height: h }, deviceScaleFactor: 1 });
   const report = [];
   for (const [i, s] of slides.entries()) {
     if (!TEMPLATES.includes(s.template)) throw new Error(`${postDir} slide ${i + 1}: unknown template "${s.template}"`);
@@ -144,12 +190,46 @@ async function renderPost(browser, postDir) {
     if (s.image && !existsSync(resolveAsset(s.image, postDir))) throw new Error(`${postDir} slide ${i + 1}: image not found: ${s.image}`);
     const n = i + 1, total = slides.length;
     const fontFaces = (spec.fonts || []).map((f) => `@font-face{font-family:"${f.family}";src:url("${pathToFileURL(resolveAsset(f.src, postDir)).href}");font-weight:${f.weight || 400}}`).join("");
-    const ctx = { fontFaces, n, total, isLast: n === total || spec.format !== "carousel", counter: spec.format === "carousel" ? `${String(n).padStart(2, "0")} / ${String(total).padStart(2, "0")}` : "", w, h, postDir: resolve(postDir), fontsCss: FONTS_CSS, slideCss: SLIDE_CSS };
+    const ctx = { fontFaces, n, total, isLast: n === total || spec.format !== "carousel", counter: "", w: cw, h, panel: panels ? w : 0, postDir: resolve(postDir), fontsCss: FONTS_CSS, slideCss: SLIDE_CSS };
     const html = join(build, `slide-${String(n).padStart(2, "0")}.html`);
     writeFileSync(html, slideHtml(s, ctx));
     await page.goto("file://" + html, { waitUntil: "load" });
     await page.evaluate(() => document.fonts.ready);
     const r = await page.evaluate(FIT_SCRIPT);
+    if (panels) {
+      // One composition, cut into slides: every slide is an exact crop, so neighbours line up to the pixel.
+      await page.screenshot({ path: join(outDir, "panorama.png"), clip: { x: 0, y: 0, width: cw, height: h } });
+      for (let k = 0; k < panels; k++) {
+        const name = `${String(k + 1).padStart(2, "0")}.png`, inPanel = (b) => b.x + b.w / 2 >= k * w && b.x + b.w / 2 < (k + 1) * w, shift = (b) => ({ ...b, x: b.x - k * w });
+        await page.screenshot({ path: join(outDir, name), clip: { x: k * w, y: 0, width: w, height: h } });
+        report.push({ slide: k + 1, file: name, errors: k ? [] : r.errors, warnings: k ? [] : r.warnings, brand: r.brand.filter(inPanel).map(shift), marks: r.marks.filter(inPanel).map(shift), names: r.names.filter(inPanel).map(shift) });
+      }
+      continue;
+    }
+    if (motion) {
+      const fps = Number(motion.fps || 30), dur = Number(motion.duration);
+      if (!(dur >= 3 && dur <= 90)) throw new Error(`${postDir}: motion.duration must be 3-90 seconds`);
+      await page.evaluate(MOTION_SCRIPT, dur);
+      const frames = join(build, "frames"); mkdirSync(frames);
+      const total = Math.round(dur * fps), transparent = !!spec.video;
+      for (let f = 0; f < total; f++) {
+        await page.evaluate((t) => window.__fwSeek(t), f / fps);
+        await page.screenshot({ path: join(frames, `f${String(f).padStart(5, "0")}.png`), omitBackground: transparent });
+      }
+      const mp4 = join(outDir, "reel.mp4"), seq = join(frames, "f%05d.png"), enc = ["-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an"];
+      if (spec.video) {
+        const clip = resolveAsset(spec.video, postDir);
+        if (!existsSync(clip)) throw new Error(`${postDir}: clip not found: ${spec.video}`);
+        const mono = spec.videoTreatment === "mono" ? ",hue=s=0" : "";
+        execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-stream_loop", "-1", "-i", clip, "-framerate", String(fps), "-i", seq, "-filter_complex", `[0:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},fps=${fps}${mono},setpts=PTS-STARTPTS[v];[v][1:v]overlay=0:0:shortest=1,format=yuv420p`, "-t", String(dur), ...enc, mp4]);
+      } else execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(fps), "-i", seq, ...enc, mp4]);
+      const coverAt = Math.min(Number(motion.coverAt ?? dur / 2), dur - 1 / fps);
+      execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-ss", String(coverAt), "-i", mp4, "-frames:v", "1", join(outDir, "reel-cover.png")]);
+      // Storyboard for review: six evenly spaced frames in one strip (contact sheet, QC).
+      execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", mp4, "-vf", `fps=6/${dur},scale=270:480,tile=6x1`, "-frames:v", "1", join(postDir, "storyboard.png")]);
+      report.push({ slide: 1, file: "reel-cover.png", ...r });
+      continue;
+    }
     const name = s.template === "reel" ? "reel-overlay.png" : `${String(n).padStart(2, "0")}.png`;
     await page.screenshot({ path: join(outDir, name), omitBackground: s.template === "reel", clip: { x: 0, y: 0, width: w, height: h } });
     report.push({ slide: n, file: name, ...r });
@@ -196,9 +276,10 @@ async function reel(postDir) {
 
 // ---------- contact sheet ----------
 async function sheet(batch) {
-  const posts = postDirs(batch).map((d) => ({ d, files: existsSync(join(d, "slides")) ? readdirSync(join(d, "slides")).filter((f) => /^\d+\.png$|^reel-cover\.png$/.test(f)).sort() : [] }));
-  const rows = posts.map(({ d, files }) => `<section><h2>${basename(d)}</h2><div class="row">${files.map((f) => `<figure><img src="file://${resolve(d, "slides", f)}"><figcaption>${f}</figcaption></figure>`).join("") || "<p>NOT RENDERED</p>"}</div></section>`).join("");
-  const html = `<!doctype html><meta charset="utf-8"><style>body{margin:0;padding:24px;background:#F5F5F5;font:13px/1.3 sans-serif;width:1832px}section{margin-bottom:20px}h2{font-size:15px;margin:0 0 8px}.row{display:flex;flex-wrap:wrap;gap:10px}figure{margin:0}img{width:216px;display:block;border:1px solid #E0E0E0;background:#fff}figcaption{color:#5C5C5C;padding-top:3px}p{color:#c00;font-weight:600}</style>${rows}`;
+  // Panoramas sit edge to edge (seams visible as they will swipe); Reels show their cover and a six-frame storyboard.
+  const posts = postDirs(batch).map((d) => ({ d, pano: existsSync(join(d, "slides", "panorama.png")), board: existsSync(join(d, "storyboard.png")) ? join(d, "storyboard.png") : null, files: existsSync(join(d, "slides")) ? readdirSync(join(d, "slides")).filter((f) => /^\d+\.png$|^reel-cover\.png$/.test(f)).sort() : [] }));
+  const rows = posts.map(({ d, files, pano, board }) => `<section><h2>${basename(d)}${pano ? " · panorama" : board ? " · reel" : ""}</h2><div class="row${pano ? " pano" : ""}">${files.map((f) => `<figure><img src="file://${resolve(d, "slides", f)}"><figcaption>${f}</figcaption></figure>`).join("") || "<p>NOT RENDERED</p>"}${board ? `<figure><img class="board" src="file://${resolve(board)}"><figcaption>storyboard</figcaption></figure>` : ""}</div></section>`).join("");
+  const html = `<!doctype html><meta charset="utf-8"><style>body{margin:0;padding:24px;background:#F5F5F5;font:13px/1.3 sans-serif;width:1832px}section{margin-bottom:20px}h2{font-size:15px;margin:0 0 8px}.row{display:flex;flex-wrap:wrap;gap:10px}figure{margin:0}img{width:216px;display:block;border:1px solid #E0E0E0;background:#fff}.pano{gap:0}.pano img{border-width:1px 0}img.board{width:auto;height:384px}figcaption{color:#5C5C5C;padding-top:3px}p{color:#c00;font-weight:600}</style>${rows}`;
   const file = join(batch, ".sheet.html"), out = join(batch, "contact-sheet.png");
   writeFileSync(file, html);
   await withBrowser(async (b) => { const p = await b.newPage({ viewport: { width: 1880, height: 800 } }); await p.goto("file://" + resolve(file)); await p.waitForLoadState("load"); await p.screenshot({ path: out, fullPage: true }); });
@@ -211,7 +292,15 @@ async function sheet(batch) {
 // 3 trust (credibility/portfolio) and 1 convert; every post passes six questions.
 const BATCH_SIZE = 9;
 const GOALS = ["attract", "trust", "convert"];
-const FORMATS = ["single", "carousel", "reel"];
+const FORMATS = ["single", "carousel", "panorama", "reel"];
+// Owner direction (2026-11-11): about 3 carousels, 2 seamless panoramas, 2 singles and 2 Reels per batch, mixed through the grid.
+const FORMAT_TARGET = { carousel: 3, panorama: 2, single: 2, reel: 2 };
+const PRESENCE = ["vibrant", "muted", "mono"];
+// Owner direction (2026-11-11): real client showcases are paused until the showcase workflow is rebuilt. Set to false to resume.
+const CLIENT_SHOWCASES_PAUSED = true;
+const CLIENT_WORK = /aurora surveys|\baurora\b|red e corp|\bred e\b|redecorp|red-e|eagle['’]?s nest|eagles-nest|social\/assets\/clients\//i;
+// A fictional concept must say so in its captions and never read as delivered client work.
+const CLIENT_CLAIM = /\bour client\b|\bclient project\b|\bfor (?:a|our) client\b|\bwe (?:built|designed|delivered) (?:this )?for\b/i;
 const CTA_TYPES = ["save", "engage", "explore", "credibility", "lead", "none"];
 const CHECKS = ["interesting", "value", "save_share_follow", "credibility", "role", "different"];
 function validate(batch) {
@@ -233,10 +322,17 @@ function validate(batch) {
     if (post.cta_type !== "none" && !post.cta) errs.push(`${at}: cta text missing (or set cta_type "none")`);
     for (const c of CHECKS) if (!post.checks || !String(post.checks[c] || "").trim()) errs.push(`${at}: checks.${c} unanswered (a post that fails a question is revised, not shipped)`);
     if (post.needs_confirmation) warns.push(`${at}: needs owner confirmation: ${post.needs_confirmation}`);
+    if (CLIENT_SHOWCASES_PAUSED) { const m = JSON.stringify(post).match(CLIENT_WORK); if (m) errs.push(`${at}: mentions real client work ("${m[0]}"): client showcases are paused (owner, 2026-11-11)`); }
+    if (post.fictional && !(post.fictional.brand && String(post.fictional.disclosure || "").length >= 10)) errs.push(`${at}: fictional needs {brand, disclosure} (how the captions say it is a concept)`);
+    const cc = post.cover_colour;
+    if (!cc || !PRESENCE.includes(cc.presence) || !Array.isArray(cc.hex) || !cc.hex.length) errs.push(`${at}: cover_colour {presence: ${PRESENCE.join("|")}, hex: [main colours], tone} missing (plan the grid's colour before the post)`);
+    if (post.format === "panorama" && !(Number(post.panels) >= 2 && Number(post.panels) <= 10 && (post.slides || []).length === Number(post.panels))) errs.push(`${at}: a panorama needs "panels" (2-10) and one slides[] entry per panel`);
+    if (post.format === "reel" && !(post.motion && Number(post.motion.duration) >= 3 && Number(post.motion.duration) <= 90 && post.motion.cover)) errs.push(`${at}: a reel needs motion {duration: 3-90 s, cover: what the grid tile shows}`);
     if (!post.concept) warns.push(`${at}: no "concept" (the visual idea; see art-direction.md)`);
     for (const [k, sl] of (post.slides || []).entries()) for (const [re, alt] of JARGON) { const m = slideText(sl).match(re); if (m) warns.push(`${at} slide ${k + 1}: specialist term "${m[0]}" planned on a slide: ${alt}`); }
     const slides = post.slides || [];
     if (post.format === "carousel" && (slides.length < 3 || slides.length > 10)) errs.push(`${at}: carousels need 3-10 slides`);
+    if (post.format === "reel" && (slides.length < 1 || slides.length > 8)) errs.push(`${at}: describe a reel's scenes as 1-8 slides[] entries`);
     if (post.format === "single" && slides.length !== 1) errs.push(`${at}: single posts have exactly 1 slide`);
     for (const [i, s] of slides.entries()) {
       if (!TEMPLATES.includes(s.template)) errs.push(`${at} slide ${i + 1}: unknown template "${s.template}"`);
@@ -259,10 +355,27 @@ function validate(batch) {
   for (const g of GOALS) if (Math.abs(mix[g] - (target[g] * n) / BATCH_SIZE) > 1) warns.push(`goal mix ${JSON.stringify(mix)} drifts from about 5 attract / 3 trust / 1 convert (fine if deliberate: say why in plan.md)`);
   const formats = new Set(b.posts.map((p) => p.format));
   if (n >= 6 && formats.size < 2) warns.push(`every post is a ${[...formats][0]}: mix carousels with single-image posts`);
+  const fmix = Object.fromEntries(FORMATS.map((f) => [f, count("format", f)]));
+  if (n === BATCH_SIZE && FORMATS.some((f) => fmix[f] !== FORMAT_TARGET[f])) warns.push(`format mix ${JSON.stringify(fmix)} differs from the target ${JSON.stringify(FORMAT_TARGET)} (only when another format clearly improves a post: say why in plan.md)`);
+  for (let i = 1; i < n; i++) if (b.posts[i].format === b.posts[i - 1].format) errs.push(`posts ${b.posts[i - 1].id} and ${b.posts[i].id}: two ${b.posts[i].format} posts back to back (mix formats through the publishing order)`);
+  // Colour: a grid-wide plan first, then each cover's place in it. Display order: the last post published sits top-left.
+  if (!b.colour_plan || !Array.isArray(b.colour_plan.palette) || b.colour_plan.palette.length < 3) errs.push(`colour_plan {palette: [{name, hex, role}], distribution} missing: plan the 3x3 colour composition before the posts`);
+  const pres = b.posts.map((p) => p.cover_colour?.presence);
+  const coloured = pres.filter((x) => x === "vibrant" || x === "muted").length;
+  if (n === BATCH_SIZE && coloured < 4) warns.push(`${coloured} covers carry colour: aim for 4-5 (black and white is an option, not the default)`);
+  if (n === BATCH_SIZE) {
+    const cell = (i) => { const k = n - 1 - i; return { r: Math.floor(k / 3), c: k % 3 }; };
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const a = cell(i), c = cell(j), ca = b.posts[i].cover_colour, cb = b.posts[j].cover_colour;
+      const near = (a.r === c.r && Math.abs(a.c - c.c) === 1) || (a.c === c.c && Math.abs(a.r - c.r) === 1);
+      if (near && ca && cb && ca.presence !== "mono" && ca.presence === cb.presence && String(ca.hex?.[0]).toLowerCase() === String(cb.hex?.[0]).toLowerCase()) warns.push(`posts ${b.posts[i].id} and ${b.posts[j].id} are grid neighbours with the same lead colour ${ca.hex[0]}: vary them`);
+    }
+    for (let r = 0; r < 3; r++) { const row = [0, 1, 2].map((c) => b.posts[n - 1 - (r * 3 + c)]?.cover_colour?.presence); if (row.every((x) => x === "mono")) warns.push(`grid row ${r + 1} has no colour`); if (row.every((x) => x && x !== "mono")) warns.push(`grid row ${r + 1} is all colour: spread colour through the block`); }
+  }
   const cats = new Set(b.posts.map((p) => p.visual_category));
   if (n >= 6 && cats.size < 4) warns.push(`only ${cats.size} visual categories across ${n} posts: aim for 4 or more`);
   for (const c of cats) if (n >= 5 && count("visual_category", c) / n > 0.4) warns.push(`${c} is over 40% of the batch`);
-  console.log(`posts ${n} · goals ${JSON.stringify(mix)} · categories ${cats.size} · higgsfield generations ${gens}${credits ? ` (~${credits} credits est.)` : ""}`);
+  console.log(`posts ${n} · goals ${JSON.stringify(mix)} · formats ${JSON.stringify(fmix)} · colour covers ${coloured} · categories ${cats.size} · higgsfield generations ${gens}${credits ? ` (~${credits} credits est.)` : ""}`);
   warns.forEach((w) => console.log("WARN " + w));
   errs.forEach((e) => console.log("FAIL " + e));
   if (errs.length) process.exit(1);
@@ -318,27 +431,30 @@ const JARGON = [[/largest contentful paint|\bLCP\b/i, "say how fast the page app
   [/bounce rate/i, "say 'people leave right away'"], [/\b(?:DNS|SSL|API|HTML|CSS)\b/, "describe the outcome, not the technology"], [/\b\d+\s?px\b|\bpixels?\b/i, "describe the size people experience (e.g. 'big enough for a thumb')"], [/contrast ratio|\d(?:\.\d)?\s?:\s?1\b/i, "say 'text people can read'"]];
 const slideText = (s) => [s.eyebrow, s.headline, s.headline2, s.support, s.body, s.giant, s.quote, ...(s.items || []).flatMap((i) => (typeof i === "string" ? [i] : [i.title, i.desc, i.label])), ...(s.rows || []).flat(), ...(s.layers || []).filter((l) => l.type === "text").map((l) => l.text)].filter(Boolean).join(" \n ").replace(/\{\{|\}\}|\*\*/g, "");
 const BRAND_HEX = ["#0a0a0a", "#ffffff", "#5c5c5c", "#a3a3a3", "#e0e0e0", "#f5f5f5", "#fff", "#000000"];
-function creativeIssues(d, spec, w, h) {
+function creativeIssues(d, spec, w, h, palette = []) {
   const out = [], say = (lvl, m) => out.push([lvl, m]);
-  spec.slides.forEach((s, i) => {
+  // A panorama is one canvas cut into slides: judge its words per slide (panel), by where each text layer sits.
+  const units = spec.format === "panorama" ? Array.from({ length: Number(spec.panels) }, (_, k) => ({ ...spec.slides[0], layers: (spec.slides[0].layers || []).filter((l) => l.type !== "text" || Math.floor((Number(l.x) || 0) / w) === k) })) : spec.slides;
+  const allowed = new Set([...BRAND_HEX, ...palette.map((x) => String(x).toLowerCase())]);
+  units.forEach((s, i) => {
     const at = `slide ${i + 1}`, text = slideText(s);
     for (const [re, alt] of JARGON) { const m = text.match(re); if (m && !s.plainLanguageOk) say("FAIL", `${at}: specialist term "${m[0]}" on the slide: ${alt}; put the technical detail and source in the caption`); }
     const words = text.split(/\s+/).filter((x) => /\w/.test(x)).length;
     if (words > 45) say("FAIL", `${at}: ${words} words on one slide (45 max; let the image or a second slide carry it)`);
     else if (words > 32) say("WARN", `${at}: ${words} words: a slide should read in a few seconds`);
     const hexes = JSON.stringify(s).match(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g) || [];
-    const off = [...new Set(hexes.map((x) => x.toLowerCase()))].filter((x) => !BRAND_HEX.includes(x));
-    if (off.length && !s.clientColour) say("FAIL", `${at}: colours ${off.join(", ")} outside Framework's palette without "clientColour" (colour belongs to client work, photography or concept art)`);
+    const off = [...new Set(hexes.map((x) => x.toLowerCase()))].filter((x) => !allowed.has(x));
+    if (off.length && !s.clientColour && !s.colourReason) say("FAIL", `${at}: colours ${off.join(", ")} are in neither Framework's palette nor the batch colour_plan: add them to the plan, or give "colourReason"`);
   });
   const withEyebrow = spec.slides.filter((s) => s.eyebrow).length;
   if (spec.slides.length >= 3 && withEyebrow / spec.slides.length > 0.5) say("WARN", `${withEyebrow} of ${spec.slides.length} slides carry an eyebrow label: use labels only where they help`);
   if (spec.slides.filter((s) => s.header).length > 1) say("WARN", "ruled headers on several slides read as template furniture");
   // Mostly-empty canvas: a slide that is almost all background with no image reads as an unfinished template.
-  const pngs = spec.slides.map((s, i) => ({ s, f: join(d, "slides", `${String(i + 1).padStart(2, "0")}.png`) })).filter(({ s, f }) => existsSync(f) && !isImagery(s) && s.template !== "minimal" && !s.intentionalSpace);
+  const pngs = spec.format === "reel" ? [] : units.map((s, i) => ({ s, f: join(d, "slides", `${String(i + 1).padStart(2, "0")}.png`) })).filter(({ s, f }) => existsSync(f) && !isImagery(s) && s.template !== "minimal" && !s.intentionalSpace);
   if (pngs.length) {
     const py = "import sys,json\nfrom PIL import Image\nout=[]\nfor p in sys.argv[1:]:\n  im=Image.open(p).convert('L').resize((108,135)); px=list(im.get_flattened_data() if hasattr(im,'get_flattened_data') else im.getdata()); bg=max(set(px),key=px.count); out.append(sum(1 for v in px if abs(v-bg)<=6)/len(px))\nprint(json.dumps(out))";
     const fr = JSON.parse(execFileSync("python3", ["-I", "-c", py, ...pngs.map((p) => p.f)]).toString());
-    fr.forEach((v, k) => { if (v > 0.9) say("WARN", `slide ${spec.slides.indexOf(pngs[k].s) + 1}: ${Math.round(v * 100)}% empty background: use the canvas (scale, image, composition) or set intentionalSpace with a reason`); });
+    fr.forEach((v, k) => { if (v > 0.9) say("WARN", `slide ${units.indexOf(pngs[k].s) + 1}: ${Math.round(v * 100)}% empty background: use the canvas (scale, image, composition) or set intentionalSpace with a reason`); });
   }
   return out;
 }
@@ -347,18 +463,35 @@ function check(batch) {
   const say = (lvl, m) => { console.log(`${lvl} ${m}`); lvl === "FAIL" ? fail++ : lvl === "WARN" ? warn++ : 0; };
   const briefs = existsSync(join(batch, "briefs.json")) ? readJson(join(batch, "briefs.json")) : null;
   const dirs = postDirs(batch);
+  const palette = briefs ? [...(briefs.colour_plan?.palette || []).map((c) => c.hex), ...briefs.posts.flatMap((p) => p.cover_colour?.hex || [])].filter(Boolean) : [];
   if (briefs && dirs.length !== briefs.posts.length) say("FAIL", `briefs has ${briefs.posts.length} posts, posts/ has ${dirs.length}`);
   for (const d of dirs) {
     const id = basename(d);
     if (!existsSync(join(d, "spec.json"))) { say("FAIL", `${id}: no spec.json`); continue; }
     const spec = readJson(join(d, "spec.json")), { w, h } = sizeOf(spec);
     const pngs = existsSync(join(d, "slides")) ? readdirSync(join(d, "slides")).filter((f) => /^\d+\.png$/.test(f)) : [];
-    if (spec.format === "reel") { if (!existsSync(join(d, "slides", "reel.mp4"))) say("FAIL", `${id}: reel.mp4 not composed`); }
-    else if (pngs.length !== spec.slides.length) say("FAIL", `${id}: ${pngs.length} PNGs for ${spec.slides.length} slides (run render)`);
+    const brief = briefs?.posts.find((p) => id.startsWith(String(p.id).padStart(2, "0")));
+    const expected = spec.format === "panorama" ? Number(spec.panels) : spec.slides.length;
+    if (spec.format === "reel") {
+      const mp4 = join(d, "slides", "reel.mp4"), cover = join(d, "slides", "reel-cover.png");
+      if (!existsSync(mp4)) say("FAIL", `${id}: reel.mp4 not composed`);
+      else {
+        const [vw, vh, dur] = execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height:format=duration", "-of", "csv=p=0:s=,", mp4]).toString().split(/[\n,]/).filter(Boolean).map(Number);
+        if (vw !== w || vh !== h) say("FAIL", `${id}/reel.mp4: ${vw}x${vh}, expected ${w}x${h}`);
+        if (!(dur >= 3 && dur <= 90)) say("FAIL", `${id}/reel.mp4: ${dur}s (3-90 s)`);
+      }
+      if (!existsSync(cover)) say("FAIL", `${id}: no reel-cover.png (every Reel needs a cover for the grid)`);
+    } else if (pngs.length !== expected) say("FAIL", `${id}: ${pngs.length} PNGs for ${expected} slides (run render)`);
+    if (CLIENT_SHOWCASES_PAUSED) { const all = JSON.stringify(spec) + ["caption-instagram.txt", "caption-facebook.txt"].map((f) => (existsSync(join(d, f)) ? readFileSync(join(d, f), "utf8") : "")).join(" "); const m = all.match(CLIENT_WORK); if (m) say("FAIL", `${id}: real client work ("${m[0]}") while client showcases are paused`); }
+    if (brief?.fictional) for (const f of ["caption-instagram.txt", "caption-facebook.txt"]) {
+      const t = existsSync(join(d, f)) ? readFileSync(join(d, f), "utf8") : "";
+      if (!/\bconcept\b|fictional|imagined|invented/i.test(t)) say("FAIL", `${id}/${f}: ${brief.fictional.brand} is a fictional concept: the caption must say so`);
+      const m = t.match(CLIENT_CLAIM); if (m) say("FAIL", `${id}/${f}: "${m[0]}" presents a concept as client work`);
+    }
     for (const f of pngs) { const s = pngSize(join(d, "slides", f)); if (s.w !== w || s.h !== h) say("FAIL", `${id}/${f}: ${s.w}x${s.h}, expected ${w}x${h}`); }
     if (spec.slides.some((s) => s.image && /^https?:/.test(s.image))) say("FAIL", `${id}: remote image URL in spec (download it into images/ first)`);
     for (const m of brandingIssues(d, spec, w, h)) say("FAIL", `${id}: ${m}`);
-    for (const [lvl, m] of creativeIssues(d, spec, w, h)) say(lvl, `${id}: ${m}`);
+    for (const [lvl, m] of creativeIssues(d, spec, w, h, palette)) say(lvl, `${id}: ${m}`);
     for (const [file, platform] of [["caption-instagram.txt", "instagram"], ["caption-facebook.txt", "facebook"], ["alt-text.txt", "alt"]]) {
       const p = join(d, file);
       if (!existsSync(p)) { say("FAIL", `${id}: missing ${file}`); continue; }
@@ -376,14 +509,14 @@ function pkg(batch) {
   const name = basename(resolve(batch)), out = join(batch, "export", name);
   rmSync(join(batch, "export"), { recursive: true, force: true }); mkdirSync(out, { recursive: true });
   const briefs = existsSync(join(batch, "briefs.json")) ? readJson(join(batch, "briefs.json")) : { posts: [] };
-  let index = `# ${name}\n\nFinished posts. Each folder: slides in posting order, the Instagram and Facebook captions, and alt text.\n\n| # | Post | Goal | Category | Format | Slides |\n|---|---|---|---|---|---|\n`;
+  let index = `# ${name}\n\nFinished posts, numbered in publishing order: publish 01 first and 09 last (Instagram shows the newest post top-left).\nEach folder: the slides in swipe order, the Instagram and Facebook captions, and alt text.\n- Panorama: upload every slide in numeric order without cropping; preview-full-panorama.png is for review only.\n- Reel: upload reel.mp4 and choose reel-cover.png as the cover.\n\n| # | Post | Goal | Category | Format | Slides |\n|---|---|---|---|---|---|\n`;
   for (const d of postDirs(batch)) {
     const id = basename(d), dest = join(out, id); mkdirSync(dest);
-    const files = readdirSync(join(d, "slides")).filter((f) => /^\d+\.png$|^reel\.mp4$|^reel-cover\.png$/.test(f));
-    files.forEach((f) => copyFileSync(join(d, "slides", f), join(dest, /^\d+\.png$/.test(f) ? `${id}-${f}` : f)));
+    const files = readdirSync(join(d, "slides")).filter((f) => /^\d+\.png$|^reel\.mp4$|^reel-cover\.png$|^panorama\.png$/.test(f));
+    files.forEach((f) => copyFileSync(join(d, "slides", f), join(dest, /^\d+\.png$/.test(f) ? `${id}-${f}` : f === "panorama.png" ? "preview-full-panorama.png" : f)));
     ["caption-instagram.txt", "caption-facebook.txt", "alt-text.txt"].forEach((f) => copyFileSync(join(d, f), join(dest, f)));
     const b = briefs.posts.find((p) => id.startsWith(String(p.id).padStart(2, "0"))) || {};
-    index += `| ${b.id ?? ""} | ${id} | ${b.goal ?? ""} | ${b.visual_category ?? ""} | ${b.format ?? ""} | ${files.filter((f) => f.endsWith(".png")).length} |\n`;
+    index += `| ${b.id ?? ""} | ${id} | ${b.goal ?? ""} | ${b.visual_category ?? ""} | ${b.format ?? ""} | ${files.filter((f) => /^\d+\.png$/.test(f)).length || (files.includes("reel.mp4") ? "video" : 0)} |\n`;
   }
   writeFileSync(join(out, "README.md"), index);
   const zip = join(batch, "export", `${name}.zip`);
@@ -414,13 +547,25 @@ const csvCell = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"
 const readHistory = () => (existsSync(HISTORY_CSV) ? parseCsv(readFileSync(HISTORY_CSV, "utf8")) : []);
 const writeHistory = (rows) => { mkdirSync(HISTORY_DIR, { recursive: true }); writeFileSync(HISTORY_CSV, [HISTORY_COLS.join(","), ...rows.map((r) => HISTORY_COLS.map((c) => csvCell(r[c])).join(","))].join("\n") + "\n"); };
 
-/** Mean luminance (0-255) and contrast of each image, measured on a small greyscale copy. */
+/** Per image, on the 3:4 middle crop the profile grid shows: mean luminance (0-255), contrast, colourfulness (Hasler-Süsstrunk M; under ~20 reads as black and white)
+ *  and the dominant hue (degrees) of its saturated pixels. */
 function imageStats(paths) {
   if (!paths.length) return [];
-  const py = "import sys,json\nfrom PIL import Image, ImageStat\nout=[]\nfor p in sys.argv[1:]:\n  im=Image.open(p).convert('L'); im.thumbnail((108,135)); st=ImageStat.Stat(im); out.append({'mean':round(st.mean[0],1),'std':round(st.stddev[0],1)})\nprint(json.dumps(out))";
+  const py = [
+    "import sys,json,colorsys", "from PIL import Image, ImageStat", "out=[]", "for p in sys.argv[1:]:",
+    "  im=Image.open(p).convert('RGB'); W,H=im.size; ch=min(H,round(W*4/3)); im=im.crop((0,(H-ch)//2,W,(H-ch)//2+ch)); im.thumbnail((108,144))",
+    "  st=ImageStat.Stat(im.convert('L')); px=list(im.get_flattened_data() if hasattr(im,'get_flattened_data') else im.getdata())",
+    "  rg=[r-g for r,g,b in px]; yb=[(r+g)/2-b for r,g,b in px]; n=len(px)",
+    "  m=lambda v:sum(v)/n; sd=lambda v:(sum((x-m(v))**2 for x in v)/n)**.5",
+    "  M=(sd(rg)**2+sd(yb)**2)**.5+.3*(m(rg)**2+m(yb)**2)**.5",
+    "  bins=[0]*12", "  for r,g,b in px:", "    h,sat,v=colorsys.rgb_to_hsv(r/255,g/255,b/255)", "    if sat>.25 and v>.15: bins[int(h*12)%12]+=1",
+    "  out.append({'mean':round(st.mean[0],1),'std':round(st.stddev[0],1),'colour':round(M,1),'hue':(bins.index(max(bins))*30+15) if max(bins)>n*.05 else None})",
+    "print(json.dumps(out))"].join("\n");
   return JSON.parse(execFileSync("python3", ["-I", "-c", py, ...paths]).toString());
 }
 const toneOf = (mean) => (mean < 100 ? "dark" : mean > 170 ? "light" : "mid");
+const presenceOf = (m) => (m >= 45 ? "vibrant" : m >= 20 ? "muted" : "mono");
+const archived = (r) => /^archived/i.test(r.notes || "");
 
 /** The batch's posts in publishing order (id order), with their cover file and feed attributes. */
 function batchCovers(batch) {
@@ -432,7 +577,7 @@ function batchCovers(batch) {
   });
   const stats = imageStats(posts.filter((p) => p.cover).map((p) => p.cover));
   let k = 0;
-  for (const p of posts) if (p.cover) { Object.assign(p, stats[k++]); p.tone = toneOf(p.mean); }
+  for (const p of posts) if (p.cover) { Object.assign(p, stats[k++]); p.tone = toneOf(p.mean); p.presence = presenceOf(p.colour); }
   return posts;
 }
 
@@ -441,7 +586,7 @@ async function grid(batch) {
   const posts = batchCovers(batch);
   const missing = posts.filter((p) => !p.cover);
   if (missing.length) die(`not rendered yet: ${missing.map((p) => p.id).join(", ")}`);
-  const past = readHistory().filter((r) => r.batch !== name && r.cover && existsSync(join(HISTORY_DIR, r.cover))).map((r) => ({ id: `${r.batch} ${r.id}`, cover: join(HISTORY_DIR, r.cover), family: r.family, category: r.category, tone: r.tone, past: true }));
+  const past = readHistory().filter((r) => r.batch !== name && !archived(r) && r.cover && existsSync(join(HISTORY_DIR, r.cover))).map((r) => ({ id: `${r.batch} ${r.id}`, cover: join(HISTORY_DIR, r.cover), family: r.family, category: r.category, tone: r.tone, past: true }));
   // Profile order: newest first. The batch publishes in id order on top of everything already in the history.
   const profile = [...posts].reverse().concat([...past].reverse()).slice(0, 15);
   const issues = [], say = (lvl, m) => issues.push({ lvl, m });
@@ -456,6 +601,14 @@ async function grid(batch) {
       else if (a.category === b.category && a.tone === b.tone) say("WARN", `${a.id} and ${b.id} are neighbours with the same category and tone (${a.category}, ${a.tone})`);
     }
   }
+  // Colour across the block: 4-5 covers with real colour, spread out, and neighbours that do not look alike.
+  const hueGap = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+  const block = profile.slice(0, 9).map((p, i) => ({ p, r: Math.floor(i / 3), c: i % 3, col: !p.past && p.presence !== "mono" }));
+  for (const a of block) for (const b of block) {
+    if (b.r * 3 + b.c <= a.r * 3 + a.c || !a.col || !b.col || Math.abs(a.r - b.r) + Math.abs(a.c - b.c) !== 1) continue;
+    if (a.p.hue != null && b.p.hue != null && hueGap(a.p.hue, b.p.hue) < 25 && a.p.tone === b.p.tone) say("WARN", `${a.p.id} and ${b.p.id} are neighbours in the same colour and tone: they will read as one tile`);
+  }
+  for (let k = 0; k < 3; k++) for (const line of [block.filter((x) => x.r === k), block.filter((x) => x.c === k)]) if (line.length === 3 && line.every((x) => x.col)) say("WARN", `a full ${line[0].r === line[1].r ? "row" : "column"} of colour covers: spread colour through the block`);
   for (let r = 0; r * 3 < Math.min(profile.length, 12); r++) {
     const row = profile.slice(r * 3, r * 3 + 3);
     if (row.length === 3 && row.some((p) => !p.past) && row.every((p) => p.tone === row[0].tone)) say("WARN", `grid row ${r + 1} is all ${row[0].tone}: alternate light and dark`);
@@ -465,6 +618,9 @@ async function grid(batch) {
   if (n >= 6 && (dark < 0.2 || dark > 0.6)) say("WARN", `${Math.round(dark * 100)}% of covers are dark: aim for 20-60%`);
   if (n >= 6 && light > 0.7) say("WARN", `${Math.round(light * 100)}% of covers are light: add dark or mid-tone covers`);
   if (n >= 6 && (imagery < 0.3 || imagery > 0.7)) say("WARN", `${Math.round(imagery * 100)}% of covers are photography or artwork: aim for 30-70% against typography and graphics`);
+  const colourCovers = posts.filter((p) => p.presence !== "mono").length;
+  if (n === 9 && colourCovers < 4) say("WARN", `${colourCovers} covers carry visible colour: aim for 4-5`);
+  if (n === 9 && colourCovers > 7) say("WARN", `${colourCovers} covers carry colour: keep some black, white or quiet tiles so colour has room`);
   const fams = {}; posts.forEach((p) => (fams[p.family] = (fams[p.family] || 0) + 1));
   for (const [f, c] of Object.entries(fams)) if (c > 2) say("WARN", `layout family ${f} is used for ${c} covers: develop another composition`);
   if (n !== 9) say("WARN", `${n} posts: a batch should fill exactly one 3x3 grid block (9 posts)`);
@@ -474,7 +630,7 @@ async function grid(batch) {
 
   // Preview: realistic profile grid (3 columns, 3:4 tiles cropped from 4:5 like Instagram's profile view) + publishing-order strip.
   const tile = (p, i) => `<div class="t${p.past ? " past" : ""}"><img src="file://${p.cover}"><span class="n">${p.past ? "" : p.id.slice(0, 2)}</span></div>${i === 8 ? '<div class="fold">first screen: the newest nine</div>' : ""}`;
-  const strip = posts.map((p) => `<figure><img src="file://${p.cover}"><figcaption><b>${p.id}</b><br>${p.family}<br>${p.category}<br>${p.tone}${p.imagery ? " · image" : " · type"}</figcaption></figure>`).join("");
+  const strip = posts.map((p) => `<figure><img src="file://${p.cover}"><figcaption><b>${p.id}</b><br>${p.format} · ${p.family}<br>${p.category}<br>${p.tone} · ${p.presence}${p.imagery ? " · image" : " · type"}</figcaption></figure>`).join("");
   const list = issues.map((x) => `<li class="${x.lvl}">${x.lvl} ${x.m}</li>`).join("") || "<li>No feed issues found.</li>";
   const html = `<!doctype html><meta charset="utf-8"><style>body{margin:0;padding:32px;background:#fff;font:14px/1.35 -apple-system,Helvetica,Arial,sans-serif;color:#0A0A0A;width:1736px;display:grid;grid-template-columns:600px 1fr;gap:48px}
 h2{font-size:15px;margin:0 0 12px;letter-spacing:.04em;text-transform:uppercase}.g{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;position:relative}
@@ -488,7 +644,7 @@ ul{padding-left:18px}li.FAIL{color:#a00;font-weight:600}li.WARN{color:#5C5C5C}</
   writeFileSync(file, html);
   await withBrowser(async (b) => { const pg = await b.newPage({ viewport: { width: 1800, height: 900 } }); await pg.goto("file://" + resolve(file)); await pg.waitForLoadState("load"); await pg.screenshot({ path: out, fullPage: true }); });
   rmSync(file);
-  const md = `# Grid report: ${name}\n\n| Order | Post | Family | Category | Tone | Imagery |\n|---|---|---|---|---|---|\n${posts.map((p, i) => `| ${i + 1} | ${p.id} | ${p.family} | ${p.category} | ${p.tone} (${p.mean}) | ${p.imagery ? "yes" : "no"} |`).join("\n")}\n\nDark ${Math.round(dark * 100)}% · light ${Math.round(light * 100)}% · imagery ${Math.round(imagery * 100)}% · categories ${cats.size} · history tiles ${past.length}\n\n${issues.map((x) => `- ${x.lvl} ${x.m}`).join("\n") || "- No feed issues found."}\n`;
+  const md = `# Grid report: ${name}\n\n| Order | Post | Format | Family | Category | Tone | Colour | Imagery |\n|---|---|---|---|---|---|---|---|\n${posts.map((p, i) => `| ${i + 1} | ${p.id} | ${p.format} | ${p.family} | ${p.category} | ${p.tone} (${p.mean}) | ${p.presence} (${p.colour}${p.hue != null ? `, hue ${p.hue}°` : ""}) | ${p.imagery ? "yes" : "no"} |`).join("\n")}\n\nDark ${Math.round(dark * 100)}% · light ${Math.round(light * 100)}% · colour covers ${colourCovers} · imagery ${Math.round(imagery * 100)}% · categories ${cats.size} · history tiles ${past.length}\n\n${issues.map((x) => `- ${x.lvl} ${x.m}`).join("\n") || "- No feed issues found."}\n`;
   writeFileSync(join(batch, "grid-report.md"), md);
   issues.forEach((x) => console.log(`${x.lvl} ${x.m}`));
   console.log(`ok   ${out}\nok   ${join(batch, "grid-report.md")}`);
@@ -508,14 +664,23 @@ function historyCmd(sub, arg2) {
       const cover = `covers/${name}--${p.id}.jpg`;
       if (p.cover) execFileSync("python3", ["-I", "-c", py, p.cover, join(HISTORY_DIR, cover)]);
       const prev = rows.find((r) => r.batch === name && r.id === p.id);
-      const row = { ...(prev || {}), date_produced: prev?.date_produced || today, batch: name, id: p.id, slug: b.slug || p.id.slice(3), goal: b.goal || "", category: b.visual_category || p.category, family: p.family, tone: p.tone || "", format: p.format, topic: b.key_message || "", headline: p.headline, cta_type: b.cta_type || "", cover: p.cover ? cover : "" };
+      const notes = prev?.notes || (b.fictional ? `fictional concept: ${b.fictional.brand}` : "");
+      const row = { ...(prev || {}), date_produced: prev?.date_produced || today, batch: name, id: p.id, slug: b.slug || p.id.slice(3), goal: b.goal || "", category: b.visual_category || p.category, family: p.family, tone: [p.tone, p.presence].filter(Boolean).join(" "), format: p.format, topic: b.key_message || "", headline: p.headline, cta_type: b.cta_type || "", cover: p.cover ? cover : "", notes };
       if (prev) Object.assign(prev, row); else rows.push(row);
     }
     writeHistory(rows);
     console.log(`ok   ${posts.length} posts recorded in ${HISTORY_CSV}`);
+  } else if (sub === "archive") {
+    // A produced batch the owner set aside: kept for reference, never published, and left out of the grid preview.
+    const name = basename(resolve(arg2 || die("usage: fw.mjs history archive <batch> [reason]"))), why = process.argv.slice(5).join(" ") || "set aside by the owner";
+    const hit = rows.filter((r) => r.batch === name);
+    if (!hit.length) die(`no rows for ${name} in the history`);
+    for (const r of hit) { if (r.date_published) die(`${name} ${r.id} was published: published posts cannot be archived`); r.notes = `archived ${new Date().toISOString().slice(0, 10)}: ${why}`; }
+    writeHistory(rows);
+    console.log(`ok   ${hit.length} posts of ${name} archived (kept for reference, left out of the grid)`);
   } else if (sub === "recent") {
     const n = Number(arg2 || 20);
-    for (const r of rows.slice(-n)) console.log([r.date_published || "unpublished", r.batch, r.id, r.goal, r.category, r.family, r.tone, r.cta_type, r.headline].join(" | "));
+    for (const r of rows.slice(-n)) console.log([archived(r) ? "ARCHIVED (never published)" : r.date_published || "unpublished", r.batch, r.id, r.goal, r.format, r.category, r.family, r.tone, r.cta_type, r.headline, r.notes].join(" | "));
     if (!rows.length) console.log("history is empty");
   } else if (sub === "report") {
     const withData = rows.filter((r) => METRICS.some((m) => r[m] !== ""));
@@ -528,7 +693,7 @@ function historyCmd(sub, arg2) {
       const groups = [...new Set(withData.map((r) => r[key]))];
       for (const g of groups) { const rs = withData.filter((r) => r[key] === g); console.log([g || "(blank)", rs.length + (rs.length < 3 ? " (too few)" : ""), ...METRICS.map((m) => med(rs.map((r) => r[m])))].join(" | ")); }
     }
-  } else die("usage: fw.mjs history add <batch> | recent [n] | report");
+  } else die("usage: fw.mjs history add <batch> | archive <batch> [reason] | recent [n] | report");
 }
 
 // ---------- Figma feed board ----------

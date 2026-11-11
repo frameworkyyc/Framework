@@ -5,7 +5,7 @@
 ```json
 { "id": "01", "slug": "strategy-before-logo", "format": "carousel", "size": "1080x1350", "slides": [ { "template": "type", "layout": "giant", "...": "..." } ] }
 ```
-- `format`: `single` (1 slide), `carousel` (3–10 slides; adds `01 / 06` counters and → cues), `reel` (adds `"video": "images/clip.mp4"`, optional `"coverAt": 1.5`; size defaults to 1080x1920; one `reel` slide).
+- `format`: `single` (1 slide), `carousel` (3–10 slides), `panorama` (one `canvas` slide spanning `"panels": N` slides, below), `reel` (1080x1920; a motion reel is one `canvas` slide with `"motion"`, below; the older static-overlay reel takes `"video"` and one `reel` slide and is built with `fw reel`).
 - `size`: default `1080x1350` (4:5 feed). `1080x1080` also works.
 
 ## One system, many compositions
@@ -31,7 +31,7 @@ The **constants** keep the feed recognisable: Switzer and General Sans, ink/pape
 | `grid` | `true` draws the 90px hairline grid behind the slide |
 | `eyebrow` | optional `— LABEL` at the top, with no rule. Use only where it orients the reader; never on every slide |
 | `header` | `true` brings back the ruled header (eyebrow + hairline) for a deliberate specification look. No slide numbers: Instagram shows its own |
-| `clientColour` | required whenever a slide uses colours outside Framework's palette: the reason (e.g. "Red E Corp.'s brand palette") |
+| `colourReason` (`clientColour`) | required when a slide uses a colour that is neither Framework's palette nor in the batch `colour_plan` / the post's `cover_colour`: the reason |
 | `intentionalSpace` | the reason a type-only slide is mostly empty (a deliberate pause); otherwise `fw check` warns |
 | `plainLanguageOk` | rare: why a specialist term must stay on the slide |
 | `headline` | `\n` = deliberate line break. 2–4 short lines |
@@ -66,6 +66,18 @@ Read `social/brand/art-direction.md` first. A canvas slide is a stack of layers 
 | `svg` | `src` (e.g. `@site/assets/img/red-e-crest.svg`), `x y w h`: crisp vector marks at any size |
 | `brand` | Framework's mark, only with `reason` (branding rule) |
 
+Every layer also takes `tilt` `{x, y, z}` (degrees, with perspective: lay a flat design onto a photographed surface; pair with `blend: "multiply"` so the paper's texture and light show through), `clip` (a CSS clip-path for creative masks: `"polygon(0 0,100% 0,70% 100%,0 100%)"`, `"inset(0 40% 0 0)"`, `"circle(45% at 50% 50%)"`), `blend` (a CSS mix-blend-mode such as `multiply`), `rotate`, `opacity`, `z`, and, in a motion reel, `anim`. `background: "transparent"` leaves a reel's canvas clear over a video.
+
+### Panorama (`"format": "panorama", "panels": 3`)
+One `canvas` slide whose canvas is `panels × 1080` wide and 1350 high: design it as one picture. `fw render` saves `slides/panorama.png` (review) and cuts `01.png…NN.png` as exact crops, so neighbouring slides align to the pixel. Images, objects and colour may cross the seams; **text may not**: every text layer must sit inside one panel and 64px clear of each seam (render fails otherwise). Panel *k* (from 1) spans x = 1080·(k−1) to 1080·k. Panel 1 is the grid cover.
+
+### Motion reel (`"format": "reel", "motion": { "duration": 8, "fps": 30, "coverAt": 5.5 }`)
+One `canvas` slide at 1080x1920. Give layers `anim`, keyframes on one timeline in seconds:
+```json
+"anim": [ { "t": 0, "opacity": 0, "y": 80 }, { "t": 0.7, "opacity": 1, "y": 0, "ease": "cubic-bezier(.2,.7,.1,1)" }, { "t": 6, "scale": 1.06 } ]
+```
+Properties: `opacity`, `x`, `y` (px offsets from the layer's place), `scale`, `rotate` (deg), `blur` (px), `clip` (an inset() reveal, e.g. from `"inset(0% 100% 0% 0%)"` to `"inset(0% 0% 0% 0%)"`). Values hold before the first and after the last keyframe; `ease` applies to the move that starts at that keyframe. `fw render` renders every frame exactly and writes `slides/reel.mp4` (H.264, silent), `slides/reel-cover.png` (the frame at `coverAt`: the grid tile, of which the profile shows the middle 3:4) and `storyboard.png` (six frames, for review). With `"video": "images/clip.mp4"` (e.g. a Higgsfield clip; `"videoTreatment": "mono"` for black and white) the animated layers are composited over the clip; set `background: "transparent"`. Keep text in the safe area (x < 960, 120 < y < 1600): render warns.
+
 Client typefaces: add `"fonts": [{ "family": "Barlow Semi Condensed", "src": "images/barlow-600.woff2", "weight": 600 }]` at the top of `spec.json` (download the woff2 from the `@fontsource` npm package with `npm pack`). Already available: `social/assets/clients/red-e/fonts/` (Barlow Semi Condensed 400–700; Red E's body face Inter is installed system-wide) and `social/assets/clients/aurora/fonts/` (Noto Sans, Noto Serif, Noto Sans Mono 400–700), each with its open font licence. Authentic website captures: `fw capture <url> <out.jpg> [desktop|mobile] [full]` into `social/assets/clients/<client>/` (2880px desktop, 1170px-wide mobile).
 
 ## Templates
@@ -85,7 +97,7 @@ Client typefaces: add `"fonts": [{ "family": "Barlow Semi Condensed", "src": "im
 | `compare` | `leftLabel`, `rightLabel`, `rows: [[l, r]]` (2–4 rows) |
 | `quote` | `quote`, `name`, `role`: verbatim, real, attributed |
 | `cta` | closing slide: headline, support, `button` (no logo unless `brand` is set on purpose) |
-| `reel` | transparent overlay for a Reel (`fw reel`) |
+| `reel` | transparent overlay for the older static Reel (`fw reel`); motion reels use `canvas` |
 
 ## Image slots and Higgsfield aspect ratios
 | Slot | Area | Generate at |
@@ -95,6 +107,7 @@ Client typefaces: add `"fonts": [{ "family": "Barlow Semi Condensed", "src": "im
 | `plate` | 904 × 600 | `3:2` |
 | `cover` band | 1080 × ~600 | `16:9` or `3:2` |
 | `point` band | 904 × ~420 | `16:9` or `21:9` |
-| `reel` clip | 1080x1920 | `9:16` |
+| `reel` clip / motion reel image | 1080x1920 | `9:16` |
+| panorama background | (panels × 1080) × 1350 | `21:9` for 3 panels (crop), or one image per panel area |
 
 Render messages: `ok`, `WARN` (fine, but look: auto-scaled text, low-resolution image), `FAIL` (must fix: overflow, unintended headline wrap, missing image, fonts not loaded).

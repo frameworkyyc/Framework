@@ -29,7 +29,8 @@ Rules:
 - Dark sections invert, they don't tint: pure ink with paper text. Never navy, charcoal-blue or warm black.
 - Photography and illustration stay desaturated: black-and-white or muted greyscale. If colour is unavoidable, keep saturation low and let structure carry the image.
 - No brand accent colour unless a specific client project calls for one (e.g. showing that client's palette in a portfolio post).
-- **[social] Owner-approved exception (2026-11-11):** controlled colour may appear *inside imagery only* (client portfolio work, photography, conceptual artwork) when it meaningfully improves the composition. Framework's own type, graphics, backgrounds and logo stay monochrome, and no accent colour is ever introduced. In the engine this is `imageTreatment: "none"` or `"muted"`; the default stays black and white.
+- **[social] Owner-approved exception (2026-11-11):** controlled colour may appear *inside imagery only* (client portfolio work, photography, conceptual artwork) when it meaningfully improves the composition. Framework's own type, graphics, backgrounds and logo stay monochrome, and no accent colour is ever introduced. In the engine this is `imageTreatment: "none"` or `"muted"`.
+- **[social] Owner direction (2026-11-11, second overhaul): grid-wide editorial colour.** Framework's official identity is unchanged, but supporting imagery, concept work and colour fields in social posts may use a planned editorial palette, chosen per batch (`colour_plan` in briefs.json; standard in `art-direction.md`). Aim for meaningful colour on 4–5 of the 9 covers, spread through the grid. Black and white is a design option, not the default. The Framework mark itself stays black and white.
 
 ## 03 Typography: Switzer for structure, General Sans for everything else
 | Role | Typeface | Weight | Notes |
@@ -64,9 +65,10 @@ Buttons: Primary = ink fill, paper semibold text, no border, 0px corners. Second
 
 ## [social] Feed identity: one system, many compositions
 The owner's goal: the Instagram grid should read like a curated design-studio portfolio, not a template run. Reference accounts (art direction only, never copied): Obrazur for range and variety, held inside Framework's minimal, architectural identity.
-- **Constant (recognition):** the two typefaces, the near-monochrome palette, the eyebrow + headline pattern, hairlines, sharp corners and the quality of the compositions. Recognition comes from the design system, not from a stamped logo.
+- **Constant (recognition):** the two typefaces, editorial restraint, sharp corners and the quality of the compositions; each batch's planned palette holds its nine posts together. Recognition comes from the design system, not from a stamped logo.
 - **[social] Owner rule (2026-11-11), no watermarks:** Framework branding never appears automatically: no logo, wordmark or website URL in corners, along the bottom, as a footer strip or as a watermark, and no logo added just to say who made the post. Branding appears only when it is an intentional part of the concept (the logo on a product or stationery mockup, signage, packaging, a branding showcase, a post about Framework's own identity, a deliberate logo-led composition). Removed branding is never replaced by another repeated decorative element. Reference: Reputeforge and Obrazur carry no repeated logos or branded footers.
 - **Variable (variety):** layout family, headline position and scale, light/dark/mid tone, photography vs typography vs graphic, density vs negative space.
+- **Formats** mixed through the publishing order, never grouped: about 3 carousels, 2 seamless panoramic carousels, 2 single images and 2 Reels per batch.
 - **Six visual categories** to mix across every batch: editorial typography, architectural photography, portfolio showcases, conceptual artwork, educational graphics, minimalist compositions.
 - **Batches are 3×3 blocks:** every batch is exactly 9 posts, so the profile grows in whole rows and each block is designed as one composition.
 - **Grid rules:** alternate light and dark; balance imagery with type; never place two covers of the same layout family side by side (in the grid or in publishing order); no grid row of three in one tone; check every batch against the posts already published.

@@ -41,12 +41,14 @@ test("grid check fails when neighbouring covers share a layout family", () => {
 test("briefs validation requires goals, categories, CTA types and the six checks", () => {
   const d = tmp();
   const post = (id, extra = {}) => ({ id, slug: "post-" + id, goal: "attract", visual_category: "editorial-typography", format: "single", objective: "o", audience: "a", key_message: "k", cta_type: "save", cta: "Save this.",
-    checks: { interesting: "x", value: "x", save_share_follow: "x", credibility: "x", role: "x", different: "x" }, slides: [{ template: "type", layout: "giant", headline: "H" }], ...extra });
+    checks: { interesting: "x", value: "x", save_share_follow: "x", credibility: "x", role: "x", different: "x" }, slides: [{ template: "type", layout: "giant", headline: "H" }],
+    cover_colour: { presence: Number(id) % 2 ? "vibrant" : "mono", hex: [Number(id) % 4 === 1 ? "#C84B31" : "#1F3A5F"], tone: "light" }, ...extra });
+  const colour_plan = { palette: [{ name: "Brick", hex: "#C84B31", role: "warm accent" }, { name: "Harbour", hex: "#1F3A5F", role: "deep" }, { name: "Paper", hex: "#FFFFFF", role: "ground" }] };
   // A valid batch: exactly 9 posts (one 3x3 grid block), 5 attract / 3 trust / 1 convert, covers alternating between two families.
   const nine = Array.from({ length: 9 }, (_, i) => post(String(i + 1).padStart(2, "0"), {
     goal: i < 5 ? "attract" : i < 8 ? "trust" : "convert", format: i % 2 ? "carousel" : "single",
     ...(i % 2 ? { slides: [{ template: "minimal", headline: "H" }, { template: "point", headline: "P" }, { template: "cta", headline: "C" }], visual_category: "minimalist" } : {}) }));
-  writeFileSync(join(d, "briefs.json"), JSON.stringify({ posts: nine }));
+  writeFileSync(join(d, "briefs.json"), JSON.stringify({ colour_plan, posts: nine }));
   const ok = fw(["validate", d]);
   assert.equal(ok.status, 0, ok.stdout);
   writeFileSync(join(d, "briefs.json"), JSON.stringify({ posts: [post("01"), post("02", { checks: { interesting: "x" }, goal: "promo" })] }));
