@@ -427,7 +427,7 @@ function batchCovers(batch) {
   const posts = postDirs(batch).map((d) => {
     const spec = readJson(join(d, "spec.json")), s0 = spec.slides[0] || {};
     const cover = ["01.png", "reel-cover.png"].map((f) => join(d, "slides", f)).find(existsSync);
-    const head = String([s0.giant, s0.headline || s0.quote, s0.headline2].filter(Boolean).join(" ")).replace(/\{\{|\}\}|\*\*/g, "").replace(/\s*\n\s*/g, " ").trim();
+    const head = String([s0.giant, s0.headline || s0.quote, s0.headline2].filter(Boolean).join(" ") || (s0.layers || []).filter((l) => l.type === "text").map((l) => l.text).join(" ")).replace(/\{\{|\}\}|\*\*/g, "").replace(/\s*\n\s*/g, " ").trim();
     return { id: basename(d), dir: d, cover, family: familyOf(s0), category: categoryOf(s0), imagery: isImagery(s0), format: spec.format, headline: head };
   });
   const stats = imageStats(posts.filter((p) => p.cover).map((p) => p.cover));
