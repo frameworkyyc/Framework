@@ -168,7 +168,9 @@ async function sheet(batch) {
 }
 
 // ---------- briefs validation ----------
-// Strategy (SKILL.md / content-strategist.md): goal mix about 60% attract, 30% trust, 10% convert; every post passes six questions.
+// Strategy (SKILL.md / content-strategist.md): every batch is exactly one 3x3 Instagram grid block of 9 posts, about 5 attract (educational),
+// 3 trust (credibility/portfolio) and 1 convert; every post passes six questions.
+const BATCH_SIZE = 9;
 const GOALS = ["attract", "trust", "convert"];
 const FORMATS = ["single", "carousel", "reel"];
 const CTA_TYPES = ["save", "engage", "explore", "credibility", "lead", "none"];
@@ -211,10 +213,13 @@ function validate(batch) {
   for (let i = 2; i < covers.length; i++) if (covers[i].tone === "dark" && covers[i - 1].tone === "dark" && covers[i - 2].tone === "dark") warns.push(`posts ${covers[i - 2].id}-${covers[i].id}: three dark covers in a row`);
   const n = b.posts.length, count = (k, v) => b.posts.filter((p) => p[k] === v).length;
   const mix = Object.fromEntries(GOALS.map((g) => [g, count("goal", g)]));
-  const target = { attract: 0.6, trust: 0.3, convert: 0.1 };
-  if (n >= 5) for (const g of GOALS) if (Math.abs(mix[g] - target[g] * n) > Math.max(1, n * 0.1)) warns.push(`goal mix ${JSON.stringify(mix)} drifts from about 60/30/10 (fine if deliberate: say why in plan.md)`);
+  if (n !== BATCH_SIZE) errs.push(`a batch is exactly ${BATCH_SIZE} posts (one complete 3x3 grid block); this one has ${n}`);
+  const target = { attract: 5, trust: 3, convert: 1 };
+  for (const g of GOALS) if (Math.abs(mix[g] - (target[g] * n) / BATCH_SIZE) > 1) warns.push(`goal mix ${JSON.stringify(mix)} drifts from about 5 attract / 3 trust / 1 convert (fine if deliberate: say why in plan.md)`);
+  const formats = new Set(b.posts.map((p) => p.format));
+  if (n >= 6 && formats.size < 2) warns.push(`every post is a ${[...formats][0]}: mix carousels with single-image posts`);
   const cats = new Set(b.posts.map((p) => p.visual_category));
-  if (n >= 8 && cats.size < 4) warns.push(`only ${cats.size} visual categories across ${n} posts: aim for 4 or more`);
+  if (n >= 6 && cats.size < 4) warns.push(`only ${cats.size} visual categories across ${n} posts: aim for 4 or more`);
   for (const c of cats) if (n >= 5 && count("visual_category", c) / n > 0.4) warns.push(`${c} is over 40% of the batch`);
   console.log(`posts ${n} · goals ${JSON.stringify(mix)} · categories ${cats.size} · higgsfield generations ${gens}${credits ? ` (~${credits} credits est.)` : ""}`);
   warns.forEach((w) => console.log("WARN " + w));
@@ -363,8 +368,9 @@ async function grid(batch) {
   if (n >= 6 && (imagery < 0.3 || imagery > 0.7)) say("WARN", `${Math.round(imagery * 100)}% of covers are photography or artwork: aim for 30-70% against typography and graphics`);
   const fams = {}; posts.forEach((p) => (fams[p.family] = (fams[p.family] || 0) + 1));
   for (const [f, c] of Object.entries(fams)) if (c > 2) say("WARN", `layout family ${f} is used for ${c} covers: develop another composition`);
+  if (n !== 9) say("WARN", `${n} posts: a batch should fill exactly one 3x3 grid block (9 posts)`);
   const cats = new Set(posts.map((p) => p.category));
-  if (n >= 8 && cats.size < 4) say("WARN", `only ${cats.size} visual categories on the covers`);
+  if (n >= 6 && cats.size < 4) say("WARN", `only ${cats.size} visual categories on the covers`);
   for (let i = 1; i < n; i++) if (posts[i].family === posts[i - 1].family) say("FAIL", `${posts[i - 1].id} and ${posts[i].id} publish back to back with the same layout family`);
 
   // Preview: realistic profile grid (3 columns, 3:4 tiles cropped from 4:5 like Instagram's profile view) + publishing-order strip.

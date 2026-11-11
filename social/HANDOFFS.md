@@ -3,7 +3,7 @@
 Every agent reads and writes files at these paths. Agents pass **paths**, not file contents, to save tokens.
 
 ```
-social/batches/<batch-id>/            e.g. 2026-11-12-ig-fb-10   (git-ignored: production files)
+social/batches/<batch-id>/            e.g. 2026-11-12-grid-01   (git-ignored: production files)
   plan.md                             01 Strategist: human-readable plan the owner approves
   briefs.json                         01 Strategist: machine-readable briefs (format below), in publishing order
   approval.md                         Director: what the owner approved (posts, changes, credit budget)
@@ -30,7 +30,7 @@ social/figma.json                     the Figma feed board (file key, page)
 Posts are listed in **publishing order** (post 01 goes out first and ends up lowest in the grid).
 ```json
 {
-  "batch": "2026-11-12-ig-fb-10",
+  "batch": "2026-11-12-grid-01",
   "created": "2026-11-12",
   "theme": "one line: what this batch is about and why now",
   "posts": [
@@ -49,7 +49,7 @@ Posts are listed in **publishing order** (post 01 goes out first and ends up low
         "value": "the educational, practical or visual value",
         "save_share_follow": "why someone would save, share or follow",
         "credibility": "how it shows Framework's quality",
-        "role": "its job in the batch and the 60/30/10 mix",
+        "role": "its job in the batch and the 5/3/1 goal mix",
         "different": "how it differs from the recent posts in social/history"
       },
       "facts_used": ["facts.md: Method (six stages)"],
@@ -84,7 +84,7 @@ Posts are listed in **publishing order** (post 01 goes out first and ends up low
   "visual_budget": { "generations": 3, "est_credits": 4 }
 }
 ```
-Check it with `node social/engine/fw.mjs validate social/batches/<batch-id>`. It fails on missing checks, unknown values, and two consecutive covers in the same layout family; it warns when the goal mix drifts from about 60/30/10, when categories are too few, or when three dark covers run together.
+Check it with `node social/engine/fw.mjs validate social/batches/<batch-id>`. It fails unless the batch is exactly 9 posts (one 3×3 grid block), on missing checks, unknown values, and two consecutive covers in the same layout family; it warns when the goal mix drifts from about 5 attract / 3 trust / 1 convert, when every post has the same format, when categories are too few, or when three dark covers run together.
 
 Rules that bind every agent:
 - Facts come only from `social/brand/facts.md` or the site pages it lists. A post that needs anything else carries `needs_confirmation` with the question for the owner.

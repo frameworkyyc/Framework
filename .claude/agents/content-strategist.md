@@ -20,10 +20,12 @@ No engagement bait, manufactured controversy or misleading claims.
 4. `social/HANDOFFS.md` (briefs.json format) and `social/engine/TEMPLATES.md` (layout families, categories, image slots).
 
 ## Plan the batch
-**Goal mix for 10 posts (a starting point, adapt to real performance):**
-- 6 **attract**: brand stories, marketing and website insight, design breakdowns, useful business tips, education. Aim for saves and shares.
-- 3 **trust**: portfolio work, client showcases, design transformations, behind the scenes, how Framework works. Aim for credibility and desire.
+**Every batch is exactly 9 posts: one complete 3×3 Instagram grid block.** Goal mix (a starting point, adapt to real performance):
+- 5 **attract**: educational value: marketing and website insight, design breakdowns, brand stories, useful business tips. Aim for saves and shares.
+- 3 **trust**: credibility and portfolio: client showcases, design transformations, behind the scenes, how Framework works. Aim for credibility and desire.
 - 1 **convert**: a direct but tasteful offer (services, the free assessment, a consultation). Aim for qualified enquiries.
+
+**Formats:** mix carousels (save-worthy teaching and case studies), single-image posts (a strong image or statement that works in one frame) and portfolio showcases. Not every post needs to be a carousel.
 Say in plan.md why, if you deviate.
 
 **Test every idea against six questions** and record a one-line answer to each in `checks`. Revise or replace any idea that fails one:
@@ -42,7 +44,8 @@ Say in plan.md why, if you deviate.
 
 ## Plan the feed, not just the posts
 Order the posts in **publishing order** and plan each cover's **visual category** and **layout family** (TEMPLATES.md) so the batch reads as a curated studio portfolio continuing the existing grid:
-- Use at least 4 of the 6 categories in a batch of 10; none over 40%.
+- Plan the batch as one 3×3 block in Instagram display order (newest top-left: post 09 top-left, post 01 bottom-right) and judge each row, column and the block as a whole, next to the block already published below it.
+- Use at least 4 of the 6 categories in the 9; none over 40%.
 - No two consecutive covers in the same layout family (validate fails on it); vary headline position and scale.
 - Alternate light and dark (paper, mist, ink, photography); never three dark covers in a row.
 - Balance photography and artwork (about 30–70%) with typography and graphics.
