@@ -45,7 +45,10 @@
     // Client Portal release (requests): the unified request system (Deliverables, SEO and Custom Development requests, My Requests, the wide navigation, the six-block Home, the SEO dashboard and
     // digital business card address). Needs migrations 0020, 0022 and 0023 (applied to Production by the manual Production D1 workflow BEFORE this deploys). It does NOT need PORTAL_SERVICES, which stays off here
     // (the Support and Invoices entries, the Support block's link and the new-request form live under it). Exactly "1" or absent: absent returns the previous Home and navigation. Rollback: delete this line.
-    "PORTAL_REQUESTS": "1"
+    "PORTAL_REQUESTS": "1",
+    // Website Analytics: the Cloudflare account that holds the Web Analytics sites. An identifier, not a secret (it is already in this repository and in every dashboard link).
+    // It must live here: set only in the dashboard, the next deploy deletes it and the client Analytics page says traffic is "not connected". The API token CF_ANALYTICS_API_TOKEN is a secret and stays in Cloudflare.
+    "CF_ANALYTICS_ACCOUNT_ID": "8d8d61851e9e56969b4a6bf9a985e9a4"
   },
   // Keep Worker logs (console.error/warn) so a failed email shows up in the Cloudflare dashboard: Workers & Pages > framework > Logs.
   // redact_query_string keeps ?code= / ?invitation_token= out of platform logs; invocation_logs is OFF because the automatic per-request record

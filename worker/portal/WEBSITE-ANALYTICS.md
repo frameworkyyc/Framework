@@ -30,7 +30,7 @@ Both tables reference `websites (id, organization_id)`; every statement names th
 | Name | Kind | Purpose |
 | --- | --- | --- |
 | `CF_ANALYTICS_API_TOKEN` | secret | Cloudflare API token, **Account > Account Analytics > Read** only |
-| `CF_ANALYTICS_ACCOUNT_ID` | plain variable **in `wrangler.jsonc` (`previews.vars`)** | the Cloudflare account id (32 hex characters; an identifier, not a secret). It must be in the file: a plain variable set only in the dashboard is deleted by the next deploy |
+| `CF_ANALYTICS_ACCOUNT_ID` | plain variable **in `wrangler.jsonc` (`vars` for Production, `previews.vars` for Staging)** | the Cloudflare account id (32 hex characters; an identifier, not a secret). It must be in the file: a plain variable set only in the dashboard is deleted by the next deploy |
 | `GSC_OAUTH_CLIENT_ID` | secret | the Google OAuth client id (Web application) |
 | `GSC_OAUTH_CLIENT_SECRET` | secret | that client's secret |
 | `GSC_OAUTH_REFRESH_TOKEN` | secret | the refresh token for the dedicated Google account, scope `webmasters.readonly` only |
