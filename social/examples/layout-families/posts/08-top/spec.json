@@ -1,0 +1,16 @@
+{
+ "id": "08",
+ "slug": "top",
+ "format": "single",
+ "slides": [
+  {
+   "template": "type",
+   "layout": "top",
+   "theme": "mist",
+   "align": "right",
+   "eyebrow": "Branding",
+   "headline": "Same truck.\nSame site.\nSame invoice.",
+   "support": "A brand is a set of rules, so everything you publish looks like one business."
+  }
+ ]
+}

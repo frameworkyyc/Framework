@@ -4,7 +4,23 @@ import { pathToFileURL } from "node:url";
 import { resolve, isAbsolute } from "node:path";
 
 export const REPO_ROOT = resolve(new URL("../../", import.meta.url).pathname);
-export const TEMPLATES = ["cover", "photo", "statement", "point", "list", "compare", "quote", "cta", "reel"];
+export const TEMPLATES = ["cover", "type", "minimal", "photo", "plate", "split", "showcase", "diagram", "statement", "point", "list", "compare", "quote", "cta", "reel"];
+
+// Visual categories (feed art direction) and the default category of each layout family. A spec may override with "category".
+export const CATEGORIES = ["editorial-typography", "architectural-photography", "portfolio", "conceptual-artwork", "educational-graphic", "minimalist"];
+/** Layout family of a slide, e.g. "type:giant", "photo:caption", "plate". Used to keep neighbouring posts from repeating. */
+export const familyOf = (s) => s.template + (s.layout ? ":" + s.layout : "");
+export function categoryOf(s) {
+  if (s.category) return s.category;
+  const t = s.template;
+  if (t === "minimal") return "minimalist";
+  if (t === "showcase") return "portfolio";
+  if (["diagram", "list", "compare", "point"].includes(t)) return "educational-graphic";
+  if (["photo", "plate", "split", "reel"].includes(t) || (t === "cover" && s.image)) return "architectural-photography";
+  return "editorial-typography";
+}
+/** Whether a slide's dominant visual is a photograph or artwork (vs. type and graphics). */
+export const isImagery = (s) => ["photo", "plate", "split", "showcase", "reel"].includes(s.template) || (s.template === "cover" && !!s.image);
 
 const MARK = (sq, f) =>
   `<svg viewBox="0 0 1092 1092" aria-hidden="true"><rect width="1092" height="1092" fill="${sq}"/><path fill="${f}" d="M302 245H815V347H411V741L302 851Z"/><path fill="${f}" d="M435 517L512 440H815V545H534V842H435Z"/></svg>`;
@@ -25,10 +41,13 @@ export function resolveAsset(p, postDir) {
 }
 const fileUrl = (p) => pathToFileURL(p).href;
 
-function photo(s, postDir, { cls = "", height } = {}) {
+// Photos are black and white by default. Colour ("none" or "muted") is the deliberate exception for client work, photography
+// and conceptual artwork when it improves the composition (brand-system.md, social exception). Never for type, graphics or the logo.
+const treatment = (s, def = "mono") => { const t = s.imageTreatment || def; return t === "none" ? "" : t === "muted" ? "muted-photo" : "mono"; };
+function photo(s, postDir, { cls = "", height, def } = {}) {
   const src = resolveAsset(s.image, postDir);
   if (!src) return "";
-  const treat = s.imageTreatment === "none" ? "" : s.imageTreatment === "muted" ? "muted-photo" : "mono";
+  const treat = treatment(s, def);
   const style = [`--fit:${s.imageFit === "contain" ? "contain" : "cover"}`, `--focus:${esc(s.imageFocus || "50% 50%")}`, height ? `height:${height}px` : ""].filter(Boolean).join(";");
   return `<figure class="photo ${treat} ${cls}" style="${style}"><img src="${fileUrl(src)}" alt=""></figure>`;
 }
@@ -45,6 +64,46 @@ const headline = (s, def, cls = "h1") => (s.headline ? `<h1 class="${cls}" data-
 const support = (s, def = 34) => (s.support ? `<p class="support" data-fit ${fs(s.supportSize || def)}>${md(s.support)}</p>` : "");
 
 const T = {
+  // Editorial typography poster. layout: "bottom" (default) | "top" | "giant" (one oversized word, optional bleed) | "split" (headline top-left, headline2 bottom-right).
+  type(s, ctx) {
+    const L = s.layout || "bottom", right = s.align === "right" ? " align-right" : "";
+    let inner;
+    if (L === "giant") inner = `<div class="giant-word${s.bleed ? " bleed" : ""}" style="--fs:${s.giantSize || 400}px">${md(s.giant || "")}</div><div class="spacer"></div><div class="stack${right}">${headline(s, 72, "h2")}${support(s)}</div>`;
+    else if (L === "top") inner = `<div class="stack${right}">${headline(s, 132)}</div><div class="spacer"></div><div class="stack${right}">${support(s)}</div>`;
+    else if (L === "split") inner = `<div class="split-a">${headline(s, 112)}</div><div class="spacer"></div><div class="split-b"><h2 class="h1" data-fit ${fs(s.headlineSize || 112)}>${md(s.headline2 || "")}</h2>${s.support ? `<div style="height:32px"></div>${support(s)}` : ""}</div>`;
+    else inner = `<div class="spacer"></div><div class="stack${right}">${headline(s, 132)}${support(s)}</div>`;
+    return `${chromeTop(s, ctx)}<main class="body" data-fit-box>${inner}</main>${chromeBottom(s, ctx)}`;
+  },
+  // Minimalist composition: one short line in a large field. position: "center" (default) | "top-left" | "bottom-left" | "bottom-right".
+  minimal(s, ctx) {
+    const pos = s.position || "center";
+    return `${chromeTop({ ...s, eyebrow: s.eyebrow || "" }, ctx)}<main class="body pos-${pos}" data-fit-box><div>${s.rule === false ? "" : '<div class="min-rule"></div>'}<p class="min-text" data-fit ${fs(s.headlineSize || 52)}>${md(s.headline)}</p></div></main>${chromeBottom(s, ctx)}`;
+  },
+  // Architecture-monograph page: photograph framed by paper, figure caption below.
+  plate(s, ctx) {
+    const fig = s.figure || `Fig. ${String(ctx.n).padStart(2, "0")}`;
+    return `${chromeTop(s, ctx)}<main class="body" data-fit-box>${photo(s, ctx.postDir, { height: s.imageHeight || 600 })}<div class="spacer" style="min-height:40px"></div><div class="plate-caption"><span class="fig">${md(fig)}</span><div>${headline(s, 52, "h2")}${support(s, 28)}</div></div></main>${chromeBottom(s, ctx)}`;
+  },
+  // Asymmetric split: photograph full height on one side, text column on the other. side: "left" (default) | "right"; cols e.g. "1.15fr 1fr".
+  split(s, ctx) {
+    return `<div class="split-wrap${s.side === "right" ? " right" : ""}" style="--cols:${esc(s.cols || "1fr 1fr")}">${photo(s, ctx.postDir)}<div class="split-text"><div class="top-row"><span class="eyebrow">${s.eyebrow ? "— " + md(s.eyebrow) : ""}</span><span class="counter">${ctx.counter}</span></div><main class="body end" data-fit-box><div class="stack">${headline(s, 76, "h2")}${support(s, 30)}</div></main><div style="height:40px;flex:none"></div><span class="lockup">${markFor(ctx.theme)}<span class="wordmark">Framework</span></span></div></div>`;
+  },
+  // Portfolio: real client work on a quiet stage (theme mist or ink suits it). image = desktop view; image2 = optional phone view; tags = disciplines.
+  showcase(s, ctx) {
+    const main = resolveAsset(s.image, ctx.postDir), second = resolveAsset(s.image2, ctx.postDir);
+    const treat = treatment(s, "none");
+    const stage = `<div class="stage ${treat}" style="height:${s.imageHeight || 640}px;--fit:${s.imageFit === "contain" ? "contain" : "cover"};--focus:${esc(s.imageFocus || "50% 0%")}"><div class="main" style="height:${s.imageHeight || 640}px"><img src="${main ? fileUrl(main) : ""}" alt=""></div>${second ? `<div class="second"><img src="${fileUrl(second)}" alt=""></div>` : ""}</div>`;
+    const tags = (s.tags || []).length ? `<div class="tags">${s.tags.map((t) => `<span>${md(t)}</span>`).join("")}</div>` : "";
+    return `${chromeTop(s, ctx)}<main class="body" data-fit-box>${stage}<div class="spacer" style="min-height:${second ? 104 : 48}px"></div><div class="stack">${headline(s, 72, "h2")}${support(s, 30)}${tags}</div></main>${chromeBottom(s, ctx)}`;
+  },
+  // Educational graphic. kind "flow": steps on a vertical line (items [{title, desc}], active: index to fill). kind "bars": items [{label, value, display}] (real, sourced numbers only) + source.
+  diagram(s, ctx) {
+    const items = s.items || [];
+    let g = "";
+    if ((s.kind || "flow") === "flow") g = `<ol class="flow" data-fit ${fs(s.itemsSize || 44)}>${items.map((it, i) => `<li class="${s.active === i + 1 ? "on" : ""}"><span class="i">${String(i + 1).padStart(2, "0")}</span><span class="t">${md(it.title)}</span>${it.desc ? `<span class="d">${md(it.desc)}</span>` : ""}</li>`).join("")}</ol>`;
+    else { const max = Math.max(...items.map((it) => Number(it.value) || 0), 1); g = `<ol class="bars" data-fit ${fs(s.itemsSize || 34)}>${items.map((it) => `<li><span class="l">${md(it.label)}</span><span class="v">${md(it.display ?? it.value)}</span><span class="track"><span class="fill" style="display:block;width:${Math.round((Number(it.value) / max) * 100)}%"></span></span></li>`).join("")}</ol>${s.source ? `<p class="src-note">${md("Source: " + s.source)}</p>` : ""}`; }
+    return `${chromeTop(s, ctx)}<main class="body" data-fit-box><div class="stack">${headline(s, 64, "h2")}${support(s, 30)}</div><div class="spacer" style="min-height:56px"></div>${g}</main>${chromeBottom(s, ctx)}`;
+  },
   // Eyebrow, big headline, one support line. layout "text" (default) or "photo" (photo band above the text).
   cover(s, ctx) {
     const hasPhoto = !!s.image;
@@ -54,7 +113,10 @@ const T = {
   // Full-bleed photograph with a solid panel carrying the text. No scrims or gradients.
   photo(s, ctx) {
     const src = resolveAsset(s.image, ctx.postDir);
-    const treat = s.imageTreatment === "none" ? "" : s.imageTreatment === "muted" ? "muted-photo" : "mono";
+    const treat = treatment(s);
+    if (s.layout === "caption") return `<div class="full-photo ${treat}" style="--focus:${esc(s.imageFocus || "50% 50%")}"><img src="${src ? fileUrl(src) : ""}" alt=""></div>
+      ${ctx.counter ? `<div class="tag"><span class="counter">${ctx.counter}</span></div>` : ""}
+      <section class="label-block" data-fit-box data-max-h="${Math.round(ctx.h * 0.42)}">${s.eyebrow ? `<div class="eyebrow">— ${md(s.eyebrow)}</div>` : ""}${headline(s, 56, "h2")}${support(s, 26)}<span class="lockup">${markFor(ctx.theme)}<span class="wordmark">Framework</span></span></section>`;
     return `<div class="full-photo ${treat}" style="--focus:${esc(s.imageFocus || "50% 50%")}"><img src="${src ? fileUrl(src) : ""}" alt=""></div>
       ${ctx.counter ? `<div class="tag"><span class="counter">${ctx.counter}</span></div>` : ""}
       <section class="panel" data-fit-box data-max-h="${Math.round(ctx.h * 0.5)}"><div class="panel-body">${s.eyebrow ? `<div class="eyebrow">— ${md(s.eyebrow)}</div>` : ""}${headline(s, 80, "h2")}${support(s, 30)}</div>${chromeBottom(s, ctx)}</section>`;

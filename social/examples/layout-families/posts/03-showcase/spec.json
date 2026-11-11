@@ -1,0 +1,21 @@
+{
+ "id": "03",
+ "slug": "showcase",
+ "format": "single",
+ "slides": [
+  {
+   "template": "showcase",
+   "theme": "mist",
+   "eyebrow": "Client work",
+   "image": "@site/assets/img/aurora-hero.jpg",
+   "image2": "@site/assets/img/aurora-mobile-station.jpg",
+   "headline": "Aurora Surveys",
+   "support": "A website that shows the survey work instead of describing it.",
+   "tags": [
+    "Website",
+    "3D field setup",
+    "Traverse map"
+   ]
+  }
+ ]
+}

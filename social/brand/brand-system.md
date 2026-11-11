@@ -29,6 +29,7 @@ Rules:
 - Dark sections invert, they don't tint: pure ink with paper text. Never navy, charcoal-blue or warm black.
 - Photography and illustration stay desaturated: black-and-white or muted greyscale. If colour is unavoidable, keep saturation low and let structure carry the image.
 - No brand accent colour unless a specific client project calls for one (e.g. showing that client's palette in a portfolio post).
+- **[social] Owner-approved exception (2026-11-11):** controlled colour may appear *inside imagery only* (client portfolio work, photography, conceptual artwork) when it meaningfully improves the composition. Framework's own type, graphics, backgrounds and logo stay monochrome, and no accent colour is ever introduced. In the engine this is `imageTreatment: "none"` or `"muted"`; the default stays black and white.
 
 ## 03 Typography: Switzer for structure, General Sans for everything else
 | Role | Typeface | Weight | Notes |
@@ -60,6 +61,14 @@ Logo: a solid black square containing a geometric "F" monogram in paper white, w
 **[social]** Lockups: 01 Primary (square mark above wordmark), 02 Secondary (mark left of wordmark), 03 Simplified (wordmark only), 04 Submark (square mark only). The mark file is `logo/submark.svg` (identical to the site's `assets/img/logo-mark.svg`).
 
 Buttons: Primary = ink fill, paper semibold text, no border, 0px corners. Secondary = transparent, ink semibold text, 1px ink border, 0px corners.
+
+## [social] Feed identity: one system, many compositions
+The owner's goal: the Instagram grid should read like a curated design-studio portfolio, not a template run. Reference accounts (art direction only, never copied): Obrazur for range and variety, held inside Framework's minimal, architectural identity.
+- **Constant (recognition):** the two typefaces, the near-monochrome palette, the eyebrow + headline pattern, hairlines, sharp corners, and the Framework mark and wordmark drawn by the engine.
+- **Variable (variety):** layout family, headline position and scale, light/dark/mid tone, photography vs typography vs graphic, density vs negative space.
+- **Six visual categories** to mix across every batch: editorial typography, architectural photography, portfolio showcases, conceptual artwork, educational graphics, minimalist compositions.
+- **Grid rules:** alternate light and dark; balance imagery with type; never place two covers of the same layout family side by side (in the grid or in publishing order); no grid row of three in one tone; check every batch against the posts already published.
+- **Covers vs interiors:** a cover earns attention and may break the pattern; interior carousel slides stay consistent for readability.
 
 ## 05 Imagery: construction-industry precision, shot like architecture
 Framework's core clients are contractors, tradespeople and construction-adjacent small businesses, so imagery nods to that world (structure, materials, tools, blueprints, job sites) through a clean, editorial, architectural lens.

@@ -1,0 +1,15 @@
+{
+ "id": "09",
+ "slug": "split-type",
+ "format": "single",
+ "slides": [
+  {
+   "template": "type",
+   "layout": "split",
+   "eyebrow": "Websites",
+   "headline": "Read it.\nLiked it.",
+   "headline2": "Then\nleft.",
+   "support": "Every page needs one next step."
+  }
+ ]
+}

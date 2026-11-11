@@ -6,12 +6,15 @@
 //   node social/engine/fw.mjs reel <post-dir>            clip + reel overlay -> slides/reel.mp4 + slides/reel-cover.png (ffmpeg)
 //   node social/engine/fw.mjs sheet <batch>              one contact-sheet PNG of every slide, for review at low token cost
 //   node social/engine/fw.mjs check <batch>              completeness, dimensions, caption and brand-voice lint
+//   node social/engine/fw.mjs grid <batch>               Instagram profile preview (3:4 grid crops, newest first, after published history) + feed checks
 //   node social/engine/fw.mjs package <batch>            export/ folder + zip of finished posts with captions alongside
+//   node social/engine/fw.mjs history add <batch> | recent [n] | report    content history (social/history/posts.csv) and performance summary
+//   node social/engine/fw.mjs figma manifest|upload|layout <batch> [urls]  push finished slides to the Figma feed board (see SKILL.md)
 import { createRequire } from "node:module";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, copyFileSync, rmSync } from "node:fs";
 import { join, resolve, basename, dirname } from "node:path";
 import { execFileSync } from "node:child_process";
-import { slideHtml, resolveAsset, TEMPLATES, REPO_ROOT } from "./templates.mjs";
+import { slideHtml, resolveAsset, TEMPLATES, REPO_ROOT, CATEGORIES, familyOf, categoryOf, isImagery } from "./templates.mjs";
 
 const ENGINE = dirname(new URL(import.meta.url).pathname);
 const FONT_DIR = join(ENGINE, ".fonts");
@@ -165,8 +168,11 @@ async function sheet(batch) {
 }
 
 // ---------- briefs validation ----------
-const PILLARS = ["educational", "promotional", "portfolio", "brand"];
+// Strategy (SKILL.md / content-strategist.md): goal mix about 60% attract, 30% trust, 10% convert; every post passes six questions.
+const GOALS = ["attract", "trust", "convert"];
 const FORMATS = ["single", "carousel", "reel"];
+const CTA_TYPES = ["save", "engage", "explore", "credibility", "lead", "none"];
+const CHECKS = ["interesting", "value", "save_share_follow", "credibility", "role", "different"];
 function validate(batch) {
   const p = join(batch, "briefs.json");
   if (!existsSync(p)) die(`${p} not found`);
@@ -176,11 +182,15 @@ function validate(batch) {
   let gens = 0, credits = 0;
   for (const post of b.posts) {
     const at = `post ${post.id ?? "?"}`;
-    for (const k of ["id", "slug", "pillar", "format", "objective", "audience", "key_message", "cta", "slides"]) if (post[k] == null || post[k] === "") errs.push(`${at}: missing ${k}`);
+    for (const k of ["id", "slug", "goal", "format", "visual_category", "objective", "audience", "key_message", "cta_type", "slides", "checks"]) if (post[k] == null || post[k] === "") errs.push(`${at}: missing ${k}`);
     if (ids.has(post.id)) errs.push(`${at}: duplicate id`); ids.add(post.id);
     if (post.slug && !/^[a-z0-9-]+$/.test(post.slug)) errs.push(`${at}: slug must be lowercase-kebab`);
-    if (!PILLARS.includes(post.pillar)) errs.push(`${at}: pillar must be one of ${PILLARS.join("/")}`);
+    if (!GOALS.includes(post.goal)) errs.push(`${at}: goal must be one of ${GOALS.join("/")}`);
     if (!FORMATS.includes(post.format)) errs.push(`${at}: format must be one of ${FORMATS.join("/")}`);
+    if (!CATEGORIES.includes(post.visual_category)) errs.push(`${at}: visual_category must be one of ${CATEGORIES.join("/")}`);
+    if (!CTA_TYPES.includes(post.cta_type)) errs.push(`${at}: cta_type must be one of ${CTA_TYPES.join("/")}`);
+    if (post.cta_type !== "none" && !post.cta) errs.push(`${at}: cta text missing (or set cta_type "none")`);
+    for (const c of CHECKS) if (!post.checks || !String(post.checks[c] || "").trim()) errs.push(`${at}: checks.${c} unanswered (a post that fails a question is revised, not shipped)`);
     if (post.needs_confirmation) warns.push(`${at}: needs owner confirmation: ${post.needs_confirmation}`);
     const slides = post.slides || [];
     if (post.format === "carousel" && (slides.length < 3 || slides.length > 10)) errs.push(`${at}: carousels need 3-10 slides`);
@@ -195,9 +205,18 @@ function validate(batch) {
       if (v.source === "site" && !(v.ref && existsSync(resolve(REPO_ROOT, v.ref.replace(/^@site\//, ""))))) errs.push(`${at} slide ${i + 1}: site image not found: ${v.ref}`);
     }
   }
-  const mix = Object.fromEntries(PILLARS.map((k) => [k, b.posts.filter((p) => p.pillar === k).length]));
-  if (b.posts.length >= 6 && Object.values(mix).some((n) => n === 0)) warns.push(`pillar mix is unbalanced: ${JSON.stringify(mix)}`);
-  console.log(`posts ${b.posts.length} · mix ${JSON.stringify(mix)} · higgsfield generations ${gens}${credits ? ` (~${credits} credits est.)` : ""}`);
+  // Feed plan: neighbours in publishing order must not share a cover family; tones should alternate; categories should vary.
+  const covers = b.posts.map((p) => ({ id: p.id, fam: familyOf(p.slides?.[0] || {}), tone: (p.slides?.[0]?.theme || "paper") === "ink" ? "dark" : "light", cat: p.visual_category }));
+  for (let i = 1; i < covers.length; i++) if (covers[i].fam === covers[i - 1].fam) errs.push(`posts ${covers[i - 1].id} and ${covers[i].id}: consecutive covers use the same layout family (${covers[i].fam})`);
+  for (let i = 2; i < covers.length; i++) if (covers[i].tone === "dark" && covers[i - 1].tone === "dark" && covers[i - 2].tone === "dark") warns.push(`posts ${covers[i - 2].id}-${covers[i].id}: three dark covers in a row`);
+  const n = b.posts.length, count = (k, v) => b.posts.filter((p) => p[k] === v).length;
+  const mix = Object.fromEntries(GOALS.map((g) => [g, count("goal", g)]));
+  const target = { attract: 0.6, trust: 0.3, convert: 0.1 };
+  if (n >= 5) for (const g of GOALS) if (Math.abs(mix[g] - target[g] * n) > Math.max(1, n * 0.1)) warns.push(`goal mix ${JSON.stringify(mix)} drifts from about 60/30/10 (fine if deliberate: say why in plan.md)`);
+  const cats = new Set(b.posts.map((p) => p.visual_category));
+  if (n >= 8 && cats.size < 4) warns.push(`only ${cats.size} visual categories across ${n} posts: aim for 4 or more`);
+  for (const c of cats) if (n >= 5 && count("visual_category", c) / n > 0.4) warns.push(`${c} is over 40% of the batch`);
+  console.log(`posts ${n} · goals ${JSON.stringify(mix)} · categories ${cats.size} · higgsfield generations ${gens}${credits ? ` (~${credits} credits est.)` : ""}`);
   warns.forEach((w) => console.log("WARN " + w));
   errs.forEach((e) => console.log("FAIL " + e));
   if (errs.length) process.exit(1);
@@ -205,7 +224,7 @@ function validate(batch) {
 }
 
 // ---------- batch check ----------
-const BANNED = ["disrupt", "game-changing", "game changer", "synergy", "world-class", "best-in-class", "unlock your", "next level", "passion", "hustle", "the ultimate", "the best ", "revolutionary", "cutting-edge", "elevate your", "supercharge", "skyrocket"];
+const BANNED = ["disrupt", "game-changing", "game changer", "synergy", "world-class", "best-in-class", "unlock your", "next level", "passion", "hustle", "the ultimate", "the best ", "revolutionary", "cutting-edge", "elevate your", "supercharge", "skyrocket", "in today's", "in today’s", "let's dive", "let’s dive", "dive into", "here's the thing", "here’s the thing"];
 const EMOJI = /\p{Extended_Pictographic}/u;
 function lintCaption(text, platform) {
   const issues = [], lower = text.toLowerCase();
@@ -217,8 +236,8 @@ function lintCaption(text, platform) {
   const tags = text.match(/#[\p{L}\d_]+/gu) || [];
   const body = text.replace(/(\s*#[\p{L}\d_]+)+\s*$/u, "");
   if (/#[\p{L}\d_]+/u.test(body)) issues.push("hashtag inside body copy (brand: hashtags only at the end)");
-  if (platform === "instagram") { if (text.length > 2200) issues.push(`over 2,200 characters (${text.length})`); if (tags.length > 8) issues.push(`${tags.length} hashtags (keep to 3-8)`); if (text.split("\n")[0].length > 150) issues.push("first line over 150 characters: the hook gets truncated"); }
-  if (platform === "facebook" && tags.length > 3) issues.push(`${tags.length} hashtags on Facebook (keep 0-3)`);
+  if (platform === "instagram") { if (text.length > 2200) issues.push(`over 2,200 characters (${text.length})`); if (tags.length > 5) issues.push(`${tags.length} hashtags (0-5, only where they help discovery)`); if (text.split("\n")[0].length > 150) issues.push("first line over 150 characters: the hook gets truncated"); }
+  if (platform === "facebook" && tags.length > 2) issues.push(`${tags.length} hashtags on Facebook (keep 0-2)`);
   return issues;
 }
 function check(batch) {
@@ -253,14 +272,14 @@ function pkg(batch) {
   const name = basename(resolve(batch)), out = join(batch, "export", name);
   rmSync(join(batch, "export"), { recursive: true, force: true }); mkdirSync(out, { recursive: true });
   const briefs = existsSync(join(batch, "briefs.json")) ? readJson(join(batch, "briefs.json")) : { posts: [] };
-  let index = `# ${name}\n\nFinished posts. Each folder: slides in posting order, the Instagram and Facebook captions, and alt text.\n\n| # | Post | Pillar | Format | Slides |\n|---|---|---|---|---|\n`;
+  let index = `# ${name}\n\nFinished posts. Each folder: slides in posting order, the Instagram and Facebook captions, and alt text.\n\n| # | Post | Goal | Category | Format | Slides |\n|---|---|---|---|---|---|\n`;
   for (const d of postDirs(batch)) {
     const id = basename(d), dest = join(out, id); mkdirSync(dest);
     const files = readdirSync(join(d, "slides")).filter((f) => /^\d+\.png$|^reel\.mp4$|^reel-cover\.png$/.test(f));
     files.forEach((f) => copyFileSync(join(d, "slides", f), join(dest, /^\d+\.png$/.test(f) ? `${id}-${f}` : f)));
     ["caption-instagram.txt", "caption-facebook.txt", "alt-text.txt"].forEach((f) => copyFileSync(join(d, f), join(dest, f)));
     const b = briefs.posts.find((p) => id.startsWith(String(p.id).padStart(2, "0"))) || {};
-    index += `| ${b.id ?? ""} | ${id} | ${b.pillar ?? ""} | ${b.format ?? ""} | ${files.filter((f) => f.endsWith(".png")).length} |\n`;
+    index += `| ${b.id ?? ""} | ${id} | ${b.goal ?? ""} | ${b.visual_category ?? ""} | ${b.format ?? ""} | ${files.filter((f) => f.endsWith(".png")).length} |\n`;
   }
   writeFileSync(join(out, "README.md"), index);
   const zip = join(batch, "export", `${name}.zip`);
@@ -268,10 +287,203 @@ function pkg(batch) {
   console.log(`ok   ${out}\nok   ${zip}`);
 }
 
+// ---------- feed: covers, tone, history ----------
+const HISTORY_DIR = process.env.FW_HISTORY_DIR ? resolve(process.env.FW_HISTORY_DIR) : join(REPO_ROOT, "social", "history"); // override for tests
+const HISTORY_CSV = join(HISTORY_DIR, "posts.csv");
+const HISTORY_COLS = ["date_produced", "date_published", "batch", "id", "slug", "goal", "category", "family", "tone", "format", "topic", "headline", "cta_type", "cover", "reach", "non_follower_reach", "saves", "shares", "profile_visits", "follows", "website_clicks", "inquiries", "notes"];
+const METRICS = ["reach", "non_follower_reach", "saves", "shares", "profile_visits", "follows", "website_clicks", "inquiries"];
+
+function parseCsv(text) {
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+    else if (c === '"') q = true; else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cell); cell = ""; if (row.some((x) => x !== "")) rows.push(row); row = []; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); if (row.some((x) => x !== "")) rows.push(row); }
+  const [head, ...body] = rows;
+  return (body || []).map((r) => Object.fromEntries((head || []).map((h, i) => [h, r[i] ?? ""])));
+}
+const csvCell = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+const readHistory = () => (existsSync(HISTORY_CSV) ? parseCsv(readFileSync(HISTORY_CSV, "utf8")) : []);
+const writeHistory = (rows) => { mkdirSync(HISTORY_DIR, { recursive: true }); writeFileSync(HISTORY_CSV, [HISTORY_COLS.join(","), ...rows.map((r) => HISTORY_COLS.map((c) => csvCell(r[c])).join(","))].join("\n") + "\n"); };
+
+/** Mean luminance (0-255) and contrast of each image, measured on a small greyscale copy. */
+function imageStats(paths) {
+  if (!paths.length) return [];
+  const py = "import sys,json\nfrom PIL import Image, ImageStat\nout=[]\nfor p in sys.argv[1:]:\n  im=Image.open(p).convert('L'); im.thumbnail((108,135)); st=ImageStat.Stat(im); out.append({'mean':round(st.mean[0],1),'std':round(st.stddev[0],1)})\nprint(json.dumps(out))";
+  return JSON.parse(execFileSync("python3", ["-I", "-c", py, ...paths]).toString());
+}
+const toneOf = (mean) => (mean < 100 ? "dark" : mean > 170 ? "light" : "mid");
+
+/** The batch's posts in publishing order (id order), with their cover file and feed attributes. */
+function batchCovers(batch) {
+  const posts = postDirs(batch).map((d) => {
+    const spec = readJson(join(d, "spec.json")), s0 = spec.slides[0] || {};
+    const cover = ["01.png", "reel-cover.png"].map((f) => join(d, "slides", f)).find(existsSync);
+    const head = String(s0.giant ? `${s0.giant} ${s0.headline || ""}` : s0.headline || s0.quote || "").replace(/\{\{|\}\}|\*\*/g, "").replace(/\s*\n\s*/g, " ").trim();
+    return { id: basename(d), dir: d, cover, family: familyOf(s0), category: categoryOf(s0), imagery: isImagery(s0), format: spec.format, headline: head };
+  });
+  const stats = imageStats(posts.filter((p) => p.cover).map((p) => p.cover));
+  let k = 0;
+  for (const p of posts) if (p.cover) { Object.assign(p, stats[k++]); p.tone = toneOf(p.mean); }
+  return posts;
+}
+
+async function grid(batch) {
+  const name = basename(resolve(batch));
+  const posts = batchCovers(batch);
+  const missing = posts.filter((p) => !p.cover);
+  if (missing.length) die(`not rendered yet: ${missing.map((p) => p.id).join(", ")}`);
+  const past = readHistory().filter((r) => r.batch !== name && r.cover && existsSync(join(HISTORY_DIR, r.cover))).map((r) => ({ id: `${r.batch} ${r.id}`, cover: join(HISTORY_DIR, r.cover), family: r.family, category: r.category, tone: r.tone, past: true }));
+  // Profile order: newest first. The batch publishes in id order on top of everything already in the history.
+  const profile = [...posts].reverse().concat([...past].reverse()).slice(0, 15);
+  const issues = [], say = (lvl, m) => issues.push({ lvl, m });
+  const at = (i) => profile[i];
+  for (let i = 0; i < profile.length; i++) {
+    const right = i % 3 < 2 ? i + 1 : -1, below = i + 3;
+    for (const j of [right, below]) {
+      if (j < 0 || j >= profile.length) continue;
+      const a = at(i), b = at(j);
+      if (a.past && b.past) continue;
+      if (a.family === b.family) say("FAIL", `${a.id} and ${b.id} sit next to each other in the grid with the same layout family (${a.family})`);
+      else if (a.category === b.category && a.tone === b.tone) say("WARN", `${a.id} and ${b.id} are neighbours with the same category and tone (${a.category}, ${a.tone})`);
+    }
+  }
+  for (let r = 0; r * 3 < Math.min(profile.length, 12); r++) {
+    const row = profile.slice(r * 3, r * 3 + 3);
+    if (row.length === 3 && row.some((p) => !p.past) && row.every((p) => p.tone === row[0].tone)) say("WARN", `grid row ${r + 1} is all ${row[0].tone}: alternate light and dark`);
+  }
+  const n = posts.length, share = (f) => posts.filter(f).length / n;
+  const dark = share((p) => p.tone === "dark"), light = share((p) => p.tone === "light"), imagery = share((p) => p.imagery);
+  if (n >= 6 && (dark < 0.2 || dark > 0.6)) say("WARN", `${Math.round(dark * 100)}% of covers are dark: aim for 20-60%`);
+  if (n >= 6 && light > 0.7) say("WARN", `${Math.round(light * 100)}% of covers are light: add dark or mid-tone covers`);
+  if (n >= 6 && (imagery < 0.3 || imagery > 0.7)) say("WARN", `${Math.round(imagery * 100)}% of covers are photography or artwork: aim for 30-70% against typography and graphics`);
+  const fams = {}; posts.forEach((p) => (fams[p.family] = (fams[p.family] || 0) + 1));
+  for (const [f, c] of Object.entries(fams)) if (c > 2) say("WARN", `layout family ${f} is used for ${c} covers: develop another composition`);
+  const cats = new Set(posts.map((p) => p.category));
+  if (n >= 8 && cats.size < 4) say("WARN", `only ${cats.size} visual categories on the covers`);
+  for (let i = 1; i < n; i++) if (posts[i].family === posts[i - 1].family) say("FAIL", `${posts[i - 1].id} and ${posts[i].id} publish back to back with the same layout family`);
+
+  // Preview: realistic profile grid (3 columns, 3:4 tiles cropped from 4:5 like Instagram's profile view) + publishing-order strip.
+  const tile = (p, i) => `<div class="t${p.past ? " past" : ""}"><img src="file://${p.cover}"><span class="n">${p.past ? "" : p.id.slice(0, 2)}</span></div>${i === 8 ? '<div class="fold">first screen: the newest nine</div>' : ""}`;
+  const strip = posts.map((p) => `<figure><img src="file://${p.cover}"><figcaption><b>${p.id}</b><br>${p.family}<br>${p.category}<br>${p.tone}${p.imagery ? " · image" : " · type"}</figcaption></figure>`).join("");
+  const list = issues.map((x) => `<li class="${x.lvl}">${x.lvl} ${x.m}</li>`).join("") || "<li>No feed issues found.</li>";
+  const html = `<!doctype html><meta charset="utf-8"><style>body{margin:0;padding:32px;background:#fff;font:14px/1.35 -apple-system,Helvetica,Arial,sans-serif;color:#0A0A0A;width:1736px;display:grid;grid-template-columns:600px 1fr;gap:48px}
+h2{font-size:15px;margin:0 0 12px;letter-spacing:.04em;text-transform:uppercase}.g{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;position:relative}
+.t{position:relative;aspect-ratio:3/4;overflow:hidden;background:#F5F5F5}.t img{width:100%;height:100%;object-fit:cover}.t.past img{opacity:.55}.t .n{position:absolute;right:6px;bottom:6px;background:#0A0A0A;color:#fff;font-size:11px;padding:2px 5px}
+.t .n:empty{display:none}.fold{grid-column:1/-1;border-top:2px dashed #A3A3A3;color:#5C5C5C;font-size:12px;padding:4px 0}
+.s{display:flex;flex-wrap:wrap;gap:12px}figure{margin:0;width:150px}figure img{width:150px;display:block;border:1px solid #E0E0E0}figcaption{font-size:12px;color:#5C5C5C;padding-top:4px}
+ul{padding-left:18px}li.FAIL{color:#a00;font-weight:600}li.WARN{color:#5C5C5C}</style>
+<div><h2>Profile preview · ${name}</h2><div class="g">${profile.map(tile).join("")}</div><p style="color:#5C5C5C;font-size:12px">Newest top-left. Faded tiles were published before this batch. Tiles are cropped to 3:4 as on the profile grid.</p></div>
+<div><h2>Publishing order</h2><div class="s">${strip}</div><h2 style="margin-top:28px">Feed checks</h2><ul>${list}</ul></div>`;
+  const file = join(batch, ".grid.html"), out = join(batch, "grid-preview.png");
+  writeFileSync(file, html);
+  await withBrowser(async (b) => { const pg = await b.newPage({ viewport: { width: 1800, height: 900 } }); await pg.goto("file://" + resolve(file)); await pg.waitForLoadState("load"); await pg.screenshot({ path: out, fullPage: true }); });
+  rmSync(file);
+  const md = `# Grid report: ${name}\n\n| Order | Post | Family | Category | Tone | Imagery |\n|---|---|---|---|---|---|\n${posts.map((p, i) => `| ${i + 1} | ${p.id} | ${p.family} | ${p.category} | ${p.tone} (${p.mean}) | ${p.imagery ? "yes" : "no"} |`).join("\n")}\n\nDark ${Math.round(dark * 100)}% · light ${Math.round(light * 100)}% · imagery ${Math.round(imagery * 100)}% · categories ${cats.size} · history tiles ${past.length}\n\n${issues.map((x) => `- ${x.lvl} ${x.m}`).join("\n") || "- No feed issues found."}\n`;
+  writeFileSync(join(batch, "grid-report.md"), md);
+  issues.forEach((x) => console.log(`${x.lvl} ${x.m}`));
+  console.log(`ok   ${out}\nok   ${join(batch, "grid-report.md")}`);
+  if (issues.some((x) => x.lvl === "FAIL")) process.exit(1);
+}
+
+function historyCmd(sub, arg2) {
+  const rows = readHistory();
+  if (sub === "add") {
+    const batch = resolve(arg2 || die("usage: fw.mjs history add <batch>")), name = basename(batch);
+    const briefs = existsSync(join(batch, "briefs.json")) ? readJson(join(batch, "briefs.json")).posts : [];
+    mkdirSync(join(HISTORY_DIR, "covers"), { recursive: true });
+    const posts = batchCovers(batch), today = new Date().toISOString().slice(0, 10);
+    const py = "import sys\nfrom PIL import Image\nim=Image.open(sys.argv[1]).convert('RGB'); im.thumbnail((540,675)); im.save(sys.argv[2],'JPEG',quality=80)";
+    for (const p of posts) {
+      const b = briefs.find((x) => p.id.startsWith(String(x.id).padStart(2, "0"))) || {};
+      const cover = `covers/${name}--${p.id}.jpg`;
+      if (p.cover) execFileSync("python3", ["-I", "-c", py, p.cover, join(HISTORY_DIR, cover)]);
+      const prev = rows.find((r) => r.batch === name && r.id === p.id);
+      const row = { ...(prev || {}), date_produced: prev?.date_produced || today, batch: name, id: p.id, slug: b.slug || p.id.slice(3), goal: b.goal || "", category: b.visual_category || p.category, family: p.family, tone: p.tone || "", format: p.format, topic: b.key_message || "", headline: p.headline, cta_type: b.cta_type || "", cover: p.cover ? cover : "" };
+      if (prev) Object.assign(prev, row); else rows.push(row);
+    }
+    writeHistory(rows);
+    console.log(`ok   ${posts.length} posts recorded in ${HISTORY_CSV}`);
+  } else if (sub === "recent") {
+    const n = Number(arg2 || 20);
+    for (const r of rows.slice(-n)) console.log([r.date_published || "unpublished", r.batch, r.id, r.goal, r.category, r.family, r.tone, r.cta_type, r.headline].join(" | "));
+    if (!rows.length) console.log("history is empty");
+  } else if (sub === "report") {
+    const withData = rows.filter((r) => METRICS.some((m) => r[m] !== ""));
+    console.log(`${rows.length} posts in history, ${withData.length} with performance data.`);
+    if (withData.length < 3) { console.log("Not enough performance data to compare yet (need 3+ posts with metrics). Nothing is proven; keep following the plan."); return; }
+    const med = (xs) => { const v = xs.filter((x) => x !== "" && !isNaN(x)).map(Number).sort((a, b) => a - b); return v.length ? v[Math.floor((v.length - 1) / 2)] : "–"; };
+    for (const key of ["goal", "category", "family", "cta_type"]) {
+      console.log(`\nby ${key} (medians; n = posts with data)`);
+      console.log(["value", "n", ...METRICS].join(" | "));
+      const groups = [...new Set(withData.map((r) => r[key]))];
+      for (const g of groups) { const rs = withData.filter((r) => r[key] === g); console.log([g || "(blank)", rs.length + (rs.length < 3 ? " (too few)" : ""), ...METRICS.map((m) => med(rs.map((r) => r[m])))].join(" | ")); }
+    }
+  } else die("usage: fw.mjs history add <batch> | recent [n] | report");
+}
+
+// ---------- Figma feed board ----------
+// Figma cannot render the brand fonts in automated runs and limits exports on the current plan, so it holds the finished
+// slides for review, arrangement and comments; the engine stays the renderer. Flow: manifest -> upload_assets(count) -> upload -> layout -> use_figma.
+const FIGMA_CFG = join(REPO_ROOT, "social", "figma.json");
+function figmaFiles(batch) {
+  return postDirs(batch).flatMap((d) => (existsSync(join(d, "slides")) ? readdirSync(join(d, "slides")).filter((f) => /^\d+\.png$|^reel-cover\.png$/.test(f)).sort().map((f) => ({ post: basename(d), slide: f.replace(".png", ""), file: join(d, "slides", f) })) : []));
+}
+function figmaCmd(sub, batchArg, urlsArg) {
+  const batch = resolve(batchArg || die("usage: fw.mjs figma manifest|upload|layout <batch> [urls-file]")), name = basename(batch);
+  const cfg = existsSync(FIGMA_CFG) ? readJson(FIGMA_CFG) : die(`${FIGMA_CFG} missing: run the Figma setup in SKILL.md`);
+  const files = figmaFiles(batch);
+  if (sub === "manifest") {
+    console.log(JSON.stringify({ fileKey: cfg.fileKey, currentPageId: cfg.pageId, count: files.length, note: "call Figma upload_assets with this fileKey, currentPageId and count (max 60 per call); save the returned submitUrl values, one per line, to <batch>/.figma-urls.txt" }, null, 1));
+  } else if (sub === "upload") {
+    const urls = readFileSync(urlsArg ? resolve(urlsArg) : join(batch, ".figma-urls.txt"), "utf8").match(/https:\/\/\S+?\/submit\S*/g) || [];
+    if (urls.length < files.length) die(`${urls.length} upload URLs for ${files.length} slides`);
+    const nodes = files.map((f, i) => {
+      const res = JSON.parse(execFileSync("curl", ["-fsS", "--max-time", "120", "-F", `file=@${f.file};type=image/png;filename=${name}--${f.post}--${f.slide}.png`, urls[i].replace(/[",]+$/, "")]).toString());
+      if (!res.success) die(`upload failed for ${f.post}/${f.slide}: ${JSON.stringify(res)}`);
+      return { post: f.post, slide: f.slide, nodeId: res.placedOnNodeId };
+    });
+    writeFileSync(join(batch, "figma.json"), JSON.stringify({ batch: name, fileKey: cfg.fileKey, nodes }, null, 1));
+    console.log(`ok   ${nodes.length} slides uploaded to ${cfg.url}`);
+  } else if (sub === "layout") {
+    const f = readJson(join(batch, "figma.json"));
+    const posts = [...new Set(f.nodes.map((n) => n.post))];
+    const covers = posts.map((p) => f.nodes.find((n) => n.post === p).nodeId);
+    // One section per batch: the profile grid of covers (newest first) on the left, then one column of slides per post, each at 1080x1350.
+    console.log(`// use_figma script for fileKey ${f.fileKey} (skillNames "resource:figma-use"). Returns the section id.
+const page = await figma.getNodeByIdAsync(${JSON.stringify(cfg.pageId)}); await figma.setCurrentPageAsync(page);
+await figma.loadFontAsync({ family: "Inter", style: "Semi Bold" });
+const G = 60, W = 1080, H = 1350, posts = ${JSON.stringify(posts)}, nodes = ${JSON.stringify(f.nodes)}, covers = ${JSON.stringify(covers)};
+const bottom = page.children.reduce((m, n) => Math.max(m, n.type === "SECTION" ? n.y + n.height : 0), 0);
+const label = (t, x, y, size) => { const n = figma.createText(); n.fontName = { family: "Inter", style: "Semi Bold" }; n.characters = t; n.fontSize = size; n.x = x; n.y = y; return n; };
+const sec = figma.createSection(); sec.name = ${JSON.stringify("Batch " + name)}; page.appendChild(sec);
+const kids = [label(${JSON.stringify(name + " · profile preview (newest first)")}, G, G, 64)];
+let y = G + 140;
+for (const [i, id] of [...covers].reverse().entries()) { const src = await figma.getNodeByIdAsync(id); const c = src.clone(); c.x = G + (i % 3) * (W + 12); c.y = y + Math.floor(i / 3) * (H + 12); kids.push(c); }
+// Posts as columns to the right of the grid: label on top, slides stacked in order.
+let x = G + 3 * (W + 12) + 300; const top = G + 140; let maxY = top + Math.ceil(covers.length / 3) * (H + 12);
+for (const p of posts) {
+  kids.push(label(p, x, top - 100, 48));
+  let yy = top;
+  for (const n of nodes.filter((n) => n.post === p)) { const node = await figma.getNodeByIdAsync(n.nodeId); node.x = x; node.y = yy; kids.push(node); yy += H + G; }
+  maxY = Math.max(maxY, yy); x += W + 120;
+}
+y = maxY + G;
+for (const k of kids) sec.appendChild(k);
+const width = Math.max(...kids.map((k) => k.x + k.width)) + G;
+sec.resizeWithoutConstraints(width, y); sec.x = 0; sec.y = bottom + 400;
+return { sectionId: sec.id, posts: posts.length, slides: nodes.length };`);
+  } else die("usage: fw.mjs figma manifest|upload|layout <batch> [urls-file]");
+}
+
 // ---------- main ----------
-const [cmd, rawArg] = process.argv.slice(2);
-const arg = rawArg && rawArg !== "--force" ? resolve(rawArg) : rawArg; // absolute: the renderer loads pages by file:// URL
+const [cmd, rawArg, rawArg2, rawArg3] = process.argv.slice(2);
+const arg = rawArg && rawArg !== "--force" && !["history", "figma"].includes(cmd) ? resolve(rawArg) : rawArg; // absolute: the renderer loads pages by file:// URL
 const need = () => arg || die(`usage: fw.mjs ${cmd} <path>`);
-const run = { fonts: () => fonts({ force: arg === "--force" }), validate: () => validate(need()), render: () => render(need()), reel: () => reel(need()), sheet: () => sheet(need()), check: () => check(need()), package: () => pkg(need()) }[cmd];
-if (!run) { console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 10).map((l) => l.replace(/^\/\/ ?/, "")).join("\n")); process.exit(cmd ? 1 : 0); }
+const run = { fonts: () => fonts({ force: arg === "--force" }), validate: () => validate(need()), render: () => render(need()), reel: () => reel(need()), sheet: () => sheet(need()), grid: () => grid(need()), check: () => check(need()), package: () => pkg(need()), history: () => historyCmd(rawArg, rawArg2), figma: () => figmaCmd(rawArg, rawArg2, rawArg3) }[cmd];
+if (!run) { console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 13).map((l) => l.replace(/^\/\/ ?/, "")).join("\n")); process.exit(cmd ? 1 : 0); }
 await run();
