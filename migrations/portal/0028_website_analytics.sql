@@ -1,5 +1,5 @@
--- 0028 (website analytics): "Analytics" under each client's Website page. PROPOSED. Not applied anywhere: show it for review, then Staging only after approval;
--- Production only through the manual "Portal Production D1 migration" workflow, after its own approval. Needs 0011 (websites).
+-- 0028 (website analytics): "Analytics" under each client's Website page. Applied to Staging. Not applied to Production:
+-- only through the manual "Portal Production D1 migration" workflow, after its own approval. Needs 0011 (websites).
 --
 -- Two additive tables. Nothing existing changes. NO credentials are stored here: the Cloudflare API token and the Google service account key are Worker secrets.
 --   website_analytics        one row per website: WHICH Cloudflare Web Analytics site (its 32-character site tag) and WHICH Google Search Console property to read.

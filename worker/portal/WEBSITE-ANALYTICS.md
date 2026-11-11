@@ -1,6 +1,6 @@
 # Website Analytics (Client Portal, under each website)
 
-Status: **built on Staging, dormant until approved.** It needs proposed migration **0028** and two sets of server credentials. Until then the client page does not exist and the Website page does not offer it; nothing else changes.
+Status: **built on Staging; migration 0028 applied to Staging; dormant until credentials and per-website settings exist.** It needs two sets of server credentials. Until then the client page does not exist and the Website page does not offer it; nothing else changes.
 
 A client opens **Website, then a website, then Analytics** (`/portal/o/<slug>/website/<id>/analytics`, `website.view`, behind `PORTAL_WEBSITE`). Two sources, shown in separate, named sections and never added together:
 
@@ -21,7 +21,7 @@ Every figure has a **period-over-period** change (the same number of days just b
 ## Reuse
 Websites and their tenant-safe keys (`websites (id, organization_id)`), `getClientWebsite` (own organization, published, not archived), the `website.view` permission, the Website page layout, the SEO dashboard's `change()` helper and `sd-*` KPI tiles and set-up panels, the Admin website card and its panel pattern, and the Admin API rules (Cloudflare Access, `PORTAL_ADMIN_WRITES`, same origin). No new navigation, role or permission.
 
-## Data (proposed migration 0028, additive, no credentials)
+## Data (migration 0028, applied to Staging, additive, no credentials)
 * `website_analytics`: one row per website, the Cloudflare **site tag** (32 hex characters) and the Search Console **property** (`sc-domain:example.com` or `https://example.com/`). No row or an empty value = not connected.
 * `website_analytics_cache`: the last answer per website, source and period (aggregates only), with `ref` (the tag or property it was read for: an answer for a different one is never used). Changing or removing a setting drops that source's cache.
 Both tables reference `websites (id, organization_id)`; every statement names the organization. Multiple websites per client each keep their own rows.
@@ -34,8 +34,8 @@ Both tables reference `websites (id, organization_id)`; every statement names th
 | `GSC_SERVICE_ACCOUNT_JSON` | secret | the whole key file of a Google service account |
 Admin sees only whether each is present (a green "Server ready"), plus the service account's email (needed to add it in Search Console; not a secret). Errors are short codes (`unauthorized`, `property_not_found`, `rate_limited`, `query_failed`, `unreachable`): no key, token, tag or response text is ever logged, stored or shown to a client.
 
-## Owner checklist (nothing here is done yet)
-1. **Approve migration 0028** (it waits in `migrations/portal-proposed/`). Staging first; Production only through the manual workflow, later.
+## Owner checklist
+1. ~~Approve migration 0028~~ **Done on Staging** (applied after a Time Travel bookmark; tables verified). Production: only through the manual workflow, later, after its own approval.
 2. **Cloudflare**: create an API token (Account Analytics: Read, limited to the account); add `CF_ANALYTICS_API_TOKEN` as a Worker secret and `CF_ANALYTICS_ACCOUNT_ID` as a variable on Staging. In Cloudflare, enable **Web Analytics** for each client website (adds a small snippet; for a client's own site the client or their host adds it) and copy the site's tag.
 3. **Google**: create a Google Cloud project, enable the **Search Console API**, create a service account and a JSON key (no cost); add the key as the `GSC_SERVICE_ACCOUNT_JSON` secret. For each client website, have the property verified in Search Console and add the service account's email under Settings, Users and permissions as a **Restricted** (read-only) user.
 4. **Admin**: Clients, the client, Website, the website card, **Analytics**: enter the site tag and property, Save, then **Test** each. The client sees a source as soon as its setting is saved and the server credentials exist.

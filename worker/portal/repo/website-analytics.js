@@ -1,5 +1,5 @@
 /**
- * Website analytics data layer (proposed migration 0028). Two small tables: which Cloudflare Web Analytics site and which Search Console property a website reads, and the cached
+ * Website analytics data layer (migration 0028). Two small tables: which Cloudflare Web Analytics site and which Search Console property a website reads, and the cached
  * last answer from each. Credentials are never stored here. Every statement names organization_id, so another organization's website, settings or cache are simply "not found",
  * and a missing table reads as "not available" (the feature stays dormant) while any other database failure is thrown.
  */

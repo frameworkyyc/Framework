@@ -48,6 +48,7 @@ export const STAGES = Object.freeze([
   { file: "0025_seo_leads.sql", tables: [], indexes: ["idx_outreach_leads_seo"] }, // four nullable columns on outreach_leads and one index; needs 0024
   { file: "0026_outreach_tracking.sql", tables: [], indexes: ["idx_outreach_leads_outreach"] }, // five nullable columns on outreach_leads and one index (Mark as Contacted); needs 0024. Applied to Staging; Production only through this workflow, after approval
   { file: "0027_call_queue.sql", tables: [], indexes: ["idx_outreach_leads_call"] }, // three nullable columns on outreach_leads and one partial index (Call Queue); needs 0024. Applied to Staging; Production only through this workflow, after approval
+  { file: "0028_website_analytics.sql", tables: ["website_analytics", "website_analytics_cache"], indexes: ["idx_website_analytics_cache_org"] }, // two tables for Website Analytics (which Cloudflare site and Search Console property to read; cached aggregates); needs 0011. Applied to Staging; Production only through this workflow, after approval
 ]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",
