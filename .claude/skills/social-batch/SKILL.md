@@ -37,15 +37,19 @@ Spawn `creative-director` with the batch path ("budget and approved posts are in
 ## 4. Captions (Agent 03)
 Spawn `social-copywriter` with the batch path. Wait.
 
-## 5. Quality control: you
-Run the checks, then judge:
-1. `node social/engine/fw.mjs check <batch>`: 0 fail. `node social/engine/fw.mjs grid <batch>`: 0 fail.
-2. **Feed** (read `grid-preview.png` and `grid-report.md` once): judge the 3×3 block in actual Instagram display order (newest top-left), row by row and column by column, on top of the previous block. Does the grid look like a curated studio portfolio continuing the existing feed? Light and dark alternate; photography, typography, graphics and mockups are balanced; no similar covers side by side; headline positions and scales vary; detail is balanced with negative space; colour appears only inside imagery and only where it helps; logo and type are unmistakably Framework; quality is even across all posts.
-3. **Posts** (read `contact-sheet.png` once): no automatic Framework branding anywhere: no logo, wordmark or URL as a corner mark, footer, bottom strip or watermark, on covers and interiors alike (`fw check` enforces this; also judge it by eye). Branding appears only where the concept calls for it, with its reason in the spec. Covers stop the scroll; interiors are consistent and legible; nothing cropped, crowded or off-palette; images free of AI artefacts and text.
-4. **Strategy** (read the briefs' `checks` and the captions): every post passes the six questions (interesting to a stranger, real value, save/share/follow-worthy, credible, clear role, different from recent posts); the goal mix is about 5 attract / 3 trust / 1 convert or the deviation is explained; formats mix carousels, single-image posts and showcases; each CTA fits its post's purpose and none repeats; no engagement bait.
-5. **Words** (read every spec.json `headline`, `support`, `body` and `items`, and every caption file): spelling (Canadian), grammar, accuracy against `social/brand/facts.md`, no fabricated claims, no AI-advertising tone, Instagram and Facebook versions distinct where useful, hashtags only where they help.
-6. Corrections: SendMessage the responsible agent with exact, numbered fixes (post, slide or file, what to change). At most two rounds; then fix trivial issues yourself and note the rest. If visuals change after the Figma upload, ask the creative director to re-publish the changed posts.
-7. Write `<batch>/qc.md`: checks run, results, corrections, credits spent.
+## 5. Quality control: you (two dimensions; both must pass)
+Standard: `social/brand/art-direction.md`. Passing the automated checks is never proof of creative quality.
+
+**Technical**
+1. `node social/engine/fw.mjs check <batch>`: 0 fail (dimensions, branding, plain language, client colour with a reason, captions). `node social/engine/fw.mjs grid <batch>`: 0 fail.
+2. Read every spec.json text and every caption: spelling (Canadian), grammar, accuracy against `social/brand/facts.md`, correct client assets, no fabricated claims, complete deliverables.
+
+**Creative** (look at `grid-preview.png`, `contact-sheet.png` and full-size slides wherever detail matters; read the Creative Director's `review.md`)
+3. Score every post 1 to 5 on the eight questions in `art-direction.md`: compelling, art-directed like a premium studio, immediately understandable, one clear idea per slide, full canvas used with intent, presentation right for the subject (the work leads in portfolio posts), makes people want to follow, makes clients trust Framework's design. Any score under 4: redesign.
+4. Reject on sight: slides that look like presentation or template slides; flat screenshots on plain backgrounds; walls of text; specialist language on slides; repeated labels, numbers or rules; empty space that isn't deliberate; any Framework logo or URL used as a signature; carousels whose slides all share one layout.
+5. Feed: the 3×3 block in Instagram display order (newest top-left) on top of the previous block, with light and dark balanced, imagery and type mixed, no similar covers side by side, and every tile at the same quality.
+6. Corrections: SendMessage the responsible agent with exact, numbered fixes. At most two rounds per post; then fix trivial issues yourself and note the rest. Re-publish changed posts to the Figma board.
+7. Write `<batch>/qc.md`: technical results, creative scores, corrections, credits spent.
 
 ## 6. Package, record, hand over
 1. `node social/engine/fw.mjs package <batch>` → `export/<batch-id>/` and a `.zip`.

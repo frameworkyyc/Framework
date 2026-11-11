@@ -44,6 +44,7 @@ Posts are listed in **publishing order** (post 01 goes out first and ends up low
       "audience": "who it is for, specifically",
       "key_message": "the one idea, in one sentence",
       "angle": "why this is interesting, not generic",
+      "concept": "the visual idea: what the viewer sees and why it works",
       "checks": {
         "interesting": "why a stranger would stop for it",
         "value": "the educational, practical or visual value",
@@ -56,7 +57,9 @@ Posts are listed in **publishing order** (post 01 goes out first and ends up low
       "needs_confirmation": null,
       "slides": [
         {
-          "template": "type | minimal | photo | plate | split | showcase | diagram | cover | statement | point | list | compare | quote | cta | reel",
+          "role": "hook | context | the work | detail | proof | takeaway | next step",
+          "art_direction": "composition (art-direction.md toolbox), what fills the canvas, how much text (often none)",
+          "template": "canvas | type | minimal | photo | plate | split | showcase | diagram | cover | statement | point | list | compare | quote | cta | reel",
           "layout": "family variant, e.g. giant | top | split | caption",
           "theme": "paper | ink | mist",
           "eyebrow": "HOW WE WORK",

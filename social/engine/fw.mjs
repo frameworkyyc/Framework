@@ -8,11 +8,13 @@
 //   node social/engine/fw.mjs check <batch>              completeness, dimensions, caption and brand-voice lint
 //   node social/engine/fw.mjs grid <batch>               Instagram profile preview (3:4 grid crops, newest first, after published history) + feed checks
 //   node social/engine/fw.mjs package <batch>            export/ folder + zip of finished posts with captions alongside
+//   node social/engine/fw.mjs capture <url> <out.jpg> [desktop|mobile] [full]   authentic client-site screenshot at 2x/3x for mockups
 //   node social/engine/fw.mjs history add <batch> | recent [n] | report    content history (social/history/posts.csv) and performance summary
 //   node social/engine/fw.mjs figma manifest|upload|layout <batch> [urls]  push finished slides to the Figma feed board (see SKILL.md)
 import { createRequire } from "node:module";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, copyFileSync, rmSync } from "node:fs";
 import { join, resolve, basename, dirname } from "node:path";
+import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { slideHtml, resolveAsset, TEMPLATES, REPO_ROOT, CATEGORIES, familyOf, categoryOf, isImagery } from "./templates.mjs";
 
@@ -56,15 +58,23 @@ const FIT_SCRIPT = async () => {
   // Load every brand face before measuring: text metrics (and so the fit) depend on them.
   const faces = ['700 100px "Switzer"', '600 100px "Switzer"', '400 30px "General Sans"', '500 30px "General Sans"', '600 30px "General Sans"'];
   await Promise.all(faces.map((f) => document.fonts.load(f)));
+  // Device screens: a capture wider than the screen opening fills the width and scrolls vertically (never cropped at the sides).
+  for (const img of document.querySelectorAll(".device .screen img")) {
+    const sc = img.parentElement.getBoundingClientRect(), ratio = img.naturalWidth / img.naturalHeight;
+    if (ratio > sc.width / sc.height) {
+      const h = sc.width / ratio, scroll = Number(img.dataset.scroll || 0);
+      Object.assign(img.style, { position: "absolute", left: "0", width: "100%", height: h + "px", objectFit: "fill", top: (h > sc.height ? -scroll * (h - sc.height) : 0) + "px" });
+    }
+  }
   const out = { warnings: [], errors: [] };
-  const box = document.querySelector("[data-fit-box]");
+  const boxes = [...document.querySelectorAll("[data-fit-box]")], box = boxes[0];
   const fits = [...document.querySelectorAll("[data-fit]")];
   const base = fits.map((e) => parseFloat(getComputedStyle(e).fontSize));
   const maxH = box && box.dataset.maxH ? Number(box.dataset.maxH) : null;
-  const heads = [...document.querySelectorAll(".h1,.h2")];
+  const heads = [...document.querySelectorAll(".h1,.h2,.ct-head")];
   const lineCount = (h) => Math.round(h.getBoundingClientRect().height / parseFloat(getComputedStyle(h).lineHeight));
   const wraps = () => heads.some((h) => lineCount(h) > h.textContent.split("\n").length); // a headline breaking where the writer did not intend
-  const over = () => !!box && ((maxH ? box.offsetHeight > maxH : box.scrollHeight > box.clientHeight + 1) || fits.some((e) => e.scrollWidth > e.clientWidth + 1) || wraps());
+  const over = () => (boxes.slice(1).some((b) => b.scrollHeight > b.clientHeight + 1)) || !!box && ((maxH ? box.offsetHeight > maxH : box.scrollHeight > box.clientHeight + 1) || fits.some((e) => e.scrollWidth > e.clientWidth + 1) || wraps());
   let scale = 1;
   while (over() && scale > 0.72) { scale = +(scale - 0.03).toFixed(2); fits.forEach((e, i) => (e.style.fontSize = base[i] * scale + "px")); }
   out.scale = scale;
@@ -82,6 +92,10 @@ const FIT_SCRIPT = async () => {
     if (img.naturalWidth < need * 0.8) out.warnings.push(`low-resolution image: ${img.naturalWidth}px wide shown at ~${Math.round(need)}px (${decodeURIComponent(img.src).split("/").pop()})`);
   }
   if (!faces.every((f) => document.fonts.check(f))) out.errors.push("brand fonts did not load");
+  for (const t of document.querySelectorAll(".layer.ct:not([data-bleed])")) {
+    const r = t.getBoundingClientRect();
+    if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) out.errors.push(`text runs off the canvas: "${t.textContent.trim().slice(0, 40)}" (set bleed: true if intended)`);
+  }
   // Branding audit for fw check: every brand element and every piece of text naming Framework or its URL, with its position.
   const rect = (r) => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
   out.brand = [...document.querySelectorAll("[data-brand]")].map((e) => ({ kind: e.dataset.brand, ...rect(e.getBoundingClientRect()) }));
@@ -119,7 +133,8 @@ async function renderPost(browser, postDir) {
     if ("footer" in s) throw new Error(`${postDir} slide ${i + 1}: "footer" no longer exists (no branded footers); put a citation in "source"`);
     if (s.image && !existsSync(resolveAsset(s.image, postDir))) throw new Error(`${postDir} slide ${i + 1}: image not found: ${s.image}`);
     const n = i + 1, total = slides.length;
-    const ctx = { n, total, isLast: n === total || spec.format !== "carousel", counter: spec.format === "carousel" ? `${String(n).padStart(2, "0")} / ${String(total).padStart(2, "0")}` : "", w, h, postDir: resolve(postDir), fontsCss: FONTS_CSS, slideCss: SLIDE_CSS };
+    const fontFaces = (spec.fonts || []).map((f) => `@font-face{font-family:"${f.family}";src:url("${pathToFileURL(resolveAsset(f.src, postDir)).href}");font-weight:${f.weight || 400}}`).join("");
+    const ctx = { fontFaces, n, total, isLast: n === total || spec.format !== "carousel", counter: spec.format === "carousel" ? `${String(n).padStart(2, "0")} / ${String(total).padStart(2, "0")}` : "", w, h, postDir: resolve(postDir), fontsCss: FONTS_CSS, slideCss: SLIDE_CSS };
     const html = join(build, `slide-${String(n).padStart(2, "0")}.html`);
     writeFileSync(html, slideHtml(s, ctx));
     await page.goto("file://" + html, { waitUntil: "load" });
@@ -208,6 +223,8 @@ function validate(batch) {
     if (post.cta_type !== "none" && !post.cta) errs.push(`${at}: cta text missing (or set cta_type "none")`);
     for (const c of CHECKS) if (!post.checks || !String(post.checks[c] || "").trim()) errs.push(`${at}: checks.${c} unanswered (a post that fails a question is revised, not shipped)`);
     if (post.needs_confirmation) warns.push(`${at}: needs owner confirmation: ${post.needs_confirmation}`);
+    if (!post.concept) warns.push(`${at}: no "concept" (the visual idea; see art-direction.md)`);
+    for (const [k, sl] of (post.slides || []).entries()) for (const [re, alt] of JARGON) { const m = slideText(sl).match(re); if (m) warns.push(`${at} slide ${k + 1}: specialist term "${m[0]}" planned on a slide: ${alt}`); }
     const slides = post.slides || [];
     if (post.format === "carousel" && (slides.length < 3 || slides.length > 10)) errs.push(`${at}: carousels need 3-10 slides`);
     if (post.format === "single" && slides.length !== 1) errs.push(`${at}: single posts have exactly 1 slide`);
@@ -283,6 +300,38 @@ function brandingIssues(d, spec, w, h) {
   if (branded > 1) out.push(`brand element on ${branded} slides: an intentional brand moment appears once per post at most`);
   return out;
 }
+// Plain language (owner rule): slides speak to everyday business owners. Jargon and specialist terms belong in captions,
+// explained, not on slides. Each entry: [pattern, plain alternative].
+const JARGON = [[/largest contentful paint|\bLCP\b/i, "say how fast the page appears"], [/percentile/i, "say 'most visits'"], [/\bWCAG\b|level a{1,3}\b/i, "say 'easy to read' or 'accessible'"],
+  [/\bCTA\b|call[- ]to[- ]action/i, "say 'next step' or the button's words"], [/\bUX\b|\bUI\b/i, "say 'easy to use'"], [/\bCMS\b/i, "say 'the system you edit your site in'"], [/\bKPIs?\b/i, "say what you measure"],
+  [/structured data|schema markup|metadata|\bmeta (?:title|description)/i, "say what it does for the customer"], [/viewport|responsive breakpoint/i, "say 'on a phone'"], [/canonical|crawl(?:er|ing)?|\bSERPs?\b|backlinks?/i, "say what Google does or shows"],
+  [/bounce rate/i, "say 'people leave right away'"], [/\b(?:DNS|SSL|API|HTML|CSS)\b/, "describe the outcome, not the technology"], [/\b\d+\s?px\b|\bpixels?\b/i, "describe the size people experience (e.g. 'big enough for a thumb')"], [/contrast ratio|\d(?:\.\d)?\s?:\s?1\b/i, "say 'text people can read'"]];
+const slideText = (s) => [s.eyebrow, s.headline, s.headline2, s.support, s.body, s.giant, s.quote, ...(s.items || []).flatMap((i) => (typeof i === "string" ? [i] : [i.title, i.desc, i.label])), ...(s.rows || []).flat(), ...(s.layers || []).filter((l) => l.type === "text").map((l) => l.text)].filter(Boolean).join(" \n ").replace(/\{\{|\}\}|\*\*/g, "");
+const BRAND_HEX = ["#0a0a0a", "#ffffff", "#5c5c5c", "#a3a3a3", "#e0e0e0", "#f5f5f5", "#fff", "#000000"];
+function creativeIssues(d, spec, w, h) {
+  const out = [], say = (lvl, m) => out.push([lvl, m]);
+  spec.slides.forEach((s, i) => {
+    const at = `slide ${i + 1}`, text = slideText(s);
+    for (const [re, alt] of JARGON) { const m = text.match(re); if (m && !s.plainLanguageOk) say("FAIL", `${at}: specialist term "${m[0]}" on the slide: ${alt}; put the technical detail and source in the caption`); }
+    const words = text.split(/\s+/).filter((x) => /\w/.test(x)).length;
+    if (words > 45) say("FAIL", `${at}: ${words} words on one slide (45 max; let the image or a second slide carry it)`);
+    else if (words > 32) say("WARN", `${at}: ${words} words: a slide should read in a few seconds`);
+    const hexes = JSON.stringify(s).match(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g) || [];
+    const off = [...new Set(hexes.map((x) => x.toLowerCase()))].filter((x) => !BRAND_HEX.includes(x));
+    if (off.length && !s.clientColour) say("FAIL", `${at}: colours ${off.join(", ")} outside Framework's palette without "clientColour" (colour belongs to client work, photography or concept art)`);
+  });
+  const withEyebrow = spec.slides.filter((s) => s.eyebrow).length;
+  if (spec.slides.length >= 3 && withEyebrow / spec.slides.length > 0.5) say("WARN", `${withEyebrow} of ${spec.slides.length} slides carry an eyebrow label: use labels only where they help`);
+  if (spec.slides.filter((s) => s.header).length > 1) say("WARN", "ruled headers on several slides read as template furniture");
+  // Mostly-empty canvas: a slide that is almost all background with no image reads as an unfinished template.
+  const pngs = spec.slides.map((s, i) => ({ s, f: join(d, "slides", `${String(i + 1).padStart(2, "0")}.png`) })).filter(({ s, f }) => existsSync(f) && !isImagery(s) && s.template !== "minimal" && !s.intentionalSpace);
+  if (pngs.length) {
+    const py = "import sys,json\nfrom PIL import Image\nout=[]\nfor p in sys.argv[1:]:\n  im=Image.open(p).convert('L').resize((108,135)); px=list(im.get_flattened_data() if hasattr(im,'get_flattened_data') else im.getdata()); bg=max(set(px),key=px.count); out.append(sum(1 for v in px if abs(v-bg)<=6)/len(px))\nprint(json.dumps(out))";
+    const fr = JSON.parse(execFileSync("python3", ["-I", "-c", py, ...pngs.map((p) => p.f)]).toString());
+    fr.forEach((v, k) => { if (v > 0.9) say("WARN", `slide ${spec.slides.indexOf(pngs[k].s) + 1}: ${Math.round(v * 100)}% empty background: use the canvas (scale, image, composition) or set intentionalSpace with a reason`); });
+  }
+  return out;
+}
 function check(batch) {
   let fail = 0, warn = 0;
   const say = (lvl, m) => { console.log(`${lvl} ${m}`); lvl === "FAIL" ? fail++ : lvl === "WARN" ? warn++ : 0; };
@@ -299,6 +348,7 @@ function check(batch) {
     for (const f of pngs) { const s = pngSize(join(d, "slides", f)); if (s.w !== w || s.h !== h) say("FAIL", `${id}/${f}: ${s.w}x${s.h}, expected ${w}x${h}`); }
     if (spec.slides.some((s) => s.image && /^https?:/.test(s.image))) say("FAIL", `${id}: remote image URL in spec (download it into images/ first)`);
     for (const m of brandingIssues(d, spec, w, h)) say("FAIL", `${id}: ${m}`);
+    for (const [lvl, m] of creativeIssues(d, spec, w, h)) say(lvl, `${id}: ${m}`);
     for (const [file, platform] of [["caption-instagram.txt", "instagram"], ["caption-facebook.txt", "facebook"], ["alt-text.txt", "alt"]]) {
       const p = join(d, file);
       if (!existsSync(p)) { say("FAIL", `${id}: missing ${file}`); continue; }
@@ -552,10 +602,26 @@ return { swapped, unmatched: fresh.filter((n) => !swapped.some((s) => s[1] === n
   } else die("usage: fw.mjs figma manifest|upload|layout|replace <batch> [urls-file]");
 }
 
+// ---------- capture: authentic, high-resolution screenshots of a live client website ----------
+// desktop: 1440x900 viewport at 2x (2880px wide); mobile: 390x844 at 3x (1170px wide). "full" captures the whole page.
+async function capture(url, out, mode = "desktop", full = "") {
+  if (!url || !out) die("usage: fw.mjs capture <url> <out.jpg> [desktop|mobile] [full]");
+  const mobile = mode === "mobile";
+  mkdirSync(dirname(resolve(out)), { recursive: true });
+  await withBrowser(async (b) => {
+    const page = await b.newPage({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 }, deviceScaleFactor: mobile ? 3 : 2, isMobile: mobile, hasTouch: mobile });
+    await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
+    await page.waitForTimeout(2500); // let entrance animations settle
+    if (full) { await page.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)); } window.scrollTo(0, 0); }); await page.waitForTimeout(800); }
+    await page.screenshot({ path: resolve(out), type: "jpeg", quality: 88, fullPage: !!full });
+  });
+  console.log(`ok   ${out}`);
+}
+
 // ---------- main ----------
 const [cmd, rawArg, rawArg2, rawArg3] = process.argv.slice(2);
-const arg = rawArg && rawArg !== "--force" && !["history", "figma"].includes(cmd) ? resolve(rawArg) : rawArg; // absolute: the renderer loads pages by file:// URL
+const arg = rawArg && rawArg !== "--force" && !["history", "figma", "capture"].includes(cmd) ? resolve(rawArg) : rawArg; // absolute: the renderer loads pages by file:// URL
 const need = () => arg || die(`usage: fw.mjs ${cmd} <path>`);
-const run = { fonts: () => fonts({ force: arg === "--force" }), validate: () => validate(need()), render: () => render(need()), reel: () => reel(need()), sheet: () => sheet(need()), grid: () => grid(need()), check: () => check(need()), package: () => pkg(need()), history: () => historyCmd(rawArg, rawArg2), figma: () => figmaCmd(rawArg, rawArg2, rawArg3) }[cmd];
+const run = { fonts: () => fonts({ force: arg === "--force" }), validate: () => validate(need()), render: () => render(need()), reel: () => reel(need()), sheet: () => sheet(need()), grid: () => grid(need()), check: () => check(need()), package: () => pkg(need()), history: () => historyCmd(rawArg, rawArg2), capture: () => capture(rawArg, rawArg2, rawArg3, process.argv[6]), figma: () => figmaCmd(rawArg, rawArg2, rawArg3) }[cmd];
 if (!run) { console.log(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 13).map((l) => l.replace(/^\/\/ ?/, "")).join("\n")); process.exit(cmd ? 1 : 0); }
 await run();
