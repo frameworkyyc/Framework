@@ -332,6 +332,18 @@ test("Admin API: read, save, validate, test; credentials never returned; writes 
 
 /* ---------- wiring ---------- */
 const src = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
+test("config: the Cloudflare account id lives in wrangler.jsonc (Staging only) so a deploy cannot delete it; every analytics credential name is known to the health check", () => {
+  const cfg = JSON.parse(src("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, "").replace(/,(\s*[}\]])/g, "$1"));
+  assert.match(cfg.previews.vars.CF_ANALYTICS_ACCOUNT_ID, /^[0-9a-f]{32}$/, "Staging carries it in the file, or the next deploy deletes it (the client page would say traffic is not connected)");
+  assert.equal(cfg.vars.CF_ANALYTICS_ACCOUNT_ID, undefined, "Production is untouched");
+  assert.ok(!/CF_ANALYTICS_API_TOKEN|GSC_OAUTH/.test(src("wrangler.jsonc").replace(/^\s*\/\/.*$/gm, "")), "secrets are never in the file");
+  assert.deepEqual(cf.credentials({ CF_ANALYTICS_API_TOKEN: "t", CF_ANALYTICS_ACCOUNT_ID: cfg.previews.vars.CF_ANALYTICS_ACCOUNT_ID }), { token: "t", account: cfg.previews.vars.CF_ANALYTICS_ACCOUNT_ID });
+  assert.equal(cf.credentials({ CF_ANALYTICS_API_TOKEN: "t" }), null, "a token without the account id is the 'not connected' state");
+  const expected = JSON.parse(src("scripts/ops/staging-expected.json"));
+  assert.equal(expected.plainVars.CF_ANALYTICS_ACCOUNT_ID, cfg.previews.vars.CF_ANALYTICS_ACCOUNT_ID);
+  for (const n of ["CF_ANALYTICS_API_TOKEN", "GSC_OAUTH_CLIENT_ID", "GSC_OAUTH_CLIENT_SECRET", "GSC_OAUTH_REFRESH_TOKEN"]) assert.ok(expected.secrets.optional.includes(n), n);
+});
+
 test("wiring: the client route sits under the website page behind website.view and the website flag; the Admin panel and API are registered; no secret is ever read into a page", () => {
   const router = src("worker/portal/router.js");
   assert.match(router, /website\\\/\(\[\^\/\]\+\)\\\/analytics\$\/, action: "website\.view"/);
