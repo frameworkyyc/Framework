@@ -40,6 +40,7 @@ function buildShell() {
   const bar = h("header", { class: "adm-bar" }, brand(), toggle);
 
   const userLine = h("p", { id: "adm-user" }, "");
+  const rest = live.filter((m) => !NAV_GROUPS.some(([, ids]) => ids.includes(m.id))); // modules in no group; no empty group (and no extra divider) when there are none
   side = h(
     "aside",
     { class: "adm-side", id: "adm-side" },
@@ -48,7 +49,7 @@ function buildShell() {
       "nav",
       { class: "adm-nav", "aria-label": "Admin" },
       NAV_GROUPS.map(([title, ids]) => { const items = live.filter((m) => ids.includes(m.id)); return items.length ? h("div", { class: "adm-nav__group" }, title ? h("p", { class: "adm-nav__title", text: title }) : null, h("ul", null, items.map(navItem))) : null; }),
-      h("div", { class: "adm-nav__group" }, h("ul", null, live.filter((m) => !NAV_GROUPS.some(([, ids]) => ids.includes(m.id))).map(navItem))),
+      rest.length ? h("div", { class: "adm-nav__group" }, h("ul", null, rest.map(navItem))) : null,
     ),
     h("div", { class: "adm-side__foot" }, userLine, h("a", { href: "/", target: "_blank", rel: "noopener" }, "View website"), h("a", { href: "/cdn-cgi/access/logout" }, "Sign out")),
   );

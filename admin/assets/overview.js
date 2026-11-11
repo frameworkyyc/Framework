@@ -185,14 +185,6 @@ function clientSection(cl) {
   return section("adm-cl", "Clients", lines.length ? h("ul", { class: "adm-feed" }, lines) : empty("No clients yet. Add the first one under Clients."), ["/admin/clients", "All clients"]);
 }
 
-function activitySection(items) {
-  if (!items) return null;
-  const body = items.length
-    ? h("ul", { class: "adm-feed rk-timeline" }, items.map((a) => row(a.orgName ? `${a.label}: ${a.orgName}` : a.label, ago(a.at), a.organizationId ? `/admin/clients/${enc(a.organizationId)}` : null)))
-    : empty("Nothing has happened yet.");
-  return section("adm-act", "Recent activity", body);
-}
-
 export async function render() {
   const [dash, feedback, services, assess] = await Promise.all([quiet("/dashboard"), quiet("/overview"), quiet("/services/attention"), quiet("/assessments/summary")]);
   const d = dash && dash.available ? dash : null;
@@ -210,7 +202,7 @@ export async function render() {
     ...[
       attentionSection(attentionItems({ dash: d, services: svc, assess, feedback })),
       kpiGrid({ dash: d, feedback, requestsCard }),
-      h("div", { class: "adm-dash__cols" }, ...[requestsEl, requestsEl ? null : supportSection(d && d.support), invoiceSection(d && d.invoices), clientSection(d && d.clients), activitySection(d && d.activity)].filter(Boolean)),
+      h("div", { class: "adm-dash__cols" }, ...[requestsEl, requestsEl ? null : supportSection(d && d.support), invoiceSection(d && d.invoices), clientSection(d && d.clients)].filter(Boolean)),
       recent ? section("adm-recent", "Recent feedback", recent, feedback.recent.length ? ["/admin/feedback", "All feedback"] : null) : null,
     ].filter(Boolean),
   );
