@@ -1,0 +1,159 @@
+/* Framework social slides. Tokens from social/brand/brand-system.md. Sharp corners, flat fills, hairlines; no shadows, gradients or radius. */
+:root { --ink: #0A0A0A; --paper: #FFFFFF; --slate: #5C5C5C; --stone: #A3A3A3; --hair: #E0E0E0; --mist: #F5F5F5; --m: 88px; }
+* { margin: 0; padding: 0; box-sizing: border-box; border-radius: 0; }
+html, body { width: var(--w); height: var(--h); background: transparent; }
+body { font-family: "General Sans", sans-serif; -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-kerning: normal; }
+
+.slide { position: relative; width: var(--w); height: var(--h); overflow: hidden; display: flex; flex-direction: column; background: var(--bg); color: var(--fg); }
+.paper { --bg: var(--paper); --fg: var(--ink); --muted: var(--slate); --label: var(--stone); --rule: var(--hair); }
+.ink   { --bg: var(--ink); --fg: var(--paper); --muted: var(--stone); --label: var(--stone); --rule: var(--slate); }
+.mist  { --bg: var(--mist); --fg: var(--ink); --muted: var(--slate); --label: var(--stone); --rule: var(--hair); }
+
+/* Optional architectural grid: 1px rules on a 90px module (12 columns across 1080). */
+.slide.grid::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .55;
+  background-image: linear-gradient(to right, var(--rule) 1px, transparent 1px), linear-gradient(to bottom, var(--rule) 1px, transparent 1px);
+  background-size: 90px 90px; background-position: -1px -1px; }
+.slide > * { position: relative; }
+
+/* Chrome: ruled header and footer, like a drawing's title block. */
+.top { flex: none; height: 136px; padding: 0 var(--m); display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--rule); background: var(--bg); }
+.bottom { flex: none; height: 112px; padding: 0 var(--m); display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--rule); background: var(--bg); }
+.eyebrow { font: 600 24px/1 "General Sans"; letter-spacing: .16em; text-transform: uppercase; color: var(--label); }
+.counter { font: 600 24px/1 "Switzer"; letter-spacing: .06em; color: var(--label); font-variant-numeric: tabular-nums; }
+.lockup { display: flex; align-items: center; gap: 18px; }
+.lockup svg { width: 40px; height: 40px; display: block; }
+.wordmark { font: 600 20px/1 "General Sans"; letter-spacing: .30em; margin-right: -.30em; text-transform: uppercase; color: var(--fg); }
+.foot-right { font: 500 22px/1 "General Sans"; color: var(--muted); letter-spacing: .02em; }
+.foot-right.arrow { font: 600 30px/1 "Switzer"; color: var(--fg); }
+
+/* Body: the fit box. */
+.body { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 64px var(--m); display: flex; flex-direction: column; }
+.end { justify-content: flex-end; }
+.center { justify-content: center; }
+.stack > * + * { margin-top: 36px; }
+.spacer { flex: 1 1 auto; }
+
+/* Type. Sizes are set inline per template (--fs) so the fitter can scale them. */
+.h1 { font: 700 var(--fs, 120px)/0.98 "Switzer"; letter-spacing: -0.02em; white-space: pre-line; }
+.h2 { font: 600 var(--fs, 72px)/1.04 "Switzer"; letter-spacing: -0.01em; white-space: pre-line; }
+.support { font: 400 var(--fs, 34px)/1.45 "General Sans"; color: var(--muted); max-width: 860px; white-space: pre-line; }
+.support strong, .body-text strong { font-weight: 600; color: var(--fg); }
+.body-text { font: 400 var(--fs, 34px)/1.5 "General Sans"; color: var(--muted); max-width: 880px; white-space: pre-line; }
+.muted { color: var(--muted); }
+.index-big { font: 600 180px/0.8 "Switzer"; letter-spacing: -0.03em; color: var(--label); }
+
+/* Photography. Desaturated by default (brand 02). */
+figure.photo { flex: none; overflow: hidden; background: var(--mist); }
+figure.photo img { display: block; width: 100%; height: 100%; object-fit: var(--fit, cover); object-position: var(--focus, 50% 50%); }
+.mono img { filter: grayscale(1) contrast(1.06); }
+.muted-photo img { filter: saturate(.3) contrast(1.04); }
+.bleed { margin: 0 calc(-1 * var(--m)); }
+
+/* Full-bleed photo with a solid panel (no gradient scrims). */
+.full-photo { position: absolute; inset: 0; width: 100%; height: 100%; }
+.full-photo img { width: 100%; height: 100%; object-fit: cover; object-position: var(--focus, 50% 50%); display: block; }
+.panel { position: absolute; left: 0; right: 0; bottom: 0; background: var(--bg); }
+.panel .panel-body { padding: 60px var(--m) 52px; }
+.panel .panel-body > * + * { margin-top: 28px; }
+.tag { position: absolute; top: 0; right: 0; background: var(--bg); padding: 30px 40px; }
+.tag-left { position: absolute; top: 0; left: 0; background: var(--bg); padding: 30px 40px; }
+
+/* Numbered rows (brand 04: index labels + hairlines). */
+.rows { list-style: none; font-size: var(--fs, 38px); border-bottom: 1px solid var(--rule); }
+.rows li { display: grid; grid-template-columns: 2.6em 1fr; padding: .78em 0; border-top: 1px solid var(--rule); align-items: baseline; }
+.rows .i { font: 600 .7em/1 "Switzer"; color: var(--label); letter-spacing: .04em; }
+.rows .t { font: 600 1em/1.12 "Switzer"; letter-spacing: -0.01em; }
+.rows .d { display: block; font: 400 .72em/1.42 "General Sans"; color: var(--muted); margin-top: .35em; }
+
+/* Two-column comparison (like the brand PDF's tables). */
+.compare { display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; font-size: var(--fs, 32px); }
+.compare .head { font: 600 24px/1 "General Sans"; letter-spacing: .18em; text-transform: uppercase; padding-bottom: 22px; border-bottom: 1px solid var(--fg); }
+.compare .head.l { color: var(--label); }
+.compare .cell { font: 400 1em/1.38 "General Sans"; padding: .8em 0; border-bottom: 1px solid var(--rule); }
+.compare .cell.l { color: var(--muted); }
+.compare .cell.r { font-weight: 500; }
+
+/* Quote. */
+.quote { font: 600 var(--fs, 56px)/1.16 "Switzer"; letter-spacing: -0.01em; white-space: pre-line; }
+.attrib { display: flex; flex-direction: column; gap: 10px; padding-top: 28px; border-top: 1px solid var(--fg); width: 520px; }
+.attrib .who { font: 600 28px/1.2 "General Sans"; }
+.attrib .role { font: 400 26px/1.3 "General Sans"; color: var(--muted); }
+
+/* Call to action. Ink slide: secondary button (1px paper border). Paper slide: primary (ink fill). */
+.mark-big svg { width: 132px; height: 132px; display: block; }
+.btn { display: inline-flex; align-items: center; gap: 18px; align-self: flex-start; font: 600 30px/1 "General Sans"; padding: 28px 38px; }
+.ink .btn { border: 1px solid var(--paper); color: var(--paper); }
+.paper .btn, .mist .btn { background: var(--ink); color: var(--paper); }
+
+/* Reel overlay: transparent canvas, ink panel kept clear of Instagram's bottom UI. */
+.reel { background: transparent; }
+.reel .panel .panel-body { padding: 64px var(--m) 330px; }
+.reel .tag-left { padding: 40px var(--m); }
+
+/* ===== Layout families for feed variety (TEMPLATES.md). Same tokens, different silhouettes. ===== */
+
+/* type: editorial typography posters */
+.align-right { text-align: right; align-items: flex-end; }
+.align-right .support { margin-left: auto; }
+.giant-word { font: 700 var(--fs, 300px)/0.82 "Switzer"; letter-spacing: -0.045em; white-space: pre; margin-left: -0.05em; }
+.giant-word.bleed { margin-right: calc(-1 * var(--m) - 200px); }
+.split-a { align-self: flex-start; }
+.split-b { align-self: flex-end; text-align: right; }
+
+/* minimal: one restrained line in a large field */
+.min-text { font: 600 var(--fs, 52px)/1.12 "Switzer"; letter-spacing: -0.01em; white-space: pre-line; max-width: 760px; }
+.pos-center { justify-content: center; align-items: center; text-align: center; }
+.pos-top-left { justify-content: flex-start; }
+.pos-bottom-left { justify-content: flex-end; }
+.pos-bottom-right { justify-content: flex-end; align-items: flex-end; text-align: right; }
+.min-rule { width: 96px; height: 1px; background: var(--fg); margin-bottom: 40px; }
+.pos-center .min-rule { margin-left: auto; margin-right: auto; }
+.pos-bottom-right .min-rule { margin-left: auto; }
+
+/* plate: architecture-monograph page, photo framed by paper */
+.plate-caption { display: grid; grid-template-columns: 180px 1fr; column-gap: 32px; padding-top: 36px; border-top: 1px solid var(--fg); flex: none; }
+.plate-caption .fig { font: 600 24px/1.2 "Switzer"; color: var(--label); letter-spacing: .04em; }
+.plate-caption .h2 { margin: 0; }
+.plate-caption .support { margin-top: 18px; }
+
+/* photo, layout caption: maximum image, small solid label */
+.label-block { position: absolute; left: 0; bottom: 0; background: var(--bg); padding: 44px 56px 40px var(--m); max-width: 820px; }
+.label-block > * + * { margin-top: 22px; }
+.label-block .lockup { margin-top: 34px; }
+
+/* showcase: portfolio work on a quiet stage */
+.stage { position: relative; flex: none; }
+.stage .main { width: 100%; border: 1px solid var(--rule); background: var(--paper); overflow: hidden; }
+.stage .main img { display: block; width: 100%; height: 100%; object-fit: var(--fit, cover); object-position: var(--focus, 50% 0%); }
+.stage .second { position: absolute; right: 40px; bottom: -64px; width: 228px; height: 470px; border: 1px solid var(--fg); background: var(--paper); overflow: hidden; }
+.stage .second.left { right: auto; left: 40px; }
+.stage .second img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 0%; }
+.tags { display: flex; flex-wrap: wrap; gap: 0; font: 600 20px/1 "General Sans"; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.tags span + span::before { content: "·"; padding: 0 16px; color: var(--label); }
+
+/* split: asymmetric two-column grid, photo full height */
+.split-wrap { display: grid; height: 100%; grid-template-columns: var(--cols, 1fr 1fr); }
+.split-wrap.right { direction: rtl; }
+.split-wrap.right > * { direction: ltr; }
+.split-wrap figure.photo { height: 100%; }
+.split-text { display: flex; flex-direction: column; min-height: 0; padding: 56px 64px 48px; }
+.split-text .top-row { display: flex; justify-content: space-between; align-items: center; }
+.split-text .body { padding: 0; }
+
+/* diagram: educational graphics */
+.flow { list-style: none; position: relative; font-size: var(--fs, 36px); }
+.flow::before { content: ""; position: absolute; left: 11px; top: .55em; bottom: .9em; width: 1px; background: var(--fg); }
+.flow li { position: relative; display: grid; grid-template-columns: 2.2em 2.4em 1fr; align-items: baseline; padding: 0 0 .7em; }
+.flow li::before { content: ""; position: absolute; left: 0; top: .3em; width: 23px; height: 23px; background: var(--bg); border: 1px solid var(--fg); }
+.flow li.on::before { background: var(--fg); }
+.flow .i { grid-column: 2; font: 600 .62em/1 "Switzer"; color: var(--label); letter-spacing: .04em; }
+.flow .t { grid-column: 3; font: 600 1em/1.1 "Switzer"; letter-spacing: -0.01em; }
+.flow .d { grid-column: 3; font: 400 .66em/1.4 "General Sans"; color: var(--muted); margin-top: .2em; }
+.bars { list-style: none; font-size: var(--fs, 30px); }
+.bars li { display: grid; grid-template-columns: 1fr auto; row-gap: 14px; padding: 22px 0; border-top: 1px solid var(--rule); }
+.bars li:last-child { border-bottom: 1px solid var(--rule); }
+.bars .l { font: 500 1em/1.2 "General Sans"; }
+.bars .v { font: 600 1em/1.2 "Switzer"; font-variant-numeric: tabular-nums; }
+.bars .track { grid-column: 1 / -1; height: 18px; background: var(--rule); }
+.bars .fill { height: 100%; background: var(--fg); }
+.src-note { font: 400 20px/1.3 "General Sans"; color: var(--label); margin-top: 18px; }

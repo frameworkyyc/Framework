@@ -1,0 +1,20 @@
+{
+  "id": "01",
+  "slug": "strategy-before-design",
+  "format": "carousel",
+  "slides": [
+    { "template": "cover", "eyebrow": "How we work", "headline": "Most businesses\nstart with a logo.\n{{We start with\na plan.}}", "support": "Six stages. The same sequence for every client." },
+    { "template": "point", "eyebrow": "Stage 01", "index": "01", "headline": "Discover", "body": "We learn how the business works today, who it serves and what success looks like. **Assumptions go before any design does.**" },
+    { "template": "list", "eyebrow": "The Framework Method", "headline": "Six stages,\nin the same order.", "items": [
+      { "title": "Discover", "desc": "Your business, market and goals." },
+      { "title": "Define", "desc": "Strategy, positioning and messaging." },
+      { "title": "Design", "desc": "Identity and website, tied to the strategy." },
+      { "title": "Build", "desc": "Built to be structurally sound." },
+      { "title": "Launch", "desc": "Live, with the SEO foundation in place." },
+      { "title": "Grow", "desc": "We stay involved after launch." } ] },
+    { "template": "compare", "eyebrow": "The difference", "headline": "Order matters.", "leftLabel": "Common", "rightLabel": "Framework", "rows": [
+      ["A logo first", "A strategy first"], ["A website bolted on", "A website built on the strategy"], ["Nothing connected", "One system, one standard"] ] },
+    { "template": "cover", "eyebrow": "Drawn, then built", "headline": "Nothing goes up\nuntil the foundation\nis set.", "image": "@site/assets/img/drafting.jpg", "imageFocus": "50% 40%", "imageHeight": 560 },
+    { "template": "cta", "eyebrow": "Start with Discover", "headline": "One conversation\nabout your business.", "support": "No obligation past that.", "button": "Book a consultation" }
+  ]
+}

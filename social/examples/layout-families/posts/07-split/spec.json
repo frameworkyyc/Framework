@@ -1,0 +1,17 @@
+{
+ "id": "07",
+ "slug": "split",
+ "format": "single",
+ "slides": [
+  {
+   "template": "split",
+   "theme": "ink",
+   "side": "right",
+   "cols": "1fr 1.1fr",
+   "eyebrow": "Contractors",
+   "image": "@site/assets/img/steel-erection.jpg",
+   "headline": "Your work is\nthe proof.",
+   "support": "So the website should show it, in real photos, up front."
+  }
+ ]
+}

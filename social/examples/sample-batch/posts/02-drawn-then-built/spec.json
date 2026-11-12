@@ -1,0 +1,8 @@
+{
+  "id": "02",
+  "slug": "drawn-then-built",
+  "format": "single",
+  "slides": [
+    { "template": "photo", "theme": "ink", "eyebrow": "Strategy first", "headline": "Plan the work.\nThen work the plan.", "support": "Strategy first. Design second. Execution third.", "image": "@site/assets/img/steel-erection.jpg", "imageFocus": "50% 30%" }
+  ]
+}
