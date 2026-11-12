@@ -305,6 +305,8 @@ const CTA_TYPES = ["save", "engage", "explore", "credibility", "lead", "none"];
 // Aesthetic standard (owner rule, 2026-11-12): editorial, architectural, industrial, premium (social/brand/art-direction.md, references in
 // social/brand/references/aesthetic/). Plans and image prompts may not ask for the treatments the owner ruled out.
 const OFF_AESTHETIC = /\bcoz(?:y|ier)\b|\bcosy\b|cheerful|playful|whimsical|\bcute\b|cartoon|smiling|happy (?:family|families|customers|people|couple)|bright and airy|warm and inviting|\bsuburban\b|stock[- ]photo|homey|friendly neighbou?rhood|lifestyle stock|candid family/i;
+// Exclusions ("no cozy staging", "without a stock-photo look") are the prompt grammar's own closing line: ignore negated phrases.
+const offAesthetic = (text) => String(text || "").replace(/\b(?:no|not|never|without|avoid(?:ing)?)\b[^.;:\n"]*/gi, " ").match(OFF_AESTHETIC);
 const CHECKS = ["interesting", "value", "save_share_follow", "credibility", "role", "different"];
 function validate(batch) {
   const p = join(batch, "briefs.json");
@@ -324,7 +326,7 @@ function validate(batch) {
     if (!CTA_TYPES.includes(post.cta_type)) errs.push(`${at}: cta_type must be one of ${CTA_TYPES.join("/")}`);
     if (post.cta_type !== "none" && !post.cta) errs.push(`${at}: cta text missing (or set cta_type "none")`);
     for (const c of CHECKS) if (!post.checks || !String(post.checks[c] || "").trim()) errs.push(`${at}: checks.${c} unanswered (a post that fails a question is revised, not shipped)`);
-    { const m = JSON.stringify([post.concept, post.angle, ...(post.slides || []).flatMap((sl) => [sl.art_direction, sl.visual?.prompt, sl.visual?.direction])]).match(OFF_AESTHETIC); if (m) errs.push(`${at}: "${m[0]}" is outside Framework's aesthetic (editorial, architectural, industrial, premium; art-direction.md)`); }
+    { const m = offAesthetic(JSON.stringify([post.concept, post.angle, ...(post.slides || []).flatMap((sl) => [sl.art_direction, sl.visual?.prompt, sl.visual?.direction])])); if (m) errs.push(`${at}: "${m[0]}" is outside Framework's aesthetic (editorial, architectural, industrial, premium; art-direction.md)`); }
     if (post.needs_confirmation) warns.push(`${at}: needs owner confirmation: ${post.needs_confirmation}`);
     if (CLIENT_SHOWCASES_PAUSED) { const m = JSON.stringify(post).match(CLIENT_WORK); if (m) errs.push(`${at}: mentions real client work ("${m[0]}"): client showcases are paused (owner, 2026-11-11)`); }
     if (post.fictional && !(post.fictional.brand && String(post.fictional.disclosure || "").length >= 10)) errs.push(`${at}: fictional needs {brand, disclosure} (how the captions say it is a concept)`);
@@ -544,7 +546,7 @@ function check(batch) {
     }
   }
   for (const d of dirs) {
-    const a = join(d, "assets.json"), m = existsSync(a) ? readFileSync(a, "utf8").match(OFF_AESTHETIC) : null;
+    const a = join(d, "assets.json"), m = existsSync(a) ? offAesthetic(readFileSync(a, "utf8")) : null;
     if (m) say("FAIL", `${basename(d)}/assets.json: an image prompt asks for "${m[0]}", outside Framework's aesthetic`);
   }
   const drawn = dirs.filter((d) => existsSync(join(d, "spec.json")) && JSON.stringify(readJson(join(d, "spec.json"))).includes('"type":"iso"'));

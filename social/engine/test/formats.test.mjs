@@ -135,6 +135,10 @@ test("aesthetic standard: off-aesthetic plans and prompts fail, and a batch need
   const v = fw(["validate", d]);
   assert.match(v.stdout, /"cozy" is outside Framework's aesthetic/);
   assert.match(v.stdout, /prompt must direct the light/);
+  // The prompt grammar's closing exclusions are negated and must not trip the check.
+  const n = tmp();
+  writeFileSync(join(n, "briefs.json"), JSON.stringify({ posts: [{ id: "01", concept: "A steel beam from directly above", slides: [{ visual: { source: "higgsfield", prompt: "A steel beam from directly above, hard low sun with crisp shadows, no people posing, no cozy or lifestyle staging, no stock-photo look, without a bright and airy feel." } }] }] }));
+  assert.doesNotMatch(fw(["validate", n]).stdout, /outside Framework's aesthetic|direct the light/);
   const b = tmp();
   for (let i = 1; i <= 9; i++) post(b, `0${i}-p`, { format: "single", slides: [{ template: "type", headline: `Post ${i}.` }] });
   assert.equal(fw(["render", b]).status, 0);
