@@ -85,6 +85,20 @@ test("a brand that is not published yet still renders every page, with Framework
   assert.ok(!/branding\/book\.css/.test(html), "fewer than three published colours: Framework's own colours");
 });
 
+test("edge to edge: only the Brand Book page leaves the portal's centred container (no max-width, gutters or padding); the portal header, the Branding page and every other page keep it", async () => {
+  const s = await setup();
+  const book = await (await s.ann.get(BOOK("alpha"))).text();
+  assert.match(book, /<main id="main" class="page page--bleed"/); assert.ok(!/<main id="main" class="wrap page"/.test(book));
+  assert.match(book, /<header class="bar[^"]*"><div class="wrap bar__in">/, "the portal navigation keeps its own container");
+  assert.match(book, /name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/, "safe areas are available to the book");
+  for (const path of ["/portal/o/alpha/branding", "/portal/o/alpha"]) {
+    const html = await (await s.ann.get(path)).text();
+    assert.match(html, /<main id="main" class="wrap page"/, path); assert.ok(!/page--bleed|viewport-fit/.test(html), path + " is not changed");
+  }
+  const css = src("assets/css/portal-branding-book.css");
+  assert.match(css, /\.page\.page--bleed \{ padding: 0; max-width: none; \}/); assert.match(css, /100dvh/); assert.match(css, /env\(safe-area-inset-bottom\)/);
+});
+
 test("the existing Branding page is unchanged and does not carry the deck", async () => {
   const s = await setup();
   const page = await (await s.ann.get(`/portal/o/alpha/branding`)).text();

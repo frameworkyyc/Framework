@@ -2,7 +2,9 @@
    reduced motion. The script adds .bb--deck, which pins one stage and lets the next card rise over the current one as the page scrolls natively (nothing is captured or snapped).
    Everything is sized from --u, a unit derived from the viewport, so each spread is composed to fit one screen. Sharp corners; Switzer for display, General Sans for text.
    Card colours: --bb-bg/--bb-fg per class (.bb-ink, .bb-paper, .bb-sand and .bb-c0 to .bb-c7); the c0 to c7 defaults below are overridden by the generated book.css. */
-.bb { --u: clamp(7px, 1.05vw, 17px); --m: calc(var(--u) * 3.4); --bb-ph: 28px; --bb-top: 64px; --bb-edge: 12px; --bb-reserve: 0px; margin: 0 0 var(--space-5); }
+.bb { --u: clamp(7px, 1.05vw, 17px); --m: calc(var(--u) * 3.4); --bb-ph: 28px; --bb-top: 64px; --bb-edge: 12px; --bb-reserve: 0px; margin: 0; }
+/* Edge to edge: the book page opts out of the portal's centred container (appPage `bleed`: <main class="page page--bleed"> has no max-width, gutters or padding). The portal header above it is unchanged. */
+.page.page--bleed { padding: 0; max-width: none; }
 
 .bb-ink { --bb-bg: #0A0A0A; --bb-fg: #FFFFFF; }
 .bb-paper { --bb-bg: #FFFFFF; --bb-fg: #0A0A0A; }
@@ -12,7 +14,7 @@
 .bb-ink, .bb-paper, .bb-sand, .bb-c0, .bb-c1, .bb-c2, .bb-c3, .bb-c4, .bb-c5, .bb-c6, .bb-c7 { background: var(--bb-bg); color: var(--bb-fg); }
 
 /* ------------------------------------------------------------ a card (plain stack) */
-.bb-card { position: relative; display: flex; flex-direction: column; min-height: calc(100svh - var(--bb-top)); margin-top: var(--space-3); overflow: hidden; }
+.bb-card { position: relative; display: flex; flex-direction: column; min-height: calc(100svh - var(--bb-top)); margin-top: 0; overflow: hidden; }
 .bb-card::after { content: ""; position: absolute; inset: 0; background: #000; opacity: var(--bb-dim, 0); pointer-events: none; }
 .bb-card__tab { display: none; }
 .bb-card__inner { flex: 1; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: calc(var(--u) * 2); padding: var(--m); }
@@ -212,13 +214,15 @@
 /* ------------------------------------------------------------ the deck */
 .bb--deck { --u: min(1.05vw, calc(var(--bb-stage) / 59)); margin-top: calc(var(--bb-lift, 0px) * -1); }
 .bb--deck .bb-runway { position: relative; height: var(--bb-runway); }
-.bb--deck .bb-stage { position: sticky; top: var(--bb-top); height: var(--bb-stage); overflow: hidden; background: #0A0A0A; }
+.bb--deck .bb-stage { position: sticky; top: var(--bb-top); height: var(--bb-stage); height: max(var(--bb-stage), calc(100dvh - var(--bb-top))); overflow: hidden; background: #0A0A0A; } /* dvh: follows a phone's collapsing address bar, so no strip shows under the deck */
 .bb--deck .bb-deck { position: absolute; inset: 0; }
 .bb--deck .bb-card { position: absolute; top: var(--bb-edge); right: 0; bottom: 0; left: 0; display: flex; margin: 0; min-height: 0; transform-origin: 50% 0; will-change: transform; box-shadow: 0 -16px 36px rgba(0, 0, 0, .35), 0 -1px 0 rgba(255, 255, 255, .12); }
 .bb--deck .bb-card__tab { flex: none; display: flex; align-items: center; gap: 14px; height: var(--bb-ph); padding: 0 var(--m); border-bottom: 1px solid rgba(128, 128, 128, .4); border-bottom-color: color-mix(in srgb, currentColor 22%, transparent); font: 600 max(10px, calc(var(--u) * .7))/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; }
 .bb--deck .bb-card.is-waiting .bb-card__tab { cursor: pointer; }
 .bb--deck .bb-card__tabno { font-family: var(--font-display); font-weight: 700; }
-.bb--deck .bb-card__inner { padding-bottom: calc(var(--m) + var(--bb-reserve)); overflow-y: auto; overscroll-behavior-y: auto; scrollbar-width: thin; }
+.bb-card__inner { padding-left: max(var(--m), env(safe-area-inset-left)); padding-right: max(var(--m), env(safe-area-inset-right)); } /* notches and landscape safe areas */
+.bb--deck .bb-card__tab { padding-left: max(var(--m), env(safe-area-inset-left)); padding-right: max(var(--m), env(safe-area-inset-right)); }
+.bb--deck .bb-card__inner { padding-bottom: calc(var(--m) + var(--bb-reserve) + env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior-y: auto; scrollbar-width: thin; }
 .bb--deck .bb-card__inner.is-more { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 40px - var(--bb-reserve)), transparent calc(100% - var(--bb-reserve))); mask-image: linear-gradient(to bottom, #000 calc(100% - 40px - var(--bb-reserve)), transparent calc(100% - var(--bb-reserve))); }
 .bb--deck .bb-card { flex-direction: column; }
 
@@ -237,7 +241,7 @@
   .bb-open--over .bb-open__text { grid-column: 1; }
   .bb-cover { display: flex; flex-direction: column; }
   .bb-cover__top { margin-bottom: calc(var(--u) * 2); }
-  .bb-cover__name { margin-top: auto; font-size: calc(var(--u) * 10); }
+  .bb-cover__name { align-self: stretch; margin-top: auto; font-size: calc(var(--u) * 10); }
   .bb-cover__line { margin-top: calc(var(--u) * 1.4); }
   .bb-cover > .bb-cover__index { width: 100%; margin-top: calc(var(--u) * 2.2); }
   .bb-split { grid-template-columns: 1fr; } .bb-split__a { justify-content: flex-start; }

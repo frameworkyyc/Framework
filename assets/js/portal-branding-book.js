@@ -51,7 +51,7 @@
     var gap = Math.max(0, root.getBoundingClientRect().top + window.pageYOffset + lift - (above + hb));
     var narrow = window.innerWidth <= 900;
     var ph = narrow ? 26 : 28, edge = 12;
-    var H = Math.max(380, Math.round(window.innerHeight - hb));
+    var H = Math.max(380, Math.round(window.innerHeight - hb - above)); /* what is visible at rest: below the header and any banner above it (the banner scrolls away; the stage then grows to the viewport, see CSS) */
     var S = Math.round(0.9 * H), T = Math.round(0.6 * S), D = S - T; /* per card: a short pause (D), then the rise (T) */
     setVar("--bb-top", hb + "px"); setVar("--bb-stage", H + "px"); setVar("--bb-ph", ph + "px"); setVar("--bb-edge", edge + "px");
     setVar("--bb-runway", Math.round(H + (n - 1) * S + D) + "px"); setVar("--bb-lift", gap + "px");
