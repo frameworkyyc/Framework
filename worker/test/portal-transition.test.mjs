@@ -170,8 +170,8 @@ test("forms: a slow save shows the mark only after a real wait; sign-out dips; a
   const out = run("/portal/logout"); assert.match(classOf(out), /fw-leave/, "sign-out is a navigation: the dip, then the black sign-in");
 });
 
-test("config: Staging only. The flag is in the Staging vars and expected list, never in the top-level (Production) vars", () => {
+test("config: transitions enabled in both environments by explicit reviewed vars", () => {
   const cfg = src("wrangler.jsonc"), top = cfg.slice(0, cfg.indexOf('"previews"')).replace(/^\s*\/\/.*$/gm, ""), pre = cfg.slice(cfg.indexOf('"previews"'));
-  assert.ok(!top.includes("PORTAL_TRANSITIONS"), "not in Production's vars"); assert.match(pre, /"PORTAL_TRANSITIONS": "1"/);
+  assert.match(top, /"PORTAL_TRANSITIONS": "1"/, "Production explicitly enables transitions"); assert.match(pre, /"PORTAL_TRANSITIONS": "1"/);
   assert.equal(JSON.parse(src("scripts/ops/staging-expected.json")).plainVars.PORTAL_TRANSITIONS, "1");
 });
