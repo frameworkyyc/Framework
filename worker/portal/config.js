@@ -69,6 +69,11 @@ export function demoEnabled(env, cfg) {
   return !!env && !!cfg && text(env.PORTAL_DEMO) === "1" && !PRODUCTION_HOSTS.includes(cfg.host);
 }
 
+/** Branded page transitions, loading states and the editorial sign-in (worker/portal/TRANSITIONS.md). Live only where PORTAL_TRANSITIONS is exactly "1" (Staging). Everywhere else the pages are byte-for-byte what they were: no script, the strict CSP. */
+export function transitionsOn(env) {
+  return !!env && text(env.PORTAL_TRANSITIONS) === "1";
+}
+
 /** The client-facing Branding section is live only where PORTAL_BRANDING is exactly "1" (Staging). Everywhere else Branding stays a "Coming soon" page. */
 export function brandingEnabled(env) {
   return !!env && text(env.PORTAL_BRANDING) === "1";

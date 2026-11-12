@@ -160,8 +160,9 @@ const ERROR_COPY = {
 };
 
 /** A branded, script-free HTML page (sign-in and system pages). `bodyHtml` must already be escaped by the caller; `title` is escaped here. */
-export function htmlPage({ status = 200, title, bodyHtml = "", ref = null, cookies = [], headers = {} } = {}) {
-  return new Response(authFrame({ title, bodyHtml, ref }), { status, headers: securityHeaders({ ...headers, "Content-Type": "text/html; charset=utf-8", "Set-Cookie": cookies }) });
+export function htmlPage({ status = 200, title, bodyHtml = "", ref = null, cookies = [], headers = {}, fx = false } = {}) {
+  // fx (only where PORTAL_TRANSITIONS is on): the branded-transition assets, which need the one same-origin script the CSP otherwise forbids on this page
+  return new Response(authFrame({ title, bodyHtml, ref, fx }), { status, headers: securityHeaders({ ...headers, "Content-Type": "text/html; charset=utf-8", "Set-Cookie": cookies }, { scripts: !!fx }) });
 }
 
 /** A generic error page with a short reference. Never shows upstream text, stack traces, emails or request data. */

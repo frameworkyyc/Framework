@@ -1,0 +1,49 @@
+/* Branded page transitions and loading states for the client portal (worker/portal/TRANSITIONS.md). Loaded only where PORTAL_TRANSITIONS is on.
+   One full-screen black curtain with the Framework mark, in four states that /assets/js/portal-transition.js sets as a class on <html>:
+     fw-intro    after sign-in: the mark is drawn (the website's outer F, inner F, then filled), then the curtain clears to reveal the portal
+     fw-enter    arriving from another major section: the curtain is already black at first paint (no flash) and clears quickly
+     fw-leave    leaving for another major section: the page eases into the black while the browser navigates (navigation is never delayed)
+     fw-loading  a real wait (the server is slow): the mark draws in a loop instead of a spinner
+   The curtain never takes pointer events, so nothing is ever blocked behind it. Without the script none of these classes exist and the curtain stays hidden. */
+.fw-curtain { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: #0A0A0A; opacity: 0; visibility: hidden; pointer-events: none; }
+.fw-curtain__mark { width: clamp(60px, 8.5vmin, 96px); height: auto; overflow: visible; }
+.fw-f { fill: #FFFFFF; fill-opacity: 1; stroke: #FFFFFF; stroke-width: 5; stroke-linejoin: miter; stroke-dasharray: 1; stroke-dashoffset: 0; }
+@media print { .fw-curtain { display: none; } }
+
+/* the shared easing of the website's drawing */
+:root { --fw-ease: cubic-bezier(.6, 0, .2, 1); }
+
+/* leaving: fade to black. The mark is already drawn: a short dip, not a show. */
+html.fw-leave .fw-curtain { visibility: visible; animation: fw-fade-in 220ms cubic-bezier(.4, 0, .2, 1) forwards; }
+html.fw-leave .fw-curtain__mark { animation: fw-mark-in 200ms ease-out 90ms both; }
+
+/* loading: the same mark, drawn in a loop (the website's 9-second drawing, compressed to ~1.9s) */
+html.fw-loading .fw-f { fill-opacity: 0; stroke-dashoffset: 1; }
+html.fw-loading .fw-f--1 { animation: fw-trace-outer 1.9s var(--fw-ease) infinite; }
+html.fw-loading .fw-f--2 { animation: fw-trace-inner 1.9s var(--fw-ease) infinite; }
+
+/* arriving: black at first paint, then clears */
+html.fw-enter .fw-curtain { visibility: visible; opacity: 1; animation: fw-clear 360ms cubic-bezier(.2, .6, .2, 1) 70ms forwards; }
+
+/* sign-in: the mark is drawn once, held, and the curtain lifts */
+html.fw-intro .fw-curtain { visibility: visible; opacity: 1; animation: fw-clear 700ms cubic-bezier(.4, 0, .2, 1) 1500ms forwards; }
+html.fw-intro .fw-f { fill-opacity: 0; stroke-dashoffset: 1; animation-duration: 1.1s; animation-timing-function: var(--fw-ease); animation-fill-mode: forwards; }
+html.fw-intro .fw-f--1 { animation-name: fw-draw-outer; }
+html.fw-intro .fw-f--2 { animation-name: fw-draw-inner; animation-delay: .18s; }
+html.fw-intro .fw-curtain__mark { animation: fw-mark-lift 700ms cubic-bezier(.4, 0, .2, 1) 1500ms forwards; }
+
+@keyframes fw-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fw-mark-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fw-clear { from { opacity: 1; visibility: visible; } to { opacity: 0; visibility: hidden; } }
+@keyframes fw-mark-lift { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-8px); } }
+@keyframes fw-draw-outer { 0% { stroke-dashoffset: 1; fill-opacity: 0; } 62% { stroke-dashoffset: 0; fill-opacity: 0; } 100% { stroke-dashoffset: 0; fill-opacity: 1; } }
+@keyframes fw-draw-inner { 0% { stroke-dashoffset: 1; fill-opacity: 0; } 58% { stroke-dashoffset: 0; fill-opacity: 0; } 100% { stroke-dashoffset: 0; fill-opacity: 1; } }
+@keyframes fw-trace-outer { 0% { stroke-dashoffset: 1; fill-opacity: 0; opacity: 1; } 34% { stroke-dashoffset: 0; fill-opacity: 0; } 46%, 80% { stroke-dashoffset: 0; fill-opacity: 1; opacity: 1; } 92%, 100% { stroke-dashoffset: 0; fill-opacity: 1; opacity: 0; } }
+@keyframes fw-trace-inner { 0%, 12% { stroke-dashoffset: 1; fill-opacity: 0; opacity: 1; } 42% { stroke-dashoffset: 0; fill-opacity: 0; } 52%, 80% { stroke-dashoffset: 0; fill-opacity: 1; opacity: 1; } 92%, 100% { stroke-dashoffset: 0; fill-opacity: 1; opacity: 0; } }
+
+/* Reduced motion: no decorative transitions at all (the script does not even start them). A real wait still shows the mark, still and fading, never moving. */
+@media (prefers-reduced-motion: reduce) {
+  .fw-curtain, .fw-curtain__mark, .fw-f { animation: none !important; transition: none !important; }
+  html.fw-loading .fw-curtain { visibility: visible; opacity: 1; transition: opacity 150ms linear !important; }
+  html.fw-loading .fw-f { fill-opacity: 1; stroke-dashoffset: 0; }
+}
