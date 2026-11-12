@@ -154,6 +154,8 @@
       "PORTAL_DISCOVERY": "1",
       // Turns on the unified request system (Deliverables, SEO and Development requests, My Requests, the wide navigation). STAGING ONLY, never at the top level. Needs migration 0020 (applied to Staging) and PORTAL_SERVICES. Exactly "1" or absent.
       "PORTAL_REQUESTS": "1",
+      // Branded portal page transitions and editorial sign-in: Staging feature enabled.
+      "PORTAL_TRANSITIONS": "1",
       // Admin -> Leads outreach email, STAGING ONLY (never at the top level, so Production sends nothing). LEADS_SENDING exactly "1" lets the workspace send at all; because LEADS_TEST_RECIPIENT is also set,
       // every email goes ONLY to that address (subject prefixed "[TEST for ...]"), is recorded as a test and never changes a lead's status. Staging can therefore never email a real business.
       // Production would need its own reviewed change (no test recipient, plus LEADS_MAILING_ADDRESS). Setup and the checklist: worker/LEADS.md.
