@@ -302,6 +302,9 @@ const CLIENT_WORK = /aurora surveys|\baurora\b|red e corp|\bred e\b|redecorp|red
 // A fictional concept must say so in its captions and never read as delivered client work.
 const CLIENT_CLAIM = /\bour client\b|\bclient project\b|\bfor (?:a|our) client\b|\bwe (?:built|designed|delivered) (?:this )?for\b/i;
 const CTA_TYPES = ["save", "engage", "explore", "credibility", "lead", "none"];
+// Aesthetic standard (owner rule, 2026-11-12): editorial, architectural, industrial, premium (social/brand/art-direction.md, references in
+// social/brand/references/aesthetic/). Plans and image prompts may not ask for the treatments the owner ruled out.
+const OFF_AESTHETIC = /\bcoz(?:y|ier)\b|\bcosy\b|cheerful|playful|whimsical|\bcute\b|cartoon|smiling|happy (?:family|families|customers|people|couple)|bright and airy|warm and inviting|\bsuburban\b|stock[- ]photo|homey|friendly neighbou?rhood|lifestyle stock|candid family/i;
 const CHECKS = ["interesting", "value", "save_share_follow", "credibility", "role", "different"];
 function validate(batch) {
   const p = join(batch, "briefs.json");
@@ -321,6 +324,7 @@ function validate(batch) {
     if (!CTA_TYPES.includes(post.cta_type)) errs.push(`${at}: cta_type must be one of ${CTA_TYPES.join("/")}`);
     if (post.cta_type !== "none" && !post.cta) errs.push(`${at}: cta text missing (or set cta_type "none")`);
     for (const c of CHECKS) if (!post.checks || !String(post.checks[c] || "").trim()) errs.push(`${at}: checks.${c} unanswered (a post that fails a question is revised, not shipped)`);
+    { const m = JSON.stringify([post.concept, post.angle, ...(post.slides || []).flatMap((sl) => [sl.art_direction, sl.visual?.prompt, sl.visual?.direction])]).match(OFF_AESTHETIC); if (m) errs.push(`${at}: "${m[0]}" is outside Framework's aesthetic (editorial, architectural, industrial, premium; art-direction.md)`); }
     if (post.needs_confirmation) warns.push(`${at}: needs owner confirmation: ${post.needs_confirmation}`);
     if (CLIENT_SHOWCASES_PAUSED) { const m = JSON.stringify(post).match(CLIENT_WORK); if (m) errs.push(`${at}: mentions real client work ("${m[0]}"): client showcases are paused (owner, 2026-11-11)`); }
     if (post.fictional && !(post.fictional.brand && String(post.fictional.disclosure || "").length >= 10)) errs.push(`${at}: fictional needs {brand, disclosure} (how the captions say it is a concept)`);
@@ -340,6 +344,7 @@ function validate(batch) {
       if (v.source === "higgsfield") {
         gens += 1; credits += Number(v.est_credits || 0);
         if (!v.prompt || v.prompt.length < 80) errs.push(`${at} slide ${i + 1}: higgsfield visual needs a full prompt`);
+        else if (!/light|shadow/i.test(v.prompt)) errs.push(`${at} slide ${i + 1}: the image prompt must direct the light (aesthetic standard: dramatic, directional, cinematic)`);
       }
       if (v.source === "site" && !(v.ref && existsSync(resolve(REPO_ROOT, v.ref.replace(/^@site\//, ""))))) errs.push(`${at} slide ${i + 1}: site image not found: ${v.ref}`);
     }
@@ -529,6 +534,18 @@ function check(batch) {
       if (platform === "alt") { if (!readFileSync(p, "utf8").trim()) say("FAIL", `${id}: empty alt-text.txt`); continue; }
       for (const i of lintCaption(readFileSync(p, "utf8"), platform)) say(/placeholder|empty|exclamation|emoji|avoided|2,200/.test(i) ? "FAIL" : "WARN", `${id}/${file}: ${i}`);
     }
+  }
+  // Aesthetic standard: every post of a batch carries the Director's verdict against the reference set (hard QC rule).
+  if (dirs.length === BATCH_SIZE) {
+    const verdicts = existsSync(join(batch, "aesthetic.json")) ? readJson(join(batch, "aesthetic.json")) : [];
+    for (const d of dirs) {
+      const id = basename(d), v = verdicts.find((r) => id.startsWith(String(r.post).padStart(2, "0")));
+      if (!v || v.verdict !== "pass") say("FAIL", `${id}: aesthetic standard ${v ? `failed: ${v.note || "see aesthetic.json"}` : "not yet judged: the Director compares the post with social/brand/references/aesthetic/ and records a verdict in aesthetic.json"}`);
+    }
+  }
+  for (const d of dirs) {
+    const a = join(d, "assets.json"), m = existsSync(a) ? readFileSync(a, "utf8").match(OFF_AESTHETIC) : null;
+    if (m) say("FAIL", `${basename(d)}/assets.json: an image prompt asks for "${m[0]}", outside Framework's aesthetic`);
   }
   const drawn = dirs.filter((d) => existsSync(join(d, "spec.json")) && JSON.stringify(readJson(join(d, "spec.json"))).includes('"type":"iso"'));
   if (dirs.length === BATCH_SIZE && !drawn.length) say("FAIL", `no post draws Framework's technical illustration style with an "iso" layer (owner rule: 1-2 per batch, drawn in the website's linework, never generated)`);

@@ -127,3 +127,22 @@ test("mockup realism: a design composited over a photograph fails, and every moc
   c = fw(["check", ok]);
   assert.equal(c.status, 0, c.stdout);
 });
+
+test("aesthetic standard: off-aesthetic plans and prompts fail, and a batch needs the Director's verdict per post", () => {
+  const d = tmp(), checks = { interesting: "x", value: "x", save_share_follow: "x", credibility: "x", role: "x", different: "x" };
+  writeFileSync(join(d, "briefs.json"), JSON.stringify({ posts: [{ id: "01", slug: "p", goal: "attract", visual_category: "editorial-typography", format: "single", objective: "o", audience: "a", key_message: "k", cta_type: "none", checks,
+    concept: "A cozy kitchen with a cheerful owner", slides: [{ template: "canvas", layout: "x", visual: { source: "higgsfield", prompt: "A bakery storefront on a quiet street with bread in the window and a sign above the door, photographed for a social media post." } }] }] }));
+  const v = fw(["validate", d]);
+  assert.match(v.stdout, /"cozy" is outside Framework's aesthetic/);
+  assert.match(v.stdout, /prompt must direct the light/);
+  const b = tmp();
+  for (let i = 1; i <= 9; i++) post(b, `0${i}-p`, { format: "single", slides: [{ template: "type", headline: `Post ${i}.` }] });
+  assert.equal(fw(["render", b]).status, 0);
+  writeFileSync(join(b, "posts", "01-p", "assets.json"), JSON.stringify([{ slide: 1, prompt: "bright and airy suburban kitchen" }]));
+  let c = fw(["check", b]);
+  assert.match(c.stdout, /09-p: aesthetic standard not yet judged/);
+  assert.match(c.stdout, /asks for "bright and airy"/);
+  writeFileSync(join(b, "aesthetic.json"), JSON.stringify(Array.from({ length: 9 }, (_, i) => ({ post: `0${i + 1}`, verdict: "pass" }))));
+  c = fw(["check", b]);
+  assert.doesNotMatch(c.stdout, /aesthetic standard/);
+});
