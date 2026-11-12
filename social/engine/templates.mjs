@@ -240,7 +240,8 @@ export function slideHtml(slide, ctx) {
   if (!tpl) throw new Error(`unknown template "${slide.template}" (use one of: ${TEMPLATES.join(", ")})`);
   const theme = slide.theme || (slide.template === "cta" ? "ink" : "paper");
   const full = { ...ctx, theme };
-  const cls = ["slide", theme, slide.grid ? "grid" : "", slide.template === "reel" ? "reel" : ""].join(" ");
+  // A transparent canvas (motion reel over a video) must not get the theme background from the slide wrapper either.
+  const cls = ["slide", theme, slide.grid ? "grid" : "", slide.template === "reel" || (slide.template === "canvas" && slide.background === "transparent") ? "reel" : ""].join(" ");
   return `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${fileUrl(ctx.fontsCss)}"><link rel="stylesheet" href="${fileUrl(ctx.slideCss)}">
 <style>:root{--w:${ctx.w}px;--h:${ctx.h}px}${ctx.fontFaces || ""}</style></head><body data-panel="${ctx.panel || ""}"><div class="${cls}">${tpl(slide, full)}</div></body></html>`;
 }
