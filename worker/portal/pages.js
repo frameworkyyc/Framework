@@ -189,7 +189,7 @@ export async function brandingPage(ctx, a, brand, o = {}) {
 export async function brandingBookPage(ctx, a, brand, o = {}) {
   const vm = liveModel(ctx, a, {});
   const fonts = Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [];
-  const own = brand.published && bookLive.cardCss(brand.colours) ? [`${vm.base}/branding/book.css`] : [];
+  const own = brand.published && bookLive.paletteCss(brand.colours) ? [`${vm.base}/branding/book.css`] : [];
   return shell(ctx, a, { title: "Brand Book (prototype)", active: "home", body: bookLive.brandBook(vm, brand, o), vm, script: "/assets/js/portal-branding-book.js", styles: ["/assets/css/portal-branding-book.css", ...own, ...fonts], ref: "branding" });
 }
 /** Brand Discovery (signed-in): the list of assessments and the step pages. `body` is built by discovery/routes.js and discovery/pages.js (every value escaped there). */

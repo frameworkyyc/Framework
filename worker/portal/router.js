@@ -60,7 +60,7 @@ import * as supportRepo from "./repo/support.js";
 import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./support-files.js";
 import { dispatchNotifications } from "./service-notifications.js";
 import { fontCss } from "./brand-type.js";
-import { cardCss } from "./branding-book.js";
+import { paletteCss } from "./branding-book.js";
 import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, clientRequestService, limitsFor } from "./brand-files.js";
 
 /**
@@ -425,9 +425,9 @@ const BRANDING_ROUTES = [
     },
   },
   { when: bookOn, re: /^\/portal\/o\/([^/]+)\/branding\/book\.css$/, action: "branding.view", run: async (ctx, a) => {
-      // The card colours from the client's own published brand colours (validated #rrggbb only); empty when there are fewer than three.
+      // The card colours (.bb-c0 to .bb-c7) from the client's own published brand colours (validated #rrggbb only); empty when there are fewer than three.
       const brand = await getClientBrand(ctx.db, a.membership.organizationId);
-      return withPortalHeaders(new Response(brand.published ? cardCss(brand.colours) : "", { status: 200, headers: securityHeaders({ "Content-Type": "text/css; charset=utf-8" }) }));
+      return withPortalHeaders(new Response(brand.published ? paletteCss(brand.colours) : "", { status: 200, headers: securityHeaders({ "Content-Type": "text/css; charset=utf-8" }) }));
     },
   },
   {
