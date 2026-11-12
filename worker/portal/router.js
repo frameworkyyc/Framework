@@ -441,7 +441,7 @@ const BRANDING_ROUTES = [
       for (const r of await listServiceRequests(ctx.db, org)) if (!newest[r.serviceKey]) newest[r.serviceKey] = r;
       const f = viewFilters(ctx.url);
       const discovery = discoveryOn(ctx) ? await listClientDiscoveries(ctx.db, org) : [];
-      return pages.brandingPage(ctx, a, brand, { discovery, canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, requirementSettings: (await listRequirementSettings(ctx.db, org)).items, pricing: await loadPricing(ctx.db), notice: f.requested ? "sent" : f.requestDup ? "dup" : "" });
+      return pages.brandingPage(ctx, a, brand, { bookHref: bookOn(ctx) && a.staff ? `/portal/o/${a.membership.slug}/branding/book` : "", discovery, canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, requirementSettings: (await listRequirementSettings(ctx.db, org)).items, pricing: await loadPricing(ctx.db), notice: f.requested ? "sent" : f.requestDup ? "dup" : "" });
     },
   },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/request$/, action: "branding.view", postAction: "branding.request", bucket: "branding", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/branding`), post: (ctx, a) => requestBrandSection(ctx, a) },

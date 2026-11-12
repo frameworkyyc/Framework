@@ -43,8 +43,11 @@
     var hb = header ? header.getBoundingClientRect().height : 0;
     var lift = g ? g.lift : 0;
     var bb = barEl.getBoundingClientRect().height;
-    /* the gap between the portal header and the top of the book at rest (page padding), so the first card is fully on screen when the page loads */
-    var gap = Math.max(0, root.getBoundingClientRect().top + window.pageYOffset + lift - hb);
+    /* what sits above the (sticky) header in the page: Framework's master-access banner, for one. It scrolls away, so it is part of the gap at rest but not of the pinned layout. */
+    var above = 0;
+    for (var el = header && header.previousElementSibling; el; el = el.previousElementSibling) { if (window.getComputedStyle(el).position === "static") above += el.getBoundingClientRect().height; }
+    /* the gap between the bottom of the header at rest and the top of the book (page padding), so the first card sits right under the header when the page loads */
+    var gap = Math.max(0, root.getBoundingClientRect().top + window.pageYOffset + lift - (above + hb));
     var narrow = window.innerWidth <= 880;
     var ph = narrow ? 30 : 32, edge = 14;
     var H = Math.max(380, Math.round(window.innerHeight - hb - bb));
