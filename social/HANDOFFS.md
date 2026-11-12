@@ -20,6 +20,7 @@ social/batches/<batch-id>/            e.g. 2026-11-12-grid-01   (git-ignored: pr
   contact-sheet.png                   02: every slide on one image (fw sheet)
   figma.json                          02: Figma node ids of the uploaded slides (fw figma upload)
   aesthetic.json                      Director: verdict per post against social/brand/references/aesthetic/ (hard gate; fw check fails without "pass")
+  imagery.json                        Director: physical-plausibility verdict for every generated image in use (hard rule; fw check fails without "pass")
   mockups.json                        Director: full-size realism verdict for every mockup slide (hard rule; fw check fails without "pass")
   qc.md                               Director: quality-control record
   export/<batch-id>/ + .zip           engine: the deliverable

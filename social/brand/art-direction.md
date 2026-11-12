@@ -22,7 +22,7 @@ Read with `brand-system.md` (rules) and `engine/TEMPLATES.md` (how to build it).
 | Ref | What it teaches |
 |---|---|
 | 01, 07 | Print and stationery as real objects: a brand book in a cloth clamshell, stacked cards shot top-down. Neutral grey or white ground, one hard shadow, one saturated accent against charcoal. |
-| 03 | Cinematic scale: a single object from directly above on a vast, textured ground (cracked earth), with a tiny figure for scale. Silence and space. |
+| 03 | Cinematic scale from directly above: a real, precisely made product in a real landscape (a car on cracked earth). It works because the object, the ground and the light are all physically true; never imitate it with an empty pad and a lone figure. |
 | 04 | Creative masking: a photograph escapes its rectangular frame onto white; the subject breaks the boundary. |
 | 05 | Hybrid: architectural line drawing and annotations laid over the photograph they describe; construction lines as content. |
 | 06, 08, 09 | Systems as editorial pages: a type specimen at monumental scale with refined small text, a colour system with tints and values, a mark derived step by step. Calm grounds, strict alignment, generous space. |
@@ -38,7 +38,7 @@ Read with `brand-system.md` (rules) and `engine/TEMPLATES.md` (how to build it).
 **Hard QC rule:** a post that does not meet the visual quality and aesthetic of the references is rejected and revised, whatever else it gets right. The Director compares every post with the reference set and records a verdict in `<batch>/aesthetic.json` (`[{"post": "01", "verdict": "pass" | "fail", "note": "..."}]`); `fw check` fails a batch without a "pass" for every post.
 
 **Image prompts (Higgsfield).** Build every photograph prompt from this grammar, not from a lifestyle description:
-`[subject], [camera: directly overhead / straight elevation / low three-quarter / extreme wide with a tiny figure for scale], editorial architectural photograph, [material and surface], hard directional [low sun / raking window / single studio key] light with crisp real shadows, controlled palette of [colours from the batch colour_plan], generous negative space, medium-format clarity, premium campaign quality`, then end with `no people posing, no clutter, no cozy or lifestyle staging, no stock-photo look, no soft haze, no oversaturation`. Brand applications add the artwork reference and print method (mockup realism rule).
+`[subject named precisely, in its real setting and purpose], [camera: directly overhead / straight elevation / low three-quarter / wide with real architectural or industrial context], editorial architectural photograph, [exact materials and construction: e.g. hot-rolled structural steel W-beam with flanges, web and mill scale, bolted to a column base plate; board-formed concrete with tie holes], hard directional [low sun / raking window / single studio key] light with crisp real shadows, controlled palette of [colours from the batch colour_plan], generous negative space, medium-format clarity, premium campaign quality`, then end with `physically accurate materials, scale and construction, no people posing, no clutter, no cozy or lifestyle staging, no stock-photo look, no soft haze, no oversaturation, no AI artifacts, no garbled text`. Brand applications add the artwork reference and print method (mockup realism rule).
 
 ## Grid-wide colour (plan it before any post)
 Black and white is a design option, not the default. Each batch gets an **editorial palette** (3 to 6 colours with roles: a deep, a warm accent, a quiet neutral…) chosen for the season and the concepts, written to `briefs.json` `colour_plan` before the posts are designed.
@@ -47,6 +47,17 @@ Black and white is a design option, not the default. Each batch gets an **editor
 - The covers should complement one another without looking identical: shared palette, different compositions, scales and subjects.
 - Colour lives in imagery, concepts and colour fields; Framework's own mark stays black and white. Colours outside the palette need a `colourReason` (`fw check`).
 - `fw grid` measures each cover's colour (black-and-white, muted, vibrant) and hue, and warns on too little colour, clustered colour and look-alike neighbours.
+
+## Physical plausibility and material truth (hard rule)
+**Owner rule, 2026-11-12. Never again:** an image with incorrect construction materials, unrealistic scale, impractical site logic, ambiguous textures or obvious AI artifacts. Example of what fails: `social/brand/references/plausibility-fail-0[12].png`, a "steel" beam that reads as concrete, dusted with snow, lying alone on a giant empty pad with a lone figure beside it.
+- **Every image must be physically plausible and contextually real:** something that could be photographed or rendered by an architectural or industrial studio, with a reason to exist where it is.
+- **Materials are exact.** Steel is steel: a hot-rolled I-beam or H-beam (W-section) with flanges, web, fillets, mill scale or primer, bolt holes and connections where it joins something. Concrete is concrete: board-formed, cast, cored or cut, with aggregate, joints and edges that behave like concrete. Never a material that could be either.
+- **Structure makes sense.** Columns sit on footings or base plates and carry beams; beams frame into columns; girts and purlins run between frames at regular spacing; nothing floats, stops mid-air or connects to nothing. Through-cores go through.
+- **Site logic.** Steel sits in a fabrication bay, on timber dunnage in a laydown yard, or erected in a frame, never as a lone oversized member on an empty slab. Scale comes from real context (a building, a crane, a doorway, a truck), not from a tiny person placed for effect.
+- **Textures are unambiguous:** snow is snow where snow would settle, concrete reads as concrete, paint as paint.
+- **No AI artifacts:** melted or merged details, repeated or mirrored patterns, impossible geometry, inconsistent shadows or light direction, garbled lettering or annotations, warped hands or tools.
+- **Banned outright:** "concrete beams"; giant empty pads or slabs; snowy or concrete-looking surfaces with no clear purpose; a lone person beside a single oversized beam in an empty scene. `fw validate` fails plans and prompts that describe them.
+- **QC:** the Director inspects every generated image at full size (structure, connections, materials, edges, lettering, shadows) and records a verdict in `<batch>/imagery.json` (`[{"post": "02", "file": "images/s01.png", "verdict": "pass" | "fail", "note": "..."}]`). `fw check` fails any generated image in use without a "pass". If an image feels uncanny, synthetic or materially wrong, it is rejected and regenerated (or replaced by a site image or type), never shipped; a rejected file is marked `"rejected": true` in assets.json.
 
 ## Mockup realism (hard rule)
 **Owner rule, 2026-11-12. A hard fail, not a preference.** A mockup or branded physical object (book, brochure, card, letterhead, sign, shopfront, packaging, vehicle, clothing, any branded object) must look like a real, finished product photographed in the real world, with the branding naturally part of it.
@@ -148,6 +159,8 @@ Do not add slide numbers, section labels, header or footer rules, decorative div
 7. Would it make someone follow Framework?
 8. Would it make a potential client trust Framework's design ability?
 9. **Hard gate:** does it meet the visual quality and aesthetic of the reference set (editorial, architectural, industrial, premium)? If not, reject and revise, regardless of the other scores.
+
+**Hard gate per image:** physical plausibility and material truth (above), recorded in `imagery.json`.
 
 **Batch level** (the Director, on `grid-preview.png`, the contact sheet, panoramas viewed edge to edge and every Reel played through):
 - Visual originality: no two covers built the same way; nothing that looks like a template.

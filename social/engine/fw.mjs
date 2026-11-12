@@ -403,6 +403,8 @@ const CTA_TYPES = ["save", "engage", "explore", "credibility", "lead", "none"];
 // Aesthetic standard (owner rule, 2026-11-12): editorial, architectural, industrial, premium (social/brand/art-direction.md, references in
 // social/brand/references/aesthetic/). Plans and image prompts may not ask for the treatments the owner ruled out.
 const OFF_AESTHETIC = /\bcoz(?:y|ier)\b|\bcosy\b|cheerful|playful|whimsical|\bcute\b|cartoon|smiling|happy (?:family|families|customers|people|couple)|bright and airy|warm and inviting|\bsuburban\b|stock[- ]photo|homey|friendly neighbou?rhood|lifestyle stock|candid family/i;
+// Physical plausibility (owner rule, 2026-11-12): compositions the owner rejected outright, in concepts, art direction and prompts.
+const IMPLAUSIBLE = /concrete (?:i-|h-)?beams?|\blone (?:figure|person|worker|man|woman)\b|tiny figure for scale|(?:single|one) (?:long |huge |giant |oversized )*(?:steel )?(?:i-|h-)?beam (?:lying|resting|on|in)|(?:empty|vast|bare|giant|huge) (?:poured )?(?:concrete )?(?:pads?|slabs?)\b/i;
 // Exclusions ("no cozy staging", "without a stock-photo look") are the prompt grammar's own closing line: ignore negated phrases.
 const offAesthetic = (text) => String(text || "").replace(/\b(?:no|not|never|without|avoid(?:ing)?)\b[^.;:\n"]*/gi, " ").match(OFF_AESTHETIC);
 const CHECKS = ["interesting", "value", "save_share_follow", "credibility", "role", "different"];
@@ -424,6 +426,7 @@ function validate(batch) {
     if (!CTA_TYPES.includes(post.cta_type)) errs.push(`${at}: cta_type must be one of ${CTA_TYPES.join("/")}`);
     if (post.cta_type !== "none" && !post.cta) errs.push(`${at}: cta text missing (or set cta_type "none")`);
     for (const c of CHECKS) if (!post.checks || !String(post.checks[c] || "").trim()) errs.push(`${at}: checks.${c} unanswered (a post that fails a question is revised, not shipped)`);
+    { const m2 = String(JSON.stringify([post.concept, post.angle, ...(post.slides || []).flatMap((sl) => [sl.art_direction, sl.visual?.prompt, sl.visual?.direction])])).replace(/\b(?:no|not|never|without|avoid(?:ing)?)\b[^.;:\n"]*/gi, " ").match(IMPLAUSIBLE); if (m2) errs.push(`${at}: "${m2[0]}" is a composition the owner rejected as physically implausible (art-direction.md, "Physical plausibility")`); }
     { const m = offAesthetic(JSON.stringify([post.concept, post.angle, ...(post.slides || []).flatMap((sl) => [sl.art_direction, sl.visual?.prompt, sl.visual?.direction])])); if (m) errs.push(`${at}: "${m[0]}" is outside Framework's aesthetic (editorial, architectural, industrial, premium; art-direction.md)`); }
     if (post.needs_confirmation) warns.push(`${at}: needs owner confirmation: ${post.needs_confirmation}`);
     if (CLIENT_SHOWCASES_PAUSED) { const m = JSON.stringify(post).match(CLIENT_WORK); if (m) errs.push(`${at}: mentions real client work ("${m[0]}"): client showcases are paused (owner, 2026-11-11)`); }
@@ -655,6 +658,17 @@ function check(batch) {
       if (!existsSync(p)) { say("FAIL", `${id}: missing ${file}`); continue; }
       if (platform === "alt") { if (!readFileSync(p, "utf8").trim()) say("FAIL", `${id}: empty alt-text.txt`); continue; }
       for (const i of lintCaption(readFileSync(p, "utf8"), platform)) say(/placeholder|empty|exclamation|emoji|avoided|2,200/.test(i) ? "FAIL" : "WARN", `${id}/${file}: ${i}`);
+    }
+  }
+  // Physical plausibility: every generated image in use carries the Director's full-size verdict (materials, scale, site logic, structure,
+  // textures, AI artifacts). Images replaced later are marked "rejected": true in assets.json.
+  const imagery = existsSync(join(batch, "imagery.json")) ? readJson(join(batch, "imagery.json")) : [];
+  for (const d of dirs) {
+    const a = join(d, "assets.json"); if (!existsSync(a)) continue;
+    const doc = readJson(a), list = Array.isArray(doc) ? doc : doc.images || [];
+    for (const im of list.filter((x) => x && x.source === "higgsfield" && !x.rejected && x.file)) {
+      const id = basename(d), v = imagery.find((r) => id.startsWith(String(r.post).padStart(2, "0")) && basename(String(r.file)) === basename(im.file));
+      if (!v || v.verdict !== "pass") say("FAIL", `${id}/${im.file}: physical plausibility ${v ? `failed: ${v.note || "see imagery.json"}` : "not yet judged: the Director checks materials, scale, site logic, structure, textures and AI artifacts at full size and records a verdict in imagery.json"}`);
     }
   }
   // Aesthetic standard: every post of a batch carries the Director's verdict against the reference set (hard QC rule).
