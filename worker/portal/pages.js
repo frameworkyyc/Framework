@@ -71,14 +71,14 @@ function liveModel(ctx, { session, membership: m, returning }, data = {}) {
   };
 }
 
-async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, styles = [], ref = null, frameSrc = [] }) {
+async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, styles = [], ref = null, frameSrc = [], bleed = false }) {
   const { session, membership: m } = a;
   // Header navigation of the connected portal: Home and Account (and Team for owners). Every other page is reached from Home.
   // Where the request area is on (PORTAL_REQUESTS) the header carries the full service navigation and the current entry follows the path (requests/nav.js).
   const wide = requestsEnabled(ctx.env);
   const list = wide ? requestsNav(ctx.env, m.role) : [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
   const current = wide ? activeKey(String(ctx.url.pathname).slice(vm.base.length)) : active === "account" || active === "team" ? active : "home";
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}` });
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}`, bleed });
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null }) {
@@ -189,8 +189,8 @@ export async function brandingPage(ctx, a, brand, o = {}) {
 export async function brandingBookPage(ctx, a, brand, o = {}) {
   const vm = liveModel(ctx, a, {});
   const fonts = Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [];
-  const own = brand.published && bookLive.cardCss(brand.colours) ? [`${vm.base}/branding/book.css`] : [];
-  return shell(ctx, a, { title: "Brand Book (prototype)", active: "home", body: bookLive.brandBook(vm, brand, o), vm, script: "/assets/js/portal-branding-book.js", styles: ["/assets/css/portal-branding-book.css", ...own, ...fonts], ref: "branding" });
+  const own = brand.published && bookLive.paletteCss(brand.colours) ? [`${vm.base}/branding/book.css`] : [];
+  return shell(ctx, a, { title: "Brand Book (prototype)", active: "home", body: bookLive.brandBook(vm, brand, o), vm, script: "/assets/js/portal-branding-book.js", styles: ["/assets/css/portal-branding-book.css", ...own, ...fonts], ref: "branding", bleed: true });
 }
 /** Brand Discovery (signed-in): the list of assessments and the step pages. `body` is built by discovery/routes.js and discovery/pages.js (every value escaped there). */
 export async function discoveryPage(ctx, a, { title = "Brand Discovery", body, status = 200 }) {
