@@ -22,8 +22,8 @@ test("canvas renders full-bleed images, real device mockups, swatches and free t
   const { d, p } = post([
     { template: "canvas", layout: "device-pair", background: "#0F2D3D", clientColour: "client palette (test)", layers: [
       { type: "image", src: "@site/assets/img/drafting.jpg", x: 0, y: 0, w: 1080, h: 1350, treatment: "mono" },
-      { type: "laptop", src: "@site/assets/img/aurora-traverse.jpg", x: -60, y: 300, w: 1000 },
-      { type: "phone", src: "@site/assets/img/aurora-mobile-map.jpg", x: 700, y: 520, w: 300 },
+      { type: "laptop", src: "@site/assets/img/arch-courtyard.jpg", x: -60, y: 300, w: 1000 },
+      { type: "phone", src: "@site/assets/img/steel-erection.jpg", x: 700, y: 520, w: 300 },
       { type: "text", text: "Every project,\nplotted.", x: 88, y: 110, w: 900, size: 72, color: "#FFFFFF" } ] },
     { template: "canvas", layout: "colour-system", clientColour: "client palette (test)", layers: [
       { type: "swatch", x: 0, y: 0, w: 1080, h: 675, color: "#8A2E2A", name: "Oxide Red" },
@@ -54,7 +54,7 @@ test("plain language: specialist terms and walls of text fail; client colour nee
   assert.match(r.stdout, /specialist term "LCP"/);
   assert.match(r.stdout, /percentile/);
   assert.match(r.stdout, /words on one slide/);
-  assert.match(r.stdout, /without "clientColour"/);
+  assert.match(r.stdout, /in neither Framework.s palette nor the batch colour_plan/);
   const off = post([{ template: "canvas", layout: "x", layers: [{ type: "text", text: "Off the edge", x: 900, y: 88, w: 600, size: 80 }] }], "single");
   assert.match(fw("render", off.d).stdout, /text runs off the canvas/);
 });

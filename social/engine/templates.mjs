@@ -86,7 +86,13 @@ const support = (s, def = 34) => (s.support ? `<p class="support" data-fit ${fs(
 // ---------- canvas: free, art-directed composition (TEMPLATES.md, "canvas") ----------
 // Layers are placed in canvas pixels (x, y, w, h; numbers or "50%"), may bleed off the edge and overlap (later layers on top).
 const px = (v) => (v == null ? "" : typeof v === "number" ? `${v}px` : esc(v));
-const pos = (l) => [`left:${px(l.x ?? 0)}`, `top:${px(l.y ?? 0)}`, l.w != null ? `width:${px(l.w)}` : "", l.h != null ? `height:${px(l.h)}` : "", l.rotate ? `transform:rotate(${Number(l.rotate)}deg)` : "", l.opacity != null ? `opacity:${Number(l.opacity)}` : "", l.z != null ? `z-index:${Number(l.z)}` : ""].filter(Boolean).join(";");
+// clip: a CSS clip-path for creative masking (e.g. "polygon(0 0,100% 0,70% 100%,0 100%)" or "inset(0 30% 0 0)"); blend: a CSS mix-blend-mode.
+const CLIP = /^(?:inset|polygon|circle|ellipse)\([-\d.%,\s]+(?:at [-\d.%\s]+)?\)$/;
+const pos = (l) => [`left:${px(l.x ?? 0)}`, `top:${px(l.y ?? 0)}`, l.w != null ? `width:${px(l.w)}` : "", l.h != null ? `height:${px(l.h)}` : "", l.rotate || l.tilt ? `transform:${l.tilt ? `perspective(2400px) rotateX(${Number(l.tilt.x || 0)}deg) rotateY(${Number(l.tilt.y || 0)}deg) ` : ""}rotate(${Number(l.rotate || 0)}deg)` : "", l.opacity != null ? `opacity:${Number(l.opacity)}` : "", l.z != null ? `z-index:${Number(l.z)}` : "",
+  l.clip && CLIP.test(l.clip) ? `clip-path:${l.clip}` : "", l.blend && /^[a-z-]+$/.test(l.blend) ? `mix-blend-mode:${l.blend}` : ""].filter(Boolean).join(";");
+// Motion (Reels): anim = [{t: seconds, opacity?, x?, y?, scale?, rotate?, blur?, clip?}, ...] keyframes on an absolute timeline.
+// Static renders ignore it; `fw render` of a reel with "motion" plays it frame by frame (fw.mjs MOTION_SCRIPT).
+const animAttr = (l) => (Array.isArray(l.anim) && l.anim.length ? ` data-anim="${esc(JSON.stringify(l.anim))}"` : "");
 const FONTS = { display: "'Switzer'", body: "'General Sans'" };
 const MASKS = { circle: "mask-circle", arch: "mask-arch", none: "" };
 const cssColor = (c) => (/^#[0-9a-f]{3,8}$/i.test(c || "") ? c : null);
@@ -130,14 +136,14 @@ function device(kind, l, ctx) {
   const src = resolveAsset(l.src, ctx.postDir), frame = resolve(REPO_ROOT, `assets/img/device-${kind === "laptop" ? "macbook" : "iphone"}.png`);
   const tilt = l.tilt ? `transform:perspective(2400px) rotateX(${Number(l.tilt.x || 0)}deg) rotateY(${Number(l.tilt.y || 0)}deg) rotateZ(${Number(l.tilt.z || 0)}deg);` : "";
   // A soft contact shadow is allowed on physical-object mockups only (devices, print), never on Framework type or graphics.
-  return `<div class="layer device ${kind}${l.shadow === false ? "" : " shadow"}" style="${pos({ ...l, h: undefined })};${tilt}"><div class="screen"><img src="${src ? fileUrl(src) : ""}" alt="" data-scroll="${Number(l.scroll || 0)}" style="object-position:50% ${Math.round((l.scroll || 0) * 100)}%"></div><img class="frame" src="${fileUrl(frame)}" alt=""></div>`;
+  return `<div class="layer device ${kind}${l.shadow === false ? "" : " shadow"}" style="${pos({ ...l, h: undefined, tilt: undefined })};${tilt}"><div class="screen"><img src="${src ? fileUrl(src) : ""}" alt="" data-scroll="${Number(l.scroll || 0)}" style="object-position:50% ${Math.round((l.scroll || 0) * 100)}%"></div><img class="frame" src="${fileUrl(frame)}" alt=""></div>`;
 }
 
 const T = {
   // Free composition: full-bleed imagery, devices, layered type. Name the composition in "layout" (it is the layout family).
   canvas(s, ctx) {
-    const bg = cssColor(s.background) || (s.theme === "ink" ? "#0A0A0A" : s.theme === "mist" ? "#F5F5F5" : "#FFFFFF");
-    return `<div class="canvas" style="background:${bg}">${(s.layers || []).map((l) => { const f = LAYERS[l.type]; if (!f) throw new Error(`unknown canvas layer type "${l.type}"`); return f(l, ctx); }).join("")}</div>`;
+    const bg = s.background === "transparent" ? "transparent" : cssColor(s.background) || (s.theme === "ink" ? "#0A0A0A" : s.theme === "mist" ? "#F5F5F5" : "#FFFFFF");
+    return `<div class="canvas" style="background:${bg}">${(s.layers || []).map((l) => { const f = LAYERS[l.type]; if (!f) throw new Error(`unknown canvas layer type "${l.type}"`); return f(l, ctx).replace(/^<div/, "<div" + animAttr(l)); }).join("")}</div>`;
   },
   // Editorial typography poster. layout: "bottom" (default) | "top" | "giant" (one oversized word, optional bleed) | "split" (headline top-left, headline2 bottom-right).
   type(s, ctx) {
@@ -236,5 +242,5 @@ export function slideHtml(slide, ctx) {
   const full = { ...ctx, theme };
   const cls = ["slide", theme, slide.grid ? "grid" : "", slide.template === "reel" ? "reel" : ""].join(" ");
   return `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${fileUrl(ctx.fontsCss)}"><link rel="stylesheet" href="${fileUrl(ctx.slideCss)}">
-<style>:root{--w:${ctx.w}px;--h:${ctx.h}px}${ctx.fontFaces || ""}</style></head><body><div class="${cls}">${tpl(slide, full)}</div></body></html>`;
+<style>:root{--w:${ctx.w}px;--h:${ctx.h}px}${ctx.fontFaces || ""}</style></head><body data-panel="${ctx.panel || ""}"><div class="${cls}">${tpl(slide, full)}</div></body></html>`;
 }

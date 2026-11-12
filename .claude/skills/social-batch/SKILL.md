@@ -18,13 +18,15 @@ The team optimises for three outcomes, in this order of weight per batch: **foll
 4. Create `social/batches/<YYYY-MM-DD>-<short-slug>/` (e.g. `2026-11-12-grid-01`).
 
 **Batch size: always exactly 9 posts**, one complete 3×3 Instagram grid block, so the profile grows in whole rows. If the owner asks for a different number, confirm before planning; validation fails on anything but 9.
+**Format mix:** about 3 carousels, 2 seamless panoramic carousels, 2 single images and 2 Reels, never two of a format back to back. **Colour:** a grid-wide palette with colour on 4–5 covers (`art-direction.md`). **Client showcases are paused** (owner, 2026-11-11); fictional brand studies are labelled.
+If the owner sets a produced batch aside, keep its files and run `node social/engine/fw.mjs history archive <batch> "<reason>"`: it stays in the history for reference but leaves the grid preview.
 
 ## 1. Plan (Agent 01)
 Spawn `content-strategist` with: the batch path, platforms, today's date and season, the owner's direction verbatim, and the credit balance. Wait. Then run `node social/engine/fw.mjs validate <batch>` (it must print `ok`).
 
 ## 2. Approval gate: the only stop
-1. Price the visuals without spending: for each distinct `{model, aspect_ratio, params}` in briefs.json, call Higgsfield `generate_image` with `get_cost: true` (or `generate_video` for Reels). Total = Σ cost × count, plus about 25% for at most one regeneration per slot.
-2. Show the owner the plan condensed from `plan.md`: the table in publishing order (goal, category, cover family, tone, headline, CTA type), the feed plan, estimated credits against the balance, and any `needs_confirmation` questions. Ask for approval of the plan and the credit budget in one question.
+1. Price the visuals without spending: for each distinct `{model, aspect_ratio, params}` in briefs.json, call Higgsfield `generate_image` with `get_cost: true` (or `generate_video` with `get_cost: true` for video). Total = Σ cost × count, plus about 25% for at most one regeneration per slot. Code animation costs nothing.
+2. Show the owner the plan condensed from `plan.md`: **the colour and visual direction** (palette, the 3×3 block in display order with each cover's colour), the table in publishing order (format, goal, category, cover colour, headline or concept, CTA type, fictional marked), the format mix, estimated credits against the balance, and any `needs_confirmation` questions. Ask for approval of the plan and the credit budget in one question.
 3. Small changes you make in briefs.json and plan.md yourself (then validate again); larger ones go back to the strategist with SendMessage.
 4. Write `<batch>/approval.md`: approved post ids, changes, the credit budget (a number) and the date.
 If the balance cannot cover the plan, offer fewer generated images (site images or type-led instead) or a top-up by the owner. Never buy credits.
@@ -32,7 +34,7 @@ If the balance cannot cover the plan, offer fewer generated images (site images 
 After approval, run steps 3–7 without asking again, unless a credit overrun or a factual question comes up.
 
 ## 3. Visuals and feed (Agent 02)
-Spawn `creative-director` with the batch path ("budget and approved posts are in approval.md"). Wait. Confirm that render passes with no FAIL, `fw grid` reports no FAIL, credits spent ≤ budget, and the Figma board was updated (or why not).
+Spawn `creative-director` with the batch path ("budget and approved posts are in approval.md"). Wait. Confirm that render passes with no FAIL, `fw grid` reports no FAIL, credits spent ≤ budget, and the Figma board was updated (or why not). The Figma Starter plan limits MCP calls: publish the whole batch in as few calls as possible, and finish any remainder after the limit resets.
 
 ## 4. Captions (Agent 03)
 Spawn `social-copywriter` with the batch path. Wait.
@@ -46,8 +48,8 @@ Standard: `social/brand/art-direction.md`. Passing the automated checks is never
 
 **Creative** (look at `grid-preview.png`, `contact-sheet.png` and full-size slides wherever detail matters; read the Creative Director's `review.md`)
 3. Score every post 1 to 5 on the eight questions in `art-direction.md`: compelling, art-directed like a premium studio, immediately understandable, one clear idea per slide, full canvas used with intent, presentation right for the subject (the work leads in portfolio posts), makes people want to follow, makes clients trust Framework's design. Any score under 4: redesign.
-4. Reject on sight: slides that look like presentation or template slides; flat screenshots on plain backgrounds; walls of text; specialist language on slides; repeated labels, numbers or rules; empty space that isn't deliberate; any Framework logo or URL used as a signature; carousels whose slides all share one layout.
-5. Feed: the 3×3 block in Instagram display order (newest top-left) on top of the previous block, with light and dark balanced, imagery and type mixed, no similar covers side by side, and every tile at the same quality.
+4. Reject on sight: slides that look like presentation or template slides; covers built the same way; colour clustered or absent; a panorama with a visible seam or a weak first panel; a Reel that jitters, rushes or has a weak cover; a fictional concept that reads as client work; flat screenshots on plain backgrounds; walls of text; specialist language on slides; repeated labels, numbers or rules; empty space that isn't deliberate; any Framework logo or URL used as a signature; carousels whose slides all share one layout.
+5. Feed: the 3×3 block in Instagram display order (newest top-left) on top of the previous published block, with the palette reading as one batch, colour on 4–5 covers spread through the block, light and dark balanced, formats and styles mixed, no similar covers side by side, and every tile at the same quality. View each panorama as one picture (`slides/panorama.png`) and edge to edge in the contact sheet; watch each Reel's storyboard and sample frames.
 6. Corrections: SendMessage the responsible agent with exact, numbered fixes. At most two rounds per post; then fix trivial issues yourself and note the rest. Re-publish changed posts to the Figma board.
 7. Write `<batch>/qc.md`: technical results, creative scores, corrections, credits spent.
 

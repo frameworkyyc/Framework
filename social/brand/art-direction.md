@@ -1,6 +1,8 @@
 # Art direction: how Framework posts are designed
 
-The standard: every post should look like the work of an established creative studio, not a slide from a presentation. **The content decides the composition; a template never does.** Framework's identity stays constant (typography, near-monochrome palette, restraint, quality); the execution varies.
+The standard: the feed should look like a premium creative studio's Instagram portfolio, never a deck of presentation slides. **The content decides the composition; a template never does.** Every slide is art-directed, not populated with text. Framework's identity stays constant (Switzer and General Sans, restraint, quality, its black-and-white mark); the execution varies, and supporting imagery and concepts may use a planned editorial palette (below).
+
+**Owner direction, 2026-11-11 (second overhaul).** The first art-directed batch still read as slides and is archived, never published. From now on: full-bleed photography and artwork, edge-to-edge compositions, editorial typography with real hierarchy, creative masking and layered imagery, lifestyle and environmental scenes, physical brand applications (print, signage, stationery, packaging, books), and striking conceptual artwork. Minimal text; no labels, dividers or numbering by habit; no excessive empty space.
 
 Read with `brand-system.md` (rules) and `engine/TEMPLATES.md` (how to build it). The owner's reference set (2026-11-11: a brand-identity carousel, architectural visualisation studios, a studio profile grid, Framework's own site) is for direction only. Learn from it; never reproduce a reference's layout, artwork or branding.
 
@@ -12,6 +14,36 @@ Read with `brand-system.md` (rules) and `engine/TEMPLATES.md` (how to build it).
 - **Negative space is deliberate,** reserved for one strong element, never left over because a template had a box there.
 - **Minimal text.** A slide can be only an image, only a word, or only a specimen.
 - **Specimens and systems are beautiful content:** a typeface shown at display size with its weights, a colour palette as large fields with names and values.
+
+## Grid-wide colour (plan it before any post)
+Black and white is a design option, not the default. Each batch gets an **editorial palette** (3 to 6 colours with roles: a deep, a warm accent, a quiet neutral…) chosen for the season and the concepts, written to `briefs.json` `colour_plan` before the posts are designed.
+- **4 to 5 of the 9 covers carry meaningful colour** (photography, artwork or colour fields), the rest are deliberate black, white or quiet tiles so colour has room.
+- Balance vibrant, muted, light and dark. Spread colour through the 3×3 block: no row or column entirely in colour, no row without any, and no two neighbours led by the same colour.
+- The covers should complement one another without looking identical: shared palette, different compositions, scales and subjects.
+- Colour lives in imagery, concepts and colour fields; Framework's own mark stays black and white. Colours outside the palette need a `colourReason` (`fw check`).
+- `fw grid` measures each cover's colour (black-and-white, muted, vibrant) and hue, and warns on too little colour, clustered colour and look-alike neighbours.
+
+## Physical applications, lifestyle and concept work
+- Show design in the world: a brand book open on a desk, business cards stacked on stone, signage on a building, a truck door, packaging, an invoice on a clipboard, a shopfront at dusk. These sell design far better than a logo on a blank slide.
+- Lifestyle and environmental images: real-feeling places, light and materials; no posed stock people, no clichés.
+- Conceptual artwork: one strong visual idea (a metaphor made physical), striking enough to stop the scroll.
+- **Fictional brand studies are welcome and clearly labelled.** A made-up business (a bakery, a roofer, a coffee roaster) lets Framework show identity thinking end to end. In the brief it carries `fictional {brand, disclosure}`; the captions say "concept" (or "fictional"), and nothing implies it was client work (`fw check` fails both). Choose names that are not real businesses in Alberta.
+- **Client showcases are paused** (owner, 2026-11-11) until the showcase workflow is rebuilt: no Aurora Surveys, Red E Corp., Eagle's Nest Resort or other real client work, assets or names. `fw validate` and `fw check` fail on them.
+
+## Panoramic carousels
+One continuous composition that unfolds as the viewer swipes (format `panorama`, 2 to 10 panels).
+- Design the whole canvas first (panels × 1080 by 1350), then let the engine cut it: the slides are exact crops, so they align to the pixel.
+- Let imagery, objects and colour fields cross the seams (that is the delight); keep every word inside one panel, 64 px clear of a seam (`fw render` fails text on a seam).
+- The first panel is the grid cover: it must work alone and invite the swipe (something cut off at the right edge).
+- Good subjects: a brand kit laid out as an open book or flat lay, a street of signage, a long table of print applications, a landscape with a story along it, a timeline.
+
+## Motion and Reels
+Format `reel` (1080×1920). Two ways to make one; choose the cheaper that is good enough:
+1. **Code animation** (no credits): kinetic typography, an identity building itself, masks revealing images, smooth moves between compositions. Layers get `anim` keyframes; the engine renders every frame exactly (`fw render`), with a cover frame and a storyboard.
+2. **Higgsfield video** where real motion of a scene genuinely improves the post (cinematic product or architectural shots), with code-animated type composited on top.
+- 5 to 15 seconds is usually right; the idea lands in the first second; nothing flashes or jitters; motion eases.
+- Keep type inside the safe area (Instagram covers the bottom and right edge); `fw render` warns.
+- **Every Reel needs a strong cover** (`motion.coverAt`) that works as a grid tile: the profile grid shows only its middle 3:4.
 
 ## Composition toolbox (built with the `canvas` template)
 Name the composition in `layout` so the grid check can tell neighbours apart.
@@ -33,7 +65,7 @@ Name the composition in `layout` so the grid check can tell neighbours apart.
 
 The older templates (`type`, `photo`, `plate`, `split`, `diagram`, `list`, `compare`, `quote`, `cta`) remain useful for text-led educational slides, but they are a choice, never the default.
 
-## Portfolio and website showcases
+## Portfolio and website showcases (paused for real clients; the standards apply to concept work too)
 **The work is the focal point.** The post should make a business owner think "I want my business to look that good."
 - Use authentic assets: `node social/engine/fw.mjs capture <url> <file> [desktop|mobile] [full]` captures the live site at 2×/3× into `social/assets/clients/<client>/`. Never invent or alter an interface; mockups show the real design.
 - Present it the way a studio would: a full-bleed hero, a device pairing on the client's colour, a tight detail of the interface, the client's own photography, the client's palette and type as a system.
@@ -62,7 +94,7 @@ Example. Instead of "2.5 s · Google's 'good' threshold for Largest Contentful P
 Do not add slide numbers, section labels, header or footer rules, decorative dividers, repeated eyebrow labels, fixed text boxes or identical margins on every slide. Use one only where it genuinely helps the reader (a label that orients a technical diagram, a rule in a specification layout). Framework's logo, wordmark and URL are never a watermark or footer (brand rule, 2026-11-11).
 
 ## Two-part quality control
-**Technical:** dimensions, spelling, readable type, correct assets, accurate claims, complete deliverables (`fw check`, `fw grid`).
+**Technical:** dimensions, spelling, readable type, correct assets, accurate claims, complete deliverables, seamless panorama alignment, Reel length, safe area and cover, the format mix, no back-to-back formats, the colour plan, the client pause, honest fictional labels (`fw validate`, `fw check`, `fw grid`).
 **Creative** (judged by eye, recorded per post in `<batch>/review.md`, score 1 to 5; any score under 4 means revise):
 1. Visually compelling at thumbnail size and full size?
 2. Professionally art-directed, like a premium studio's work?
@@ -72,4 +104,14 @@ Do not add slide numbers, section labels, header or footer rules, decorative div
 6. Is the presentation right for the subject (the work leads in portfolio posts)?
 7. Would it make someone follow Framework?
 8. Would it make a potential client trust Framework's design ability?
+
+**Batch level** (the Director, on `grid-preview.png`, the contact sheet, panoramas viewed edge to edge and every Reel played through):
+- Visual originality: no two covers built the same way; nothing that looks like a template.
+- Grid-wide colour harmony: the palette reads as one batch; colour spread, not clustered.
+- Variety of content and formats, mixed through the publishing order.
+- Panoramas: seamless, with the cover working alone.
+- Motion: smooth, purposeful, readable, with a cover that holds the grid.
+- Branding: consistent through design quality, never a repeated watermark.
+- Claims accurate, concepts labelled, CTAs natural and compelling.
+
 Passing `fw check` is not proof of creative quality. If it looks like a generic presentation slide, it is redesigned.
