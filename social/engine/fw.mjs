@@ -463,11 +463,31 @@ function creativeIssues(d, spec, w, h, palette = []) {
   }
   return out;
 }
+// Mockup realism (owner hard rule, 2026-11-12): a branded object must look like a real, finished product photographed in the world,
+// with the artwork physically part of it. A design laid over a photograph afterwards fails, however neat. Two layers of defence:
+// 1. the renderer refuses the compositing signatures (a mark, graphic or blended/tilted layer placed on top of a photograph);
+// 2. every slide marked "mockup" needs the Director's full-size verdict "pass" in <batch>/mockups.json.
+const isPhoto = (l) => l.type === "image" && !/\.svg$/i.test(l.src || "");
+function compositeIssues(spec) {
+  const out = [];
+  spec.slides.forEach((s, i) => {
+    const L = s.layers || [], first = L.findIndex(isPhoto);
+    if (first < 0) return;
+    const found = new Set();
+    for (const l of L.slice(first + 1)) {
+      const what = l.type === "image" && !isPhoto(l) ? "vector graphic" : ["svg", "brand", "swatch"].includes(l.type) ? `${l.type} layer` : (l.blend || l.tilt) && !["laptop", "phone", "browser"].includes(l.type) ? `${l.type} with ${l.blend ? "blend" : "tilt"}` : null;
+      if (what) found.add(what);
+    }
+    if (found.size) out.push(`slide ${i + 1}: design laid over a photograph (${[...found].join(", ")}): branding on an object must be part of the photograph itself (generated or edited into the image), never composited on top`);
+  });
+  return out;
+}
 function check(batch) {
   let fail = 0, warn = 0;
   const say = (lvl, m) => { console.log(`${lvl} ${m}`); lvl === "FAIL" ? fail++ : lvl === "WARN" ? warn++ : 0; };
   const briefs = existsSync(join(batch, "briefs.json")) ? readJson(join(batch, "briefs.json")) : null;
   const dirs = postDirs(batch);
+  const mockReview = existsSync(join(batch, "mockups.json")) ? readJson(join(batch, "mockups.json")) : [];
   const palette = briefs ? [...(briefs.colour_plan?.palette || []).map((c) => c.hex), ...briefs.posts.flatMap((p) => p.cover_colour?.hex || [])].filter(Boolean) : [];
   if (briefs && dirs.length !== briefs.posts.length) say("FAIL", `briefs has ${briefs.posts.length} posts, posts/ has ${dirs.length}`);
   for (const d of dirs) {
@@ -496,6 +516,12 @@ function check(batch) {
     for (const f of pngs) { const s = pngSize(join(d, "slides", f)); if (s.w !== w || s.h !== h) say("FAIL", `${id}/${f}: ${s.w}x${s.h}, expected ${w}x${h}`); }
     if (spec.slides.some((s) => s.image && /^https?:/.test(s.image))) say("FAIL", `${id}: remote image URL in spec (download it into images/ first)`);
     for (const m of brandingIssues(d, spec, w, h)) say("FAIL", `${id}: ${m}`);
+    for (const m of compositeIssues(spec)) say("FAIL", `${id}: mockup realism: ${m}`);
+    spec.slides.forEach((s, i) => {
+      if (!s.mockup) return;
+      const v = mockReview.find((r) => id.startsWith(String(r.post).padStart(2, "0")) && Number(r.slide) === i + 1);
+      if (!v || v.verdict !== "pass") say("FAIL", `${id}: slide ${i + 1} (${s.mockup}) mockup realism ${v ? `failed: ${v.note || "see mockups.json"}` : "not yet reviewed: the Director records a full-size verdict in mockups.json"}`);
+    });
     for (const [lvl, m] of creativeIssues(d, spec, w, h, palette)) say(lvl, `${id}: ${m}`);
     for (const [file, platform] of [["caption-instagram.txt", "instagram"], ["caption-facebook.txt", "facebook"], ["alt-text.txt", "alt"]]) {
       const p = join(d, file);

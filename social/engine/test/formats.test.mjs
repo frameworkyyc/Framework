@@ -106,3 +106,24 @@ test("Framework's technical illustration: the iso layer draws the website's line
   writeFileSync(join(b, "briefs.json"), JSON.stringify({ colour_plan: { palette: [{ hex: "#0A0A0A" }, { hex: "#FFFFFF" }, { hex: "#C84B31" }] }, posts: nine }));
   assert.match(fw(["validate", b]).stdout, /no post uses Framework's technical illustration style/);
 });
+
+test("mockup realism: a design composited over a photograph fails, and every mockup needs the Director's full-size pass", () => {
+  const d = tmp();
+  post(d, "01-book", { format: "single", slides: [{ template: "canvas", layout: "book", mockup: "book", layers: [
+    { type: "image", src: "@site/assets/img/drafting.jpg", x: 0, y: 0, w: 1080, h: 1350 },
+    { type: "rect", x: 200, y: 300, w: 400, h: 600, fill: "#0A0A0A", blend: "multiply", tilt: { x: 10 } },
+    { type: "text", x: 96, y: 1100, w: 800, text: "Drawn,\nthen built.", size: 80, color: "#FFFFFF" }] }] });
+  assert.equal(fw(["render", d]).status, 0);
+  let c = fw(["check", d]);
+  assert.match(c.stdout, /mockup realism: slide 1: design laid over a photograph \(rect with blend\)/);
+  assert.match(c.stdout, /\(book\) mockup realism not yet reviewed/);
+  // An integrated photograph (the artwork is part of the image) with the post's own headline beside it passes once the Director signs it off.
+  const ok = tmp();
+  post(ok, "01-book", { format: "single", slides: [{ template: "canvas", layout: "book", mockup: "book", layers: [
+    { type: "image", src: "@site/assets/img/drafting.jpg", x: 0, y: 0, w: 1080, h: 1350 },
+    { type: "text", x: 96, y: 1100, w: 800, text: "Drawn,\nthen built.", size: 80, color: "#FFFFFF" }] }] });
+  assert.equal(fw(["render", ok]).status, 0);
+  writeFileSync(join(ok, "mockups.json"), JSON.stringify([{ post: "01", slide: 1, object: "book", verdict: "pass", note: "print follows the page curve and light" }]));
+  c = fw(["check", ok]);
+  assert.equal(c.status, 0, c.stdout);
+});
