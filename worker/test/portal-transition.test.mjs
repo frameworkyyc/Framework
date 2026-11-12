@@ -39,20 +39,23 @@ test("flag OFF: sign-in and signed-in pages are what they were: no script, no cu
   assert.equal(home.status, 200); assert.equal(csp(home), PORTAL_CSP); assert.ok(!/portal-transition|fw-curtain|fw-fx|<script/.test(h));
 });
 
-test("flag ON: the editorial sign-in keeps every link and message, and carries only the same-origin script", async () => {
+test("flag ON: the editorial sign-in is minimal: one instruction, Continue, a discreet help link and Privacy; the session-ended notice is kept", async () => {
   const s = await setup({ demo: true });
   const login = await s.anon.get("/portal/login"); const html = await login.text();
   assert.equal(login.status, 200);
   assert.equal(csp(login), PORTAL_CSP_WITH_SCRIPT, "script-src 'self' and nothing else widened");
   assert.ok(!/unsafe-inline|unsafe-eval|https?:\/\/[^ ;]*script/i.test(csp(login).replace(/https:\/\/(api|cdn)\.fontshare\.com|https:\/\/api\.workos\.com/g, "")));
   assert.ok(noInline(html), "no inline style, inline script or event handler");
-  for (const t of ["Client", "Portal", "Use the email address your Framework invitation was sent to.", "one-time code", "Access is by invitation.", "hello@frameworkco.ca", "/portal/demo", "/privacy.html"]) assert.ok(html.includes(t), t);
+  for (const t of ["Client", "Portal", "Enter your email to receive a one-time sign-in code.", ">Need help?<", 'href="mailto:hello@frameworkco.ca"', 'href="/privacy.html"', ">Privacy<"]) assert.ok(html.includes(t), t);
+  for (const t of ["demonstration", "/portal/demo", "Not signed in yet", "Access is by invitation", "Calgary", "invitation was sent", "We’ll email you", "Questions?", "si__eyebrow"]) assert.ok(!html.includes(t), "removed: " + t);
+  assert.ok(!html.includes(">hello@frameworkco.ca<"), "the address is no longer printed, only linked");
   assert.match(html, /<a class="si__btn" data-fw-signin href="\/portal\/login\?start=1">/, "Continue is the same link auth.js built");
   assert.equal([...html.matchAll(/class="fw-curtain"/g)].length, 1); assert.match(html, /role="status" data-fw-status/);
   assert.match(html, /<meta name="fw-fx" content="page">/); assert.match(html, /href="\/assets\/css\/portal-transition\.css"/); assert.match(html, /href="\/assets\/css\/portal-signin\.css"/); assert.match(html, /<script src="\/assets\/js\/portal-transition\.js"><\/script>/);
   assert.ok(html.indexOf("portal-transition.css") < html.indexOf("portal-transition.js"), "the stylesheet blocks first, so the curtain never flashes");
   assert.match(html, /<h1 class="si__title">/); assert.equal([...html.matchAll(/<h1/g)].length, 1);
-  const ended = await (await s.anon.get("/portal/login?r=ended")).text(); assert.match(ended, /Your previous session has ended\. Please sign in again\./);
+  const plain = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " "); assert.ok(plain.length < 420, "very little text on the page (" + plain.length + " characters)");
+  const ended = await (await s.anon.get("/portal/login?r=ended")).text(); assert.match(ended, /Your previous session has ended\. Please sign in again\./); assert.match(ended, /role="status"/);
   const fwd = await (await s.anon.get("/portal/login?login_hint=ann%40alpha.test")).text(); assert.match(fwd, /data-fw-signin href="\/portal\/login\?start=1&amp;login_hint=ann%40alpha\.test"/, "forwarded parameters survive");
 });
 

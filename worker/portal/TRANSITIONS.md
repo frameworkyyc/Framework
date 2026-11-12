@@ -12,7 +12,7 @@ One full-screen black curtain with the Framework mark, used four ways. The mark 
 | **Loading** | A navigation or a form that is **genuinely** slow (over about 0.65 s / 0.5 s) | The mark draws in a loop instead of a spinner, and a polite "Loading" status is announced |
 | **Nothing** | Direct links, refresh, Back/Forward, moves inside a section (for example Branding to the Brand Book), anchors, downloads, new tabs, modified clicks | An ordinary instant navigation |
 
-The **editorial sign-in** (`signInPage` in `transition.js`, `portal-signin.css`) replaces the plain card on Staging: black, full bleed, an oversized "Client Portal" title, one hairline drawing of the mark, one white Continue button. Same copy, same links, same notices (including "session has ended" and the demo link), 56 px touch target, safe-area aware, one column below 900 px.
+The **editorial sign-in** (`signInPage` in `transition.js`, `portal-signin.css`) replaces the plain card on Staging: black, full bleed, an oversized "Client Portal" title, one hairline drawing of the mark, one white Continue button. Minimal copy: one instruction ("Enter your email to receive a one-time sign-in code."), Continue, a discreet "Need help?" link to hello@frameworkco.ca and Privacy in the footer. The demo link, the "access is by invitation" line and the footer address are gone; the "session has ended" notice stays, and sign-in errors and restrictions are shown by the same error pages as before. 56 px touch target, safe-area aware, fits a 360×640 phone without scrolling, one column below 900 px.
 
 ## Decorative versus real
 Decoration never waits for anything and never blocks anything:
