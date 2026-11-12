@@ -64,3 +64,12 @@ test("a rotated headline is measured by its own lines, not its rotated box", () 
   const r = fw("render", d);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
+
+test("a canvas with background transparent leaves the whole slide clear, so a motion reel's video shows through", async () => {
+  const { slideHtml } = await import("../templates.mjs");
+  const ctx = { w: 1080, h: 1920, fontsCss: "/tmp/f.css", slideCss: "/tmp/s.css", postDir: "/tmp" };
+  const clear = slideHtml({ template: "canvas", theme: "paper", background: "transparent", layers: [] }, ctx);
+  assert.match(clear, /class="slide paper\s+reel"/, "the slide wrapper must not paint the theme background behind a transparent canvas");
+  const solid = slideHtml({ template: "canvas", theme: "paper", background: "#D2552A", layers: [] }, ctx);
+  assert.doesNotMatch(solid, /class="[^"]*\breel\b/);
+});

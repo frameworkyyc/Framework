@@ -738,13 +738,13 @@ const label = (t, x, y, size) => { const n = figma.createText(); n.fontName = { 
 const sec = figma.createSection(); sec.name = ${JSON.stringify("Batch " + name)}; page.appendChild(sec);
 const kids = [label(${JSON.stringify(name + " · profile preview (newest first)")}, G, G, 64)];
 let y = G + 140;
-for (const [i, id] of [...covers].reverse().entries()) { const src = await figma.getNodeByIdAsync(id); const c = src.clone(); c.name = "grid · " + src.name; c.x = G + (i % 3) * (W + 12); c.y = y + Math.floor(i / 3) * (H + 12); kids.push(c); }
+for (const [i, id] of [...covers].reverse().entries()) { const src = await figma.getNodeByIdAsync(id); const c = src.clone(); c.name = "grid · " + src.name; if (c.height !== H) c.resize(W, H); /* reel covers: the grid shows their middle */ c.x = G + (i % 3) * (W + 12); c.y = y + Math.floor(i / 3) * (H + 12); kids.push(c); }
 // Posts as columns to the right of the grid: label on top, slides stacked in order.
 let x = G + 3 * (W + 12) + 300; const top = G + 140; let maxY = top + Math.ceil(covers.length / 3) * (H + 12);
 for (const p of posts) {
   kids.push(label(p, x, top - 100, 48));
   let yy = top;
-  for (const n of nodes.filter((n) => n.post === p)) { const node = await figma.getNodeByIdAsync(n.nodeId); node.x = x; node.y = yy; kids.push(node); yy += H + G; }
+  for (const n of nodes.filter((n) => n.post === p)) { const node = await figma.getNodeByIdAsync(n.nodeId); node.x = x; node.y = yy; kids.push(node); yy += node.height + G; }
   maxY = Math.max(maxY, yy); x += W + 120;
 }
 y = maxY + G;
