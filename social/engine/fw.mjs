@@ -152,6 +152,10 @@ const MOTION_SCRIPT = (duration) => {
     const full = steps.map((st, i) => Object.fromEntries([["t", st.t], ["ease", st.ease], ...Object.keys(REST).map((k) => [k, props.includes(k) ? at(i, k) : REST[k]])]));
     if (full[0].t > 0) full.unshift({ ...full[0], t: 0 });
     if (full.at(-1).t < duration) full.push({ ...full.at(-1), t: duration, ease: undefined });
+    // Display type is set with tight leading, so its box is shorter than its glyphs: a reveal mask on text gets 0.3em of room above
+    // and below (except a side that is fully closed), so descenders and accents are never cut off.
+    const isText = el.classList.contains("ct");
+    const padClip = (c) => { const m = /^inset\(([^)]*)\)$/.exec(String(c).trim()); if (!m) return c; let [t, r = t, b = t, l = r] = m[1].trim().split(/\s+/); const pad = (x) => (/^100%$/.test(x) ? x : `calc(${x} - 0.3em)`); return `inset(${pad(t)} ${r} ${pad(b)} ${l})`; };
     const frames = full.map((v) => {
       const f = { offset: v.t / duration, easing: v.ease || "cubic-bezier(.2,.7,.1,1)" }, has = (k) => props.includes(k);
       if (has("opacity")) f.opacity = v.opacity;
@@ -159,7 +163,7 @@ const MOTION_SCRIPT = (duration) => {
       if (has("scale")) f.scale = String(v.scale);
       if (has("rotate")) f.rotate = `${v.rotate}deg`;
       if (has("blur")) f.filter = `blur(${v.blur}px)`;
-      if (has("clip")) f.clipPath = v.clip;
+      if (has("clip")) f.clipPath = isText ? padClip(v.clip) : v.clip;
       return f;
     });
     const anim = el.animate(frames, { duration: duration * 1000, fill: "both" });
