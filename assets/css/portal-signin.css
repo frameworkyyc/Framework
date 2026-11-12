@@ -1,0 +1,59 @@
+/* The editorial sign-in (worker/portal/transition.js; only where PORTAL_TRANSITIONS is on). Black, full bleed, one oversized title, one hairline drawing of the mark, one white button.
+   Framework's identity: sharp corners, ruled lines, Switzer for display and General Sans for text. The same black as the transition curtain, so a transition into or out of this page is seamless. */
+html.fx-signin { background: #0A0A0A; color-scheme: dark; }
+.si-body { margin: 0; min-height: 100vh; min-height: 100dvh; background: #0A0A0A; color: #FFFFFF; font-family: var(--font-body); }
+.si-body .skip-link { background: #FFFFFF; color: #0A0A0A; }
+.si-body :focus-visible { outline: 2px solid #FFFFFF; outline-offset: 4px; }
+.si { --pad: clamp(20px, 4.4vw, 64px); position: relative; display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh; min-height: 100dvh; padding: max(var(--pad), env(safe-area-inset-top)) max(var(--pad), env(safe-area-inset-right)) max(var(--pad), env(safe-area-inset-bottom)) max(var(--pad), env(safe-area-inset-left)); overflow: hidden; }
+
+.si__top { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: clamp(14px, 2vw, 22px); border-bottom: 1px solid rgba(255, 255, 255, .22); }
+.si__brand { display: inline-flex; align-items: center; gap: 14px; color: #FFFFFF; text-decoration: none; }
+.si__brand .brand__mark { width: 30px; height: 30px; }
+.si__word, .si__label, .si__eyebrow, .si__foot { font: 600 12px/1.2 var(--font-body); letter-spacing: .16em; text-transform: uppercase; }
+.si__label { color: #A8A8A8; }
+
+.si__main { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: 1fr auto; column-gap: clamp(16px, 2vw, 32px); align-items: end; padding: clamp(28px, 5vw, 72px) 0 clamp(28px, 4vw, 56px); min-height: 0; }
+.si__main:focus { outline: none; }
+.si__art { position: absolute; right: -6vw; top: -8%; height: 128%; width: auto; max-width: none; z-index: -1; overflow: visible; pointer-events: none; }
+.si__line { fill: none; stroke: #FFFFFF; stroke-opacity: .3; stroke-width: .8; stroke-linejoin: miter; stroke-dasharray: 1; stroke-dashoffset: 1; animation: si-draw 2.6s cubic-bezier(.6, 0, .2, 1) .25s forwards; }
+.si__line--2 { animation-delay: .75s; }
+@keyframes si-draw { to { stroke-dashoffset: 0; } }
+
+.si__title { grid-column: 1 / span 8; grid-row: 2; margin: 0; font: 700 clamp(64px, 14.2vw, 248px)/.86 var(--font-display); letter-spacing: -.045em; }
+.si__title span { display: block; }
+.si__panel { grid-column: 9 / -1; grid-row: 2; align-self: end; padding-top: clamp(18px, 2vw, 28px); border-top: 1px solid rgba(255, 255, 255, .22); background: #0A0A0A; box-shadow: 0 0 0 clamp(12px, 1.6vw, 22px) #0A0A0A; } /* solid black: the drawing passes behind the text, never through it */
+.si__eyebrow { margin: 0 0 clamp(14px, 1.6vw, 22px); color: #A8A8A8; }
+.si__eyebrow::before { content: "— "; }
+.si__notice { margin: 0 0 18px; padding: 12px 14px; border: 1px solid rgba(255, 255, 255, .4); font-size: 15px; line-height: 1.45; }
+.si__lead { margin: 0 0 clamp(20px, 2.4vw, 32px); max-width: 26em; font-size: clamp(17px, 1.45vw, 21px); line-height: 1.45; color: #FFFFFF; }
+.si__cta { margin: 0 0 clamp(18px, 2vw, 26px); }
+.si__btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 28px; min-width: min(100%, 260px); min-height: 56px; padding: 0 22px 0 24px; background: #FFFFFF; color: #0A0A0A; font: 600 13px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; text-decoration: none; border: 1px solid #FFFFFF; transition: background-color .2s ease, color .2s ease; }
+.si__btn:hover { background: #0A0A0A; color: #FFFFFF; }
+.si__arrow { width: 22px; height: 22px; flex: none; transition: transform .25s cubic-bezier(.6, 0, .2, 1); }
+.si__btn:hover .si__arrow { transform: translateX(5px); }
+.si__small { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: #A8A8A8; }
+.si__link { color: #FFFFFF; text-underline-offset: 3px; }
+.si__link:hover { text-decoration-thickness: 2px; }
+.si__foot { position: relative; z-index: 2; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 24px; padding-top: clamp(14px, 2vw, 22px); border-top: 1px solid rgba(255, 255, 255, .22); color: #A8A8A8; font-size: 11px; }
+.si__foot .si__link { color: #A8A8A8; }
+
+/* the page itself arrives quietly: title, then the panel */
+@media (prefers-reduced-motion: no-preference) {
+  .si__title span { animation: si-rise .8s cubic-bezier(.2, .6, .2, 1) both; }
+  .si__title span:nth-child(2) { animation-delay: .08s; }
+  .si__panel { animation: si-rise .8s cubic-bezier(.2, .6, .2, 1) .22s both; }
+  @keyframes si-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) { .si__line { animation: none; stroke-dashoffset: 0; } .si__btn, .si__arrow { transition: none; } }
+
+/* tablet and phone: one column, the title first, the panel below it */
+@media (max-width: 900px) {
+  .si__main { grid-template-columns: minmax(0, 1fr); grid-template-rows: 1fr auto auto; row-gap: clamp(28px, 6vw, 44px); }
+  .si__title { grid-column: 1; grid-row: 2; font-size: clamp(60px, 22vw, 168px); }
+  .si__panel { grid-column: 1; grid-row: 3; }
+  .si__art { right: -22vw; top: 0; height: 78%; }
+  .si__lead { max-width: 30em; }
+  .si__btn { width: 100%; }
+}
+@media (max-height: 520px) and (orientation: landscape) { .si__title { font-size: clamp(48px, 12vw, 120px); } .si__main { padding-top: 16px; } }
+@media print { .si__art { display: none; } }

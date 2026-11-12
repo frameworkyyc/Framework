@@ -19,6 +19,7 @@ import { bindStaffUser } from "./repo/staff.js";
 import { activatePendingInvitations } from "./repo/invitations.js";
 import { recordActivity } from "./repo/activity.js";
 import { loginPage } from "./pages.js";
+import { transitionsOn } from "./config.js";
 import { requireSession, dbCall, Unavailable, unavailablePage } from "./guard.js";
 import { logEvent, routeName } from "./log.js";
 import { htmlPage } from "./http.js";
@@ -53,7 +54,7 @@ export async function handleLogin(ctx) {
   if (ctx.url.searchParams.get("start") !== "1") {
     // An interstitial, so that returning here after sign-out never silently signs the person straight back in.
     const qs = new URLSearchParams({ start: "1", ...forward }).toString();
-    return loginPage({ continueHref: `/portal/login?${qs}`, ended: ctx.url.searchParams.get("r") === "ended", demoHref: ctx.demo ? "/portal/demo" : null });
+    return loginPage({ continueHref: `/portal/login?${qs}`, ended: ctx.url.searchParams.get("r") === "ended", demoHref: ctx.demo ? "/portal/demo" : null, fx: transitionsOn(ctx.env) });
   }
 
   const state = randomToken(32);

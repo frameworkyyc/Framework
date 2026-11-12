@@ -30,6 +30,7 @@ const goodEnv = () => ({
   PORTAL_WEBSITE: { type: "plain_text", text: "1" },
   PORTAL_DISCOVERY: { type: "plain_text", text: "1" },
   PORTAL_REQUESTS: { type: "plain_text", text: "1" },
+  PORTAL_TRANSITIONS: { type: "plain_text", text: "1" },
   LEADS_SENDING: { type: "plain_text", text: "1" },
   LEADS_TEST_RECIPIENT: { type: "plain_text", text: "owner@example.test" },
   CF_ANALYTICS_ACCOUNT_ID: { type: "plain_text", text: expected.plainVars.CF_ANALYTICS_ACCOUNT_ID },
