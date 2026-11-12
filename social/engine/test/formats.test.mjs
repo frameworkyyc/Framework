@@ -135,6 +135,10 @@ test("aesthetic standard: off-aesthetic plans and prompts fail, and a batch need
   const v = fw(["validate", d]);
   assert.match(v.stdout, /"cozy" is outside Framework's aesthetic/);
   assert.match(v.stdout, /prompt must direct the light/);
+  // The prompt grammar's closing exclusions are negated and must not trip the check.
+  const n = tmp();
+  writeFileSync(join(n, "briefs.json"), JSON.stringify({ posts: [{ id: "01", concept: "A steel beam from directly above", slides: [{ visual: { source: "higgsfield", prompt: "A steel beam from directly above, hard low sun with crisp shadows, no people posing, no cozy or lifestyle staging, no stock-photo look, without a bright and airy feel." } }] }] }));
+  assert.doesNotMatch(fw(["validate", n]).stdout, /outside Framework's aesthetic|direct the light/);
   const b = tmp();
   for (let i = 1; i <= 9; i++) post(b, `0${i}-p`, { format: "single", slides: [{ template: "type", headline: `Post ${i}.` }] });
   assert.equal(fw(["render", b]).status, 0);
@@ -145,4 +149,13 @@ test("aesthetic standard: off-aesthetic plans and prompts fail, and a batch need
   writeFileSync(join(b, "aesthetic.json"), JSON.stringify(Array.from({ length: 9 }, (_, i) => ({ post: `0${i + 1}`, verdict: "pass" }))));
   c = fw(["check", b]);
   assert.doesNotMatch(c.stdout, /aesthetic standard/);
+});
+
+test("a motion reel's word count is the busiest moment, not the whole timeline", () => {
+  const d = tmp();
+  const scene = (i) => ({ type: "text", font: "body", x: 96, y: 400 + i * 10, w: 800, size: 34, color: "#FFFFFF", text: "One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty.",
+    anim: [{ t: i * 2, opacity: 0 }, { t: i * 2 + 0.3, opacity: 1 }, { t: i * 2 + 1.7, opacity: 1 }, { t: i * 2 + 2, opacity: 0 }] });
+  post(d, "01-reel", { format: "reel", motion: { duration: 6, fps: 6, coverAt: 1 }, slides: [{ template: "canvas", layout: "kinetic", background: "#0A0A0A", layers: [scene(0), scene(1), scene(2)] }] });
+  assert.equal(fw(["render", d]).status, 0);
+  assert.doesNotMatch(fw(["check", d]).stdout, /words on one slide/); // 60 words in total, never more than 20 at once
 });

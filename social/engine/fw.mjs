@@ -152,6 +152,10 @@ const MOTION_SCRIPT = (duration) => {
     const full = steps.map((st, i) => Object.fromEntries([["t", st.t], ["ease", st.ease], ...Object.keys(REST).map((k) => [k, props.includes(k) ? at(i, k) : REST[k]])]));
     if (full[0].t > 0) full.unshift({ ...full[0], t: 0 });
     if (full.at(-1).t < duration) full.push({ ...full.at(-1), t: duration, ease: undefined });
+    // Display type is set with tight leading, so its box is shorter than its glyphs: a reveal mask on text gets 0.3em of room above
+    // and below (except a side that is fully closed), so descenders and accents are never cut off.
+    const isText = el.classList.contains("ct");
+    const padClip = (c) => { const m = /^inset\(([^)]*)\)$/.exec(String(c).trim()); if (!m) return c; let [t, r = t, b = t, l = r] = m[1].trim().split(/\s+/); const pad = (x) => (/^100%$/.test(x) ? x : `calc(${x} - 0.3em)`); return `inset(${pad(t)} ${r} ${pad(b)} ${l})`; };
     const frames = full.map((v) => {
       const f = { offset: v.t / duration, easing: v.ease || "cubic-bezier(.2,.7,.1,1)" }, has = (k) => props.includes(k);
       if (has("opacity")) f.opacity = v.opacity;
@@ -159,7 +163,7 @@ const MOTION_SCRIPT = (duration) => {
       if (has("scale")) f.scale = String(v.scale);
       if (has("rotate")) f.rotate = `${v.rotate}deg`;
       if (has("blur")) f.filter = `blur(${v.blur}px)`;
-      if (has("clip")) f.clipPath = v.clip;
+      if (has("clip")) f.clipPath = isText ? padClip(v.clip) : v.clip;
       return f;
     });
     const anim = el.animate(frames, { duration: duration * 1000, fill: "both" });
@@ -305,6 +309,8 @@ const CTA_TYPES = ["save", "engage", "explore", "credibility", "lead", "none"];
 // Aesthetic standard (owner rule, 2026-11-12): editorial, architectural, industrial, premium (social/brand/art-direction.md, references in
 // social/brand/references/aesthetic/). Plans and image prompts may not ask for the treatments the owner ruled out.
 const OFF_AESTHETIC = /\bcoz(?:y|ier)\b|\bcosy\b|cheerful|playful|whimsical|\bcute\b|cartoon|smiling|happy (?:family|families|customers|people|couple)|bright and airy|warm and inviting|\bsuburban\b|stock[- ]photo|homey|friendly neighbou?rhood|lifestyle stock|candid family/i;
+// Exclusions ("no cozy staging", "without a stock-photo look") are the prompt grammar's own closing line: ignore negated phrases.
+const offAesthetic = (text) => String(text || "").replace(/\b(?:no|not|never|without|avoid(?:ing)?)\b[^.;:\n"]*/gi, " ").match(OFF_AESTHETIC);
 const CHECKS = ["interesting", "value", "save_share_follow", "credibility", "role", "different"];
 function validate(batch) {
   const p = join(batch, "briefs.json");
@@ -324,7 +330,7 @@ function validate(batch) {
     if (!CTA_TYPES.includes(post.cta_type)) errs.push(`${at}: cta_type must be one of ${CTA_TYPES.join("/")}`);
     if (post.cta_type !== "none" && !post.cta) errs.push(`${at}: cta text missing (or set cta_type "none")`);
     for (const c of CHECKS) if (!post.checks || !String(post.checks[c] || "").trim()) errs.push(`${at}: checks.${c} unanswered (a post that fails a question is revised, not shipped)`);
-    { const m = JSON.stringify([post.concept, post.angle, ...(post.slides || []).flatMap((sl) => [sl.art_direction, sl.visual?.prompt, sl.visual?.direction])]).match(OFF_AESTHETIC); if (m) errs.push(`${at}: "${m[0]}" is outside Framework's aesthetic (editorial, architectural, industrial, premium; art-direction.md)`); }
+    { const m = offAesthetic(JSON.stringify([post.concept, post.angle, ...(post.slides || []).flatMap((sl) => [sl.art_direction, sl.visual?.prompt, sl.visual?.direction])])); if (m) errs.push(`${at}: "${m[0]}" is outside Framework's aesthetic (editorial, architectural, industrial, premium; art-direction.md)`); }
     if (post.needs_confirmation) warns.push(`${at}: needs owner confirmation: ${post.needs_confirmation}`);
     if (CLIENT_SHOWCASES_PAUSED) { const m = JSON.stringify(post).match(CLIENT_WORK); if (m) errs.push(`${at}: mentions real client work ("${m[0]}"): client showcases are paused (owner, 2026-11-11)`); }
     if (post.fictional && !(post.fictional.brand && String(post.fictional.disclosure || "").length >= 10)) errs.push(`${at}: fictional needs {brand, disclosure} (how the captions say it is a concept)`);
@@ -444,7 +450,24 @@ const BRAND_HEX = ["#0a0a0a", "#ffffff", "#5c5c5c", "#a3a3a3", "#e0e0e0", "#f5f5
 function creativeIssues(d, spec, w, h, palette = []) {
   const out = [], say = (lvl, m) => out.push([lvl, m]);
   // A panorama is one canvas cut into slides: judge its words per slide (panel), by where each text layer sits.
-  const units = spec.format === "panorama" ? Array.from({ length: Number(spec.panels) }, (_, k) => ({ ...spec.slides[0], layers: (spec.slides[0].layers || []).filter((l) => l.type !== "text" || Math.floor((Number(l.x) || 0) / w) === k) })) : spec.slides;
+  // A motion reel shows its words over time: judge the busiest moment (layers whose opacity is above 5% at the same time), not the whole timeline.
+  const opacityAt = (l, t) => {
+    const ks = (l.anim || []).filter((k) => k.opacity != null).sort((a, b) => a.t - b.t), base = l.opacity ?? 1;
+    if (!ks.length) return base;
+    if (t <= ks[0].t) return ks[0].opacity;
+    for (let i = 1; i < ks.length; i++) if (t <= ks[i].t) return ks[i - 1].opacity + ((ks[i].opacity - ks[i - 1].opacity) * (t - ks[i - 1].t)) / ((ks[i].t - ks[i - 1].t) || 1);
+    return ks.at(-1).opacity;
+  };
+  const busiest = (sl) => {
+    let best = { ...sl, layers: [] }, most = -1;
+    for (let t = 0; t <= Number(spec.motion.duration); t += 0.25) {
+      const clipped = (l) => { const ks = (l.anim || []).filter((k) => k.clip).sort((a, b) => a.t - b.t); if (!ks.length) return false; const k = [...ks].reverse().find((x) => x.t <= t) || ks[0]; return /100%/.test(k.clip); }; // a fully closed reveal mask hides the text
+      const layers = (sl.layers || []).filter((l) => l.type !== "text" || (opacityAt(l, t) > 0.05 && !clipped(l))), n = slideText({ layers }).split(/\s+/).filter((x) => /\w/.test(x)).length;
+      if (n > most) { most = n; best = { ...sl, layers }; }
+    }
+    return best;
+  };
+  const units = spec.format === "reel" && spec.motion ? spec.slides.map(busiest) : spec.format === "panorama" ? Array.from({ length: Number(spec.panels) }, (_, k) => ({ ...spec.slides[0], layers: (spec.slides[0].layers || []).filter((l) => l.type !== "text" || Math.floor((Number(l.x) || 0) / w) === k) })) : spec.slides;
   const allowed = new Set([...BRAND_HEX, ...palette.map((x) => String(x).toLowerCase())]);
   units.forEach((s, i) => {
     const at = `slide ${i + 1}`, text = slideText(s);
@@ -544,7 +567,7 @@ function check(batch) {
     }
   }
   for (const d of dirs) {
-    const a = join(d, "assets.json"), m = existsSync(a) ? readFileSync(a, "utf8").match(OFF_AESTHETIC) : null;
+    const a = join(d, "assets.json"), m = existsSync(a) ? offAesthetic(readFileSync(a, "utf8")) : null;
     if (m) say("FAIL", `${basename(d)}/assets.json: an image prompt asks for "${m[0]}", outside Framework's aesthetic`);
   }
   const drawn = dirs.filter((d) => existsSync(join(d, "spec.json")) && JSON.stringify(readJson(join(d, "spec.json"))).includes('"type":"iso"'));
