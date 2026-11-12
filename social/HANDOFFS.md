@@ -19,6 +19,7 @@ social/batches/<batch-id>/            e.g. 2026-11-12-grid-01   (git-ignored: pr
   grid-preview.png, grid-report.md    02: Instagram profile preview + feed checks (fw grid)
   contact-sheet.png                   02: every slide on one image (fw sheet)
   figma.json                          02: Figma node ids of the uploaded slides (fw figma upload)
+  aesthetic.json                      Director: verdict per post against social/brand/references/aesthetic/ (hard gate; fw check fails without "pass")
   mockups.json                        Director: full-size realism verdict for every mockup slide (hard rule; fw check fails without "pass")
   qc.md                               Director: quality-control record
   export/<batch-id>/ + .zip           engine: the deliverable
@@ -101,6 +102,7 @@ Posts are listed in **publishing order** (post 01 goes out first and ends up low
 Check it with `node social/engine/fw.mjs validate social/batches/<batch-id>`. It fails unless the batch is exactly 9 posts (one 3×3 grid block), on missing checks, unknown values, two consecutive covers in the same layout family, two consecutive posts in the same format, a missing `colour_plan` or `cover_colour`, a panorama without matching `panels`, a reel without `motion`, a fictional brand without a disclosure, real client work while showcases are paused, and a batch with no post in Framework's technical illustration style (a post with `visual_category` or a slide with `category` "technical-illustration"). It warns when the goal mix drifts from about 5 attract / 3 trust / 1 convert, the format mix from 3 carousels / 2 panoramas / 2 singles / 2 reels, fewer than 4 covers carry colour, colour clusters in a grid row, neighbours share a lead colour, categories are too few, or three dark covers run together.
 
 Rules that bind every agent:
+- Aesthetic standard: editorial, architectural, industrial, premium, at the level of `social/brand/references/aesthetic/`. Hard QC gate.
 - Mockups must look like real, finished products photographed in the real world, with the branding printed into the object (generated with the artwork as a reference image), never composited on top. Hard fail.
 - Real client showcases are paused (owner, 2026-11-11). Fictional brand studies are labelled `fictional` and called "concept" in captions; never presented as client work.
 - No automatic branding: no Framework logo, wordmark or URL as a corner mark, footer or watermark on any slide. Branding only as an intentional part of a concept (`brand` with a `reason`).

@@ -15,6 +15,31 @@ Read with `brand-system.md` (rules) and `engine/TEMPLATES.md` (how to build it).
 - **Minimal text.** A slide can be only an image, only a word, or only a specimen.
 - **Specimens and systems are beautiful content:** a typeface shown at display size with its weights, a colour palette as large fields with names and values.
 
+## Aesthetic standard (non-negotiable)
+**Owner rule, 2026-11-12. Editorial. Architectural. Industrial. Premium.** Every post, carousel, panorama and Reel must reach the visual quality and aesthetic of the reference set in `social/brand/references/aesthetic/` (ref-01 to ref-13). This governs the visual treatment, not the subject: vehicles, products, businesses, architecture and abstract ideas are all fine when art-directed this way. Framework's brand identity stays as it is; colour is used creatively.
+
+**What the references show**
+| Ref | What it teaches |
+|---|---|
+| 01, 07 | Print and stationery as real objects: a brand book in a cloth clamshell, stacked cards shot top-down. Neutral grey or white ground, one hard shadow, one saturated accent against charcoal. |
+| 03 | Cinematic scale: a single object from directly above on a vast, textured ground (cracked earth), with a tiny figure for scale. Silence and space. |
+| 04 | Creative masking: a photograph escapes its rectangular frame onto white; the subject breaks the boundary. |
+| 05 | Hybrid: architectural line drawing and annotations laid over the photograph they describe; construction lines as content. |
+| 06, 08, 09 | Systems as editorial pages: a type specimen at monumental scale with refined small text, a colour system with tints and values, a mark derived step by step. Calm grounds, strict alignment, generous space. |
+| 11 | Identity in architecture: a monochrome building corner in hard daylight, the mark large and integrated into the facade. |
+| 12 | Confidence: one mark on one flat saturated field. |
+| 13 | Environmental application: posters on corrugated metal cladding in raking sun, with real shadow bands across them. |
+| 02, 10 | Framework's own isometric linework (the technical illustration style). |
+
+**Do:** sophisticated editorial photography and composition; architectural geometry, structure and precision; industrial textures and materials (concrete, steel, corrugated metal, stone, cloth bindings, uncoated paper, cracked earth); dramatic, directional light with real, crisp shadows; cinematic framing (top-down, elevation, low angle, extreme scale contrast); bold or refined typography with intentional negative space; a controlled palette, often one saturated accent against charcoal, grey or white; artistic experimentation, creative masking and conceptual visuals.
+
+**Avoid (automatic reject):** friendly, cheerful or playful small-business aesthetics; generic suburban lifestyle photography; cozy, soft-focus, warm-and-inviting or overly commercial imagery; cheap-looking mockups and generic stock photography; anything that resembles an ordinary social-media marketing template. `fw validate` fails plans and prompts that ask for these, and `fw check` fails image prompts that did.
+
+**Hard QC rule:** a post that does not meet the visual quality and aesthetic of the references is rejected and revised, whatever else it gets right. The Director compares every post with the reference set and records a verdict in `<batch>/aesthetic.json` (`[{"post": "01", "verdict": "pass" | "fail", "note": "..."}]`); `fw check` fails a batch without a "pass" for every post.
+
+**Image prompts (Higgsfield).** Build every photograph prompt from this grammar, not from a lifestyle description:
+`[subject], [camera: directly overhead / straight elevation / low three-quarter / extreme wide with a tiny figure for scale], editorial architectural photograph, [material and surface], hard directional [low sun / raking window / single studio key] light with crisp real shadows, controlled palette of [colours from the batch colour_plan], generous negative space, medium-format clarity, premium campaign quality`, then end with `no people posing, no clutter, no cozy or lifestyle staging, no stock-photo look, no soft haze, no oversaturation`. Brand applications add the artwork reference and print method (mockup realism rule).
+
 ## Grid-wide colour (plan it before any post)
 Black and white is a design option, not the default. Each batch gets an **editorial palette** (3 to 6 colours with roles: a deep, a warm accent, a quiet neutral…) chosen for the season and the concepts, written to `briefs.json` `colour_plan` before the posts are designed.
 - **4 to 5 of the 9 covers carry meaningful colour** (photography, artwork or colour fields), the rest are deliberate black, white or quiet tiles so colour has room.
@@ -121,6 +146,7 @@ Do not add slide numbers, section labels, header or footer rules, decorative div
 6. Is the presentation right for the subject (the work leads in portfolio posts)?
 7. Would it make someone follow Framework?
 8. Would it make a potential client trust Framework's design ability?
+9. **Hard gate:** does it meet the visual quality and aesthetic of the reference set (editorial, architectural, industrial, premium)? If not, reject and revise, regardless of the other scores.
 
 **Batch level** (the Director, on `grid-preview.png`, the contact sheet, panoramas viewed edge to edge and every Reel played through):
 - Visual originality: no two covers built the same way; nothing that looks like a template.
