@@ -150,3 +150,12 @@ test("aesthetic standard: off-aesthetic plans and prompts fail, and a batch need
   c = fw(["check", b]);
   assert.doesNotMatch(c.stdout, /aesthetic standard/);
 });
+
+test("a motion reel's word count is the busiest moment, not the whole timeline", () => {
+  const d = tmp();
+  const scene = (i) => ({ type: "text", font: "body", x: 96, y: 400 + i * 10, w: 800, size: 34, color: "#FFFFFF", text: "One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty.",
+    anim: [{ t: i * 2, opacity: 0 }, { t: i * 2 + 0.3, opacity: 1 }, { t: i * 2 + 1.7, opacity: 1 }, { t: i * 2 + 2, opacity: 0 }] });
+  post(d, "01-reel", { format: "reel", motion: { duration: 6, fps: 6, coverAt: 1 }, slides: [{ template: "canvas", layout: "kinetic", background: "#0A0A0A", layers: [scene(0), scene(1), scene(2)] }] });
+  assert.equal(fw(["render", d]).status, 0);
+  assert.doesNotMatch(fw(["check", d]).stdout, /words on one slide/); // 60 words in total, never more than 20 at once
+});

@@ -446,7 +446,24 @@ const BRAND_HEX = ["#0a0a0a", "#ffffff", "#5c5c5c", "#a3a3a3", "#e0e0e0", "#f5f5
 function creativeIssues(d, spec, w, h, palette = []) {
   const out = [], say = (lvl, m) => out.push([lvl, m]);
   // A panorama is one canvas cut into slides: judge its words per slide (panel), by where each text layer sits.
-  const units = spec.format === "panorama" ? Array.from({ length: Number(spec.panels) }, (_, k) => ({ ...spec.slides[0], layers: (spec.slides[0].layers || []).filter((l) => l.type !== "text" || Math.floor((Number(l.x) || 0) / w) === k) })) : spec.slides;
+  // A motion reel shows its words over time: judge the busiest moment (layers whose opacity is above 5% at the same time), not the whole timeline.
+  const opacityAt = (l, t) => {
+    const ks = (l.anim || []).filter((k) => k.opacity != null).sort((a, b) => a.t - b.t), base = l.opacity ?? 1;
+    if (!ks.length) return base;
+    if (t <= ks[0].t) return ks[0].opacity;
+    for (let i = 1; i < ks.length; i++) if (t <= ks[i].t) return ks[i - 1].opacity + ((ks[i].opacity - ks[i - 1].opacity) * (t - ks[i - 1].t)) / ((ks[i].t - ks[i - 1].t) || 1);
+    return ks.at(-1).opacity;
+  };
+  const busiest = (sl) => {
+    let best = { ...sl, layers: [] }, most = -1;
+    for (let t = 0; t <= Number(spec.motion.duration); t += 0.25) {
+      const clipped = (l) => { const ks = (l.anim || []).filter((k) => k.clip).sort((a, b) => a.t - b.t); if (!ks.length) return false; const k = [...ks].reverse().find((x) => x.t <= t) || ks[0]; return /100%/.test(k.clip); }; // a fully closed reveal mask hides the text
+      const layers = (sl.layers || []).filter((l) => l.type !== "text" || (opacityAt(l, t) > 0.05 && !clipped(l))), n = slideText({ layers }).split(/\s+/).filter((x) => /\w/.test(x)).length;
+      if (n > most) { most = n; best = { ...sl, layers }; }
+    }
+    return best;
+  };
+  const units = spec.format === "reel" && spec.motion ? spec.slides.map(busiest) : spec.format === "panorama" ? Array.from({ length: Number(spec.panels) }, (_, k) => ({ ...spec.slides[0], layers: (spec.slides[0].layers || []).filter((l) => l.type !== "text" || Math.floor((Number(l.x) || 0) / w) === k) })) : spec.slides;
   const allowed = new Set([...BRAND_HEX, ...palette.map((x) => String(x).toLowerCase())]);
   units.forEach((s, i) => {
     const at = `slide ${i + 1}`, text = slideText(s);
