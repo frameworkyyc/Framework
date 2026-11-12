@@ -159,3 +159,22 @@ test("a motion reel's word count is the busiest moment, not the whole timeline",
   assert.equal(fw(["render", d]).status, 0);
   assert.doesNotMatch(fw(["check", d]).stdout, /words on one slide/); // 60 words in total, never more than 20 at once
 });
+
+test("video QC catches ghosting cross-fades, one-frame flicker and masked text that still paints", () => {
+  const reel = (layers) => { const d = tmp(); post(d, "01-reel", { format: "reel", motion: { duration: 3, fps: 10, coverAt: 2 }, slides: [{ template: "canvas", layout: "qc", background: "#0A0A0A", layers }] }); return d; };
+  const T = (text, anim, extra = {}) => ({ type: "text", x: 96, y: 700, w: 860, size: 120, color: "#FFFFFF", text, anim, ...extra });
+  // Two different words cross-fading on the same spot.
+  let r = fw(["render", reel([T("Before.", [{ t: 1, opacity: 1 }, { t: 1.6, opacity: 0 }]), T("After.", [{ t: 1, opacity: 0 }, { t: 1.6, opacity: 1 }])])]);
+  assert.match(r.stdout, /text overlap .*"Before\." and "After\."/);
+  // A word that exists for exactly one frame.
+  r = fw(["render", reel([T("Blink.", [{ t: 0.99, opacity: 0 }, { t: 1.0, opacity: 1 }, { t: 1.01, opacity: 0 }])])]);
+  assert.match(r.stdout, /single-frame flicker at 1\.00s/);
+  // A closed mask with its overhang left open: only descenders show (the stray-fragment bug).
+  r = fw(["render", reel([({ ...T("Typography", [{ t: 0, clip: "inset(100% 0% calc(0% - 40px) 0%)" }]), leading: 0.8 })])]);
+  assert.match(r.stdout, /stray fragment|hidden text still paints/);
+  // The same reel without the defect passes, and check reads the QC record.
+  const ok = reel([T("Steady.", [{ t: 0, opacity: 0, y: 30 }, { t: 0.8, opacity: 1, y: 0 }])]);
+  r = fw(["render", ok]);
+  assert.equal(r.status, 0, r.stdout);
+  assert.doesNotMatch(fw(["check", ok]).stdout, /video QC/);
+});

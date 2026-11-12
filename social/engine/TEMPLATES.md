@@ -81,6 +81,15 @@ One `canvas` slide at 1080x1920. Give layers `anim`, keyframes on one timeline i
 ```
 Properties: `opacity`, `x`, `y` (px offsets from the layer's place), `scale`, `rotate` (deg), `blur` (px), `clip` (an inset() reveal, e.g. from `"inset(0% 100% 0% 0%)"` to `"inset(0% 0% 0% 0%)"`). Values hold before the first and after the last keyframe; `ease` applies to the move that starts at that keyframe. `fw render` renders every frame exactly and writes `slides/reel.mp4` (H.264, silent), `slides/reel-cover.png` (the frame at `coverAt`: the grid tile, of which the profile shows the middle 3:4) and `storyboard.png` (six frames, for review). With `"video": "images/clip.mp4"` (e.g. a Higgsfield clip; `"videoTreatment": "mono"` for black and white) the animated layers are composited over the clip; set `background: "transparent"`. Keep text in the safe area (x < 960, 120 < y < 1600): render warns.
 
+**Video QC (every motion reel, every frame; `slides/video-qc.json`; render and `fw check` fail on any error).**
+- **Ghosting:** two different text layers visible on top of each other (a cross-fade of different words, or a slide that lands on another line). Sequence the transition so the outgoing layer has gone before the next arrives. `overlap: true` on a layer allows a deliberate overlay.
+- **Stray fragments:** a text layer whose mask rests on less than a quarter of it for longer than 0.3 s, or a fully masked layer that still paints pixels (descenders, punctuation). `partial: true` allows a deliberate static crop.
+- **Flicker:** an area that changes for exactly one frame and changes back with nothing similar nearby (moving content is not flagged).
+- **Dropped frames:** one blank frame between full ones; the frame count of the MP4 against the timeline.
+- **Hard cuts:** a frame-to-frame change above 14 on a 0–255 scale, a warning unless listed in `motion.cuts` (seconds).
+- **Encoding fidelity:** PSNR of the MP4 against the rendered frames under 32 dB is a warning.
+Reveal masks on text leave 0.3em above and below for descenders, except a side that is fully closed.
+
 Client typefaces: add `"fonts": [{ "family": "Barlow Semi Condensed", "src": "images/barlow-600.woff2", "weight": 600 }]` at the top of `spec.json` (download the woff2 from the `@fontsource` npm package with `npm pack`). Already available: `social/assets/clients/red-e/fonts/` (Barlow Semi Condensed 400–700; Red E's body face Inter is installed system-wide) and `social/assets/clients/aurora/fonts/` (Noto Sans, Noto Serif, Noto Sans Mono 400–700), each with its open font licence. Authentic website captures: `fw capture <url> <out.jpg> [desktop|mobile] [full]` into `social/assets/clients/<client>/` (2880px desktop, 1170px-wide mobile).
 
 ## Templates

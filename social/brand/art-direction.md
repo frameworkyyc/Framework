@@ -85,6 +85,7 @@ Format `reel` (1080×1920). Two ways to make one; choose the cheaper that is goo
 2. **Higgsfield video** where real motion of a scene genuinely improves the post (cinematic product or architectural shots), with code-animated type composited on top.
 - 5 to 15 seconds is usually right; the idea lands in the first second; nothing flashes or jitters; motion eases.
 - Keep type inside the safe area (Instagram covers the bottom and right edge); `fw render` warns.
+- **Video QC is a hard gate** (TEMPLATES.md): no ghosted cross-fades, no stray fragments, no flicker, no dropped frames. Fix the timing at its cause: one element leaves before the next arrives in the same place; masks open and close fully. Never hide an artifact behind a cut or a blur.
 - **Every Reel needs a strong cover** (`motion.coverAt`) that works as a grid tile: the profile grid shows only its middle 3:4.
 
 ## Composition toolbox (built with the `canvas` template)
