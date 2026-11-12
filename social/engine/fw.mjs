@@ -16,7 +16,7 @@ import { createRequire } from "node:module";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, copyFileSync, rmSync } from "node:fs";
 import { join, resolve, basename, dirname } from "node:path";
 import { pathToFileURL } from "node:url";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { slideHtml, resolveAsset, TEMPLATES, REPO_ROOT, CATEGORIES, familyOf, categoryOf, isImagery } from "./templates.mjs";
 
 const ENGINE = dirname(new URL(import.meta.url).pathname);
@@ -155,7 +155,13 @@ const MOTION_SCRIPT = (duration) => {
     // Display type is set with tight leading, so its box is shorter than its glyphs: a reveal mask on text gets 0.3em of room above
     // and below (except a side that is fully closed), so descenders and accents are never cut off.
     const isText = el.classList.contains("ct");
-    const padClip = (c) => { const m = /^inset\(([^)]*)\)$/.exec(String(c).trim()); if (!m) return c; let [t, r = t, b = t, l = r] = m[1].trim().split(/\s+/); const pad = (x) => (/^100%$/.test(x) ? x : `calc(${x} - 0.3em)`); return `inset(${pad(t)} ${r} ${pad(b)} ${l})`; };
+    const padClip = (c) => {
+      const m = /^inset\(([^)]*)\)$/.exec(String(c).trim()); if (!m) return c;
+      const [t, r = t, b = t, l = r] = m[1].trim().split(/\s+/), pct = (x) => (/^-?[\d.]+%$/.test(x) ? parseFloat(x) : 0);
+      // A closed mask (top + bottom, or left + right, reach 100%) must hide everything, overhang included: never pad it.
+      if (pct(t) + pct(b) >= 100 || pct(l) + pct(r) >= 100) return `inset(${t} ${r} ${b} ${l})`;
+      return `inset(calc(${t} - 0.3em) ${r} calc(${b} - 0.3em) ${l})`;
+    };
     const frames = full.map((v) => {
       const f = { offset: v.t / duration, easing: v.ease || "cubic-bezier(.2,.7,.1,1)" }, has = (k) => props.includes(k);
       if (has("opacity")) f.opacity = v.opacity;
@@ -172,6 +178,46 @@ const MOTION_SCRIPT = (duration) => {
   window.__fwSeek = (t) => { for (const a of window.__fwAnims) a.currentTime = t * 1000; };
   return window.__fwAnims.length;
 };
+
+// ---------- video QC (every motion reel, every frame) ----------
+// In the page, per frame: every text layer's opacity and the part of its ink that its reveal mask leaves visible.
+const VIDEO_PROBE = () => {
+  const px = (v, size) => { let sum = 0; String(v).replace(/([+-]?)\s*(\d*\.?\d+)(%|px)/g, (m, sign, n, u) => { const x = (u === "%" ? (Number(n) * size) / 100 : Number(n)) * (sign === "-" ? -1 : 1); sum += x; return m; }); return sum; };
+  return [...document.querySelectorAll(".layer.ct")].map((el) => {
+    const cs = getComputedStyle(el), op = Number(cs.opacity), box = el.getBoundingClientRect(), g = document.createRange(); g.selectNodeContents(el);
+    const ink = g.getBoundingClientRect(); let vis = { l: ink.left, t: ink.top, r: ink.right, b: ink.bottom };
+    const m = /^inset\((.*)\)$/.exec(cs.clipPath || "");
+    if (m) {
+      const parts = m[1].match(/calc\([^)]*\)|[^\s]+/g) || [], [t, r = t, b = t, l = r] = parts, H = el.offsetHeight || box.height, W = el.offsetWidth || box.width;
+      vis = { l: Math.max(vis.l, box.left + px(l, W)), t: Math.max(vis.t, box.top + px(t, H)), r: Math.min(vis.r, box.right - px(r, W)), b: Math.min(vis.b, box.bottom - px(b, H)) };
+    }
+    const vw = vis.r - vis.l, vh = vis.b - vis.t, area = vw >= 1 && vh >= 1 ? vw * vh : 0; // under a pixel is closed (rounding), and is then pixel-tested
+    const inkArea = Math.max(1, (ink.right - ink.left) * (ink.bottom - ink.top));
+    return { i: Number(el.closest("[data-li]")?.dataset.li ?? -1), text: el.textContent.trim().slice(0, 28), op, area, frac: area / inkArea, vis, ink: { l: ink.left, t: ink.top, r: ink.right, b: ink.bottom }, overlapOk: !!el.closest("[data-overlap]"), partialOk: !!el.closest("[data-partial]") };
+  });
+};
+// On the rendered frames: hard cuts, single-frame flicker and blank frames.
+const FRAME_QC_PY = [
+  "import sys,json,os", "import numpy as np", "from PIL import Image",
+  "d=sys.argv[1]; fs=sorted(f for f in os.listdir(d) if f.endswith('.png'))",
+  "A=[np.asarray(Image.open(os.path.join(d,f)).convert('L').resize((270,480)),dtype=np.int16) for f in fs]",
+  "B=[np.asarray(Image.open(os.path.join(d,f)).convert('L').resize((54,96),Image.BOX),dtype=np.int16) for f in fs]",
+  "diff=[0.0]+[float(np.abs(A[i]-A[i-1]).mean()) for i in range(1,len(A))]",
+  "blip=[0]*len(A)",
+  "# flicker: a 20 px block that jumps and jumps back within one frame, with no similar content within 40 px in the frames",
+  "# either side (moving content always has a neighbour there; a real flicker does not)",
+  "def nb(x,f):",
+  "  out=x.copy()",
+  "  for dy in (-2,-1,0,1,2):",
+  "    for dx in (-2,-1,0,1,2): out=f(out,np.roll(np.roll(x,dy,0),dx,1))",
+  "  return out",
+  "for i in range(1,len(B)-1):",
+  "  a,b,c=B[i-1],B[i],B[i+1]; m=(np.abs(b-a)>25)&(np.abs(c-b)>25)&(np.abs(c-a)<8)",
+  "  if not m.any(): continue",
+  "  dark=(b<a)&(np.minimum(nb(a,np.minimum),nb(c,np.minimum))>b+12); light=(b>a)&(np.maximum(nb(a,np.maximum),nb(c,np.maximum))<b-12)",
+  "  blip[i]=int((m&(dark|light)).sum())",
+  "std=[float(x.std()) for x in A]",
+  "print(json.dumps({'n':len(A),'diff':diff,'blip':blip,'std':std}))"].join("\n");
 
 async function renderPost(browser, postDir) {
   const specPath = join(postDir, "spec.json");
@@ -216,10 +262,47 @@ async function renderPost(browser, postDir) {
       await page.evaluate(MOTION_SCRIPT, dur);
       const frames = join(build, "frames"); mkdirSync(frames);
       const total = Math.round(dur * fps), transparent = !!spec.video;
+      const qc = { errors: [], warnings: [], overlaps: [], leaks: [], slivers: [] }, at = (f) => `${(f / fps).toFixed(2)}s`, sliverRun = new Map();
       for (let f = 0; f < total; f++) {
         await page.evaluate((t) => window.__fwSeek(t), f / fps);
         await page.screenshot({ path: join(frames, `f${String(f).padStart(5, "0")}.png`), omitBackground: transparent });
+        const layers = await page.evaluate(VIDEO_PROBE);
+        if (process.env.FW_QC_DEBUG) (qc.debug ||= []).push({ f, layers });
+        // Ghosting: two different text layers visibly on top of each other (a cross-fade or a slide that lands on another line).
+        const shown = layers.filter((x) => x.op > 0.06 && x.area > 0); // even a faint ghost over solid text reads as garbled
+        for (let a = 0; a < shown.length; a++) for (let b = a + 1; b < shown.length; b++) {
+          const A = shown[a], B = shown[b]; if (A.overlapOk || B.overlapOk) continue;
+          const ix = Math.max(0, Math.min(A.vis.r, B.vis.r) - Math.max(A.vis.l, B.vis.l)) * Math.max(0, Math.min(A.vis.b, B.vis.b) - Math.max(A.vis.t, B.vis.t));
+          if (ix > 0.1 * Math.min(A.area, B.area)) qc.overlaps.push({ f, a: A.text, b: B.text });
+        }
+        // Stray fragments: text whose mask rests on a small part of it for longer than a transition shows loose pieces
+        // (descenders, a full stop). Reveals and exits pass through this state for a few frames only. partial: true allows a deliberate crop.
+        for (const x of layers) {
+          const sliver = !x.partialOk && x.op > 0.05 && x.area > 0 && x.frac < 0.25, run = sliver ? (sliverRun.get(x.i) || 0) + 1 : 0;
+          sliverRun.set(x.i, run);
+          if (run > Math.round(fps * 0.3)) qc.slivers.push({ f, text: x.text });
+        }
+        // Mask leaks: a layer its mask should hide completely must not paint a single pixel (descenders, accents, overhang).
+        if (f % 6 === 0) for (const x of layers.filter((y) => y.op > 0.02 && y.area === 0)) {
+          const pad = 40, clip = { x: Math.max(0, x.ink.l - pad), y: Math.max(0, x.ink.t - pad) }; clip.width = Math.min(w, x.ink.r + pad) - clip.x; clip.height = Math.min(h, x.ink.b + pad) - clip.y;
+          if (clip.width < 2 || clip.height < 2) continue;
+          const shot = () => page.screenshot({ clip, omitBackground: transparent });
+          const withIt = await shot();
+          await page.evaluate((i) => (document.querySelector(`[data-li="${i}"]`).style.visibility = "hidden"), x.i);
+          const without = await shot();
+          await page.evaluate((i) => (document.querySelector(`[data-li="${i}"]`).style.visibility = ""), x.i);
+          if (!withIt.equals(without)) qc.leaks.push({ f, text: x.text });
+        }
       }
+      const once = (list, key) => { const seen = new Map(); for (const e of list) { const k = key(e); if (!seen.has(k)) seen.set(k, { ...e, from: e.f, to: e.f }); else seen.get(k).to = e.f; } return [...seen.values()]; };
+      for (const o of once(qc.overlaps, (e) => `${e.a}|${e.b}`)) qc.errors.push(`text overlap ${at(o.from)}-${at(o.to)}: "${o.a}" and "${o.b}" are visible on top of each other (ghosting); sequence the transition or set overlap: true if intended`);
+      for (const k of once(qc.slivers, (e) => e.text)) qc.errors.push(`stray fragment ${at(k.from)}-${at(k.to)}: only a small part of "${k.text}" stays visible (a mask left almost closed shows descenders or punctuation; partial: true if it is a deliberate crop)`);
+      for (const k of once(qc.leaks, (e) => e.text)) qc.errors.push(`hidden text still paints ${at(k.from)}-${at(k.to)}: "${k.text}" is masked but pixels of it show (stray fragments)`);
+      const fq = JSON.parse(execFileSync("python3", ["-I", "-c", FRAME_QC_PY, frames], { maxBuffer: 1 << 26 }).toString());
+      if (fq.n !== total) qc.errors.push(`${fq.n} frames rendered, expected ${total}`);
+      fq.blip.forEach((n, f) => { if (n >= 4) qc.errors.push(`single-frame flicker at ${at(f)}: ${n} areas change for one frame and change back`); });
+      fq.diff.forEach((d, f) => { if (d > 14 && !(motion.cuts || []).some((t) => Math.abs(t - f / fps) < 1.5 / fps)) qc.warnings.push(`hard cut at ${at(f)} (mean change ${d.toFixed(1)}): ease the transition or list the time in motion.cuts`); });
+      fq.std.forEach((sd, f) => { if (sd < 1.5 && f > 0 && f < fq.n - 1 && fq.std[f - 1] > 8 && fq.std[f + 1] > 8) qc.errors.push(`dropped frame at ${at(f)}: one blank frame between two full ones`); });
       const mp4 = join(outDir, "reel.mp4"), seq = join(frames, "f%05d.png"), enc = ["-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an"];
       if (spec.video) {
         const clip = resolveAsset(spec.video, postDir);
@@ -231,6 +314,17 @@ async function renderPost(browser, postDir) {
       execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-ss", String(coverAt), "-i", mp4, "-frames:v", "1", join(outDir, "reel-cover.png")]);
       // Storyboard for review: six evenly spaced frames in one strip (contact sheet, QC).
       execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", mp4, "-vf", `fps=6/${dur},scale=270:480,tile=6x1`, "-frames:v", "1", join(postDir, "storyboard.png")]);
+      const probe = execFileSync("ffprobe", ["-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", mp4]).toString().trim();
+      if (Number(probe) !== total) qc.errors.push(`reel.mp4 has ${probe} frames, expected ${total}`);
+      if (!spec.video) {
+        const ps = spawnSync("ffmpeg", ["-hide_banner", "-i", mp4, "-framerate", String(fps), "-i", seq, "-lavfi", "[0:v]format=rgb24[a];[1:v]format=rgb24[b];[a][b]psnr", "-f", "null", "-"], { encoding: "utf8" }).stderr || ""; // ffmpeg reports PSNR on stderr
+        const avg = Number((/average:([\d.]+|inf)/.exec(ps) || [])[1]);
+        if (avg && avg < 32) qc.warnings.push(`encoding loses detail (PSNR ${avg.toFixed(1)} dB against the rendered frames)`);
+        qc.psnr = avg || null;
+      }
+      if (qc.debug) writeFileSync(join(build, "..", "video-probe.json"), JSON.stringify(qc.debug));
+      writeFileSync(join(outDir, "video-qc.json"), JSON.stringify({ frames: total, fps, errors: qc.errors, warnings: qc.warnings, psnr: qc.psnr ?? null, maxChange: Math.max(...fq.diff).toFixed(2) }, null, 1));
+      r.errors.push(...qc.errors.map((e) => "video QC: " + e)); r.warnings.push(...qc.warnings.map((e) => "video QC: " + e));
       report.push({ slide: 1, file: "reel-cover.png", ...r });
       continue;
     }
@@ -534,6 +628,11 @@ function check(batch) {
         if (!(dur >= 3 && dur <= 90)) say("FAIL", `${id}/reel.mp4: ${dur}s (3-90 s)`);
       }
       if (!existsSync(cover)) say("FAIL", `${id}: no reel-cover.png (every Reel needs a cover for the grid)`);
+      if (spec.motion) {
+        const vq = join(d, "slides", "video-qc.json");
+        if (!existsSync(vq)) say("FAIL", `${id}: no video QC (slides/video-qc.json): re-render with the current engine`);
+        else { const q = readJson(vq); for (const e of q.errors) say("FAIL", `${id}: video QC: ${e}`); for (const e of q.warnings) say("WARN", `${id}: video QC: ${e}`); }
+      }
     } else if (pngs.length !== expected) say("FAIL", `${id}: ${pngs.length} PNGs for ${expected} slides (run render)`);
     if (CLIENT_SHOWCASES_PAUSED) { const all = JSON.stringify(spec) + ["caption-instagram.txt", "caption-facebook.txt"].map((f) => (existsSync(join(d, f)) ? readFileSync(join(d, f), "utf8") : "")).join(" "); const m = all.match(CLIENT_WORK); if (m) say("FAIL", `${id}: real client work ("${m[0]}") while client showcases are paused`); }
     if (brief?.fictional) for (const f of ["caption-instagram.txt", "caption-facebook.txt"]) {

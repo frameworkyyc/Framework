@@ -191,7 +191,7 @@ const T = {
   // Free composition: full-bleed imagery, devices, layered type. Name the composition in "layout" (it is the layout family).
   canvas(s, ctx) {
     const bg = s.background === "transparent" ? "transparent" : cssColor(s.background) || (s.theme === "ink" ? "#0A0A0A" : s.theme === "mist" ? "#F5F5F5" : "#FFFFFF");
-    return `<div class="canvas" style="background:${bg}">${(s.layers || []).map((l) => { const f = LAYERS[l.type]; if (!f) throw new Error(`unknown canvas layer type "${l.type}"`); return f(l, ctx).replace(/^<div/, "<div" + animAttr(l)); }).join("")}</div>`;
+    return `<div class="canvas" style="background:${bg}">${(s.layers || []).map((l, i) => { const f = LAYERS[l.type]; if (!f) throw new Error(`unknown canvas layer type "${l.type}"`); return f(l, ctx).replace(/^<div/, `<div data-li="${i}"${l.overlap ? " data-overlap" : ""}${l.partial ? " data-partial" : ""}` + animAttr(l)); }).join("")}</div>`;
   },
   // Editorial typography poster. layout: "bottom" (default) | "top" | "giant" (one oversized word, optional bleed) | "split" (headline top-left, headline2 bottom-right).
   type(s, ctx) {
