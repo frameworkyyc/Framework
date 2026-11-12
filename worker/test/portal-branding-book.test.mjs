@@ -1,4 +1,4 @@
-/* The Brand Book PROTOTYPE (Staging only): the Branding content as a deck of stacked cards. Proves it is gated to Staging (PORTAL_DEMO) and the Branding flag, private to the member's own
+/* The Brand Book PROTOTYPE (Staging only): the Branding content as an editorial deck of full-screen pages (three chapters: Logo, Typography, Colours). Proves it is gated to Staging (PORTAL_DEMO) and the Branding flag, private to the member's own
    organization, read-only (nothing is posted from it), free of inline style and script, reuses the existing permission-checked file routes, colours its cards only from validated
    #rrggbb values with readable text, and leaves the existing Branding page alone. The scroll behaviour itself is a browser matter; the script is checked for what it must never do. */
 import test from "node:test";
@@ -11,7 +11,7 @@ import * as brand from "../portal/repo/brand.js";
 import * as B from "../portal/brand-files.js";
 import { PORTAL_CSP_WITH_SCRIPT } from "../portal/http.js";
 import { revokeStaff } from "../portal/repo/staff.js";
-import { CARDS, DEFAULT_PALETTE, cardColours, cardCss, contrast, textOn } from "../portal/branding-book.js";
+import { CARDS, CHAPTERS, DEFAULT_PALETTE, paletteCss, paletteOf, contrast, textOn } from "../portal/branding-book.js";
 
 const ADMIN = "admin@framework.test";
 const src = (p) => readFileSync(new URL("../../" + p, import.meta.url), "utf8");
@@ -48,21 +48,22 @@ test("gate: a 404 unless BOTH the Branding flag and the Staging-only demo switch
   assert.equal((await s.ann.get(BOOK("alpha"))).status, 200);
 });
 
-test("the page: seven cards in order with a numbered index, the published brand, downloads through the existing routes, and nothing that posts", async () => {
+test("the page: twenty pages in order across three chapters, the published brand, downloads through the existing routes, and nothing that posts", async () => {
   const s = await setup();
   const res = await s.ann.get(BOOK("alpha")); const html = await res.text();
   assert.equal(res.status, 200);
-  assert.deepEqual([...html.matchAll(/<section class="bb-card bb-card--(\d)" id="([a-z]+)"/g)].map((m) => `${m[1]}:${m[2]}`), CARDS.map((c, i) => `${i + 1}:${c.id}`));
-  assert.equal([...html.matchAll(/data-bb-go="(\d)"/g)].length, 7, "the numbered index links every card");
-  for (const t of ["Brand Overview", "Logo System", "Colour Palette", "Typography", "Imagery &amp; Textures", "Layout, Icons &amp; Style", "Documents &amp; Assets", "Alpha Co", "Built to last.", "Harbour Blue", "#0B3C5D"]) assert.ok(html.includes(t), t);
-  assert.match(html, /\d of 9 complete/);
+  assert.deepEqual([...html.matchAll(/<section class="bb-card bb-(\w+)[^"]*" id="([a-z-]+)"/g)].map((m) => m[2]), CARDS.map((c) => c.id), "every page, in order");
+  assert.deepEqual(CHAPTERS.map((c) => c.first), ["logo", "typography", "colours"]);
+  assert.deepEqual(CHAPTERS.map((c) => CARDS.filter((x) => x.ch === CHAPTERS.indexOf(c)).length), [6, 6, 6], "three chapters of six pages, plus the cover and the files page");
+  for (const i of [1, 7, 13]) assert.ok(html.includes(`data-bb-go="${i}"`), "every page header links to chapter " + i);
+  for (const t of ["Alpha Co", "Built to last.", "Harbour Blue", "#0B3C5D", "Framework default guideline"]) assert.ok(html.includes(t), t);
   assert.match(html, new RegExp(`/portal/o/alpha/branding/files/${s.ids.logo}`), "a logo preview/download is the existing permission-checked file route");
   assert.match(html, new RegExp(`/portal/o/alpha/branding/files/${s.ids.guide}`));
   const book = html.slice(html.indexOf('id="brand-book"'), html.indexOf("data-bb-live"));
-  assert.ok(book.length > 5000 && !/<form|method="post"|name="csrf"|<textarea|type="file"/i.test(book), "read-only: no form, no posting from the Brand Book (the shell's own sign-out form is outside it)");
+  assert.ok(book.length > 20000 && !/<form|method="post"|name="csrf"|<textarea|type="file"/i.test(book), "read-only: no form, no posting from the Brand Book (the shell's own sign-out form is outside it)");
   assert.match(html, /href="\/portal\/o\/alpha\/branding"/, "the real Branding page is one link away (requests, uploads and Discovery live there)");
   assert.ok(!/ style=|<style|<script(?![^>]*\ssrc=)|javascript:|\son[a-z]+=["']/i.test(html), "no inline style, inline script or event handler (the one script tag has a same-origin src)");
-  assert.match(html, /href="\/assets\/css\/portal-branding-book\.css"/); assert.match(html, /src="\/assets\/js\/portal-branding-book\.js"/); assert.match(html, /\/branding\/book\.css"/, "the generated card colours (client has 4 colours)");
+  assert.match(html, /href="\/assets\/css\/portal-branding-book\.css"/); assert.match(html, /src="\/assets\/js\/portal-branding-book\.js"/); assert.match(html, /\/branding\/book\.css"/, "the generated colour fields (client has 4 colours)");
   assert.equal(res.headers.get("Content-Security-Policy"), PORTAL_CSP_WITH_SCRIPT, "only same-origin script, nothing inline");
 });
 
@@ -70,18 +71,18 @@ test("private to the member's own organization; signed out is sent to sign in; a
   const s = await setup();
   const bob = await (await s.bob.get(BOOK("beta"))).text();
   assert.ok(!/Alpha Co|Harbour Blue|Alpha logo/.test(bob), "another organization's brand never appears");
-  assert.match(bob, /Not added yet|Example: Framework/);
+  assert.match(bob, /Not added yet|Example: Framework|Illustrative/);
   const cross = await s.bob.get(BOOK("alpha")); assert.ok(cross.status === 404 || cross.status === 403, "a member of another organization cannot open it: " + cross.status);
   const anon = await s.w.browser().get(BOOK("alpha")); assert.ok([302, 303].includes(anon.status), "signed out: " + anon.status);
   const css = await (await s.bob.get(BOOK("beta") + ".css")).text(); assert.equal(css, "", "no published colours, no generated colours");
 });
 
-test("a brand that is not published yet still renders every card, with Framework's labelled examples and no generated colours", async () => {
+test("a brand that is not published yet still renders every page, with Framework's labelled examples and no generated colours", async () => {
   const s = await setup({ publish: false });
   const html = await (await s.ann.get(BOOK("alpha"))).text();
-  assert.equal([...html.matchAll(/data-bb-card/g)].length, 7);
-  assert.match(html, /Example: Framework/); assert.match(html, /Your approved brand will appear here when it is ready/);
-  assert.ok(!/branding\/book\.css/.test(html), "fewer than three published colours: Framework's own card colours");
+  assert.equal([...html.matchAll(/data-bb-card/g)].length, CARDS.length);
+  assert.match(html, /Example: Framework|Not added yet/);
+  assert.ok(!/branding\/book\.css/.test(html), "fewer than three published colours: Framework's own colours");
 });
 
 test("the existing Branding page is unchanged and does not carry the deck", async () => {
@@ -90,25 +91,23 @@ test("the existing Branding page is unchanged and does not carry the deck", asyn
   assert.ok(!/bb-card|brand-book/.test(page)); assert.match(page, /id="logo"/); assert.match(page, /bk-nav/);
 });
 
-test("card colours: the client's own validated colours (three or more), otherwise Framework's; text is always readable; nothing but #rrggbb reaches a stylesheet", async () => {
-  assert.equal(cardCss(COLOURS), cardColours(COLOURS).map((c, i) => `.bb-card--${i + 1}{--bb-bg:${c.bg};--bb-fg:${c.fg}}`).join("\n") + "\n");
-  assert.ok(/^(\.bb-card--[1-7]\{--bb-bg:#[0-9A-F]{6};--bb-fg:#(0A0A0A|FFFFFF|000000)\}\n){7}$/.test(cardCss(COLOURS)), "exactly seven rules of fixed shape");
-  assert.equal(cardCss(COLOURS.slice(0, 2)), "", "two colours: the static defaults apply");
-  assert.equal(cardCss([]), ""); assert.equal(cardCss(undefined), "");
+test("page colours: the client's own validated colours (three or more), otherwise Framework's; text is always readable; nothing but #rrggbb reaches a stylesheet", async () => {
+  const css = paletteCss(COLOURS);
+  assert.ok(/^(\.bb-c[0-7]\{--bb-bg:#[0-9A-F]{6};--bb-fg:#[0-9A-F]{6}\}\n){8}$/.test(css), "exactly eight rules of fixed shape");
+  assert.equal(paletteCss(COLOURS.slice(0, 2)), "", "two colours: the static defaults apply");
+  assert.equal(paletteCss([]), ""); assert.equal(paletteCss(undefined), "");
   const evil = [{ hex: "#fff;}body{display:none}", role: "primary" }, { hex: "red", role: "primary" }, { hex: "#12345", role: "accent" }, { hex: "url(x)", role: "accent" }];
-  assert.equal(cardCss(evil), "", "anything that is not #rrggbb is ignored");
-  assert.deepEqual(cardColours(evil).map((c) => c.bg), CARDS.map((_, i) => DEFAULT_PALETTE[i % DEFAULT_PALETTE.length]));
+  assert.equal(paletteCss(evil), "", "anything that is not #rrggbb is ignored");
+  assert.deepEqual(paletteOf(evil), { own: false, hexes: DEFAULT_PALETTE }); assert.equal(paletteOf(COLOURS).own, true);
   for (const bg of [...DEFAULT_PALETTE, ...COLOURS.map((c) => c.hex), "#808080", "#777777", "#FFFFFF", "#000000", "#FF0000", "#00FF00"]) assert.ok(contrast(bg, textOn(bg)) >= 4.5, `${bg} reads with ${textOn(bg)}`);
-  const order = cardColours([{ hex: "#111111", role: "neutral" }, { hex: "#222222", role: "accent" }, { hex: "#333333", role: "primary" }, { hex: "#444444", role: "secondary" }]).map((c) => c.bg);
-  assert.deepEqual(order.slice(0, 4), ["#333333", "#444444", "#222222", "#111111"], "primary, secondary, accent, neutral first");
-  assert.equal(CARDS.length, 7); assert.equal(new Set(DEFAULT_PALETTE).size, 7, "seven distinct default colours");
+  assert.equal(new Set(DEFAULT_PALETTE).size, 8, "eight distinct default colours"); assert.equal(CARDS.length, 20);
 });
 
 test("the script and stylesheet: progressive enhancement only, reduced motion respected, nothing fetched or stored, no inline-style writes", () => {
   const js = src("assets/js/portal-branding-book.js"), css = src("assets/css/portal-branding-book.css");
   assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|localStorage|sessionStorage|document\.cookie|innerHTML|insertAdjacentHTML|eval\(|new Function|setAttribute\(["']style/.test(js), "nothing fetched, stored or injected as HTML");
   assert.match(js, /prefers-reduced-motion: reduce/); assert.match(js, /canDeck/); assert.match(js, /removeAttribute\("inert"\)|setAttribute\("inert"/);
-  assert.match(js, /preventDefault/, "only the index links are intercepted, and only while the deck is on");
+  assert.match(js, /preventDefault/, "only the chapter links are intercepted, and only while the deck is on");
   assert.ok(!/wheel|touchstart|touchmove|preventDefault\(\)\s*;?\s*\}\s*,\s*\{\s*passive:\s*false/.test(js.replace(/ev\.preventDefault\(\);/g, "")), "no wheel or touch capture, no non-passive listeners: the page scrolls natively");
   assert.match(css, /prefers-reduced-motion: reduce/); assert.ok(!/@import|url\(/.test(css));
   assert.match(css, /\.bb--deck/, "the deck is opt-in: the default is a plain stack");
