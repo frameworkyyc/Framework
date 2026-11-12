@@ -23,6 +23,14 @@ Black and white is a design option, not the default. Each batch gets an **editor
 - Colour lives in imagery, concepts and colour fields; Framework's own mark stays black and white. Colours outside the palette need a `colourReason` (`fw check`).
 - `fw grid` measures each cover's colour (black-and-white, muted, vibrant) and hue, and warns on too little colour, clustered colour and look-alike neighbours.
 
+## Mockup realism (hard rule)
+**Owner rule, 2026-11-12. A hard fail, not a preference.** A mockup or branded physical object (book, brochure, card, letterhead, sign, shopfront, packaging, vehicle, clothing, any branded object) must look like a real, finished product photographed in the real world, with the branding naturally part of it.
+- **Required:** the artwork is physically integrated into the object, with correct perspective and scale, natural light and shadow falling across it, believable printing or material behaviour (ink on paper, vinyl on a van, embroidery or screen print on fabric, paint or lit lettering on a sign), and the surface texture showing through the design. A panorama keeps that realism continuous across every slide boundary: one photograph, one light.
+- **Automatic fail** (example: `social/brand/references/mockup-realism-fail-example.png`, a black page laid flat over a book with no paper texture, curve or light): any overlay look; a "sticker pasted on" appearance; logo blocks or graphics floating unnaturally on a product; a flat panel with no paper texture or curve; lettering lit differently from the object it sits on; any image that reads as an AI-generated background with a design composited over it.
+- **How to make one:** render the exact artwork flat in the engine (mark, wordmark, page layout), upload it as a reference image, then generate the photograph with the artwork printed on the object (`nano_banana_pro` or `gpt_image_2_6` with `image_references`). Describe the object, material, print method, camera angle and light. Check the lettering and mark against the artwork at full size; if anything is misspelt, distorted or invented, regenerate or drop the shot.
+- **Never** composite a design over a photograph in the engine: the renderer refuses marks, vector graphics, swatches, and blended or tilted layers on top of a photograph. The post's own editorial headline may sit over or beside a photograph, as type on the slide, never on the object.
+- **QC:** every mockup slide carries `mockup` (the object) in spec.json. The Director inspects each at full size and records a verdict in `<batch>/mockups.json`; `fw check` fails any mockup without a "pass".
+
 ## Framework technical illustration (core style)
 **Owner rule, 2026-11-12.** Framework's isometric wireframe illustration, the linework on frameworkco.ca (`assets/img/ill/*.svg`: website, SEO, branding, systems), is one of Framework's core visual styles. Every 9-post batch includes **1–2 posts in this style**, or features it prominently inside a carousel or Reel (`fw validate` and `fw check` fail a batch without it).
 - **Reference:** `social/brand/references/technical-illustration-site-0[12].png` (the owner's screenshots of the services section on frameworkco.ca, 2026-11-12) and the drawings themselves in `assets/img/ill/`.
@@ -122,6 +130,7 @@ Do not add slide numbers, section labels, header or footer rules, decorative div
 - Panoramas: seamless, with the cover working alone.
 - Motion: smooth, purposeful, readable, with a cover that holds the grid.
 - Branding: consistent through design quality, never a repeated watermark.
+- **Mockup realism (hard fail):** every branded object reads as a real photographed product with the design physically part of it; no overlay or pasted look anywhere, including across panorama seams.
 - Claims accurate, concepts labelled, CTAs natural and compelling.
 
 Passing `fw check` is not proof of creative quality. If it looks like a generic presentation slide, it is redesigned.
