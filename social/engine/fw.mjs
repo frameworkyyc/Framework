@@ -73,7 +73,7 @@ const FIT_SCRIPT = async () => {
   const base = fits.map((e) => parseFloat(getComputedStyle(e).fontSize));
   const maxH = box && box.dataset.maxH ? Number(box.dataset.maxH) : null;
   const heads = [...document.querySelectorAll(".h1,.h2,.ct-head")];
-  const lineCount = (h) => Math.round(h.getBoundingClientRect().height / parseFloat(getComputedStyle(h).lineHeight));
+  const lineCount = (h) => Math.round(h.offsetHeight / parseFloat(getComputedStyle(h).lineHeight)); // layout height: a rotated or tilted headline is not counted as extra lines
   const wraps = () => heads.some((h) => lineCount(h) > h.textContent.split("\n").length); // a headline breaking where the writer did not intend
   const over = () => (boxes.slice(1).some((b) => b.scrollHeight > b.clientHeight + 1)) || !!box && ((maxH ? box.offsetHeight > maxH : box.scrollHeight > box.clientHeight + 1) || fits.some((e) => e.scrollWidth > e.clientWidth + 1) || wraps());
   let scale = 1;

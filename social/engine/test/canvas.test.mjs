@@ -58,3 +58,9 @@ test("plain language: specialist terms and walls of text fail; client colour nee
   const off = post([{ template: "canvas", layout: "x", layers: [{ type: "text", text: "Off the edge", x: 900, y: 88, w: 600, size: 80 }] }], "single");
   assert.match(fw("render", off.d).stdout, /text runs off the canvas/);
 });
+
+test("a rotated headline is measured by its own lines, not its rotated box", () => {
+  const { d } = post([{ template: "canvas", layout: "rotated", layers: [{ type: "text", text: "Pick one colour.\nUse it everywhere.", x: 140, y: 500, w: 820, size: 72, rotate: -22 }] }], "single");
+  const r = fw("render", d);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
