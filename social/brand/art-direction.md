@@ -23,6 +23,15 @@ Black and white is a design option, not the default. Each batch gets an **editor
 - Colour lives in imagery, concepts and colour fields; Framework's own mark stays black and white. Colours outside the palette need a `colourReason` (`fw check`).
 - `fw grid` measures each cover's colour (black-and-white, muted, vibrant) and hue, and warns on too little colour, clustered colour and look-alike neighbours.
 
+## Framework technical illustration (core style)
+**Owner rule, 2026-11-12.** Framework's isometric wireframe illustration, the linework on frameworkco.ca (`assets/img/ill/*.svg`: website, SEO, branding, systems), is one of Framework's core visual styles. Every 9-post batch includes **1–2 posts in this style**, or features it prominently inside a carousel or Reel (`fw validate` and `fw check` fail a batch without it).
+- **Reference:** `social/brand/references/technical-illustration-site-0[12].png` (the owner's screenshots of the services section on frameworkco.ca, 2026-11-12) and the drawings themselves in `assets/img/ill/`.
+- **The exact visual language of the website, not a generic minimal style:** a dark ground (#0A0A0A, #101010 or #141414); thin white linework in true 30° isometric; a hairline floor grid at 16% opacity; inner details at 42%; dashed construction lines dropping to the grid; plates and blocks whose side faces carry a faint fill (3.5% and 8%); exploded layers stacked on a vertical axis; small cubes, nodes and rings as the vocabulary. The result should feel precise, architectural and engineered.
+- **Drawn by the engine, never generated.** Use the `iso` layer (TEMPLATES.md): new drawings from plates, boxes, grids, lines, rings and drops, or one of the site's own illustrations (`src`) restyled for the slide. An image model does not draw this style.
+- **Use it for:** website systems (pages as exploded layers), SEO and digital ecosystems (nodes on a grid), branding systems (a mark built from a grid, applications as plates), process breakdowns (stages as stacked plates), service explanations.
+- **In motion:** layers separate and settle (one `iso` layer per plate, each with an `anim` on `y`), lines draw in with `clip` reveals, nodes light up one by one.
+- Type around it stays in Switzer and General Sans, large and few, as on the site. The illustration carries the slide.
+
 ## Physical applications, lifestyle and concept work
 - Show design in the world: a brand book open on a desk, business cards stacked on stone, signage on a building, a truck door, packaging, an invoice on a clipboard, a shopfront at dusk. These sell design far better than a logo on a blank slide.
 - Lifestyle and environmental images: real-feeling places, light and materials; no posed stock people, no clichés.
@@ -107,6 +116,7 @@ Do not add slide numbers, section labels, header or footer rules, decorative div
 
 **Batch level** (the Director, on `grid-preview.png`, the contact sheet, panoramas viewed edge to edge and every Reel played through):
 - Visual originality: no two covers built the same way; nothing that looks like a template.
+- Framework's technical illustration appears (1–2 posts, or prominently in a carousel or Reel) and reads unmistakably as frameworkco.ca's linework.
 - Grid-wide colour harmony: the palette reads as one batch; colour spread, not clustered.
 - Variety of content and formats, mixed through the publishing order.
 - Panoramas: seamless, with the cover working alone.

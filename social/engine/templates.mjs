@@ -7,7 +7,7 @@ export const REPO_ROOT = resolve(new URL("../../", import.meta.url).pathname);
 export const TEMPLATES = ["canvas", "cover", "type", "minimal", "photo", "plate", "split", "showcase", "diagram", "statement", "point", "list", "compare", "quote", "cta", "reel"];
 
 // Visual categories (feed art direction) and the default category of each layout family. A spec may override with "category".
-export const CATEGORIES = ["editorial-typography", "architectural-photography", "portfolio", "conceptual-artwork", "educational-graphic", "minimalist"];
+export const CATEGORIES = ["editorial-typography", "architectural-photography", "portfolio", "conceptual-artwork", "educational-graphic", "minimalist", "technical-illustration"];
 /** Layout family of a slide, e.g. "type:giant", "photo:caption", "plate". Used to keep neighbouring posts from repeating. */
 export const familyOf = (s) => s.template + (s.layout ? ":" + s.layout : "");
 export function categoryOf(s) {
@@ -15,6 +15,7 @@ export function categoryOf(s) {
   const t = s.template;
   if (t === "canvas") {
     const kinds = (s.layers || []).map((l) => l.type);
+    if (kinds.includes("iso")) return "technical-illustration";
     if (kinds.some((k) => ["laptop", "phone", "browser", "swatch"].includes(k))) return "portfolio";
     if (kinds.includes("image")) return "architectural-photography";
     return "editorial-typography";
@@ -27,7 +28,7 @@ export function categoryOf(s) {
 }
 /** Whether a slide's dominant visual is a photograph or artwork (vs. type and graphics). */
 export const isImagery = (s) => ["photo", "plate", "split", "showcase", "reel"].includes(s.template) || (s.template === "cover" && !!s.image) ||
-  (s.template === "canvas" && (s.layers || []).some((l) => ["image", "laptop", "phone", "browser"].includes(l.type)));
+  (s.template === "canvas" && (s.layers || []).some((l) => ["image", "laptop", "phone", "browser", "iso"].includes(l.type)));
 
 const MARK = (sq, f) =>
   `<svg viewBox="0 0 1092 1092" aria-hidden="true"><rect width="1092" height="1092" fill="${sq}"/><path fill="${f}" d="M302 245H815V347H411V741L302 851Z"/><path fill="${f}" d="M435 517L512 440H815V545H534V842H435Z"/></svg>`;
@@ -130,8 +131,55 @@ const LAYERS = {
     const raw = src ? readFile(src, "utf8").replace(/<\?xml[^>]*>/, "").replace(/<svg/, '<svg preserveAspectRatio="xMidYMid meet" width="100%" height="100%"') : "";
     return `<div class="layer svg" style="${pos(l)}">${raw}</div>`;
   },
+  iso: (l, ctx) => isoLayer(l, ctx),
   brand(l, ctx) { return `<div class="layer" style="${pos(l)}">${brandBlock({ brand: { element: l.element, size: l.size, reason: l.reason } }, ctx)}</div>`; },
 };
+// ---------- iso: Framework's technical illustration style (frameworkco.ca, assets/img/ill/*.svg) ----------
+// True 30° isometric linework in one colour: hairline grids at 16%, details at 42%, dashed construction lines, side faces filled at 3.5% / 8%.
+// Scene units: x runs down-right, y down-left, z up; `unit` = px per unit; `origin` = where (0,0,0) lands in the layer box.
+// Or `src`: one of the site's own illustrations, restyled to the slide's stroke weight.
+// Colour and line weight come from each layer's own style (--sw), so several drawings on one slide never clash.
+const ISO_STYLE = `<style>.ill{overflow:visible}.ill :is(path,ellipse){fill:none;stroke:currentColor;stroke-width:var(--sw);stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}.ill .f1{fill:currentColor;fill-opacity:.035}.ill .f2{fill:currentColor;fill-opacity:.08}.ill .dim{stroke-opacity:.42}.ill .g{stroke-opacity:.16}.ill .dash{stroke-dasharray:calc(var(--sw) * 2) calc(var(--sw) * 4)}.ill .hl{stroke-width:calc(var(--sw) * 1.5)}.ill .solid{fill:currentColor;fill-opacity:1}</style>`;
+function isoLayer(l, ctx) {
+  const stroke = cssColor(l.stroke) || "#FFFFFF", sw = Number(l.strokeWidth || 2.5);
+  if (l.src) {
+    const src = resolveAsset(l.src, ctx.postDir);
+    const raw = readFile(src, "utf8").replace(/<\?xml[^>]*>/, "").replace(/<style>[\s\S]*?<\/style>/, "").replace(/<svg/, '<svg class="ill" preserveAspectRatio="xMidYMid meet" width="100%" height="100%"');
+    return `<div class="layer svg" data-ill style="${pos(l)};color:${stroke};--sw:${sw}px">${ISO_STYLE}${raw}</div>`;
+  }
+  const u = Number(l.unit || 60), [ox, oy] = l.origin || [Number(l.w || 1080) / 2, Number(l.h || 1080) / 2];
+  const C = Math.cos(Math.PI / 6), S = 0.5;
+  const P = ([x, y, z = 0]) => [ox + (x - y) * C * u, oy + ((x + y) * S - z) * u];
+  const d = (pts, close) => "M" + pts.map((p) => P(p).map((v) => v.toFixed(1)).join(" ")).join(" L") + (close ? " Z" : "");
+  const cls = (it, base = "") => [base, it.dim ? "dim" : "", it.hl ? "hl" : "", it.dash ? "dash" : ""].filter(Boolean).join(" ");
+  const out = [];
+  for (const it of l.items || []) {
+    const k = it.kind;
+    if (k === "grid") { // hairline floor grid
+      const { x = 0, y = 0, z = 0, w = 8, d: dd = 8, step = 1 } = it;
+      for (let i = 0; i <= w + 1e-9; i += step) out.push(`<path class="dim g" d="${d([[x + i, y, z], [x + i, y + dd, z]])}"/>`);
+      for (let j = 0; j <= dd + 1e-9; j += step) out.push(`<path class="dim g" d="${d([[x, y + j, z], [x + w, y + j, z]])}"/>`);
+    } else if (k === "plate" || k === "box") { // a slab (plate: thin) or a block: top face plus the two visible sides, lightly filled
+      const { x = 0, y = 0, z = 0, w = 1, d: dd = 1 } = it, h = k === "plate" ? Number(it.t ?? 0.12) : Number(it.h ?? 1), t = z + h;
+      out.push(`<path class="f1 ${cls(it)}" d="${d([[x, y + dd, z], [x + w, y + dd, z], [x + w, y + dd, t], [x, y + dd, t]], true)}"/>`);
+      out.push(`<path class="f2 ${cls(it)}" d="${d([[x + w, y, z], [x + w, y + dd, z], [x + w, y + dd, t], [x + w, y, t]], true)}"/>`);
+      out.push(`<path class="${cls(it)}" d="${d([[x, y, t], [x + w, y, t], [x + w, y + dd, t], [x, y + dd, t]], true)}"/>`);
+    } else if (k === "rect") { // a flat outline lying on a plane (screen blocks, plots, panels)
+      const { x = 0, y = 0, z = 0, w = 1, d: dd = 1 } = it;
+      out.push(`<path class="${cls(it, it.fill ? "f2" : "")}" d="${d([[x, y, z], [x + w, y, z], [x + w, y + dd, z], [x, y + dd, z]], true)}"/>`);
+    } else if (k === "line") {
+      out.push(`<path class="${cls(it)}" d="${d(it.points || [])}"/>`);
+    } else if (k === "ring" || k === "dot") { // a circle lying on the plane (isometric ellipse); dot = small and solid
+      const [cx, cy] = P([it.x || 0, it.y || 0, it.z || 0]), r = Number(it.r ?? (k === "dot" ? 0.08 : 0.5));
+      out.push(`<ellipse class="${cls(it, k === "dot" ? "solid" : "")}" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(r * u * 1.2247).toFixed(1)}" ry="${(r * u * 0.7071).toFixed(1)}"/>`);
+    } else if (k === "drop") { // dashed construction line straight down to the floor
+      out.push(`<path class="dim dash" d="${d([[it.x || 0, it.y || 0, it.z ?? 2], [it.x || 0, it.y || 0, it.to ?? 0]])}"/>`);
+    } else throw new Error(`unknown iso item kind "${k}" (grid, plate, box, rect, line, ring, dot, drop)`);
+  }
+  const W = Number(l.w || 1080), H = Number(l.h || 1080);
+  return `<div class="layer svg" data-ill style="${pos(l)};color:${stroke};--sw:${sw}px">${ISO_STYLE}<svg class="ill" viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">${out.join("")}</svg></div>`;
+}
+
 function device(kind, l, ctx) {
   const src = resolveAsset(l.src, ctx.postDir), frame = resolve(REPO_ROOT, `assets/img/device-${kind === "laptop" ? "macbook" : "iphone"}.png`);
   const tilt = l.tilt ? `transform:perspective(2400px) rotateX(${Number(l.tilt.x || 0)}deg) rotateY(${Number(l.tilt.y || 0)}deg) rotateZ(${Number(l.tilt.z || 0)}deg);` : "";
