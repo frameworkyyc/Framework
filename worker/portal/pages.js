@@ -85,7 +85,7 @@ async function shell(ctx, a, { title, active, body, status = 200, vm, script = n
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null, fx = false }) {
-  if (fx) return signInPage({ continueHref, ended, demoHref }); // the editorial sign-in (PORTAL_TRANSITIONS); same links, same copy, same Continue
+  if (fx) return signInPage({ continueHref, ended }); // the editorial sign-in (PORTAL_TRANSITIONS): same Continue and notices, minimal copy (no demo link)
   const notice = ended ? `<p class="muted">Your previous session has ended. Please sign in again.</p>` : "";
   const demo = demoHref ? `<p class="auth__alt">Not signed in yet? <a class="text-link" href="${e(demoHref)}">See a demonstration of the portal</a>. It uses sample data for a fictional client.</p>` : "";
   return htmlPage({
