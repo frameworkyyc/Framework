@@ -85,3 +85,24 @@ test("an archived batch stays in the history but leaves the grid preview", () =>
   const g = fw(["grid", now], env);
   assert.match(readFileSync(join(now, "grid-report.md"), "utf8"), /history tiles 0/, g.stdout + oldName);
 });
+
+test("Framework's technical illustration: the iso layer draws the website's linework, and a batch must include it", () => {
+  const d = tmp();
+  const p = post(d, "01-iso", { format: "single", slides: [{ template: "canvas", layout: "iso-exploded", background: "#0A0A0A", layers: [
+    { type: "iso", x: 0, y: 200, w: 1080, h: 1000, unit: 60, items: [{ kind: "grid", x: -1, y: -1, w: 8, d: 6 }, { kind: "plate", x: 0, y: 0, z: 0.4, w: 6, d: 4 }, { kind: "plate", x: 0, y: 0, z: 2.4, w: 6, d: 4, hl: true },
+      { kind: "box", x: 6.5, y: 3, z: 1, w: 0.8, d: 0.8, h: 0.8 }, { kind: "ring", x: 3, y: 2, r: 1.2, dim: true }, { kind: "drop", x: 0, y: 0, z: 3.5 }, { kind: "line", points: [[0.5, 1, 2.52], [5, 1, 2.52]], dim: true }] },
+    { type: "iso", src: "@site/assets/img/ill/website-dark.svg", x: 600, y: 900, w: 400, h: 300 },
+    { type: "text", x: 96, y: 96, w: 880, text: "Three layers.", size: 88, color: "#FFFFFF" }] }] });
+  const r = fw(["render", d]);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const c = fw(["check", d]);
+  assert.equal(c.status, 0, c.stdout); // linework is not mistaken for a logo or watermark
+  const html = JSON.parse(readFileSync(join(p, "slides", "render.json"), "utf8"));
+  assert.equal(html.slides[0].marks.length, 0);
+  // A full batch without the style fails validation.
+  const b = tmp(), checks = { interesting: "x", value: "x", save_share_follow: "x", credibility: "x", role: "x", different: "x" };
+  const nine = Array.from({ length: 9 }, (_, i) => ({ id: String(i + 1).padStart(2, "0"), slug: "p" + i, goal: "attract", visual_category: "editorial-typography", format: i % 2 ? "carousel" : "single", objective: "o", audience: "a", key_message: "k", cta_type: "none", checks,
+    slides: i % 2 ? [{ template: "canvas", layout: "c" + i }, { template: "canvas" }, { template: "canvas" }] : [{ template: "canvas", layout: "c" + i }], cover_colour: { presence: "mono", hex: ["#0A0A0A"] } }));
+  writeFileSync(join(b, "briefs.json"), JSON.stringify({ colour_plan: { palette: [{ hex: "#0A0A0A" }, { hex: "#FFFFFF" }, { hex: "#C84B31" }] }, posts: nine }));
+  assert.match(fw(["validate", b]).stdout, /no post uses Framework's technical illustration style/);
+});

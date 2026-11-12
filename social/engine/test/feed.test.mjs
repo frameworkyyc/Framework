@@ -46,7 +46,7 @@ test("briefs validation requires goals, categories, CTA types and the six checks
   const colour_plan = { palette: [{ name: "Brick", hex: "#C84B31", role: "warm accent" }, { name: "Harbour", hex: "#1F3A5F", role: "deep" }, { name: "Paper", hex: "#FFFFFF", role: "ground" }] };
   // A valid batch: exactly 9 posts (one 3x3 grid block), 5 attract / 3 trust / 1 convert, covers alternating between two families.
   const nine = Array.from({ length: 9 }, (_, i) => post(String(i + 1).padStart(2, "0"), {
-    goal: i < 5 ? "attract" : i < 8 ? "trust" : "convert", format: i % 2 ? "carousel" : "single",
+    goal: i < 5 ? "attract" : i < 8 ? "trust" : "convert", format: i % 2 ? "carousel" : "single", ...(i === 2 ? { visual_category: "technical-illustration" } : {}),
     ...(i % 2 ? { slides: [{ template: "minimal", headline: "H" }, { template: "point", headline: "P" }, { template: "cta", headline: "C" }], visual_category: "minimalist" } : {}) }));
   writeFileSync(join(d, "briefs.json"), JSON.stringify({ colour_plan, posts: nine }));
   const ok = fw(["validate", d]);

@@ -43,7 +43,7 @@ Posts are listed in **publishing order** (post 01 goes out first and ends up low
       "id": "01",
       "slug": "strategy-before-logo",
       "goal": "attract | trust | convert",
-      "visual_category": "editorial-typography | architectural-photography | portfolio | conceptual-artwork | educational-graphic | minimalist",
+      "visual_category": "editorial-typography | architectural-photography | portfolio | conceptual-artwork | educational-graphic | minimalist | technical-illustration",
       "format": "single | carousel | panorama | reel",
       "panels": "panoramas only: 2-10, with one slides[] entry per panel",
       "motion": "reels only: { \"duration\": 8, \"cover\": \"what the grid tile shows\", \"approach\": \"code | higgsfield + code\" }",
@@ -97,7 +97,7 @@ Posts are listed in **publishing order** (post 01 goes out first and ends up low
   "visual_budget": { "generations": 3, "est_credits": 4 }
 }
 ```
-Check it with `node social/engine/fw.mjs validate social/batches/<batch-id>`. It fails unless the batch is exactly 9 posts (one 3×3 grid block), on missing checks, unknown values, two consecutive covers in the same layout family, two consecutive posts in the same format, a missing `colour_plan` or `cover_colour`, a panorama without matching `panels`, a reel without `motion`, a fictional brand without a disclosure, and real client work while showcases are paused. It warns when the goal mix drifts from about 5 attract / 3 trust / 1 convert, the format mix from 3 carousels / 2 panoramas / 2 singles / 2 reels, fewer than 4 covers carry colour, colour clusters in a grid row, neighbours share a lead colour, categories are too few, or three dark covers run together.
+Check it with `node social/engine/fw.mjs validate social/batches/<batch-id>`. It fails unless the batch is exactly 9 posts (one 3×3 grid block), on missing checks, unknown values, two consecutive covers in the same layout family, two consecutive posts in the same format, a missing `colour_plan` or `cover_colour`, a panorama without matching `panels`, a reel without `motion`, a fictional brand without a disclosure, real client work while showcases are paused, and a batch with no post in Framework's technical illustration style (a post with `visual_category` or a slide with `category` "technical-illustration"). It warns when the goal mix drifts from about 5 attract / 3 trust / 1 convert, the format mix from 3 carousels / 2 panoramas / 2 singles / 2 reels, fewer than 4 covers carry colour, colour clusters in a grid row, neighbours share a lead colour, categories are too few, or three dark covers run together.
 
 Rules that bind every agent:
 - Real client showcases are paused (owner, 2026-11-11). Fictional brand studies are labelled `fictional` and called "concept" in captions; never presented as client work.

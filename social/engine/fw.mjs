@@ -122,7 +122,7 @@ const FIT_SCRIPT = async () => {
   // Branding audit for fw check: every brand element and every piece of text naming Framework or its URL, with its position.
   const rect = (r) => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
   out.brand = [...document.querySelectorAll("[data-brand]")].map((e) => ({ kind: e.dataset.brand, ...rect(e.getBoundingClientRect()) }));
-  out.marks = [...document.querySelectorAll("svg")].filter((e) => !e.closest("[data-brand]")).map((e) => ({ kind: "svg", ...rect(e.getBoundingClientRect()) }));
+  out.marks = [...document.querySelectorAll("svg")].filter((e) => !e.closest("[data-brand], [data-ill]")).map((e) => ({ kind: "svg", ...rect(e.getBoundingClientRect()) }));
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   out.names = [];
   for (let n; (n = walker.nextNode()); ) {
@@ -356,6 +356,10 @@ function validate(batch) {
   const formats = new Set(b.posts.map((p) => p.format));
   if (n >= 6 && formats.size < 2) warns.push(`every post is a ${[...formats][0]}: mix carousels with single-image posts`);
   const fmix = Object.fromEntries(FORMATS.map((f) => [f, count("format", f)]));
+  // Owner rule (2026-11-12): Framework's isometric technical illustration (the frameworkco.ca linework) is a core style: 1-2 posts per batch, or a prominent part of a carousel or Reel.
+  const iso = b.posts.filter((p) => p.visual_category === "technical-illustration" || (p.slides || []).some((sl) => sl.category === "technical-illustration"));
+  if (n === BATCH_SIZE && !iso.length) errs.push(`no post uses Framework's technical illustration style: plan 1-2 (visual_category "technical-illustration", or slides with category "technical-illustration" in a carousel or Reel)`);
+  if (iso.length > 3) warns.push(`${iso.length} posts use the technical illustration style: 1-2 keeps it special`);
   if (n === BATCH_SIZE && FORMATS.some((f) => fmix[f] !== FORMAT_TARGET[f])) warns.push(`format mix ${JSON.stringify(fmix)} differs from the target ${JSON.stringify(FORMAT_TARGET)} (only when another format clearly improves a post: say why in plan.md)`);
   for (let i = 1; i < n; i++) if (b.posts[i].format === b.posts[i - 1].format) errs.push(`posts ${b.posts[i - 1].id} and ${b.posts[i].id}: two ${b.posts[i].format} posts back to back (mix formats through the publishing order)`);
   // Colour: a grid-wide plan first, then each cover's place in it. Display order: the last post published sits top-left.
@@ -430,7 +434,8 @@ const JARGON = [[/largest contentful paint|\bLCP\b/i, "say how fast the page app
   [/structured data|schema markup|metadata|\bmeta (?:title|description)/i, "say what it does for the customer"], [/viewport|responsive breakpoint/i, "say 'on a phone'"], [/canonical|crawl(?:er|ing)?|\bSERPs?\b|backlinks?/i, "say what Google does or shows"],
   [/bounce rate/i, "say 'people leave right away'"], [/\b(?:DNS|SSL|API|HTML|CSS)\b/, "describe the outcome, not the technology"], [/\b\d+\s?px\b|\bpixels?\b/i, "describe the size people experience (e.g. 'big enough for a thumb')"], [/contrast ratio|\d(?:\.\d)?\s?:\s?1\b/i, "say 'text people can read'"]];
 const slideText = (s) => [s.eyebrow, s.headline, s.headline2, s.support, s.body, s.giant, s.quote, ...(s.items || []).flatMap((i) => (typeof i === "string" ? [i] : [i.title, i.desc, i.label])), ...(s.rows || []).flat(), ...(s.layers || []).filter((l) => l.type === "text").map((l) => l.text)].filter(Boolean).join(" \n ").replace(/\{\{|\}\}|\*\*/g, "");
-const BRAND_HEX = ["#0a0a0a", "#ffffff", "#5c5c5c", "#a3a3a3", "#e0e0e0", "#f5f5f5", "#fff", "#000000"];
+// Framework's palette, plus the website's dark surfaces (theme.css, home.css) used behind its technical illustrations.
+const BRAND_HEX = ["#0a0a0a", "#ffffff", "#5c5c5c", "#a3a3a3", "#e0e0e0", "#f5f5f5", "#fff", "#000000", "#141414", "#101010"];
 function creativeIssues(d, spec, w, h, palette = []) {
   const out = [], say = (lvl, m) => out.push([lvl, m]);
   // A panorama is one canvas cut into slides: judge its words per slide (panel), by where each text layer sits.
@@ -499,6 +504,8 @@ function check(batch) {
       for (const i of lintCaption(readFileSync(p, "utf8"), platform)) say(/placeholder|empty|exclamation|emoji|avoided|2,200/.test(i) ? "FAIL" : "WARN", `${id}/${file}: ${i}`);
     }
   }
+  const drawn = dirs.filter((d) => existsSync(join(d, "spec.json")) && JSON.stringify(readJson(join(d, "spec.json"))).includes('"type":"iso"'));
+  if (dirs.length === BATCH_SIZE && !drawn.length) say("FAIL", `no post draws Framework's technical illustration style with an "iso" layer (owner rule: 1-2 per batch, drawn in the website's linework, never generated)`);
   console.log(`check: ${dirs.length} posts, ${fail} fail, ${warn} warn`);
   if (fail) process.exit(1);
 }
