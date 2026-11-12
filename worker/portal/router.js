@@ -60,6 +60,7 @@ import * as supportRepo from "./repo/support.js";
 import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./support-files.js";
 import { dispatchNotifications } from "./service-notifications.js";
 import { fontCss } from "./brand-type.js";
+import { cardCss } from "./branding-book.js";
 import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, clientRequestService, limitsFor } from "./brand-files.js";
 
 /**
@@ -410,7 +411,25 @@ async function downloadBrandFile(ctx, a, id, kind) {
   return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
 }
 
+/** The Brand Book prototype: only where the Staging-only demo switch (PORTAL_DEMO) is on, so it is a 404 on Production even if this code is released there. */
+const bookOn = (ctx) => brandingOn(ctx) && demoEnabled(ctx.env, ctx.cfg);
+
 const BRANDING_ROUTES = [
+  // The Brand Book PROTOTYPE (Staging only; read-only, no new data, no posting): the same published brand as the Branding page, as a deck of stacked cards. See branding-book.js.
+  { when: bookOn, re: /^\/portal\/o\/([^/]+)\/branding\/book$/, action: "branding.view", run: async (ctx, a) => {
+      const org = a.membership.organizationId;
+      const brand = await getClientBrand(ctx.db, org);
+      const kit = brand.published ? await getBrandKit(ctx.db, org) : null;
+      const discovery = discoveryOn(ctx) ? await listClientDiscoveries(ctx.db, org) : [];
+      return pages.brandingBookPage(ctx, a, brand, { discovery, canUpload: can(a.membership.role, "branding.upload"), brandName: kit && kit.brandName ? kit.brandName : "", orgName: a.membership.name, requirementSettings: (await listRequirementSettings(ctx.db, org)).items });
+    },
+  },
+  { when: bookOn, re: /^\/portal\/o\/([^/]+)\/branding\/book\.css$/, action: "branding.view", run: async (ctx, a) => {
+      // The card colours from the client's own published brand colours (validated #rrggbb only); empty when there are fewer than three.
+      const brand = await getClientBrand(ctx.db, a.membership.organizationId);
+      return withPortalHeaders(new Response(brand.published ? cardCss(brand.colours) : "", { status: 200, headers: securityHeaders({ "Content-Type": "text/css; charset=utf-8" }) }));
+    },
+  },
   {
     when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding$/, action: "branding.view",
     run: async (ctx, a) => {

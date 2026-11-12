@@ -483,3 +483,6 @@ export function brandingUploads(vm, { uploads = [], canUpload = false, canDelete
   const note = !canDelete && uploads.length ? `<p class="muted small">Only an owner of your organization can remove shared files.</p>` : "";
   return `${head}${banner}<section aria-labelledby="h-add"><h2 class="h2" id="h-add">Add a file</h2>${form}</section><section aria-labelledby="h-shared"><h2 class="h2" id="h-shared">Shared with Framework</h2>${list}${note}</section>`;
 }
+
+/* The Brand Book prototype (branding-book.js) lays out these same pieces in a different frame; nothing about them changes. */
+export { variationCard, exampleCard, swatch, typeCard, hierarchy, taglineBlock, fileTile, docRow, emptyState };
