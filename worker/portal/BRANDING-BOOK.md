@@ -27,6 +27,9 @@ Logos, typefaces, colours, names, taglines and files are the client's published 
 ## Design direction
 Black and white foundations with strong colour moments; oversized display type; large negative space; asymmetrical grid layouts; minimal chrome (a thin header with the chapter links, a folio at the foot). No cards-in-cards, tabs, accordions or dashboard styling. Framework's own identity: sharp corners, ruled lines, Switzer display and General Sans text. Colours come from the client's palette when it has three or more (otherwise Framework's set) through a generated stylesheet of validated `#rrggbb` values (`book.css`); no inline styles anywhere (the portal CSP is unchanged).
 
+## Layout: edge to edge
+The portal wraps every page in `<main class="wrap page">` (centred, `max-width`, side gutters, top and bottom padding). The Brand Book page alone opts out (`bleed` in `appPage`: `<main class="page page--bleed">`, no max-width, gutters or padding), so the deck spans the full viewport width beneath the unchanged portal header and the stage fills the height from the header to the bottom of the screen. Editorial padding lives inside each page. The stage height follows `dvh` (a phone's collapsing address bar), the page opts in to `viewport-fit=cover`, and page padding uses `env(safe-area-inset-*)`. No other page is affected.
+
 ## Scroll behaviour
 - The **page scrolls natively**: wheel, trackpad, touch and keyboard. Nothing is captured, snapped or re-timed. A pinned stage holds the deck while the page scrolls through a runway; each page's position is computed from the scroll offset (a short pause on each page, then the next rises with a soft shadow and a smoothstep ease; no rotation or 3D).
 - **Tall content** scrolls inside its page and hands over to the page at its end.
