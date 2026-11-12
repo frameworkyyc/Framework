@@ -25,16 +25,18 @@ html.fx-signin { background: #0A0A0A; color-scheme: dark; }
 .si__eyebrow { margin: 0 0 clamp(14px, 1.6vw, 22px); color: #A8A8A8; }
 .si__eyebrow::before { content: "— "; }
 .si__notice { margin: 0 0 18px; padding: 12px 14px; border: 1px solid rgba(255, 255, 255, .4); font-size: 15px; line-height: 1.45; }
-.si__lead { margin: 0 0 clamp(20px, 2.4vw, 32px); max-width: 26em; font-size: clamp(17px, 1.45vw, 21px); line-height: 1.45; color: #FFFFFF; }
-.si__cta { margin: 0 0 clamp(18px, 2vw, 26px); }
+.si__lead { margin: 0 0 clamp(24px, 3vw, 40px); max-width: 22em; font-size: clamp(17px, 1.45vw, 21px); line-height: 1.45; color: #FFFFFF; }
+.si__cta { margin: 0 0 clamp(20px, 2.4vw, 32px); }
 .si__btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 28px; min-width: min(100%, 260px); min-height: 56px; padding: 0 22px 0 24px; background: #FFFFFF; color: #0A0A0A; font: 600 13px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; text-decoration: none; border: 1px solid #FFFFFF; transition: background-color .2s ease, color .2s ease; }
 .si__btn:hover { background: #0A0A0A; color: #FFFFFF; }
 .si__arrow { width: 22px; height: 22px; flex: none; transition: transform .25s cubic-bezier(.6, 0, .2, 1); }
 .si__btn:hover .si__arrow { transform: translateX(5px); }
-.si__small { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: #A8A8A8; }
+.si__help { margin: 0; font-size: 14px; line-height: 1.4; color: #A8A8A8; }
+.si__help .si__link { color: #A8A8A8; }
+.si__help .si__link:hover { color: #FFFFFF; }
 .si__link { color: #FFFFFF; text-underline-offset: 3px; }
 .si__link:hover { text-decoration-thickness: 2px; }
-.si__foot { position: relative; z-index: 2; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 24px; padding-top: clamp(14px, 2vw, 22px); border-top: 1px solid rgba(255, 255, 255, .22); color: #A8A8A8; font-size: 11px; }
+.si__foot { position: relative; z-index: 2; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 6px 24px; padding-top: clamp(14px, 2vw, 22px); border-top: 1px solid rgba(255, 255, 255, .22); color: #A8A8A8; font-size: 11px; }
 .si__foot .si__link { color: #A8A8A8; }
 
 /* the page itself arrives quietly: title, then the panel */
