@@ -178,3 +178,19 @@ test("video QC catches ghosting cross-fades, one-frame flicker and masked text t
   assert.equal(r.status, 0, r.stdout);
   assert.doesNotMatch(fw(["check", ok]).stdout, /video QC/);
 });
+
+test("physical plausibility: banned compositions fail validation, and every generated image in use needs the Director's verdict", () => {
+  const d = tmp();
+  writeFileSync(join(d, "briefs.json"), JSON.stringify({ posts: [{ id: "01", concept: "A lone figure beside a single long steel I-beam lying on a vast concrete slab", slides: [{ visual: { source: "higgsfield", prompt: "Concrete beams on an empty pad, a tiny figure for scale, hard low sun with crisp shadows." } }] }] }));
+  assert.match(fw(["validate", d]).stdout, /physically implausible/);
+  const b = tmp();
+  const p = post(b, "01-photo", { format: "single", slides: [{ template: "canvas", layout: "x", layers: [{ type: "image", src: "@site/assets/img/steel-erection.jpg", x: 0, y: 0, w: 1080, h: 1350 }] }] });
+  writeFileSync(join(p, "assets.json"), JSON.stringify({ images: [{ slide: 1, source: "higgsfield", file: "images/s01.png" }, { slide: 1, source: "higgsfield", file: "images/old.png", rejected: true }] }));
+  assert.equal(fw(["render", b]).status, 0);
+  let c = fw(["check", b]);
+  assert.match(c.stdout, /images\/s01\.png: physical plausibility not yet judged/);
+  assert.doesNotMatch(c.stdout, /old\.png/);
+  writeFileSync(join(b, "imagery.json"), JSON.stringify([{ post: "01", file: "images/s01.png", verdict: "pass", note: "real steel, real site" }]));
+  c = fw(["check", b]);
+  assert.doesNotMatch(c.stdout, /physical plausibility/);
+});
