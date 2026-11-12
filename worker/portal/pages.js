@@ -16,7 +16,8 @@ import * as servicesLive from "./services-live.js";
 import * as websiteLive from "./website-live.js";
 import { frameSources } from "./website-preview.js";
 import { analyticsPage } from "./analytics/view.js";
-import { brandingEnabled, servicesEnabled, websiteEnabled, requestsEnabled } from "./config.js";
+import { brandingEnabled, servicesEnabled, websiteEnabled, requestsEnabled, transitionsOn } from "./config.js";
+import { signInPage } from "./transition.js";
 import { requestsNav, activeKey } from "./requests/nav.js";
 import { unifiedHome as requestsUnifiedHome } from "./requests/views.js";
 import { LIVE_AREAS } from "./guided-data.js";
@@ -44,6 +45,7 @@ export async function staffDirectoryPage(ctx, session, orgs, q = "") {
   const none = `<p class="muted">${q ? "No client matches that search." : "There are no active clients yet."}</p>`;
   return htmlPage({
     title: "Client portals",
+    fx: transitionsOn(ctx.env) ? "app" : false,
     bodyHtml: `<p class="lead">Framework master access. Choose a client to open their portal exactly as their team sees it.</p><form method="get" action="/portal" class="staff-search field"><label class="visually-hidden" for="staff-q">Search clients</label><input id="staff-q" type="text" name="q" value="${e(q)}" maxlength="80" placeholder="Search clients"><button class="btn" type="submit">Search</button></form>${orgs.length ? `<ul class="rows">${items}</ul>` : none}<div class="auth__alt">${await signOutForm(ctx, session)}</div>`,
   });
 }
@@ -73,15 +75,17 @@ function liveModel(ctx, { session, membership: m, returning }, data = {}) {
 
 async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, styles = [], ref = null, frameSrc = [], bleed = false }) {
   const { session, membership: m } = a;
+  const fx = transitionsOn(ctx.env);
   // Header navigation of the connected portal: Home and Account (and Team for owners). Every other page is reached from Home.
   // Where the request area is on (PORTAL_REQUESTS) the header carries the full service navigation and the current entry follows the path (requests/nav.js).
   const wide = requestsEnabled(ctx.env);
   const list = wide ? requestsNav(ctx.env, m.role) : [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
   const current = wide ? activeKey(String(ctx.url.pathname).slice(vm.base.length)) : active === "account" || active === "team" ? active : "home";
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}`, bleed });
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}`, bleed, fx });
 }
 
-export function loginPage({ continueHref, ended = false, demoHref = null }) {
+export function loginPage({ continueHref, ended = false, demoHref = null, fx = false }) {
+  if (fx) return signInPage({ continueHref, ended, demoHref }); // the editorial sign-in (PORTAL_TRANSITIONS); same links, same copy, same Continue
   const notice = ended ? `<p class="muted">Your previous session has ended. Please sign in again.</p>` : "";
   const demo = demoHref ? `<p class="auth__alt">Not signed in yet? <a class="text-link" href="${e(demoHref)}">See a demonstration of the portal</a>. It uses sample data for a fictional client.</p>` : "";
   return htmlPage({
@@ -102,7 +106,7 @@ export async function noAccessPage(ctx, session) {
 
 export async function pickerPage(ctx, session, memberships) {
   const items = memberships.map((m) => `<li><a class="row" href="/portal/o/${e(m.slug)}"><span class="row__title">${e(m.name)}</span><span class="row__meta">${e(views.roleLabel(m.role))}</span></a></li>`).join("");
-  return htmlPage({ title: "Choose an organization", bodyHtml: `<p class="lead">You belong to more than one organization.</p><ul class="rows">${items}</ul><div class="auth__alt">${await signOutForm(ctx, session)}</div>` });
+  return htmlPage({ title: "Choose an organization", fx: transitionsOn(ctx.env) ? "app" : false, bodyHtml: `<p class="lead">You belong to more than one organization.</p><ul class="rows">${items}</ul><div class="auth__alt">${await signOutForm(ctx, session)}</div>` });
 }
 
 /** The home of the connected portal: the six workspace blocks. Nothing from the demonstration is shown. */
