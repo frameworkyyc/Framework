@@ -4,12 +4,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { makeWorld } from "./helpers/portal-e2e.mjs";
+import { makeWorld, csrfOf } from "./helpers/portal-e2e.mjs";
 import { fakeR2 } from "./helpers/fake-r2.mjs";
 import * as S from "./helpers/sample-files.mjs";
 import * as brand from "../portal/repo/brand.js";
 import * as B from "../portal/brand-files.js";
 import { PORTAL_CSP_WITH_SCRIPT } from "../portal/http.js";
+import { revokeStaff } from "../portal/repo/staff.js";
 import { CARDS, DEFAULT_PALETTE, cardColours, cardCss, contrast, textOn } from "../portal/branding-book.js";
 
 const ADMIN = "admin@framework.test";
@@ -119,4 +120,73 @@ test("wiring: the routes sit behind branding.view and the gate, and the page is 
   assert.match(router, /when: bookOn, re: \/\^\\\/portal\\\/o\\\/\(\[\^\/\]\+\)\\\/branding\\\/book\$\/, action: "branding\.view"/);
   assert.match(router, /when: bookOn, re: \/\^\\\/portal\\\/o\\\/\(\[\^\/\]\+\)\\\/branding\\\/book\\\.css\$\/, action: "branding\.view"/);
   assert.ok(!/postAction/.test(router.slice(router.indexOf("const bookOn"), router.indexOf("const bookOn") + 2600).split("branding\\/request")[0]), "neither Brand Book route can be posted to");
+});
+
+/* ------------------------------------------------------------------ Framework master access (the staff preview), the real grant and guard */
+const STAFF = "hello@frameworkco.ca"; // the seeded Master Client Access grant (migration 0013); it binds to the account at the first verified sign-in
+async function staffSetup(opts) {
+  const s = await setup(opts);
+  const hello = s.w.browser(); await hello.signIn(s.w.user(9, STAFF));
+  return { ...s, hello };
+}
+const BOOK_LINK = '<a class="btn btn--small" href="/portal/o/alpha/branding/book">Preview Brand Book</a>';
+
+test("master access: directory, client, Branding page, the Preview Brand Book button, the book: one session, the client's organization carried through, no separate client login", async () => {
+  const s = await staffSetup();
+  const dir = await (await s.hello.get("/portal")).text(); assert.match(dir, /Client portals/); assert.match(dir, /href="\/portal\/o\/alpha"/);
+  const home = await s.hello.get("/portal/o/alpha"); assert.equal(home.status, 200); assert.match(await home.text(), /Framework master access/);
+  const page = await (await s.hello.get("/portal/o/alpha/branding")).text();
+  assert.ok(page.includes(BOOK_LINK), "the button is on the regular Branding page, pointing at the SAME organization's book");
+  assert.equal([...page.matchAll(/Preview Brand Book/g)].length, 1);
+  const href = /href="([^"]*)">Preview Brand Book/.exec(page)[1];
+  const res = await s.hello.get(href); const html = await res.text();
+  assert.equal(res.status, 200, "following the button opens the book (it is not sent to sign-in or the directory)");
+  assert.match(html, /Viewing: <\/strong>|Viewing: Alpha Co|Viewing: <strong>Alpha Co/); assert.match(html, /Framework master access/);
+  assert.match(html, /<title>Brand Book \(prototype\)/); assert.ok(html.includes("Harbour Blue") && html.includes(`/portal/o/alpha/branding/files/${s.ids.logo}`), "that client's own brand and files, read through the guard's organization");
+  assert.equal(s.w.db.raw.prepare("SELECT COUNT(*) n FROM memberships WHERE organization_id = ? AND user_id = (SELECT id FROM portal_users WHERE email = ?)").get(s.alpha.id, STAFF).n, 0, "no membership row is created by looking");
+  assert.ok(s.w.db.raw.prepare("SELECT COUNT(*) n FROM activity_log WHERE action = 'staff.portal.opened' AND visibility = 'internal'").get().n >= 1, "the visit is audited internally, as for every master-access page");
+});
+
+test("master access: previewing as Owner or Member keeps the button and the book (the role only chooses what is shown)", async () => {
+  const s = await staffSetup();
+  for (const role of ["member", "owner"]) {
+    const csrf = csrfOf(await (await s.hello.get("/portal/o/alpha/branding")).text());
+    const sw = await s.hello.post("/portal/staff/view-as", { csrf, role, next: "/portal/o/alpha/branding" });
+    assert.ok([302, 303].includes(sw.status), "view-as " + role);
+    const page = await (await s.hello.get("/portal/o/alpha/branding")).text();
+    assert.ok(page.includes(BOOK_LINK), "button as " + role);
+    assert.equal((await s.hello.get(BOOK("alpha"))).status, 200, "book as " + role);
+  }
+});
+
+test("master access: only Framework master access sees the button; clients, strangers and revoked or unbound people get nothing new", async () => {
+  const s = await staffSetup();
+  assert.ok(!(await (await s.ann.get("/portal/o/alpha/branding")).text()).includes("Preview Brand Book"), "a client member does not see the prototype button");
+  assert.equal((await s.ann.get(BOOK("alpha"))).status, 200, "(a member can still open their own prototype by address, as before)");
+  const stranger = s.w.browser(); await stranger.signIn(s.w.user(8, "stranger@example.test"));
+  assert.equal((await stranger.get(BOOK("alpha"))).status, 404, "no grant, no membership: the same 404 as for any organization page");
+  assert.equal((await stranger.get(BOOK("alpha") + ".css")).status, 404);
+  assert.ok((await revokeStaff(s.w.db, STAFF, "admin@framework.test")).ok);
+  assert.equal((await s.hello.get(BOOK("alpha"))).status, 404, "a revoked grant loses it on the very next request (the guard re-reads it every time)");
+  assert.ok(!(await (await s.hello.get("/portal/o/alpha/branding")).text()).includes("Preview Brand Book"));
+});
+
+test("master access: where the prototype is off (Production), there is no button and no route, even for master access", async () => {
+  const s = await staffSetup({ demo: false });
+  assert.equal((await s.hello.get("/portal/o/alpha/branding")).status, 200);
+  assert.ok(!(await (await s.hello.get("/portal/o/alpha/branding")).text()).includes("Preview Brand Book"));
+  assert.equal((await s.hello.get(BOOK("alpha"))).status, 404);
+});
+
+test("what a request without a live session gets (the cause of 'redirected to the client directory'): sign-in, which does not remember a deep link, so it ends on the directory", async () => {
+  const s = await staffSetup();
+  const out = await s.w.browser().get(BOOK("alpha"));
+  assert.equal(out.status, 303); assert.equal(out.headers.get("location"), "/portal/login", "no session: to sign-in (unchanged; this prototype does not alter authentication)");
+  const again = s.w.browser(); await again.signIn(s.w.user(9, STAFF));
+  assert.match(await (await again.get("/portal")).text(), /Client portals/, "and signing in lands on /portal, the master-access directory");
+});
+
+test("the deck's layout accounts for what sits above the header (Framework's master-access banner)", () => {
+  const js = src("assets/js/portal-branding-book.js");
+  assert.match(js, /previousElementSibling/); assert.match(js, /above \+ hb/);
 });
