@@ -11,6 +11,7 @@ import * as views from "./views.js";
 import * as guided from "./guided.js";
 import * as live from "./profile-live.js";
 import * as brandingLive from "./branding-live.js";
+import * as bookLive from "./branding-book.js";
 import * as servicesLive from "./services-live.js";
 import * as websiteLive from "./website-live.js";
 import { frameSources } from "./website-preview.js";
@@ -183,6 +184,13 @@ export async function brandingPage(ctx, a, brand, o = {}) {
   const vm = liveModel(ctx, a, {});
   const csrf = await csrfFor(ctx.cfg, a.session);
   return shell(ctx, a, { title: "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, { ...o, csrf }), vm, script: brand.published ? BRANDING_SCRIPT : null, styles: Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [], ref: "branding" });
+}
+/** The Brand Book PROTOTYPE (Staging only): the same published brand as the Branding page, as a deck of stacked cards. Read-only; see branding-book.js. */
+export async function brandingBookPage(ctx, a, brand, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const fonts = Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [];
+  const own = brand.published && bookLive.cardCss(brand.colours) ? [`${vm.base}/branding/book.css`] : [];
+  return shell(ctx, a, { title: "Brand Book (prototype)", active: "home", body: bookLive.brandBook(vm, brand, o), vm, script: "/assets/js/portal-branding-book.js", styles: ["/assets/css/portal-branding-book.css", ...own, ...fonts], ref: "branding" });
 }
 /** Brand Discovery (signed-in): the list of assessments and the step pages. `body` is built by discovery/routes.js and discovery/pages.js (every value escaped there). */
 export async function discoveryPage(ctx, a, { title = "Brand Discovery", body, status = 200 }) {
