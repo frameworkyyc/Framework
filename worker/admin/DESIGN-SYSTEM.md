@@ -85,6 +85,8 @@ The sidebar is grouped in `admin.js` (`NAV_GROUPS`: Inbox, Assessments, People, 
 | Service Pricing, Additional Services | long forms | one fold per group or service with a one-line summary; the save bar stays in view |
 | Settings | hub | link cards |
 
+**Write-only secret field** (website Analytics panel, `website-analytics.js`): a credential an admin pastes but must never see again is an empty `type="password"` input with `autocomplete="new-password"`, never filled from the server; a placeholder says whether one is saved ("Saved. Leave empty to keep it"), a kit `badge` shows the state and date (`ok`, or `bad` when missing), an empty field keeps the saved value, and removing it goes through `confirmDialog`. Optional fields that depend on a `<select>` are hidden with the `hidden` attribute (scoped `[hidden]` rule), not inline styles.
+
 Patterns worth reusing: **rows** (`.adm-reqlist` with `.adm-reqrow`: client, title, a line of facts, status chips), **long forms as folds** (`fold()` per group, a summary in `meta`, a status in `badges`, open state kept across a save), **stat cards first** (`.rk-stats` with `statCard`), **quiet empties** (`.rk-quiet` for a section with nothing, `emptyState` for a whole list).
 
 ## Rules that are tested
