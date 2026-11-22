@@ -1,0 +1,138 @@
+/* =========================================================
+   FRAMEWORK CLIENT PORTAL: the Admin visual system, applied to the portal.
+   Loaded last (after portal.css and any page stylesheet) on every portal page, so it only overrides appearance; markup, routes and behaviour are unchanged.
+   Same tokens as admin/assets/ds.css: soft grey ground, white cards with gentle corners and soft depth, monochrome with small status pills that always carry words,
+   short motion that respects reduced motion. The sign-in and system pages (body.auth) keep their own editorial design.
+   ========================================================= */
+
+:root {
+  --ds-ground: #EDEDEB; --ds-card: #FFFFFF; --ds-soft: #F5F5F3; --ds-line: #E3E3E0; --ds-line-strong: #CFCFCB; --ds-ink: #0A0A0A; --ds-muted: #66665F;
+  --ds-r-sm: 8px; --ds-r: 12px; --ds-r-lg: 18px; --ds-pill: 999px;
+  --ds-shadow-1: 0 1px 2px rgba(10, 10, 10, .04), 0 2px 10px rgba(10, 10, 10, .05);
+  --ds-shadow-2: 0 2px 4px rgba(10, 10, 10, .06), 0 14px 40px rgba(10, 10, 10, .12);
+  --ds-ease: cubic-bezier(.2, .7, .2, 1); --ds-dur: 180ms;
+  --ds-ok: #1E6B3C; --ds-warn: #8A5300; --ds-bad: #A12B2B; --ds-info: #2F4B7C;
+}
+
+body:not(.auth) { background: var(--ds-ground); color: #1A1A1A; }
+body:not(.auth) :focus-visible { border-radius: var(--ds-r-sm); }
+
+/* ---------- top bar and navigation ---------- */
+body:not(.auth) .bar { background: rgba(237, 237, 235, .92); backdrop-filter: saturate(1.2) blur(10px); border-bottom: 0; }
+body:not(.auth) .bar__in { min-height: 68px; }
+body:not(.auth) .primary { margin-left: 8px; border-top: 0; }
+body:not(.auth) .bar { padding-bottom: 8px; }
+body:not(.auth) .primary ul { gap: 2px; padding: 4px; width: max-content; max-width: 100%; background: var(--ds-card); border-radius: var(--ds-pill); box-shadow: var(--ds-shadow-1); }
+body:not(.auth) .primary a { min-height: 38px; padding: 0 14px; border: 0; border-radius: var(--ds-pill); font-size: 14px; color: var(--ds-muted); transition: background var(--ds-dur) var(--ds-ease), color var(--ds-dur) var(--ds-ease); }
+body:not(.auth) .primary a:hover { color: var(--ds-ink); background: var(--ds-soft); }
+body:not(.auth) .primary a[aria-current="page"] { background: var(--ds-ink); color: #fff; }
+body:not(.auth) .primary--wide .primary__menu summary { border-radius: var(--ds-pill); }
+body:not(.auth) .who { gap: 10px; }
+body:not(.auth) .who__org { font-weight: 600; }
+body:not(.auth) .brand__word { letter-spacing: 0.22em; }
+@media (max-width: 880px) {
+  body:not(.auth) .primary { border-top: 0; margin: 0 calc(var(--gutter) * -1); padding: 4px var(--gutter) 10px; }
+  body:not(.auth) .primary ul { width: max-content; }
+}
+
+/* ---------- buttons ---------- */
+body:not(.auth) .btn { min-height: 44px; border-radius: var(--ds-pill); border: 1px solid var(--ds-line-strong); background: var(--ds-card); color: var(--ds-ink); font-weight: 600; transition: background var(--ds-dur) var(--ds-ease), color var(--ds-dur) var(--ds-ease), box-shadow var(--ds-dur) var(--ds-ease), transform var(--ds-dur) var(--ds-ease); }
+body:not(.auth) .btn:hover { background: var(--ds-soft); color: var(--ds-ink); box-shadow: var(--ds-shadow-1); }
+body:not(.auth) .btn--primary { background: var(--ds-ink); color: #fff; border-color: var(--ds-ink); }
+body:not(.auth) .btn--primary:hover { background: #262626; color: #fff; }
+body:not(.auth) .btn--small { min-height: 38px; }
+body:not(.auth) .btn--quiet { color: var(--ds-muted); border-color: var(--ds-line-strong); background: transparent; }
+body:not(.auth) .btn:focus-visible { outline-offset: 2px; }
+
+/* ---------- status: a small pill with a dot and words ---------- */
+body:not(.auth) .status { gap: 7px; padding: 3px 10px 3px 9px; border-radius: var(--ds-pill); background: var(--ds-soft); font-size: 12.5px; }
+body:not(.auth) .status::before { width: 8px; height: 8px; border: 0; border-radius: 50%; background: var(--ds-muted); }
+body:not(.auth) .status--done, body:not(.auth) .status--live { background: #E7F1EA; color: var(--ds-ok); }
+body:not(.auth) .status--done::before, body:not(.auth) .status--live::before { background: var(--ds-ok); }
+body:not(.auth) .status--active { background: #E8EDF5; color: var(--ds-info); }
+body:not(.auth) .status--active::before { background: var(--ds-info); }
+body:not(.auth) .status--idle, body:not(.auth) .status--paused { background: var(--ds-soft); color: var(--ds-muted); }
+body:not(.auth) .status--paused::before { border: 0; background: var(--ds-line-strong); }
+body:not(.auth) .status--attention { background: #FBEFD9; color: var(--ds-warn); }
+body:not(.auth) .status--attention::before { background: var(--ds-warn); }
+
+/* ---------- page: the dashboard-style pages lay out their own cards; every other page's content sits in one white card ---------- */
+body:not(.auth) main.wrap.page { width: calc(100% - 2 * var(--gutter)); max-width: calc(var(--max) - 2 * var(--gutter)); padding: 0; margin: 6px auto 48px; }
+body:not(.auth) main.wrap.page:not(:has(.hm-services, .wd)) { padding: clamp(20px, 3vw, 36px); background: var(--ds-card); border: 1px solid var(--ds-line); border-radius: var(--ds-r-lg); box-shadow: var(--ds-shadow-1); }
+body:not(.auth) main.page--bleed { margin: 0; }
+body:not(.auth) .page-head { margin-bottom: 22px; }
+body:not(.auth) .page-head--home { margin: 8px 0 18px; }
+body:not(.auth) .page-head .h1, body:not(.auth) .h1 { font-size: clamp(30px, 4vw, 44px); letter-spacing: -0.02em; }
+body:not(.auth) .eyebrow::before { content: ""; }
+body:not(.auth) .eyebrow { letter-spacing: 0.1em; }
+body:not(.auth) .lead { color: var(--ds-muted); }
+
+/* ---------- cards ---------- */
+body:not(.auth) .hm-grid { gap: 14px; border: 0; margin-top: 14px; }
+body:not(.auth) .hm-block { min-height: 200px; padding: 22px; border: 1px solid var(--ds-line); border-radius: var(--ds-r-lg); background: var(--ds-card); box-shadow: var(--ds-shadow-1); transition: box-shadow var(--ds-dur) var(--ds-ease), transform var(--ds-dur) var(--ds-ease); }
+body:not(.auth) a.hm-block:hover, body:not(.auth) a.hm-block:focus-visible { background: var(--ds-card); box-shadow: var(--ds-shadow-2); transform: translateY(-2px); }
+body:not(.auth) .hm-block--off { background: rgba(255, 255, 255, .6); box-shadow: none; }
+body:not(.auth) .hm-block__title { font-size: 20px; margin-top: 18px; }
+body:not(.auth) .hm-block__desc { color: var(--ds-muted); }
+body:not(.auth) .hm-block__go { color: var(--ds-line-strong); }
+body:not(.auth) .hm-profile { margin-top: 0; padding: 22px 26px; border-radius: var(--ds-r-lg); background: var(--ds-ink); box-shadow: var(--ds-shadow-1); }
+body:not(.auth) .hm-profile .btn { background: #fff; color: var(--ds-ink); border-color: #fff; }
+body:not(.auth) .hm-profile .btn:hover { background: #E9E9E6; }
+body:not(.auth) .hm-profile .meter { border-radius: var(--ds-pill); overflow: hidden; }
+body:not(.auth) .hm-need { margin-top: 14px; padding: 18px 22px; border: 1px solid var(--ds-line); border-top: 3px solid var(--ds-warn); border-radius: var(--ds-r-lg); background: var(--ds-card); box-shadow: var(--ds-shadow-1); }
+body:not(.auth) .hm-need > .h3 { color: var(--ds-warn); }
+
+/* ---------- lists, notices and empty states as soft cards ---------- */
+body:not(.auth) .rows { display: grid; gap: 10px; }
+body:not(.auth) .rows > li { border: 1px solid var(--ds-line); border-radius: var(--ds-r); background: var(--ds-card); box-shadow: var(--ds-shadow-1); overflow: hidden; }
+body:not(.auth) .rows > li:last-child { border-bottom: 1px solid var(--ds-line); }
+body:not(.auth) .rows--nav > li:first-child { border-top-color: var(--ds-line); }
+body:not(.auth) .row { padding: 16px 20px; transition: background var(--ds-dur) var(--ds-ease); }
+body:not(.auth) a.row:hover { background: var(--ds-soft); }
+body:not(.auth) .notice { padding: 18px 20px; border: 1px solid var(--ds-line); border-radius: var(--ds-r); background: var(--ds-card); margin-bottom: 10px; box-shadow: var(--ds-shadow-1); }
+body:not(.auth) .notice:first-child { border-top-color: var(--ds-line); }
+body:not(.auth) .notice-line { padding: 12px 16px; border: 0; border-radius: var(--ds-r); background: var(--ds-card); box-shadow: var(--ds-shadow-1); }
+body:not(.auth) .empty { padding: 28px 24px; border: 1px dashed var(--ds-line-strong); border-radius: var(--ds-r-lg); background: rgba(255, 255, 255, .55); max-width: none; text-align: center; }
+body:not(.auth) .empty strong { font-size: 18px; }
+body:not(.auth) .brand-aside { border: 1px solid var(--ds-line); border-radius: var(--ds-r-lg); background: var(--ds-card); box-shadow: var(--ds-shadow-1); }
+body:not(.auth) .rq-block, body:not(.auth) .acc, body:not(.auth) details.acc { border-radius: var(--ds-r-lg); }
+
+/* ---------- forms ---------- */
+body:not(.auth) .field input[type="text"], body:not(.auth) .field input[type="email"], body:not(.auth) .field input[type="tel"], body:not(.auth) .field input[type="url"], body:not(.auth) .field input[type="search"],
+body:not(.auth) .field input[type="date"], body:not(.auth) .field input[type="number"], body:not(.auth) .field textarea, body:not(.auth) .field select { min-height: 46px; padding: 12px 16px; border-radius: var(--ds-r); border-color: var(--ds-line-strong); background: var(--ds-card); }
+body:not(.auth) .field input:focus, body:not(.auth) .field textarea:focus, body:not(.auth) .field select:focus { outline: 2px solid var(--ds-ink); outline-offset: 1px; border-radius: var(--ds-r); }
+body:not(.auth) .error-summary { border-radius: var(--ds-r); }
+
+/* ---------- foot ---------- */
+body:not(.auth) .foot { border-top: 0; color: var(--ds-muted); }
+
+/* ---------- motion respects the preference ---------- */
+@media (prefers-reduced-motion: reduce) { body:not(.auth) * { transition: none !important; animation: none !important; } body:not(.auth) a.hm-block:hover { transform: none; } }
+
+/* ---------- the Website dashboard (portal-website-workspace.css) in the same system ---------- */
+body:not(.auth) .wd-ground { background: transparent; min-height: 0; }
+body:not(.auth) .wd-wrap { max-width: none; padding: 0 0 8px; }
+body:not(.auth) .wd-title { font-size: clamp(28px, 3.4vw, 40px); }
+body:not(.auth) .wd-grid, body:not(.auth) .wd-col { gap: 14px; }
+body:not(.auth) .wd-card { border: 1px solid var(--ds-line); border-radius: var(--ds-r-lg); background: var(--ds-card); box-shadow: var(--ds-shadow-1); }
+body:not(.auth) .wd-card--tone { background: var(--ds-card); }
+body:not(.auth) .wd-card--ink { background: var(--ds-ink); border-color: var(--ds-ink); }
+body:not(.auth) .wd-prev.wd-card--ink { background: var(--ds-card); color: var(--ds-ink); border-color: var(--ds-line); }
+body:not(.auth) .wd-prev.wd-card--ink .wd-u, body:not(.auth) .wd-prev.wd-card--ink .wd-m { color: var(--ds-muted); }
+body:not(.auth) .wd-prev.wd-card--ink .wd-btn { background: var(--ds-ink); color: #fff; border-color: var(--ds-ink); }
+body:not(.auth) .wd-shot { border-radius: var(--ds-r); }
+body:not(.auth) .wd-shot--none { background: var(--ds-soft); border-radius: var(--ds-r); }
+body:not(.auth) .wd-btn { border-radius: var(--ds-pill); min-height: 44px; }
+body:not(.auth) .wd-btn--line { border-color: var(--ds-line-strong); background: var(--ds-card); }
+body:not(.auth) .wd-need { border-radius: var(--ds-pill); background: #FBEFD9; color: var(--ds-warn); letter-spacing: .06em; }
+body:not(.auth) .wd-count { border-radius: var(--ds-pill); background: var(--ds-soft); color: var(--ds-ink); }
+body:not(.auth) .wd-tag { border-radius: var(--ds-pill); border-color: var(--ds-line-strong); letter-spacing: .08em; padding: 3px 9px; }
+body:not(.auth) .wd-list, body:not(.auth) .wd-empty { border-top: 1px solid var(--ds-line); }
+body:not(.auth) .wd-mk { border-radius: 50%; }
+body:not(.auth) .wd-big { font-size: clamp(40px, 4.6vw, 60px); }
+body:not(.auth) details.wd-details, body:not(.auth) .wd-fold, body:not(.auth) .wd > details { border-radius: var(--ds-r-lg); background: var(--ds-card); border: 1px solid var(--ds-line); box-shadow: var(--ds-shadow-1); }
+body:not(.auth) .wd-wrap { width: calc(100% - 2 * var(--gutter)); max-width: calc(var(--max) - 2 * var(--gutter)); margin: 6px auto 0; }
+body:not(.auth) .wd-moreg { margin-top: 14px; border: 1px solid var(--ds-line); border-radius: var(--ds-r-lg); background: var(--ds-card); box-shadow: var(--ds-shadow-1); overflow: hidden; }
+body:not(.auth) .wd-moreg > summary { padding-left: 22px; padding-right: 22px; }
+body:not(.auth) .wd-row > summary { border-radius: var(--ds-r-sm); }
+body:not(.auth) .wd-rq > summary, body:not(.auth) .wd-card--ink .wd-btn { border-radius: var(--ds-r); }
