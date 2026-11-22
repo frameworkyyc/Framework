@@ -67,7 +67,7 @@ test("status colours in the design-system layer always have a text or icon partn
 
 test("the rebuilt pages use the shared kit instead of their own markup for summaries, folds and empty states", () => {
   const uses = { "overview.js": ["navIcon", "badge"], "feedback.js": ["statCard", "badge", "fold"], "support-global.js": ["statCard"], "assessments.js": ["badge", "fold", "statCard"], "discovery.js": ["statCard", "emptyState", "fold"],
-    "clients.js": ["statCard", "searchBox"], "invoices.js": ["statCard"], "approved-emails.js": ["fold"], "settings.js": ["linkCard", "fold"], "client-services.js": ["fold"], "websites.js": ["fold"] };
+    "clients.js": ["statCard", "searchBox"], "invoices.js": ["statCard"], "approved-emails.js": ["fold"], "settings.js": ["linkCard", "fold"], "client-services.js": ["fold"] };
   for (const [file, names] of Object.entries(uses)) {
     const src = read("admin/assets/" + file);
     const imp = src.match(/import \{([^}]*)\} from "\.\/kit\.js";/);

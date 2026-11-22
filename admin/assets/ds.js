@@ -72,9 +72,10 @@ export const crumbs = (items) => h("nav", { class: "ds-crumbs", "aria-label": "B
 export const pageHead = ({ title, sub, actions, kicker, back }) => h("header", { class: "ds-pagehead" }, h("div", { class: "ds-pagehead__text" }, back ? h("a", { class: "ds-back", href: back[1], "data-link": "" }, icon("back"), back[0]) : null, kicker ? h("p", { class: "ds-kicker", text: kicker }) : null, h("h1", { class: "ds-title", tabindex: "-1", text: title }), sub ? h("p", { class: "ds-sub", text: sub }) : null), actions ? h("div", { class: "ds-pagehead__actions" }, actions) : null);
 
 /* ---------- controls ---------- */
-export const button = (label, { onClick, tone = "", icon: ic, type = "button", disabled, href, title, label: aria } = {}) => {
+export const button = (label, { onClick, tone = "", icon: ic, type = "button", disabled, href, external, title, label: aria } = {}) => {
   const cls = "ds-btn" + (tone ? " ds-btn--" + tone : "");
-  const kids = [ic ? icon(ic) : null, label ? h("span", { text: label }) : null];
+  const kids = [ic ? icon(ic) : null, label ? h("span", { text: label }) : null, external ? h("span", { class: "rk-sr", text: " (opens in a new tab)" }) : null];
+  if (external && href) return h("a", { class: cls, href, target: "_blank", rel: "noopener noreferrer", title: title || null }, kids);
   return href ? h("a", { class: cls, href, "data-link": "", title: title || null }, kids) : h("button", { class: cls, type, onclick: onClick, disabled: disabled ? true : null, "aria-label": aria || null, title: title || null }, kids);
 };
 export const switchInput = ({ id, label, checked, hint }) => { const input = h("input", { type: "checkbox", id, class: "ds-switch__input", checked: checked ? true : null }); return { input, node: h("div", { class: "ds-field" }, h("label", { class: "ds-switch", for: id }, input, h("span", { class: "ds-switch__track", "aria-hidden": "true" }), h("span", { class: "ds-switch__label", text: label })), hint ? h("p", { class: "ds-hint", text: hint }) : null) }; };
@@ -127,8 +128,8 @@ export function barChart({ data, label, unit = "", height = 160, format = (n) =>
 }
 
 /* ---------- a list that becomes stacked records on a phone ---------- */
-export function dataList({ columns, rows, label, onRow }) {
-  return h("div", { class: "ds-dl", role: "table", "aria-label": label || null },
+export function dataList({ columns, rows, label, onRow, cls = "" }) {
+  return h("div", { class: "ds-dl" + (cls ? " " + cls : ""), role: "table", "aria-label": label || null },
     h("div", { class: "ds-dl__head", role: "row" }, columns.map((c) => h("span", { role: "columnheader", class: "ds-dl__h" + (c.cls ? " " + c.cls : ""), text: c.label }))),
     rows.map((r) => { const el = r.href ? h("a", { class: "ds-dl__row", role: "row", href: r.href, "data-link": "" }) : h("div", { class: "ds-dl__row", role: "row" }); columns.forEach((c) => el.append(h("span", { role: "cell", class: "ds-dl__c" + (c.cls ? " " + c.cls : ""), "data-label": c.label }, c.render(r)))); if (onRow) el.addEventListener("click", () => onRow(r)); return el; }));
 }

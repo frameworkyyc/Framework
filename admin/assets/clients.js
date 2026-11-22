@@ -14,7 +14,7 @@ const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 export async function render(ctx) {
   const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding|\/website|\/profile|\/invoices|\/support|\/requests|\/additional-services)?$/);
   if (m && m[2] === "/branding") return (await import("./branding.js")).render(decodeURIComponent(m[1]), ctx);
-  if (m && m[2] === "/website") return (await import("./websites.js")).render(decodeURIComponent(m[1]), ctx);
+  if (m && m[2] === "/website") { ctx.navigate("/admin/websites?client=" + m[1], { replace: true }); return { title: "Websites", node: document.createElement("div") }; } // a client's websites now live in the Websites section
   if (m && m[2] === "/additional-services") return (await import("./client-services.js")).render(decodeURIComponent(m[1]), ctx);
   if (m && m[2] === "/requests") return (await import("./requests.js")).render(ctx);
   if (m && m[2] === "/support") return (await import("./support.js")).render(decodeURIComponent(m[1]), ctx);
