@@ -317,3 +317,14 @@ progress.ds-meter::-webkit-progress-bar { background: var(--ds-line); } progress
 .ds-main .adm-tile, .ds-main .adm-next { background: var(--ds-card); border: 1px solid var(--ds-line); border-radius: var(--ds-r); box-shadow: var(--ds-shadow-1); }
 .ds-clientshell__body .adm-page { padding: 0; background: transparent; border: 0; box-shadow: none; }
 .ds-main .adm-acc--quiet > summary { padding-left: 16px; padding-right: 16px; }
+
+/* ---------- Analytics ---------- */
+.ds-dl--analytics { --ds-cols: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.8fr); }
+.ds-conn__stack { display: grid; gap: 4px; justify-items: start; font-size: 13px; }
+.ds-statuslist { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.ds-statuslist__i { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; font-size: 14px; }
+.ds-help { margin: 0; display: grid; gap: 14px 28px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ds-help dt { font-weight: 600; margin: 0; } .ds-help dd { margin: 4px 0 0; color: var(--ds-muted); font-size: 14px; line-height: 1.5; }
+.ds-help__i { min-width: 0; }
+.ds-page > .ds-grid + .ds-grid, .ds-page > .ds-grid + .ds-card, .ds-page > .ds-card + .ds-card { margin-top: 14px; }
+@media (max-width: 899px) { .ds-dl--analytics .ds-dl__c { padding: 2px 0; } .ds-help { grid-template-columns: minmax(0, 1fr); } }

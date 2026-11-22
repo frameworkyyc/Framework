@@ -113,3 +113,6 @@ Patterns worth reusing: **rows** (`.adm-reqlist` with `.adm-reqrow`: client, tit
 2. Use tokens; add a new token here before using a new value.
 3. Check 1440, 820, 390 and 320px: no sideways scroll, readable, touch targets 44px.
 4. Add the page to the design-system test if it adds a new pattern, and describe it here.
+
+## Analytics (`/admin/analytics`)
+The portfolio across every client website: KPI cards (connected counts, last-read totals), a page-views bar chart, a Connections card (what the server is set up to read), a filterable data list and a troubleshooting card. It is built from `GET /api/admin/analytics/summary`, which is read-only and returns only saved settings and the last cached 30-day figures with their read time; nothing is fetched live and nothing is estimated ("Not read yet" otherwise). Each row opens the website's Analytics tab (`/admin/websites/:id/analytics`), the existing multi-account settings panel (site tag, property, the client's own Cloudflare account and write-only token, Test). `/admin/analytics/:id` redirects there.

@@ -17,6 +17,7 @@ export const MODULES = [
   { id: "clients", label: "Clients", path: "/admin/clients", enabled: true, load: () => import("./clients.js") },
   // The new sections (Phase 3): websites across every client, analytics across every website, and the Operations hub (its older pages keep their own addresses and modules).
   { id: "websites", label: "Websites", path: "/admin/websites", enabled: true, load: () => import("./sites.js") },
+  { id: "analytics", label: "Analytics", path: "/admin/analytics", enabled: true, load: () => import("./analytics.js") },
   { id: "operations", label: "Operations", path: "/admin/operations", enabled: true, load: () => import("./operations.js") },
   { id: "approved-emails", label: "Approved Emails", path: "/admin/approved-emails", enabled: true, load: () => import("./approved-emails.js") },
   // Direct entries for the two services screens (they live under /admin/settings/..., and must come BEFORE "settings" so the longer paths match first). Different jobs: what is offered vs. what it costs.
