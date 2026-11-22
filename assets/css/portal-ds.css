@@ -123,7 +123,9 @@ body:not(.auth):not(.si-body) .wd-card--tone { background: var(--ds-card); }
 body:not(.auth):not(.si-body) .wd-card--ink { background: var(--ds-ink); border-color: var(--ds-ink); }
 body:not(.auth):not(.si-body) .wd-prev.wd-card--ink { background: var(--ds-card); color: var(--ds-ink); border-color: var(--ds-line); }
 body:not(.auth):not(.si-body) .wd-prev.wd-card--ink .wd-u, body:not(.auth):not(.si-body) .wd-prev.wd-card--ink .wd-m { color: var(--ds-muted); }
-body:not(.auth):not(.si-body) .wd-shot { border-radius: var(--ds-r); }
+body:not(.auth):not(.si-body) .wd-prev.wd-card--ink .wd-mk--ink, body:not(.auth):not(.si-body) .wd-prev.wd-card--ink .wd-mk--live { background: var(--ds-ink); } /* the Preview card is white here: its status square must be dark, like the Live card's */
+body:not(.auth):not(.si-body) .wd-live .wd-foot .wd-btn, body:not(.auth):not(.si-body) .wd-prev .wd-foot .wd-btn { min-width: 176px; justify-content: center; } /* the two action buttons are the same size */
+body:not(.auth):not(.si-body) .wd-shot { border-radius: var(--ds-r); background: var(--ds-soft); border: 1px solid var(--ds-line); }
 body:not(.auth):not(.si-body) .wd-shot--none { background: var(--ds-soft); border-radius: var(--ds-r); }
 /* the two website action buttons ("Open live site", "Open preview") share one shape: pill, 44px, same padding, icon aligned; only the colour differs (outlined for Live, solid for Preview) */
 body:not(.auth):not(.si-body) .wd-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 22px; border-radius: var(--ds-pill); border: 1px solid var(--ds-ink); line-height: 1; }

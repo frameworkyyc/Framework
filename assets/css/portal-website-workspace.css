@@ -15,13 +15,14 @@
 
 /* the grid: twelve columns; the two website cards on top, then a left and a right column */
 .wd-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; align-items: start; }
-.wd-live { grid-column: span 7; }
-.wd-prev { grid-column: span 5; }
+.wd-live, .wd-prev { grid-column: span 6; } /* identical width: the two website cards are one shape */
 .wd-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; align-self: stretch; }
 .wd-col--l { grid-column: span 7; }
 .wd-col--r { grid-column: span 5; }
 .wd-col--r .wd-traffic { flex: 1; }
 .wd-live, .wd-prev { align-self: stretch; }
+.wd-live .wd-ct, .wd-prev .wd-ct { align-items: flex-start; min-height: 52px; }
+.wd-live .wd-foot, .wd-prev .wd-foot { margin-top: auto; }
 
 .wd-card { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: clamp(18px, 2vw, 26px); background: var(--paper); color: var(--ink); position: relative; }
 .wd-card--ink { background: var(--ink); color: #fff; }
@@ -44,12 +45,9 @@
 .wd-card--ink .wd-mk--ink, .wd-card--ink .wd-mk--live { background: #fff; }
 
 /* the two website cards: the picture first, or a neutral panel that says why there is none */
-.wd-shot { position: relative; flex: 1; min-height: 200px; aspect-ratio: 16 / 10; background: #0A0A0A; overflow: hidden; }
-.wd-live .wd-shot { aspect-ratio: 16 / 9; flex: none; }
-.wd-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: left top; display: block; transition: transform .5s var(--wd-ease); }
-.wd-card:hover .wd-shot img { transform: scale(1.015); }
+.wd-shot { position: relative; flex: none; width: 100%; aspect-ratio: 16 / 9; background: #F1F1EF; overflow: hidden; }
+.wd-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center; display: block; } /* the whole picture, never cropped or stretched, whatever its size or shape; the neutral ground shows around it */
 .wd-shot--none { display: grid; align-content: center; justify-items: start; gap: 10px; padding: clamp(16px, 2vw, 28px); background: repeating-linear-gradient(135deg, #F1F1EF 0 10px, #E9E9E7 10px 20px); color: var(--slate); }
-.wd-prev .wd-shot--none { background: repeating-linear-gradient(135deg, #161616 0 10px, #1C1C1C 10px 20px); color: #A9A9A9; }
 .wd-none { margin: 0; max-width: 28em; font-size: 14px; line-height: 1.5; }
 .wd-foot { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 
@@ -153,11 +151,10 @@ details[open] > summary > .wd-pl::after { transform: rotate(0); }
 @keyframes wd-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .wd *, .wd *::before, .wd *::after { animation: none !important; transition: none !important; } }
 
-/* iPad and below: the two website cards stay side by side; the columns stack */
+/* iPad and below: the two website cards stay side by side at equal height; the columns stack */
 @media (max-width: 900px) {
   .wd-live, .wd-prev { grid-column: span 6; }
   .wd-col--l, .wd-col--r { grid-column: span 12; }
-  .wd-live .wd-shot { aspect-ratio: auto; flex: 1; min-height: 200px; }
 }
 
 /* phone: both websites side by side as small cards (each is one big tap target), then what needs the client, the request, recent updates and traffic */
@@ -167,17 +164,10 @@ details[open] > summary > .wd-pl::after { transform: rotate(0); }
   .wd-card { padding: 14px; gap: 12px; }
   .wd-head { margin-bottom: 8px; }
   .wd-head__r > span { display: none; }
-  .wd-live, .wd-prev { grid-column: span 6; gap: 10px; order: 0; }
-  .wd-live .wd-ct, .wd-prev .wd-ct { display: block; }
+  .wd-live, .wd-prev { grid-column: span 12; order: 0; } /* phone: the two website cards stack, each full width */
   .wd-card h2 { font-size: 17px; }
-  .wd-live .wd-s, .wd-prev .wd-s { margin-top: 6px; }
-  .wd-live .wd-shot, .wd-prev .wd-shot { aspect-ratio: 16 / 11; min-height: 0; flex: none; }
-  .wd-shot--none { padding: 8px; gap: 0; justify-items: center; text-align: center; align-content: center; }
-  .wd-shot--none .wd-none { display: none; }
-  .wd-shot--none .wd-tag { font-size: 8px; letter-spacing: .08em; padding: 4px 5px; }
-  .wd-foot { display: block; }
-  .wd-foot .wd-btn { width: 100%; justify-content: space-between; padding: 0 12px; min-height: 40px; font-size: 13px; }
-  .wd-foot .wd-btn::after { content: ""; position: absolute; inset: 0; }
+  .wd-live .wd-ct, .wd-prev .wd-ct { min-height: 0; }
+  .wd-foot .wd-btn { width: 100%; justify-content: center; }
   .wd-col { display: contents; }
   .wd-needs { grid-column: span 12; order: 3; }
   .wd-req { grid-column: span 12; order: 4; }
