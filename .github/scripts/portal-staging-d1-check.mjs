@@ -2,9 +2,9 @@
 // Same idea as portal-d1-check.mjs (which guards Production and is untouched): each check reads Wrangler's output on stdin (or the config file) and exits non-zero on ANY mismatch ("fail closed").
 // It only ever accepts the Staging database (name AND id) and refuses the Production database id and name. It never prints secrets: it handles database names/ids, migration file names, table and column names,
 // one Time Travel bookmark and a few counts.
-// Usage: node portal-staging-d1-check.mjs <config|info|pending-before|tables-before|bookmark|fingerprint|fingerprint-compare|pending-after|tables-after|columns-after> [arg] [arg2] < wrangler-output
+// Usage: node portal-staging-d1-check.mjs <config|info|pending-before|lint|tables-before|bookmark|fingerprint|fingerprint-compare|pending-after|tables-after|columns-after> [arg] [arg2] < wrangler-output
 import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
-import { EXPECTED as PRODUCTION, pendingMigrations, namesFromExecute, parseBookmark } from "./portal-d1-check.mjs";
+import { EXPECTED as PRODUCTION, STAGES, pendingMigrations, namesFromExecute, parseBookmark } from "./portal-d1-check.mjs";
 
 /** The one database this workflow may touch. */
 export const STAGING = Object.freeze({
@@ -12,9 +12,9 @@ export const STAGING = Object.freeze({
   id: "1edda8a2-5249-4f40-9dbc-d29aa44e21f8",
   binding: "PORTAL_DB",
   migrationsDir: ".",
-  // Everything up to and including 0030 is already applied to Staging. The only migration this workflow may apply is listed here; add the next one by a reviewed change, like the Production list.
-  applicable: Object.freeze(["0031_website_staging_screenshot.sql"]),
-  // What 0031 adds to `websites` (and the Production columns it must leave alone).
+  // Every migration file in migrations/portal is on the reviewed list in portal-d1-check.mjs (a test keeps the folder and the list identical), and a file only gets into that folder through a merged,
+  // CI-checked pull request: that merge is the approval of a Staging migration. A pending migration must be on that list AND pass lintMigration (additive only).
+  // What 0031 adds to `websites` (and the Production columns it must leave alone); checked after it is applied.
   newColumns: Object.freeze(["staging_screenshot_format", "staging_screenshot_key", "staging_screenshot_name", "staging_screenshot_sha256", "staging_screenshot_size", "staging_screenshot_type"]),
   keptColumns: Object.freeze(["screenshot_format", "screenshot_key", "screenshot_name", "screenshot_sha256", "screenshot_size", "screenshot_type"]),
 });
@@ -46,11 +46,20 @@ export function checkInfo(text) {
   return "remote database ok: " + info.name + " " + id;
 }
 
-/** Pending migrations on Staging: only ones this workflow may apply. Apply mode needs at least one. */
+/** Migration SQL that may be applied to Staging without a person reading it again: additive only. Anything that removes, rewrites or renames data, or touches another database, is refused (a person decides those). */
+export function lintMigration(name, sql) {
+  const code = sql.replace(/--[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+  const bad = code.match(/\bDROP\b|\bTRUNCATE\b|\bRENAME\b|\bATTACH\b|\bPRAGMA\b|\bREPLACE\s+INTO\b|(?<!ON )\b(DELETE|UPDATE)\b/i);
+  if (bad) fail(`${name} is not additive (contains ${bad[0].toUpperCase()}); a person must approve it`);
+  if (!/\b(CREATE\s+(UNIQUE\s+)?(TABLE|INDEX)|ALTER\s+TABLE\s+\w+\s+ADD\s+COLUMN|INSERT)\b/i.test(code)) fail(`${name} contains no recognisable additive statement`);
+  return true;
+}
+
+/** Pending migrations on Staging: only ones on the reviewed list. Apply mode needs at least one. */
 export function checkPendingBefore(text, mode) {
   const names = [...pendingMigrations(text)].sort();
-  const unexpected = names.filter((n) => !STAGING.applicable.includes(n));
-  if (unexpected.length) fail("unexpected pending migration(s) on Staging: " + unexpected.join(", "));
+  const unexpected = names.filter((n) => !PRODUCTION.migrations.includes(n));
+  if (unexpected.length) fail("unexpected pending migration(s) on Staging (not on the reviewed list): " + unexpected.join(", "));
   if (mode === "apply" && names.length === 0) fail("apply requires at least one pending migration; none found");
   return "pending: " + (names.join(", ") || "none");
 }
@@ -68,18 +77,22 @@ export function checkTablesBefore(text) {
   const extra = have.filter((t) => !PRODUCTION.tables.includes(t));
   return `tables ok: ${have.length} (extra, left alone: ${extra.join(", ") || "none"})`;
 }
-/** The migration adds no table: the table list after must be exactly the list before. */
-export function checkTablesAfter(afterText, beforeText) {
-  const a = userTables(afterText).sort().join(","), b = userTables(beforeText).sort().join(",");
-  if (a !== b) fail("the table list changed during the migration (it must not)");
-  return "tables unchanged: " + userTables(afterText).length;
+/** After the migration the table list is the one before plus exactly the tables the applied migrations declare. */
+export function checkTablesAfter(afterText, beforeText, applied = []) {
+  const declared = STAGES.filter((st) => applied.includes(st.file)).flatMap((st) => st.tables);
+  const want = [...new Set([...userTables(beforeText), ...declared])].sort().join(",");
+  const got = userTables(afterText).sort().join(",");
+  if (got !== want) fail("the table list after the migration is not what the migration declares");
+  return "tables ok: " + userTables(afterText).length + (declared.length ? ` (new: ${declared.join(", ")})` : " (unchanged)");
 }
-/** The new Staging columns exist and the Production screenshot columns are still there. */
-export function checkColumnsAfter(text) {
-  const have = namesFromExecute(text);
-  const missing = [...STAGING.newColumns, ...STAGING.keptColumns].filter((c) => !have.includes(c));
+/** Column expectations per migration (only for migrations that add columns): after it is applied, the new columns exist and the older ones are still there. */
+const COLUMN_EXPECTATIONS = Object.freeze({ "0031_website_staging_screenshot.sql": [...STAGING.newColumns, ...STAGING.keptColumns] });
+export function checkColumnsAfter(text, applied = ["0031_website_staging_screenshot.sql"]) {
+  const want = applied.flatMap((f) => COLUMN_EXPECTATIONS[f] || []);
+  if (!want.length) return "no column expectations for the applied migrations";
+  const have = namesFromExecute(text), missing = want.filter((c) => !have.includes(c));
   if (missing.length) fail("websites is missing columns: " + missing.join(", "));
-  return "columns ok: " + STAGING.newColumns.length + " new, " + STAGING.keptColumns.length + " kept";
+  return "columns ok: " + want.length;
 }
 
 /** A fixed fingerprint of the Production-style screenshot data in `websites`: how many rows, how many have a screenshot, and their total size and hashes. Equal before and after means nothing was rewritten. */
@@ -107,8 +120,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       "pending-before": () => checkPendingBefore(input(), arg),
       "tables-before": () => checkTablesBefore(input()),
       "pending-after": () => checkPendingAfter(input()),
-      "tables-after": () => checkTablesAfter(input(), readFileSync(arg, "utf8")),
-      "columns-after": () => checkColumnsAfter(input()),
+      lint: () => { const names = pendingMigrations(readFileSync(arg, "utf8")); for (const n of names) lintMigration(n, readFileSync(new URL("../../migrations/portal/" + n, import.meta.url), "utf8")); return "migration SQL is additive: " + (names.join(", ") || "nothing pending"); },
+      "tables-after": () => checkTablesAfter(input(), readFileSync(arg, "utf8"), (arg2 || "").split(",").filter(Boolean)),
+      "columns-after": () => checkColumnsAfter(input(), (arg || "").split(",").filter(Boolean)),
       fingerprint: () => { const f = fingerprint(input()); writeFileSync(arg, f + "\n"); return "screenshot fingerprint: " + f; },
       "fingerprint-compare": () => compareFingerprints(readFileSync(arg, "utf8"), readFileSync(arg2, "utf8")),
       bookmark: () => {
