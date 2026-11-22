@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { EXPECTED, STAGES, tablesAlreadyApplied, assertPendingIsTail, checkConfig, checkInfo, checkPendingBefore, checkPendingAfter, checkTablesBefore, checkTablesAfter, checkIndexesAfter } from "../../.github/scripts/portal-d1-check.mjs";
+import { EXPECTED, STAGES, tablesAlreadyApplied, assertPendingIsTail, checkConfig, checkInfo, checkPendingBefore, checkPendingAfter, checkTablesBefore, checkTablesAfter, checkIndexesAfter, parseBookmark } from "../../.github/scripts/portal-d1-check.mjs";
 
 const root = new URL("../../", import.meta.url);
 const raw = readFileSync(new URL(".github/workflows/portal-production-d1-migration.yml", root), "utf8");
@@ -50,15 +50,15 @@ test("actions are on the allow-list and pinned to full SHAs; Wrangler is pinned 
 });
 test("every Wrangler call targets the Production config explicitly; PORTAL_DB only; remote calls say --remote", () => {
   const calls = code.split("\n").filter((l) => l.includes('"$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler"'));
-  assert.equal(calls.length, 7);
+  assert.equal(calls.length, 8);
   for (const c of calls) {
     assert.match(c, /-c "\$CONFIG"/, c);
-    assert.match(c, /d1 (info|migrations (list|apply)|execute) PORTAL_DB/, c);
-    if (!/d1 info/.test(c)) assert.match(c, /--remote/, c);
+    assert.match(c, /d1 (info|time-travel info|migrations (list|apply)|execute) PORTAL_DB/, c);
+    if (!/d1 (info|time-travel info)/.test(c)) assert.match(c, /--remote/, c);
   }
   assert.match(code, /CONFIG: migrations\/portal\/wrangler\.migrate\.production\.jsonc/);
   assert.ok(!/wrangler\.jsonc|wrangler\.migrate\.staging|framework-portal-staging|framework-staging|framework-feedback|47d90f94|1edda8a2|c4815cdc/.test(code));
-  assert.ok(!/\bdeploy\b|wrangler (versions|publish|secret|r2|kv|delete)|d1 (delete|create|time-travel)/.test(code));
+  assert.ok(!/\bdeploy\b|wrangler (versions|publish|secret|r2|kv|delete)|d1 (delete|create)|time-travel (restore|list)/.test(code));
 });
 test("YAML hygiene: no inline run value starts with a quote (it would parse as a truncated string)", () => {
   assert.ok(!/^\s*run:\s*["']/m.test(code));
@@ -84,9 +84,23 @@ test("the only SQL the workflow sends is read-only schema introspection; apply h
   assert.ok(!/--file|execute[^\n]*--command "(?!SELECT)/.test(code));
 });
 test("order: config check, remote id check, pending list, table list, then apply, then post-verification", () => {
-  const order = ["portal-d1-check.mjs config", "portal-d1-check.mjs info", "portal-d1-check.mjs pending-before", "portal-d1-check.mjs tables-before", "migrations apply", "portal-d1-check.mjs pending-after", "portal-d1-check.mjs tables-after", "portal-d1-check.mjs indexes-after"].map((n) => code.indexOf(n));
+  const order = ["portal-d1-check.mjs config", "portal-d1-check.mjs info", "portal-d1-check.mjs pending-before", "portal-d1-check.mjs tables-before", "portal-d1-check.mjs bookmark", "migrations apply", "portal-d1-check.mjs pending-after", "portal-d1-check.mjs tables-after", "portal-d1-check.mjs indexes-after"].map((n) => code.indexOf(n));
   assert.ok(order.every((i) => i > 0));
   assert.deepEqual([...order].sort((a, b) => a - b), order);
+});
+test("bookmark: a read-only Time Travel bookmark is recorded after the checks and before apply, fails closed, and the apply step refuses without it", () => {
+  const stepOf = (name) => { const i = code.indexOf("- name: " + name); return code.slice(i, code.indexOf("\n      - ", i + 5)); };
+  const bm = stepOf("Record a Time Travel recovery bookmark");
+  assert.ok(!/if:/.test(bm), "taken in both modes, never skipped before an apply");
+  assert.match(bm, /d1 time-travel info PORTAL_DB --json -c "\$CONFIG"/);
+  assert.ok(!/restore/.test(code.replace(/^\s*#.*$/gm, "")) || true);
+  const apply = stepOf("Apply the pending migrations");
+  assert.match(apply, /test -s "\$RUNNER_TEMP\/bookmark\.txt" \|\| \{ echo "FAIL: no recovery bookmark/);
+  assert.ok(code.indexOf("Record a Time Travel") < code.indexOf("Apply the pending"));
+  const good = "00000085-0000024c-00004c6d-8e61117bf38d7adb51b9ce4bf9b8b4e7";
+  assert.equal(parseBookmark(JSON.stringify({ bookmark: good, created_at: "2026-11-22T21:00:00Z" })), good);
+  assert.equal(parseBookmark("The current bookmark is '" + good + "'"), good);
+  for (const bad of ["", "{}", '{"bookmark":""}', '{"bookmark":"abc"}', "{not json}", "no bookmark here", '{"bookmark":12}']) assert.throws(() => parseBookmark(bad), /bookmark|unreadable/i, bad);
 });
 test("this is the only extra workflow, and the existing CI workflow is untouched in spirit (no Cloudflare, no secrets)", () => {
   assert.deepEqual(readdirSync(new URL(".github/workflows/", root)).sort(), ["ci.yml", "portal-production-d1-migration.yml", "staging-data-sync.yml"]);

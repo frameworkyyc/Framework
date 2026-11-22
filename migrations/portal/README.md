@@ -109,7 +109,7 @@ not re-run it blindly: check the tables, then restore from the Time Travel bookm
 It is `workflow_dispatch` only, so nothing runs until someone starts it from the Actions tab. It has two inputs: the database name typed
 exactly (`framework-portal`) and a mode, **verify-only** (default; read-only) or **apply**. It fails closed on a name/id mismatch, on a pending list that is not the **next migrations in order** (0001, 0002, 0003, 0004; an unknown file, a skipped one or an out-of-order one is refused), on output it cannot read,
 on a database whose tables are not exactly what the already-applied migrations created, and for apply when nothing is pending. After an apply it checks that nothing is pending and that exactly the 9 tables and 15 indexes of
-the four migrations exist (0004 only adds columns). **Order of use on Production: run verify-only first, read its report, record a Time Travel bookmark, then run apply, then run verify-only again.** Only one run can
+the four migrations exist (0004 only adds columns). **Order of use on Production: run verify-only first and read its report, then run apply (then verify-only again).** Every run, in both modes, records a read-only D1 Time Travel bookmark after the checks and before any apply (printed in the log and the job summary, kept with the run's logs); the run stops, and apply never starts, if no bookmark is obtained. No manual bookmark step is needed any more. Only one run can
 be active at a time. It refuses any ref except `Staging` (the migration config and SQL live there); Wrangler is installed in a step
 without secrets, with install scripts disabled, at an exact pinned version.
 
