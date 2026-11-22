@@ -4,6 +4,7 @@
 import { h, api, stateBlock, fmtDate, confirmDialog } from "./ui.js";
 import { responseCards } from "./feedback.js";
 import { navIcon, badge } from "./kit.js";
+import { card, barChart } from "./ds.js";
 
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const money = (cents) => new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format((Number(cents) || 0) / 100);
@@ -184,8 +185,17 @@ function columns(cells) {
   return h("div", { class: "adm-dash__cols" }, ...cells);
 }
 
+/** The weekly activity card: counts of the allow-listed activity events for the last eight weeks (GET /dashboard/trends). null when it cannot load. */
+function activityCard(trends) {
+  if (!trends || !trends.available || !Array.isArray(trends.weeks)) return null;
+  const data = trends.weeks.map((w) => ({ label: "Week of " + fmtDate(w.start + "T00:00:00Z"), value: w.total }));
+  const total = data.reduce((a, d) => a + d.value, 0);
+  return card({ title: "Weekly activity", sub: total ? `${total.toLocaleString("en-CA")} events in the last eight weeks: new clients, invitations, requests, feedback and invoices.` : "Nothing has happened in the last eight weeks yet.",
+    body: total ? barChart({ data, label: "Activity per week", unit: "events" }) : null });
+}
+
 export async function render() {
-  const [dash, feedback, services, assess] = await Promise.all([quiet("/dashboard"), quiet("/overview"), quiet("/services/attention"), quiet("/assessments/summary")]);
+  const [dash, feedback, services, assess, trends] = await Promise.all([quiet("/dashboard"), quiet("/overview"), quiet("/services/attention"), quiet("/assessments/summary"), quiet("/dashboard/trends")]);
   const d = dash && dash.available ? dash : null;
   const svc = services && services.available ? services : null;
   const recent = feedback && feedback.recent.length
@@ -201,6 +211,7 @@ export async function render() {
     ...[
       attentionSection(attentionItems({ dash: d, services: svc, assess, feedback })),
       kpiGrid({ dash: d, feedback, requestsCard }),
+      activityCard(trends),
       columns([requestsEl, requestsEl ? null : supportSection(d && d.support), invoiceSection(d && d.invoices)].filter(Boolean)),
       recent ? section("adm-recent", "Recent feedback", recent, feedback.recent.length ? ["/admin/feedback", "All feedback"] : null) : null,
     ].filter(Boolean),

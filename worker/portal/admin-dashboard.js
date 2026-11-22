@@ -123,12 +123,34 @@ async function activityPart(rdb) {
   return out;
 }
 
+/** Weekly activity for the last eight weeks (the Overview chart): the same allow-listed events as the activity list, counted per week (weeks start on Monday, UTC). Counts only; no names. */
+const weekStart = (ms) => { const x = new Date(ms); return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, "0")}-${String(x.getUTCDate()).padStart(2, "0")}`; };
+async function trendsPart(rdb, now) {
+  const WEEKS = 8, DAY = 86400000;
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const monday = d.getTime() - ((d.getUTCDay() + 6) % 7) * DAY;
+  const first = monday - (WEEKS - 1) * 7 * DAY;
+  const weeks = Array.from({ length: WEEKS }, (_, i) => ({ start: weekStart(first + i * 7 * DAY), total: 0 }));
+  const actions = Object.keys(ACTIVITY_LABELS);
+  const rows = (await rdb.prepare(
+    `SELECT a.created_at FROM activity_log a LEFT JOIN organizations o ON o.id = a.organization_id WHERE a.action IN (${actions.map(() => "?").join(",")}) AND a.created_at >= ? AND (o.id IS NULL OR o.status <> 'archived') LIMIT 20000`,
+  ).bind(...actions, new Date(first).toISOString()).all()).results;
+  for (const r of rows) {
+    const t = Date.parse(r.created_at);
+    if (!Number.isFinite(t) || t < first) continue;
+    const i = Math.min(WEEKS - 1, Math.floor((t - first) / (7 * DAY)));
+    weeks[i].total += 1;
+  }
+  return weeks;
+}
+
 export async function handleDashboardApi(request, env, principal, path, deps = {}) {
-  if (path !== "/dashboard" && path !== "/dashboard/requests") return null;
+  if (path !== "/dashboard" && path !== "/dashboard/requests" && path !== "/dashboard/trends") return null;
   if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
   if (!env.PORTAL_DB) return json({ available: false });
   const now = deps.now || new Date();
   const rdb = readOnlyDb(env.PORTAL_DB);
+  if (path === "/dashboard/trends") return json({ available: true, generatedAt: now.toISOString(), weeks: await part(() => trendsPart(rdb, now)) });
   if (path === "/dashboard/requests") return json({ available: true, generatedAt: now.toISOString(), requests: await part(() => requestsPart(env, rdb)) });
   return json({
     available: true,

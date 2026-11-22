@@ -9,7 +9,7 @@ export const NAV = [
   { id: "websites", label: "Websites", path: "/admin/websites", icon: "websites" },
   { id: "analytics", label: "Analytics", path: "/admin/analytics", icon: "analytics" },
   { id: "operations", label: "Operations", path: "/admin/operations", icon: "operations", children: [
-    ["Overview", "/admin/operations"], ["Leads", "/admin/leads"], ["Enquiries", "/admin/assessments"], ["Brand Discovery", "/admin/discovery"], ["Requests", "/admin/requests"], ["Support", "/admin/support"], ["Feedback", "/admin/feedback"],
+    ["Overview", "/admin/operations"], ["Leads", "/admin/leads"], ["Enquiries", "/admin/assessments"], ["Brand Discovery", "/admin/discovery"], ["Requests", "/admin/requests"], ["Support", "/admin/support"], ["Invoices", "/admin/operations/invoices"], ["Feedback", "/admin/feedback"],
   ] },
   { id: "settings", label: "Settings", path: "/admin/settings", icon: "settings", children: [
     ["Overview", "/admin/settings"], ["Approved emails", "/admin/approved-emails"], ["Additional services", "/admin/settings/additional-services"], ["Service pricing", "/admin/settings/service-pricing"],
