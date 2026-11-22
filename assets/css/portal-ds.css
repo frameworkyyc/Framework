@@ -18,7 +18,11 @@ body:not(.auth) { background: var(--ds-ground); color: #1A1A1A; }
 body:not(.auth) :focus-visible { border-radius: var(--ds-r-sm); }
 
 /* ---------- top bar and navigation ---------- */
-body:not(.auth) .bar { background: rgba(237, 237, 235, .92); backdrop-filter: saturate(1.2) blur(10px); border-bottom: 0; }
+/* the sticky header: frosted glass (a light, semi-transparent ground with a modest blur and a hairline) over a soft fade, so content dissolves as it passes underneath instead of being clipped */
+body:not(.auth) .bar { background: rgba(237, 237, 235, .78); -webkit-backdrop-filter: saturate(1.15) blur(12px); backdrop-filter: saturate(1.15) blur(12px); border-bottom: 1px solid rgba(10, 10, 10, .07); }
+body:not(.auth) .bar::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 28px; pointer-events: none; background: linear-gradient(to bottom, rgba(237, 237, 235, .85), rgba(237, 237, 235, 0)); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); -webkit-mask-image: linear-gradient(to bottom, #000, transparent); mask-image: linear-gradient(to bottom, #000, transparent); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { body:not(.auth) .bar { background: rgba(237, 237, 235, .97); } }
+@media (prefers-reduced-transparency: reduce) { body:not(.auth) .bar { background: #EDEDEB; -webkit-backdrop-filter: none; backdrop-filter: none; } body:not(.auth) .bar::after { -webkit-backdrop-filter: none; backdrop-filter: none; background: linear-gradient(to bottom, #EDEDEB, rgba(237, 237, 235, 0)); } }
 body:not(.auth) .bar__in { min-height: 68px; }
 body:not(.auth) .primary { margin-left: 8px; border-top: 0; }
 body:not(.auth) .bar { padding-bottom: 8px; }
