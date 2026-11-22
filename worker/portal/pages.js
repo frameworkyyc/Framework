@@ -84,12 +84,12 @@ async function shell(ctx, a, { title, active, body, status = 200, vm, script = n
   return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}`, bleed, fx });
 }
 
-export function loginPage({ continueHref, ended = false, demoHref = null, fx = false }) {
-  if (fx) return signInPage({ continueHref, ended }); // the editorial sign-in (PORTAL_TRANSITIONS): same Continue and notices, minimal copy (no demo link)
+export function loginPage({ continueHref, ended = false, demoHref = null, fx = false, share = null }) {
+  if (fx) return signInPage({ continueHref, ended, share }); // the editorial sign-in (PORTAL_TRANSITIONS): same Continue and notices, minimal copy (no demo link)
   const notice = ended ? `<p class="muted">Your previous session has ended. Please sign in again.</p>` : "";
   const demo = demoHref ? `<p class="auth__alt">Not signed in yet? <a class="text-link" href="${e(demoHref)}">See a demonstration of the portal</a>. It uses sample data for a fictional client.</p>` : "";
   return htmlPage({
-    title: "Sign in",
+    title: "Sign in", share,
     bodyHtml: `${notice}<p class="lead">Use the email address your Framework invitation was sent to. We’ll email you a one-time code.</p><p><a class="btn btn--primary" href="${e(continueHref)}">Continue</a></p><p class="auth__alt">Access is by invitation. Questions? <a class="text-link" href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a></p>${demo}`,
   });
 }
