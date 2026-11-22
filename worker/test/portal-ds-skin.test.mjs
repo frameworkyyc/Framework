@@ -12,7 +12,7 @@ test("portal-ds.css is linked after portal.css and any page stylesheet, and shar
   const css = read("assets/css/portal-ds.css"), admin = read("admin/assets/ds.css");
   for (const t of ["--ds-ground: #EDEDEB", "--ds-card: #FFFFFF", "--ds-r-lg: 18px"]) { assert.ok(css.includes(t), t); assert.ok(admin.includes(t), t + " in Admin"); }
   assert.match(css, /prefers-reduced-motion: reduce/);
-  assert.ok(!/body\s*\{/.test(css.replace(/body:not\(\.auth\)[^{]*\{/g, "")), "every rule is scoped away from the sign-in pages");
+  assert.ok(!/body\s*\{/.test(css.replace(/body:not\(\.auth\)[^{]*\{/g, "")), "every rule is scoped away from the sign-in pages"); assert.ok(!/body:not\(\.auth\)(?!:not\(\.si-body\))/.test(css), "and from the editorial sign-in (body.si-body), whose own black design must stay");
 });
 
 test("the skin is appearance only: no script, no inline style, no markup changes needed", () => {
