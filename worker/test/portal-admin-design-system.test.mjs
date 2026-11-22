@@ -25,7 +25,7 @@ test("every documented kit component exists and the status and spacing tokens ar
   for (const token of ["--ok:", "--warn:", "--bad:", "--pend:", "--adm-space-1:", "--adm-space-6:"]) assert.ok(layer.includes(token), token);
 });
 
-test("Admin identity: soft cards from tokens (radius, depth, motion), a reduced-motion rule, no third-party assets, and the Admin-only scope is stated", () => {
+test("Admin identity: soft cards from tokens (radius, depth, motion), a reduced-motion rule, no third-party assets, and the portal scope is stated", () => {
   const ds = read("admin/assets/ds.css"), doc = read("worker/admin/DESIGN-SYSTEM.md"), rules = read("CLAUDE.md");
   for (const token of ["--ds-ground:", "--ds-card:", "--ds-r:", "--ds-r-lg:", "--ds-pill:", "--ds-shadow-1:", "--ds-shadow-2:", "--ds-ease:", "--ds-dur:", "--ds-ok:", "--ds-warn:", "--ds-bad:", "--ds-info:"]) assert.ok(ds.includes(token), token);
   assert.match(ds, /@media \(prefers-reduced-motion: reduce\)[^}]*\{[^}]*animation: none !important; transition: none !important/s, "every animation and transition is switched off under reduced motion");
@@ -34,7 +34,7 @@ test("Admin identity: soft cards from tokens (radius, depth, motion), a reduced-
   assert.deepEqual(shadows, [], "depth comes from the shadow tokens");
   assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML/.test(strip(read("admin/assets/ds.js"))) && !/setAttribute\(["']style|\.style\./.test(strip(read("admin/assets/ds.js"))), "the components set text and attributes only");
   for (const phrase of ["## Admin identity", "soft grey ground", "Gentle corners", "always with words", "Admin only", "prefers-reduced-motion", "Switzer"]) assert.ok(doc.includes(phrase), phrase);
-  assert.match(rules, /premium, card-based design system/); assert.match(rules, /applies to Admin only/);
+  assert.match(rules, /premium, card-based design system/); assert.match(rules, /client portal wears the same visual system through `assets\/css\/portal-ds\.css`/, "the portal adopts the Admin system through its own stylesheet; the public site and sign-in keep theirs");
 });
 
 test("six navigation sections, every enabled module has a section and an icon, and no address is dropped", async () => {
