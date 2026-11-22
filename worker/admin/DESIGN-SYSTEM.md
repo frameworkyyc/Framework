@@ -116,3 +116,8 @@ Patterns worth reusing: **rows** (`.adm-reqlist` with `.adm-reqrow`: client, tit
 
 ## Analytics (`/admin/analytics`)
 The portfolio across every client website: KPI cards (connected counts, last-read totals), a page-views bar chart, a Connections card (what the server is set up to read), a filterable data list and a troubleshooting card. It is built from `GET /api/admin/analytics/summary`, which is read-only and returns only saved settings and the last cached 30-day figures with their read time; nothing is fetched live and nothing is estimated ("Not read yet" otherwise). Each row opens the website's Analytics tab (`/admin/websites/:id/analytics`), the existing multi-account settings panel (site tag, property, the client's own Cloudflare account and write-only token, Test). `/admin/analytics/:id` redirects there.
+
+## Operations Invoices, Settings and the Overview chart
+- `/admin/operations/invoices`: every client's invoices (`GET /api/admin/invoices`, read-only; no storage key, note or description). Rows open the client's Billing tab, where invoices are still created and edited.
+- `/admin/settings`: grouped cards (people and access, services and pricing, integrations status as booleans, and a "Not tracked yet" card listing what Framework does not store).
+- Overview "Weekly activity" card: `GET /api/admin/dashboard/trends` (eight Monday-start weeks of the allow-listed activity events, counts only).

@@ -328,3 +328,13 @@ progress.ds-meter::-webkit-progress-bar { background: var(--ds-line); } progress
 .ds-help__i { min-width: 0; }
 .ds-page > .ds-grid + .ds-grid, .ds-page > .ds-grid + .ds-card, .ds-page > .ds-card + .ds-card { margin-top: 14px; }
 @media (max-width: 899px) { .ds-dl--analytics .ds-dl__c { padding: 2px 0; } .ds-help { grid-template-columns: minmax(0, 1fr); } }
+.ds-main .adm-dash .ds-card { margin: 0 0 14px; }
+.ds-dl--invoices { --ds-cols: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 899px) { .ds-dl--invoices .ds-dl__c { padding: 2px 0; } }
+
+/* ---------- Settings ---------- */
+.ds-setrows { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ds-setrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: var(--ds-r-sm); color: var(--ds-ink); text-decoration: none; transition: background var(--ds-dur) var(--ds-ease); }
+.ds-setrow__t { display: grid; gap: 2px; min-width: 0; font-size: 14px; } .ds-setrow .rk-ico { flex: none; width: 18px; height: 18px; }
+@media (hover: hover) { .ds-setrow:hover { background: var(--ds-soft); } }
+.ds-setrow:focus-visible { outline: 2px solid var(--ds-ink); outline-offset: -2px; }

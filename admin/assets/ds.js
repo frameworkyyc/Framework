@@ -13,7 +13,7 @@ const MORE_ICONS = {
   bell: "M6 17V11a6 6 0 0112 0v6l2 2H4zM10 21h4", link: "M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3A4 4 0 0011 18.7l1-1", server: "M4 5h16v6H4zM4 13h16v6H4zM8 8h.01M8 16h.01",
   billing: "M3 6h18v12H3zM3 10h18M7 15h3", calendar: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4", arrowup: "M12 19V5M6 11l6-6 6 6", arrowdown: "M12 5v14M6 13l6 6 6-6", globe: "M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18",
   shield: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z", key: "M14 10a4 4 0 11-3 6.6L4 21v-3H1v-3l7-7A4 4 0 0114 10zM15 9h.01", plug: "M9 3v6M15 3v6M6 9h12v3a6 6 0 01-12 0zM12 18v3", user: "M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0",
-  menu: "M4 7h16M4 12h16M4 17h16", doc: "M6 3h9l4 4v14H6zM14 3v5h5", clock: "M12 3a9 9 0 100 18 9 9 0 000-18zM12 7v5l3 2", warn: "M12 4l10 17H2zM12 10v5M12 18h.01",
+  arrowright: "M5 12h14M13 6l6 6-6 6", menu: "M4 7h16M4 12h16M4 17h16", doc: "M6 3h9l4 4v14H6zM14 3v5h5", clock: "M12 3a9 9 0 100 18 9 9 0 000-18zM12 7v5l3 2", warn: "M12 4l10 17H2zM12 10v5M12 18h.01",
 };
 export function icon(name, cls = "") {
   if (MORE_ICONS[name]) {
