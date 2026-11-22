@@ -176,10 +176,10 @@ test("Admin UI: one Edit button per environment card, the screenshot lives in th
   assert.match(css, /\.ds-eshot \{[^}]*aspect-ratio: 16 \/ 10/); assert.match(css, /\.ds-card--ink \.ds-eshot/);
 });
 
-test("UI refinements: the two website cards are one shape (equal columns, 16:9, contain on a neutral ground, stacked on a phone); the Admin Review panels are padded and sectioned", () => {
+test("UI refinements: the two website cards are one shape (equal columns, 16:9, full-bleed cover, stacked on a phone); the Admin Review panels are padded and sectioned", () => {
   const wd = read("assets/css/portal-website-workspace.css"), ds = read("assets/css/portal-ds.css"), adm = read("admin/assets/ds.css"), js = read("admin/assets/website-workspace.js");
   assert.match(wd, /\.wd-live, \.wd-prev \{ grid-column: span 6;/, "identical width");
-  assert.match(wd, /\.wd-shot \{[^}]*aspect-ratio: 16 \/ 9;[^}]*background: #F1F1EF/); assert.match(wd, /\.wd-shot img \{[^}]*object-fit: contain/); assert.ok(!/\.wd-shot img \{[^}]*object-fit: cover/.test(wd), "never cropped");
+  assert.match(wd, /\.wd-shot \{[^}]*aspect-ratio: 16 \/ 9;[^}]*background: #F1F1EF/); assert.match(wd, /\.wd-shot img \{[^}]*object-fit: cover/); assert.match(wd, /object-position: center top/, "full-bleed, no side bars");
   assert.ok(!/\.wd-live \.wd-shot \{/.test(wd), "no card-specific picture size");
   const phone = wd.slice(wd.indexOf("@media (max-width: 640px)"));
   assert.match(phone, /\.wd-live, \.wd-prev \{ grid-column: span 12;/, "stacked on a phone");
