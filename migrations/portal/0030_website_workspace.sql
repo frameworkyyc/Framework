@@ -1,5 +1,5 @@
--- 0030 (website review workspace): PROPOSED. Not applied anywhere. Needs 0011 (websites) and 0001 (activity_log).
--- Staging: only after review and approval, after a Time Travel bookmark. Production: only through the manual "Portal Production D1 migration" workflow, after its own approval.
+-- 0030 (website review workspace): APPLIED TO STAGING on 2026-11-22 (approved; Time Travel bookmark 0000020f-00000000-0000512b-ac213a6cfe4d059019a682c86d163db1 taken first; tables verified). Production: NOT applied.
+-- Needs 0011 (websites) and 0001 (activity_log). Production: only through the manual "Portal Production D1 migration" workflow, after its own approval.
 --
 -- Additive only: one nullable column and two new tables. No UPDATE, no DELETE, no table rebuild; no existing row changes (every website keeps NULL in staging_url).
 --

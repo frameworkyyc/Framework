@@ -1,5 +1,5 @@
-/* The Website review workspace (migration 0030, proposed): environments, updates that need approval, client tasks, request changes; the Admin API behind it; and what happens on a database without 0030.
-   Through the real router and the real Admin API in one world. Migration 0030 is applied by hand to the test database (it is still proposed). */
+/* The Website review workspace (migration 0030, applied to Staging): environments, updates that need approval, client tasks, request changes; the Admin API behind it; and what happens on a database without 0030.
+   Through the real router and the real Admin API in one world. Migration 0030 is applied to the test database like every applied migration; the "without 0030" case skips it. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, createSign } from "node:crypto";
@@ -23,7 +23,7 @@ const noInline = (h) => !/ style=|<style|<script|javascript:|\son[a-z]+=["']/i.t
 
 async function setup({ m30 = true, flag = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld({ proposed: m30 ? ["0030_website_workspace.sql"] : [] });
+  const w = await makeWorld({ skip: m30 ? [] : ["0030_website_workspace.sql"] }); // 0030 is applied to Staging and lives with the applied migrations; "without 0030" is how Production still is
   Object.assign(w.env, { PORTAL_FILES: fakeR2(), PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   if (flag) w.env.PORTAL_WEBSITE = "1";
   const A = await w.org("alpha", "Alpha Co"), B = await w.org("beta", "Beta Co");
@@ -144,6 +144,10 @@ test("tasks: Needed from you: published ones only, a due date, a written answer 
   assert.equal(rows(s.w, "SELECT status FROM website_tasks WHERE id = ?", t)[0].status, "done");
   assert.equal((await s.call(s.ws(s.A, id, `/tasks/${t}/update`), { method: "POST", json: { status: "submitted" } })).status, 422, "Admin cannot fake the client's answer");
   assert.ok(rv);
+  // reopening a task clears the answer on the task but the audit log keeps what the client wrote
+  assert.equal((await s.call(s.ws(s.A, id, `/tasks/${t}/update`), { method: "POST", json: { status: "open" } })).status, 200);
+  assert.equal(rows(s.w, "SELECT response_text FROM website_tasks WHERE id = ?", t)[0].response_text, null, "the task asks the client again");
+  assert.match(rows(s.w, "SELECT detail FROM activity_log WHERE action = 'website.task.responded' AND entity_id = ?", t)[0].detail, /we design and build websites/, "but what they wrote earlier stays in the audit log");
 });
 
 test("security: CSRF is required, another organization and master access can never decide or answer, nothing is inline, and the CSP is still script-free", async () => {
@@ -234,13 +238,15 @@ test("data layer: a decision is a single compare-and-set (two at once: exactly o
   assert.deepEqual(await wk.workspaceAttention(s.w.db, s.B.id), { updates: 0, tasks: 0 });
 });
 
-test("the migration is additive and proposed: one column and two tables, nothing dropped or rewritten, not in the applied folder", async () => {
+test("the migration is additive and applied to Staging only: one column and two tables, nothing dropped or rewritten, in the applied folder, recorded in its own header", async () => {
   const { readFileSync, existsSync } = await import("node:fs");
-  const sql = readFileSync(new URL("../../migrations/portal-proposed/0030_website_workspace.sql", import.meta.url), "utf8").replace(/--.*$/gm, "");
+  const file = readFileSync(new URL("../../migrations/portal/0030_website_workspace.sql", import.meta.url), "utf8");
+  const sql = file.replace(/--.*$/gm, "");
   assert.ok(!/\bDROP\b|\bDELETE FROM\b|\bUPDATE\s+\w+\s+SET\b|\bRENAME\b/i.test(sql), "nothing is dropped, deleted or rewritten");
   assert.deepEqual([...sql.matchAll(/ALTER TABLE (\w+) ADD COLUMN (\w+)/g)].map((m) => `${m[1]}.${m[2]}`), ["websites.staging_url"]);
   assert.deepEqual([...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).sort(), ["website_tasks", "website_updates"]);
-  assert.ok(!existsSync(new URL("../../migrations/portal/0030_website_workspace.sql", import.meta.url)), "not applied: it waits in migrations/portal-proposed/");
+  assert.ok(!existsSync(new URL("../../migrations/portal-proposed/0030_website_workspace.sql", import.meta.url)), "it left the proposed folder when it was applied");
+  assert.match(file, /APPLIED TO STAGING on 2026-11-22/); assert.match(file, /Production: NOT applied/);
   const s = await setup();
   const id = await s.site(s.A);
   assert.throws(() => s.w.db.raw.prepare("INSERT INTO website_updates (id, organization_id, website_id, title, kind, status, decided_at, decision_note) VALUES (?, ?, ?, 'x', 'approval', 'rejected', ?, NULL)").run(crypto.randomUUID(), s.A.id, id, "2026-01-01T00:00:00Z"), /constraint/i, "the database itself refuses a rejection without a reason");
