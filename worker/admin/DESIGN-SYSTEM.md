@@ -1,17 +1,19 @@
 # Framework Admin design system
 
-One system for every Admin page, in two parts that are both required: **Framework's visual identity** and **the usability standards**. The benchmark for the information design is the Brand Discovery review (`admin/assets/discovery.js`): a page you can read in seconds, with the detail one click away, drawn in Framework's own language. **Every new or changed Admin screen follows this document**, uses the shared kit before inventing markup, and keeps the guard tests green (`worker/test/portal-admin-design-system.test.mjs`).
+One system for every Admin page. It applies to **Framework Admin only**; the public website, the client portal and the Brand Book keep their own, sharper identity. The Admin is a business tool used all day, so it is allowed to be softer than the marketing site while staying recognisably Framework: monochrome, Switzer and General Sans, restrained, precise.
 
-## Framework identity (required, tested)
+## Admin identity (required, tested)
 
-The Admin looks like Framework, not like a generic SaaS dashboard.
+A premium, modern administration platform built from cards.
 
-- **Sharp corners only.** No `border-radius` (a status dot may be a circle; nothing else), no rounded cards, no pill-shaped buttons, chips or filters, no shadows, no gradients, no tinted panels.
-- **Lines, not boxes.** One black rule opens a section; hairlines separate rows. A boxed tile (a client dashboard tile, a stat cell) uses a hairline square outline.
-- **Type.** Display face (`--font-display`, Switzer) for titles and for the numbers that matter; body face (`--font-body`, General Sans) for everything else; small labels are 12px, uppercase, `letter-spacing: .14em`, in `--slate`.
-- **Colour.** Black on white, `--slate` for secondary text, `--hairline` and `--mist` for structure. A status colour appears only as a small square marker, a left edge or a chip with its text, never as a background wash on a whole region.
-- **Pictures are the content.** Photos, swatches, lettering samples and sketches sit in square frames with a square outline; likes get an ink outline and a tick, "not for me" is quiet, struck through, with a cross.
-- **Do not copy old patterns that break these rules** (some older components were rounded; they have been corrected).
+- **Ground and cards.** A soft grey ground (`--ds-ground`) with individual white cards (`--ds-card`); a black card (`ink`) and a darker grey card (`tone`) are used sparingly for contrast and emphasis. No tinted washes over whole regions.
+- **Shape and depth.** Gentle corners (`--ds-r-sm` 8px, `--ds-r` 12px, `--ds-r-lg` 18px; pills `--ds-pill` for status, tabs, filters and buttons), a hairline border, and soft depth (`--ds-shadow-1` for resting cards, `--ds-shadow-2` for what floats: drawers, dialogs, search, toasts). Depth and radius come only from the tokens.
+- **Type.** Display face (`--font-display`, Switzer) for titles and the numbers that matter; body face (`--font-body`, General Sans) for everything else. Hierarchy comes from size and weight, not decoration.
+- **Colour.** Black, white and greys. A status colour (`--ds-ok`, `--ds-warn`, `--ds-bad`, `--ds-info`) appears only as a small dot, a pill or a delta arrow, and **always with words** (never colour alone).
+- **Bento layout.** A 12-column grid (`grid`, `span`): cards of different sizes and tones, one clear lead card per page, compact figures (`kpi`), no equal-height tile farms.
+- **Motion.** Transitions of 150 to 250 ms (`--ds-dur`, `--ds-ease`) on hover, focus, open and close; one gentle rise when content opens. Everything is switched off under `prefers-reduced-motion`. No animation that delays the person.
+- **No decoration for its own sake**: no illustrations, gradients (other than the loading shimmer), glows or stock imagery. Pictures are content (screenshots, swatches).
+- **Responsive.** Same content on every size: the grid collapses to one column, a data list becomes stacked records, tabs scroll sideways, the sidebar becomes a menu. 44px touch targets, no sideways page scroll at 320px.
 
 ## Usability standards (required)
 
@@ -23,40 +25,48 @@ The Admin looks like Framework, not like a generic SaaS dashboard.
 6. **Consistency.** The same kind of information is always shown the same way (see the components below), so a new feature is understood without explanation.
 7. **Same on a phone.** Single column, 44px touch targets, no sideways scroll at 320px.
 
-## Tokens (`admin/assets/admin.css`, `:root`)
+## Tokens (`admin/assets/ds.css`, `:root`)
 
 | Token | Use |
 | --- | --- |
-| `--ink`, `--paper`, `--slate`, `--hairline`, `--mist` | text, surface, secondary text, borders, quiet fill. Never use `--stone` for text (low contrast). |
-| `--ok`/`--ok-bg`, `--warn`/`--warn-bg`, `--bad`/`--bad-bg`, `--pend`/`--pend-bg` | the four statuses: done or healthy, needs a look, broken or overdue, informational or in progress |
-| `--adm-space-1…6` 8, 12, 16, 24, 32, 48px | the only spacing steps |
-| (no radius token) | there is no corner radius in Framework; do not add one |
+| `--ds-ground`, `--ds-card`, `--ds-soft`, `--ds-line`, `--ds-line-strong` | page ground, card surface, quiet fill, hairlines |
+| `--ds-ink`, `--ds-text`, `--ds-muted` | strongest text and black cards, body text, secondary text (never lighter than `--ds-muted`) |
+| `--ds-r-sm`, `--ds-r`, `--ds-r-lg`, `--ds-pill` | corner radii |
+| `--ds-shadow-1`, `--ds-shadow-2` | resting depth, floating depth |
+| `--ds-ok`, `--ds-warn`, `--ds-bad`, `--ds-info` | the four statuses (dot, pill, delta) |
+| `--ds-ease`, `--ds-dur`, `--ds-gap` | motion curve, motion time, grid gap |
+| `--ok`/`--warn`/`--bad`/`--pend` and `--adm-space-1…6` (`admin.css`) | the older pages' status colours and spacing steps; still defined |
 
-Page title: `.adm-title` (the large display title, unchanged). Section title: `.adm-section-title h2` or `.rk-card__title`. Labels: 12px uppercase, `letter-spacing: .14em`.
+Add a token here before using a new value.
 
-## Components (`admin/assets/kit.js`, styles in `admin.css`)
+## Components (`admin/assets/ds.js`; the older `kit.js` pieces remain for the review pages)
 
 | Component | Use it for |
 | --- | --- |
-| `statCard({ label, value, hint, meter, tone })` | one headline figure in the display face, with an optional square meter and a square status marker; lay out in a ruled strip with `.rk-stats` |
-| `badge(text, tone)` | a status or count; tones `ok`, `warn`, `bad`, `pending` or none |
-| `card(title, body, { id, aside, wide })` | a titled group: a black rule, a heading, the content (not a box) |
-| `fold({ title, number, meta, badges, open, body })`, `foldControls(container)` | collapsible sections, with Expand all and Collapse all |
-| `barList(rows, { max })` | ranked comparison or a spread (native square `<progress>`, no inline styles) |
-| `choiceGroups`, `choice`, `visual` | picture tiles (photo, colour swatches, lettering sample, sketch) with likes and dislikes told apart |
-| `attentionList(rows, { limit })` | the few things worth a person's time, rest behind "Show more" |
-| `emptyState({ title, body, action })` | "nothing here" for a whole list, with the one action that fixes it |
-| `linkCard({ href, title, body, icon })` | a hub entry: a ruled row with an icon, a title, a line and an arrow (Settings) |
-| `searchBox({ label, onInput })` | a boxed "find" field that filters rows already on the page |
-| `navIcon(name)` | 20px line icons (module ids, `check`, `chevron`) |
+| `pageHead({ title, sub, actions, kicker, back })` | the top of a page |
+| `grid(...)`, `span(node, cols)` | the 12-column bento grid (spans 3 to 12; one column on a phone) |
+| `card({ title, sub, actions, body, foot, tone })` | a titled card; `tone`: white (default), `ink`, `tone` |
+| `expander({ title, meta, body })` | a card that opens and closes (native `<details>`), for secondary content |
+| `kpi({ label, value, unit, note, delta, tone, spark, href })`, `delta(pct)`, `sparkline(values)` | one compact figure, with an optional change and trend line |
+| `pill(text, tone)`, `dot(tone)` | a status: dot plus words |
+| `fact(label, value, { edit })`, `facts(rows)` | label and value rows inside a card, with an optional edit button |
+| `tabs({ items, current })`, `segmented({ options, value, onChange })`, `crumbs(items)` | section tabs, filters, breadcrumbs |
+| `button(label, { tone, icon, href, onClick })`, `switchInput`, `field` | actions and form controls |
+| `drawer({ title, body })` | a panel that slides in for editing one thing in context (native `<dialog>`: focus is kept, Escape closes) |
+| `toast(message, tone)` | a short, announced confirmation |
+| `skeleton()`, `pageSkeleton()`, `empty({ title, body, action })` | loading and empty states |
+| `barChart({ data, label, unit })` | an interactive bar chart (hover or arrow keys read a bar; "View as a table"); real data only |
+| `dataList({ columns, rows, cls })` | columns on a wide screen, stacked records on a phone |
+| `icon(name)` | line icons (the kit's plus websites, analytics, search, edit, close and more) |
+| `openSearch()` (`search.js`) | global search over pages, clients and websites (`/` or Ctrl/Cmd+K) |
 
-Older shared pieces remain the way to do their job: `h`, `api`, `stateBlock`, `errorState`, `confirmDialog`, `fmtDate`, `fmtDateTime` (`ui.js`), the client tiles and section map (`client-dashboard.js`), `.adm-table`, `.adm-tabs`, `.adm-filter`, `.adm-banner`, `.adm-notice`.
+The older kit (`statCard`, `badge`, `card`, `fold`, `foldControls`, `barList`, `choiceGroups`, `choice`, `visual`, `attentionList`, `emptyState`, `linkCard`, `navIcon`, `searchBox` in `kit.js`) is still used by the review pages and is re-skinned by `ds.css`, so every page shares one look. Prefer the new components for new work.
 
-## Navigation
+## Navigation (`admin/assets/nav.js`)
 
-The sidebar is grouped in `admin.js` (`NAV_GROUPS`: Inbox, Assessments, People, Setup) and every module has an icon in `kit.js`. A new module is added to `modules.js`, given an icon and placed in a group.
+Six sections in the sidebar: **Overview, Clients, Websites, Analytics, Operations, Settings**. Operations and Settings group the older pages; each keeps its own address, and the section's pages share one row of tabs above the content (Operations: Overview, Leads, Enquiries, Brand Discovery, Requests, Support, Feedback; Settings: Overview, Approved emails, Additional services, Service pricing). A section appears only when its module is registered in `modules.js`. The top bar shows breadcrumbs, search and what needs attention. A new page is added to `modules.js` and to the right section in `nav.js`; every existing address keeps working.
 
-## Page patterns
+## Page patterns (older pages, still in use)
 
 - **Dashboard** (Overview, a client, an assessment): stat cards, then "needs attention", then sections, then Manage.
 - **List** (Clients, Support, Feedback): a toolbar (search, filters), one rounded list, a status chip per row, an empty state.
@@ -91,7 +101,7 @@ Patterns worth reusing: **rows** (`.adm-reqlist` with `.adm-reqrow`: client, tit
 
 ## Rules that are tested
 
-- No `border-radius`, `box-shadow` or gradient in the kit layer of `admin.css`, and no radius token.
+- Radius, shadow and motion come only from the `--ds-*` tokens; the design-system layer has a reduced-motion rule and no third-party scripts, fonts or images.
 - No `innerHTML`, `insertAdjacentHTML` or inline `style` in the kit or the review pages; server text is always set as text.
 - Status colours come from the four status tokens, paired with an icon or text.
 - Secure links and admin controls never appear above the content they manage.
@@ -99,7 +109,7 @@ Patterns worth reusing: **rows** (`.adm-reqlist` with `.adm-reqrow`: client, tit
 
 ## Adding a page
 
-1. Start from the pattern above and the kit; write no new card, badge or empty-state markup.
+1. Start from the components above (`ds.js`); write no new card, pill or empty-state markup.
 2. Use tokens; add a new token here before using a new value.
 3. Check 1440, 820, 390 and 320px: no sideways scroll, readable, touch targets 44px.
 4. Add the page to the design-system test if it adds a new pattern, and describe it here.

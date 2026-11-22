@@ -1,9 +1,11 @@
-/* Framework Admin — shell and router.
-   Builds the sidebar from modules.js, routes by URL (History API), and hands each module a small context. */
+/* Framework Admin: shell and router. Builds the sidebar, top bar (breadcrumbs, search, attention) and the section tabs from the six navigation sections below, routes by URL (History API),
+   and hands each module a small context. The older pages keep their own addresses; this file only decides which section each one belongs to. */
 
 import { h, api, errorState } from "./ui.js";
 import { MODULES } from "./modules.js";
-import { navIcon } from "./kit.js";
+import { icon, tabs, crumbs, pageSkeleton } from "./ds.js";
+import { openSearch } from "./search.js";
+import { NAV, sectionOf, clean } from "./nav.js";
 
 const MARK = `<svg viewBox="0 0 1092 1092" aria-hidden="true" focusable="false"><rect width="1092" height="1092" fill="#0A0A0A"/><path fill="#FFFFFF" d="M302 245H815V347H411V741L302 851Z"/><path fill="#FFFFFF" d="M435 517L512 440H815V545H534V842H435Z"/></svg>`;
 
@@ -12,10 +14,12 @@ let main;
 let side;
 let toggle;
 let notice;
-let navLinks = [];
+let topCrumbs;
+let attn;
 let routeToken = 0;
+let navLinks = [];
 
-/* ---------- Shell ---------- */
+/* ---------- Navigation: six sections; Operations and Settings group the older pages (their addresses do not change) ---------- */
 
 function brand() {
   const a = h("a", { class: "adm-brand", href: "/admin", "data-link": "", "aria-label": "Framework Admin home" });
@@ -24,43 +28,35 @@ function brand() {
   return a;
 }
 
-// How the sidebar is grouped (worker/admin/DESIGN-SYSTEM.md). A module not listed here still appears, after the groups.
-const NAV_GROUPS = [[null, ["overview", "leads"]], ["Inbox", ["feedback", "support", "requests"]], ["Assessments", ["assessments", "discovery"]], ["People", ["clients", "approved-emails"]], ["Setup", ["additional-services", "service-pricing", "settings"]]];
-
-function navItem(m) {
-  const a = h("a", { class: "adm-nav__link", href: m.path, "data-link": "", "data-module": m.id }, navIcon(m.id), h("span", { text: m.label }));
+function navItem(n) {
+  const a = h("a", { class: "ds-nav__link", href: n.path, "data-link": "", "data-section": n.id }, icon(n.icon), h("span", { text: n.label }));
   navLinks.push(a);
   return h("li", null, a);
 }
 
 function buildShell() {
-  const live = MODULES.filter((m) => m.enabled); // a module that is not built yet (enabled: false) is not shown at all
-
-  toggle = h("button", { class: "menu-toggle", type: "button", "aria-expanded": "false", "aria-controls": "adm-side" }, "Menu");
-  const bar = h("header", { class: "adm-bar" }, brand(), toggle);
+  toggle = h("button", { class: "menu-toggle ds-iconbtn", type: "button", "aria-expanded": "false", "aria-controls": "adm-side", "aria-label": "Menu" }, icon("menu"));
+  const searchBtn = (cls) => h("button", { class: "ds-searchbtn " + cls, type: "button", onclick: () => openSearch(), "aria-label": "Search clients, websites and pages" }, icon("search"), h("span", { text: "Search" }), h("kbd", { text: "/" }));
+  const bar = h("header", { class: "ds-mobilebar" }, brand(), h("button", { class: "ds-iconbtn", type: "button", "aria-label": "Search", onclick: () => openSearch() }, icon("search")), toggle);
 
   const userLine = h("p", { id: "adm-user" }, "");
-  const rest = live.filter((m) => !NAV_GROUPS.some(([, ids]) => ids.includes(m.id))); // modules in no group; no empty group (and no extra divider) when there are none
-  side = h(
-    "aside",
-    { class: "adm-side", id: "adm-side" },
-    h("div", { class: "adm-side__head" }, brand(), h("span", { class: "adm-side__label" }, "Admin")),
-    h(
-      "nav",
-      { class: "adm-nav", "aria-label": "Admin" },
-      NAV_GROUPS.map(([title, ids]) => { const items = live.filter((m) => ids.includes(m.id)); return items.length ? h("div", { class: "adm-nav__group" }, title ? h("p", { class: "adm-nav__title", text: title }) : null, h("ul", null, items.map(navItem))) : null; }),
-      rest.length ? h("div", { class: "adm-nav__group" }, h("ul", null, rest.map(navItem))) : null,
-    ),
-    h("div", { class: "adm-side__foot" }, userLine, h("a", { href: "/", target: "_blank", rel: "noopener" }, "View website"), h("a", { href: "/cdn-cgi/access/logout" }, "Sign out")),
-  );
+  side = h("aside", { class: "adm-side", id: "adm-side" },
+    h("div", { class: "adm-side__head ds-side__head" }, brand()),
+    h("nav", { class: "adm-nav", "aria-label": "Admin" }, h("ul", { class: "ds-nav" }, NAV.filter((n) => MODULES.some((m) => m.enabled && m.id === n.id)).map(navItem))),
+    h("div", { class: "ds-side__foot" }, userLine, h("a", { href: "/", target: "_blank", rel: "noopener" }, "View website"), h("a", { href: "/cdn-cgi/access/logout" }, "Sign out")));
 
+  topCrumbs = h("div", { class: "ds-top__crumbs" });
+  attn = h("a", { class: "ds-attn", href: "/admin/support", "data-link": "", hidden: true });
   notice = h("p", { class: "adm-notice", role: "status", hidden: true });
   main = h("main", { class: "adm-main", id: "adm-main", tabindex: "-1" }, notice);
-  shell.replaceChildren(bar, side, main);
+  const top = h("header", { class: "ds-top" }, topCrumbs, h("div", { class: "ds-top__search" }, searchBtn("")), attn);
+  shell.replaceChildren(bar, side, h("div", { class: "ds-main" }, top, main));
 
   toggle.addEventListener("click", () => setNav(toggle.getAttribute("aria-expanded") !== "true"));
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && side.classList.contains("is-open")) { setNav(false); toggle.focus(); }
+    const typing = /^(input|textarea|select)$/i.test((e.target && e.target.tagName) || "") || (e.target && e.target.isContentEditable);
+    if ((e.key === "/" && !typing && !e.metaKey && !e.ctrlKey) || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) { e.preventDefault(); openSearch(); }
   });
   window.matchMedia("(min-width: 1024px)").addEventListener("change", (e) => { if (e.matches) setNav(false); });
 }
@@ -72,8 +68,6 @@ function setNav(open) {
 }
 
 /* ---------- Router ---------- */
-
-const clean = (p) => p.replace(/\/+$/, "") || "/";
 
 function resolve(pathname) {
   const path = clean(pathname);
@@ -97,16 +91,24 @@ export function notify(message) {
   notify.timer = window.setTimeout(() => { notice.hidden = true; }, 7000);
 }
 
-/** The count of requests needing attention, shown beside "Support Requests" in the navigation. A courtesy: any failure simply shows no badge. */
+/** What needs attention (support requests with new activity), shown on Operations, on Support and in the top bar. A courtesy: any failure simply shows no badge. */
 async function refreshBadge() {
-  const link = navLinks.find((a) => a.dataset.module === "support");
-  if (!link) return;
   try {
     const a = await api("/services/attention");
-    link.querySelectorAll(".adm-nav__badge, .adm-nav__sr").forEach((el) => el.remove());
     const n = a && a.available && a.support ? a.support.attention : 0;
-    if (n > 0) link.append(h("span", { class: "adm-nav__badge", "aria-hidden": "true", text: String(n) }), h("span", { class: "visually-hidden adm-nav__sr", text: `, ${n} need attention` }));
+    document.querySelectorAll(".adm-nav__badge, .adm-nav__sr").forEach((el) => el.remove());
+    const link = navLinks.find((x) => x.dataset.section === "operations");
+    if (n > 0 && link) link.append(h("span", { class: "adm-nav__badge", "aria-hidden": "true", text: String(n) }), h("span", { class: "visually-hidden adm-nav__sr", text: `, ${n} need attention` }));
+    attn.hidden = !(n > 0); attn.replaceChildren(icon("bell"), h("span", { text: `${n} need${n === 1 ? "s" : ""} attention` }));
   } catch { /* no badge */ }
+}
+
+function defaultCrumbs(section, title) {
+  const items = [["Admin", "/admin"]];
+  if (section && section.id !== "overview") items.push([section.label, section.path]);
+  if (title && (!section || title !== section.label)) items.push([title, null]);
+  else if (section && section.id === "overview") items.push(["Overview", null]);
+  return items.length > 1 ? items : [["Overview", null]];
 }
 
 async function route() {
@@ -115,22 +117,27 @@ async function route() {
   if (clean(location.pathname) === "/admin/demo-traffic") history.replaceState(null, "", "/admin/leads/activity" + location.search); // Demo traffic is now the Activity view of Leads
   const url = new URL(location.href);
   const module = resolve(url.pathname);
-  navLinks.forEach((a) => (a.dataset.module === (module && module.id) ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
+  const section = sectionOf(url.pathname);
+  navLinks.forEach((a) => (section && a.dataset.section === section.id ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current")));
   setNav(false);
 
   let node;
   let title;
+  let crumbItems;
   if (!module) {
     title = "Not found";
     node = h("div", { class: "adm-page" }, h("h1", { class: "adm-title", tabindex: "-1" }, "Not found"), h("p", { class: "adm-sub" }, "There is nothing at this address."),
       h("p", null, h("a", { class: "adm-link", href: "/admin", "data-link": "" }, "Back to overview")));
   } else {
     main.setAttribute("aria-busy", "true");
+    [...main.children].forEach((c) => { if (c !== notice) c.remove(); });
+    main.append(pageSkeleton());
     try {
       const mod = await module.load();
       const result = await mod.render({ url, navigate, notify, retry: route });
       if (token !== routeToken) return;
       ({ title, node } = result);
+      crumbItems = result.crumbs;
     } catch (err) {
       if (token !== routeToken) return;
       title = "Error";
@@ -139,12 +146,15 @@ async function route() {
   }
   main.removeAttribute("aria-busy");
   [...main.children].forEach((c) => { if (c !== notice) c.remove(); });
+  topCrumbs.replaceChildren(crumbs(crumbItems || defaultCrumbs(section, title)));
+  // The pages of a grouped section (Operations, Settings) share one row of section tabs above their content.
+  if (section && section.children) main.append(h("div", { class: "ds-subnav" }, tabs({ label: section.label + " sections", current: section.children.map(([, href]) => href).filter((href) => clean(url.pathname) === href || (href !== section.path && clean(url.pathname).startsWith(href + "/"))).sort((a, b) => b.length - a.length)[0] || section.path, items: section.children.map(([label, href]) => ({ id: href, label, href })) })));
   main.append(node);
-  document.title = `${title} — Framework Admin`;
-  const heading = main.querySelector(".adm-title");
+  document.title = `${title} | Framework Admin`;
+  const heading = main.querySelector(".adm-title, .ds-title");
   (heading || main).focus({ preventScroll: true });
   window.scrollTo(0, 0);
-  if (location.hash.length > 1) { const target = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (target) target.scrollIntoView(); } // a link such as /admin/settings/service-pricing#sp-h-addon lands on its section
+  if (location.hash.length > 1) { const target = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (target) target.scrollIntoView(); } // a link such as /admin/settings/service-pricing#svc-x scrolls to its card
   refreshBadge();
 }
 
