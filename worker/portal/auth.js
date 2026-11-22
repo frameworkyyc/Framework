@@ -20,6 +20,7 @@ import { activatePendingInvitations } from "./repo/invitations.js";
 import { recordActivity } from "./repo/activity.js";
 import { loginPage } from "./pages.js";
 import { transitionsOn } from "./config.js";
+import { authFrame, shareOrigin } from "./frame.js";
 import { requireSession, dbCall, Unavailable, unavailablePage } from "./guard.js";
 import { logEvent, routeName } from "./log.js";
 import { htmlPage } from "./http.js";
@@ -54,7 +55,7 @@ export async function handleLogin(ctx) {
   if (ctx.url.searchParams.get("start") !== "1") {
     // An interstitial, so that returning here after sign-out never silently signs the person straight back in.
     const qs = new URLSearchParams({ start: "1", ...forward }).toString();
-    return loginPage({ continueHref: `/portal/login?${qs}`, ended: ctx.url.searchParams.get("r") === "ended", demoHref: ctx.demo ? "/portal/demo" : null, fx: transitionsOn(ctx.env) });
+    return loginPage({ continueHref: `/portal/login?${qs}`, ended: ctx.url.searchParams.get("r") === "ended", demoHref: ctx.demo ? "/portal/demo" : null, fx: transitionsOn(ctx.env), share: shareOrigin(ctx.url) });
   }
 
   const state = randomToken(32);
@@ -234,4 +235,12 @@ export async function handleLogout(ctx) {
   const back = ctx.cfg.origin + "/portal/login";
   const idp = workosLogoutUrl(ctx.cfg, ended.workosSessionId, back);
   return redirect(idp || "/portal/login", { cookies: [ended.cookie], allowedOrigins: ALLOWED_ORIGINS });
+}
+
+/** A signed-out visit to /portal is redirected to the sign-in page. Link-preview crawlers that read the redirect response itself get the preview metadata from its body; browsers follow the Location header exactly as before. */
+export function withSharePreview(ctx, response) {
+  if (response.status !== 303 || response.headers.get("Location") !== "/portal/login") return response;
+  const headers = new Headers(response.headers);
+  headers.set("Content-Type", "text/html; charset=utf-8"); headers.delete("Content-Length");
+  return new Response(authFrame({ title: "Sign in", bodyHtml: `<p><a class="btn btn--primary" href="/portal/login">Continue to sign in</a></p>`, share: shareOrigin(ctx.url) }), { status: 303, headers });
 }

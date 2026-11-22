@@ -11,10 +11,10 @@ import { escapeHtml as e, MARK, CURTAIN, head } from "./frame.js";
 const OUTLINE = `<svg class="si__art" viewBox="200 300 320 374" aria-hidden="true" focusable="false"><path class="si__line si__line--1" pathLength="1" d="M215.2 312.1 L512.7 312.1 L512.7 371.3 L278.4 371.3 L278.4 599.8 L215.2 663.6 Z"/><path class="si__line si__line--2" pathLength="1" d="M292.3 469.9 L337.0 425.2 L512.7 425.2 L512.7 486.1 L349.7 486.1 L349.7 658.4 L292.3 658.4 Z"/></svg>`;
 const ARROW = `<svg class="si__arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h16M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`;
 
-export function signInPage({ continueHref, ended = false, status = 200 }) {
+export function signInPage({ continueHref, ended = false, status = 200, share = null }) {
   const notice = ended ? `<p class="si__notice" role="status">Your previous session has ended. Please sign in again.</p>` : "";
   const html = `<!DOCTYPE html>
-<html lang="en-CA" class="fx-signin"><head>${head("Sign in", { fx: "page", styles: ["/assets/css/portal-signin.css"] })}</head>
+<html lang="en-CA" class="fx-signin"><head>${head("Sign in", { fx: "page", styles: ["/assets/css/portal-signin.css"], share })}</head>
 <body class="si-body"><a class="skip-link" href="#main">Skip to content</a>${CURTAIN}
 <div class="si">
 <header class="si__top"><a class="si__brand" href="/portal/login" aria-label="Framework client portal">${MARK}<span class="si__word">Framework</span></a><span class="si__label">Client portal</span></header>
