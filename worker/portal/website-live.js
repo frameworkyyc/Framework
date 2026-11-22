@@ -13,6 +13,7 @@ import { stageOf, milestoneProgress } from "./website-stage.js";
 import { serviceCatalogue } from "./service-catalogue.js";
 import { SEO_STATUS_LABEL } from "./repo/website-seo.js";
 import { analyticsTeaser } from "./analytics/view.js";
+import { workspaceSections } from "./website-workspace.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const isWebUrl = (u) => typeof u === "string" && /^https?:\/\/[^\s"'<>]+$/.test(u);
@@ -98,9 +99,12 @@ function seoTeaser(vm, s, seo) {
 }
 
 function detailBody(vm, s, preview, extra = {}) {
+  const wk = extra.workspace ? workspaceSections(vm, s, extra.workspace) : "";
+  // With the review workspace (environments, updates & requests, request changes) on the page it comes first and the rest becomes the quieter "Website details" group; "Request a change" is then the form above, not a second button.
+  const rest = `${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${extra.analytics ? analyticsTeaser(vm, s) : ""}${management(vm, s, extra.management && wk ? { ...extra.management, inline: true } : extra.management)}${serviceCatalogue(vm, extra.services)}`;
   return `<div class="ws__badges">${statusChip(s)}${managedChip(s)}</div>
 <p class="lead ws__lead">${e(statement(s))}</p>
-${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${extra.analytics ? analyticsTeaser(vm, s) : ""}${management(vm, s, extra.management)}${serviceCatalogue(vm, extra.services)}`;
+${wk ? `${wk}<div class="wk-details"><h2 class="wk-h wk-h--quiet">Website details</h2>${rest}</div>` : rest}`;
 }
 
 /* ------------------------------------------------------------------ Website management and Additional Services */
@@ -123,7 +127,7 @@ function management(vm, s, m) {
   const r = m.requests;
   const summary = r && r.total ? `<p class="ws-sec__more"><a class="text-link" href="${e(href(vm, "/website/requests"))}">Your website requests</a> <span class="muted small">${[r.unread ? `${r.unread} new ${r.unread === 1 ? "reply" : "replies"}` : "", r.open ? `${r.open} open` : "None open"].filter(Boolean).join(" · ")}</span></p>` : "";
   return `<section class="ws-sec" aria-labelledby="ws-mgmt-h"><h2 class="h2" id="ws-mgmt-h">Website management</h2>
-<ul class="ws-actions">${action("Download website files", downloadText, download)}${action("Request a change", "Ask for an update to your website, with details and files.", ask("change", "Request a change"))}${action("Get support", "Report a problem or ask for technical help.", ask("support", "Get support"))}</ul>${summary}${m.canRequest ? "" : `<p class="muted small">Only people with access to this account can send requests.</p>`}</section>`;
+<ul class="ws-actions">${action("Download website files", downloadText, download)}${m.inline ? "" : action("Request a change", "Ask for an update to your website, with details and files.", ask("change", "Request a change"))}${action("Get support", "Report a problem or ask for technical help.", ask("support", "Get support"))}</ul>${summary}${m.canRequest ? "" : `<p class="muted small">Only people with access to this account can send requests.</p>`}</section>`;
 }
 
 /** The empty state: no website has been added for this organization. */
