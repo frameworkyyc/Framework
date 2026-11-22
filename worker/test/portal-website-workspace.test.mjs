@@ -46,19 +46,19 @@ async function setup({ m30 = true, flag = true } = {}) {
 }
 const text = async (r) => r.text();
 
-test("environments: Production and Staging cards, a quick action on each; Staging is the review environment; a website that has not launched says so", async () => {
+test("website cards: Live website and Preview changes, a quick link on each, never Production or Staging as titles; a website that has not launched says so", async () => {
   const s = await setup();
   const id = await s.site(s.A);
   let h = await text(await s.page(s.ann, "alpha", id));
-  assert.match(h, /Main · Production/); assert.match(h, /Staging · Review here/);
-  assert.match(h, /View live site/); assert.match(h, /href="https:\/\/alpha\.example\.ca\/?"/); assert.match(h, /Not set up yet/);
-  assert.ok(!/View staging/.test(h), "no staging address, no staging button");
+  assert.match(h, /<h2 id="wd-live-h">Live website<\/h2>/); assert.match(h, /<h2 id="wd-prev-h">Preview changes<\/h2>/); assert.ok(!/Main · Production|Staging · Review here|<h2[^>]*>(Production|Staging)</.test(h), "the technical names are not titles");
+  assert.match(h, /Open live site/); assert.match(h, /href="https:\/\/alpha\.example\.ca\/?"/); assert.match(h, /Not set up yet/);
+  assert.ok(!/Open preview/.test(h), "no preview address, no preview link");
   assert.ok((await s.call(s.ws(s.A, id, "/staging"), { method: "POST", json: { staging_url: "https://staging.alpha.example.ca" } })).status === 200);
   h = await text(await s.page(s.ann, "alpha", id));
-  assert.match(h, /View staging/); assert.match(h, /href="https:\/\/staging\.alpha\.example\.ca\/?"/); assert.match(h, /target="_blank" rel="noopener noreferrer"/);
+  assert.match(h, /Open preview/); assert.match(h, /href="https:\/\/staging\.alpha\.example\.ca\/?"/); assert.match(h, /No preview image yet/, "no preview picture exists yet: a neutral panel, never a stock image"); assert.match(h, /target="_blank" rel="noopener noreferrer"/);
   const dev = await s.site(s.A, { name: "New site", status: "in_development", origin: "framework", url: null });
   const d = await text(await s.page(s.ann, "alpha", dev));
-  assert.match(d, /Not launched/); assert.ok(!/View live site/.test(d), "an unlaunched website has no live link");
+  assert.match(d, /Not launched/); assert.ok(!/Open live site/.test(d), "an unlaunched website has no live link");
   for (const bad of ["http://staging.alpha.example.ca", "javascript:alert(1)", "https://u:p@alpha.example.ca", "https://a b.example.ca", "nonsense"]) assert.equal((await s.call(s.ws(s.A, id, "/staging"), { method: "POST", json: { staging_url: bad } })).status, 422, bad);
   assert.equal((await s.call(s.ws(s.A, id, "/staging"), { method: "POST", json: { staging_url: "" } })).status, 200); // clearing it
   assert.match(await text(await s.page(s.ann, "alpha", id)), /Not set up yet/);
@@ -72,7 +72,7 @@ test("updates: a draft is invisible; a published approval update shows Approve a
   assert.ok(!(await text(await s.page(s.ann, "alpha", id))).includes("Homepage layout updated"), "a draft is invisible to the client");
   assert.equal((await s.call(s.ws(s.A, id, `/updates/${uid}/update`), { method: "POST", json: { published: true } })).status, 200);
   const owner = await text(await s.page(s.ann, "alpha", id));
-  assert.match(owner, /Homepage layout updated/); assert.match(owner, /New hero and spacing\./); assert.match(owner, /Awaiting review/); assert.match(owner, /Staging<\/span>/);
+  assert.match(owner, /Homepage layout updated/); assert.match(owner, /New hero and spacing\./); assert.match(owner, /Awaiting review/); assert.match(owner, /Preview update/); assert.ok(!/<details class="wd-row"[^>]* open/.test(owner) && !/<details class="wd-rq"[^>]* open/.test(owner), "nothing is open until chosen");
   assert.match(owner, new RegExp(`action="/portal/o/alpha/website/${id}/updates/${uid}/approve"`)); assert.match(owner, new RegExp(`action="/portal/o/alpha/website/${id}/updates/${uid}/reject"`));
   assert.match(owner, /<textarea[^>]*name="note"[^>]*required/, "a rejection asks why");
   const member = await text(await s.page(s.mia, "alpha", id));
@@ -127,9 +127,9 @@ test("tasks: Needed from you: published ones only, a due date, a written answer 
   const rv = (await s.call(s.ws(s.A, id, "/tasks"), { method: "POST", json: { title: "Approve homepage content", cta: "review", published: true } })).json.id;
   let h = await text(await s.page(s.mia, "alpha", id));
   assert.ok(!h.includes("Draft task"), "an unpublished task is invisible"); assert.ok(!h.includes("<img src=x"), "titles are escaped"); assert.match(h, /&lt;img src=x onerror=alert\(1\)&gt;/);
-  assert.match(h, /Due Dec 3, 2099/); assert.match(h, /Needed/);
+  assert.match(h, /Due Dec 3, 2099/); assert.match(h, /Needs your attention/);
   assert.match(h, new RegExp(`/website/${id}/requests/new\\?kind=change&amp;title=Hydroelectric%20project%20photo`), "Upload files opens the request form that accepts files");
-  assert.match(h, /View staging/, "a review task points at staging");
+  assert.match(h, /Open preview/, "a review task points at the preview");
   const form = await text(await s.mia.get(`/portal/o/alpha/website/${id}/requests/new?kind=change&title=Hydroelectric%20project%20photo`)); assert.match(form, /value="Hydroelectric project photo"/, "and the title is prefilled");
   const r = await s.post(s.mia, "alpha", `/website/${id}/tasks/${t}/respond`, { text: "Here is the text: we design and build websites." }, { id });
   assert.match(r.headers.get("Location"), /flash=answered/);
@@ -178,7 +178,7 @@ test("request changes: the form is on the page, posts to the existing change-req
   const s = await setup();
   const id = await s.site(s.A);
   const h = await text(await s.page(s.mia, "alpha", id));
-  assert.match(h, /Request changes/); assert.match(h, new RegExp(`action="/portal/o/alpha/website/${id}/requests"`)); assert.match(h, /enctype="multipart\/form-data"/); assert.match(h, /type="file"/); assert.match(h, /<option value="change">/);
+  assert.match(h, /Need something changed\?/); assert.match(h, /<details class="wd-rq">/, "the form is closed until chosen"); assert.match(h, new RegExp(`action="/portal/o/alpha/website/${id}/requests"`)); assert.match(h, /enctype="multipart\/form-data"/); assert.match(h, /type="file"/); assert.match(h, /<option value="change">/);
   const fd = new FormData(); fd.set("csrf", await s.csrf(s.mia, "alpha", id)); fd.set("kind", "change"); fd.set("title", "New opening hours"); fd.set("description", "Footer hours changed.");
   const r = await s.mia.send(`/portal/o/alpha/website/${id}/requests`, { method: "POST", body: fd, headers: { "Sec-Fetch-Site": "same-origin", Origin: PORTAL_ORIGIN } });
   assert.equal(r.status, 303); assert.match(r.headers.get("Location"), /\/website\/requests\//);
@@ -189,8 +189,8 @@ test("without migration 0030 the page still works: environments and the request 
   const s = await setup({ m30: false });
   const id = await s.site(s.A);
   const res = await s.ann.get(`/portal/o/alpha/website/${id}`); const h = await res.text();
-  assert.equal(res.status, 200); assert.match(h, /Main · Production/); assert.match(h, /Not set up yet/); assert.match(h, /Request changes/);
-  assert.ok(!/Updates &amp; requests|Needed from you|Website updates/.test(h), "the updates section is simply absent");
+  assert.equal(res.status, 200); assert.match(h, /Live website/); assert.match(h, /Not set up yet/); assert.match(h, /Need something changed\?/);
+  assert.ok(!/Needs your attention|Recent updates/.test(h), "the updates and tasks cards are simply absent");
   assert.deepEqual((await s.call(s.ws(s.A, id))).json, { available: false, website: { id, name: "Main website", url: "https://alpha.example.ca/", status: "live", published: true }, capabilities: { writes: true }, labels: { update: wk.UPDATE_STATUS_LABEL, task: wk.TASK_STATUS_LABEL } });
   assert.equal((await s.call(s.ws(s.A, id, "/updates"), { method: "POST", json: { title: "x" } })).status, 409, "writes say 'unavailable', not a server error");
   assert.equal((await s.call(s.ws(s.A, id, "/staging"), { method: "POST", json: { staging_url: "https://staging.alpha.example.ca" } })).status, 409);

@@ -209,7 +209,7 @@ export async function brandingUploadsPage(ctx, a, o = {}) {
 }
 
 /** The Website section: `sites` is every website Framework published for this organization (the empty list is the "no website" state); `one` is a single website's own page. */
-export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null, milestones = [], seo = null, analytics = false, workspace = undefined, workspaceMsg = {} } = {}) {
+export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null, milestones = [], seo = null, analytics = false, traffic = null, workspace = undefined, workspaceMsg = {} } = {}) {
   const vm = liveModel(ctx, a, {});
   const single = one || (sites.length === 1 ? sites[0] : null);
   // The live preview needs the page to be allowed to frame that one website: its verified origins go into THIS response's CSP only (frame-src); no other page and no global policy changes.
@@ -222,8 +222,10 @@ export async function websitePage(ctx, a, { sites = [], one = null, preview = nu
     flash: workspaceMsg.flash || "", error: workspaceMsg.error || "", now: ctx.now,
     requestSummary: management && management.requests && management.requests.open ? `${management.requests.open} open` : "",
   } : null;
-  const extra = { management, milestones, seo, analytics, workspace: workspaceOpts, services: services ? { ...services, csrf } : null };
-  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", styles: workspaceOpts ? ["/assets/css/portal-website-workspace.css"] : [], body: one ? websiteLive.websiteDetail(vm, one, preview, extra) : websiteLive.websiteOverview(vm, sites, preview, extra), vm, ref: "website", frameSrc });
+  const extra = { management, milestones, seo, analytics, traffic, workspace: workspaceOpts, services: services ? { ...services, csrf } : null };
+  const body = one ? websiteLive.websiteDetail(vm, one, preview, extra) : websiteLive.websiteOverview(vm, sites, preview, extra);
+  // With the dashboard the page sits on its own grey ground, edge to edge (the portal header above is unchanged); the content keeps the portal's width inside it.
+  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", styles: workspaceOpts ? ["/assets/css/portal-website-workspace.css"] : [], body: workspaceOpts ? `<div class="wd-ground"><div class="wd-wrap">${body}</div></div>` : body, vm, ref: "website", frameSrc, bleed: Boolean(workspaceOpts) });
 }
 /** SEO & Search Visibility: a subsection of one website (not a main navigation item). `seo` is only what Admin has published. */
 export async function websiteSeoPage(ctx, a, site, seo) {

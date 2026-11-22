@@ -392,7 +392,7 @@ test("route: owners and members of the organization see the page; setup messages
     assert.match(html, /\/assets\/js\/portal-analytics\.js/); assert.match(html, /\/assets\/css\/portal-analytics\.css/);
   }
   const page = await (await s.ann.get(`/portal/o/alpha/website/${id}`)).text();
-  assert.match(page, new RegExp(`href="/portal/o/alpha/website/${id}/analytics"`)); assert.match(page, /View analytics/);
+  assert.match(page, new RegExp(`href="/portal/o/alpha/website/${id}/analytics"`)); assert.match(page, /Open analytics/);
   assert.equal((await s.anon.get(`/portal/o/alpha/website/${id}/analytics`)).status, 303, "signed-out visitors are sent to sign in");
 });
 test("route: another organization's, unpublished and unknown websites are all 'not found'; dormant without the migration; range is allow-listed", async () => {
