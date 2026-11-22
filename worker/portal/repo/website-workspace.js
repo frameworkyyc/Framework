@@ -287,7 +287,7 @@ export async function respondTask(db, organizationId, websiteId, taskId, { text 
     const answerable = "id = ? AND organization_id = ? AND website_id = ? AND published = 1 AND archived_at IS NULL AND cta IN ('respond', 'review') AND status IN ('open', 'submitted')";
     const results = await db.batch([
       db.prepare(`INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, detail, visibility, created_at) SELECT ?, ?, 'client', ?, 'website.task.responded', 'website_task', ?, ?, 'internal', ? WHERE EXISTS (SELECT 1 FROM website_tasks WHERE ${answerable})`)
-        .bind(newId(), organizationId, by, taskId, JSON.stringify({ length: t.length }), at, taskId, organizationId, websiteId),
+        .bind(newId(), organizationId, by, taskId, JSON.stringify({ text: t }), at, taskId, organizationId, websiteId),
       db.prepare(`UPDATE website_tasks SET status = 'submitted', response_text = ?, responded_at = ?, responded_by = ?, updated_at = ?, updated_by = ? WHERE ${answerable}`).bind(t, at, by, at, by, taskId, organizationId, websiteId),
     ]);
     return results[1].meta.changes === 1 ? ok() : fail("not_found");
