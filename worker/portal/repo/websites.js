@@ -80,6 +80,7 @@ const toWebsite = (r) => ({
   domain: { registrar: r.domain_registrar, owner: r.domain_owner, renewal: r.domain_renewal }, hosting: { provider: r.hosting_provider, owner: r.hosting_owner, renewal: r.hosting_renewal },
   managementNotes: r.management_notes, published: r.published === 1, sortOrder: r.sort_order,
   screenshot: r.screenshot_key ? { name: r.screenshot_name, format: r.screenshot_format, contentType: r.screenshot_type, size: r.screenshot_size, sha256: r.screenshot_sha256 } : null,
+  stagingScreenshot: r.staging_screenshot_key ? { name: r.staging_screenshot_name, format: r.staging_screenshot_format, contentType: r.staging_screenshot_type, size: r.staging_screenshot_size, sha256: r.staging_screenshot_sha256 } : null,
   createdAt: r.created_at, updatedAt: r.updated_at, updatedBy: r.updated_by, archivedAt: r.archived_at,
 });
 
@@ -100,11 +101,24 @@ export async function getWebsiteAdmin(db, organizationId, websiteId) {
   return r ? toWebsite(r) : null;
 }
 
-/** The private object behind a website's screenshot (storage key and type), or null. Admin-side only. */
-export async function getScreenshotRecord(db, organizationId, websiteId) {
+/** Each environment keeps its own screenshot in its own column set: Production in screenshot_* (migration 0011), Staging in staging_screenshot_* (migration 0031). */
+export const SCREENSHOT_ENVS = Object.freeze({ production: "screenshot", staging: "staging_screenshot" });
+const colsOf = (env) => { const prefix = SCREENSHOT_ENVS[env]; if (!prefix) throw new Error("unknown screenshot environment"); return prefix; };
+const noColumn = (err) => /no such column/i.test(String(err && err.message));
+
+/** Does this database have the Staging screenshot columns (migration 0031)? Until it does, Staging screenshots are simply "not available" and nothing else changes. */
+export async function stagingScreenshotAvailable(db) {
+  try { await db.prepare("SELECT staging_screenshot_key FROM websites LIMIT 1").first(); return true; } catch { return false; }
+}
+
+/** The private object behind a website's screenshot for one environment (storage key and type), or null. Admin-side only. */
+export async function getScreenshotRecord(db, organizationId, websiteId, env = "production") {
   requireOrgId(organizationId); requireId(websiteId, "website_id");
-  const r = await db.prepare("SELECT screenshot_key, screenshot_name, screenshot_format, screenshot_type, screenshot_size FROM websites WHERE id = ? AND organization_id = ? AND screenshot_key IS NOT NULL").bind(websiteId, organizationId).first();
-  return r ? { key: r.screenshot_key, name: r.screenshot_name, format: r.screenshot_format, contentType: r.screenshot_type, size: r.screenshot_size } : null;
+  const SHOT = colsOf(env);
+  try {
+    const r = await db.prepare(`SELECT ${SHOT}_key AS k, ${SHOT}_name AS n, ${SHOT}_format AS f, ${SHOT}_type AS t, ${SHOT}_size AS z FROM websites WHERE id = ? AND organization_id = ? AND ${SHOT}_key IS NOT NULL`).bind(websiteId, organizationId).first();
+    return r ? { key: r.k, name: r.n, format: r.f, contentType: r.t, size: r.z } : null;
+  } catch (err) { if (env === "staging" && noColumn(err)) return null; throw err; }
 }
 
 const audit = (db, organizationId, actor, action, websiteId, at, detail) =>
@@ -169,30 +183,33 @@ export async function setWebsiteArchived(db, organizationId, websiteId, archived
   return (await getWebsiteAdmin(db, organizationId, websiteId)) ? ok({ unchanged: true }) : fail("not_found");
 }
 
-/** Point a website at a new screenshot object (the caller has stored it). Returns the previous key so the caller can delete that object. */
-export async function setScreenshot(db, organizationId, websiteId, file, actor, { now = new Date() } = {}) {
+/** Point a website at a new screenshot object for one environment (the caller has stored it). Returns the previous key so the caller can delete that object. */
+export async function setScreenshot(db, organizationId, websiteId, file, actor, { now = new Date(), env = "production" } = {}) {
   requireOrgId(organizationId); requireId(websiteId, "website_id");
   if (!validActor(actor)) return fail("invalid_actor");
-  const prev = await getScreenshotRecord(db, organizationId, websiteId);
+  const SHOT = colsOf(env);
+  if (env === "staging" && !(await stagingScreenshotAvailable(db))) return fail("unavailable");
+  const prev = await getScreenshotRecord(db, organizationId, websiteId, env);
   const at = isoTime(now);
   const res = await db.batch([
-    db.prepare("UPDATE websites SET screenshot_key = ?, screenshot_name = ?, screenshot_format = ?, screenshot_type = ?, screenshot_size = ?, screenshot_sha256 = ?, updated_at = ?, updated_by = ? WHERE id = ? AND organization_id = ? AND archived_at IS NULL")
+    db.prepare(`UPDATE websites SET ${SHOT}_key = ?, ${SHOT}_name = ?, ${SHOT}_format = ?, ${SHOT}_type = ?, ${SHOT}_size = ?, ${SHOT}_sha256 = ?, updated_at = ?, updated_by = ? WHERE id = ? AND organization_id = ? AND archived_at IS NULL`)
       .bind(file.key, file.name, file.ext, file.contentType, file.size, file.sha256, at, actor.trim(), websiteId, organizationId),
-    audit(db, organizationId, actor, "website.screenshot_set", websiteId, at),
+    audit(db, organizationId, actor, env === "staging" ? "website.staging_screenshot_set" : "website.screenshot_set", websiteId, at),
   ]);
   return res[0].meta.changes === 1 ? ok({ previousKey: prev ? prev.key : null }) : fail("not_found");
 }
 
-/** Remove the screenshot reference. Returns the key so the caller can delete the object. */
-export async function clearScreenshot(db, organizationId, websiteId, actor, { now = new Date() } = {}) {
+/** Remove one environment's screenshot reference. Returns the key so the caller can delete the object. */
+export async function clearScreenshot(db, organizationId, websiteId, actor, { now = new Date(), env = "production" } = {}) {
   requireOrgId(organizationId); requireId(websiteId, "website_id");
   if (!validActor(actor)) return fail("invalid_actor");
-  const prev = await getScreenshotRecord(db, organizationId, websiteId);
+  const SHOT = colsOf(env);
+  const prev = await getScreenshotRecord(db, organizationId, websiteId, env);
   if (!prev) return (await getWebsiteAdmin(db, organizationId, websiteId)) ? ok({ previousKey: null }) : fail("not_found");
   const at = isoTime(now);
   const res = await db.batch([
-    db.prepare("UPDATE websites SET screenshot_key = NULL, screenshot_name = NULL, screenshot_format = NULL, screenshot_type = NULL, screenshot_size = NULL, screenshot_sha256 = NULL, updated_at = ?, updated_by = ? WHERE id = ? AND organization_id = ? AND screenshot_key = ?").bind(at, actor.trim(), websiteId, organizationId, prev.key),
-    audit(db, organizationId, actor, "website.screenshot_removed", websiteId, at),
+    db.prepare(`UPDATE websites SET ${SHOT}_key = NULL, ${SHOT}_name = NULL, ${SHOT}_format = NULL, ${SHOT}_type = NULL, ${SHOT}_size = NULL, ${SHOT}_sha256 = NULL, updated_at = ?, updated_by = ? WHERE id = ? AND organization_id = ? AND ${SHOT}_key = ?`).bind(at, actor.trim(), websiteId, organizationId, prev.key),
+    audit(db, organizationId, actor, env === "staging" ? "website.staging_screenshot_removed" : "website.screenshot_removed", websiteId, at),
   ]);
   return res[0].meta.changes === 1 ? ok({ previousKey: prev.key }) : fail("conflict");
 }
@@ -200,7 +217,8 @@ export async function clearScreenshot(db, organizationId, websiteId, actor, { no
 /** Every stored object a live website row points to (for the orphan check). */
 export async function listWebsiteStorageKeys(db, organizationId) {
   requireOrgId(organizationId);
-  try { return (await db.prepare("SELECT screenshot_key FROM websites WHERE organization_id = ? AND screenshot_key IS NOT NULL").bind(organizationId).all()).results.map((r) => r.screenshot_key); } catch { return []; }
+  const keys = async (sql) => { try { return (await db.prepare(sql).bind(organizationId).all()).results.map((r) => r.k); } catch { return []; } };
+  return [...(await keys("SELECT screenshot_key AS k FROM websites WHERE organization_id = ? AND screenshot_key IS NOT NULL")), ...(await keys("SELECT staging_screenshot_key AS k FROM websites WHERE organization_id = ? AND staging_screenshot_key IS NOT NULL"))];
 }
 
 /** Counts for the client's Admin dashboard tile, or null when the table is missing. */

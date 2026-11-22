@@ -419,3 +419,12 @@ progress.ds-meter::-webkit-progress-bar { background: var(--ds-line); } progress
 .adm-side { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
 @media (min-width: 1024px) { .adm-side { height: 100vh; height: 100dvh; } }
 .ds-main .ds-nc__acts { justify-content: flex-start; }
+
+/* ---------- Website environments: the screenshot on each Production / Staging card and in its Edit panel ---------- */
+.ds-eshot { margin-top: 12px; aspect-ratio: 16 / 10; overflow: hidden; border-radius: var(--ds-r); border: 1px solid var(--ds-line); background: var(--ds-soft); }
+.ds-eshot img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+.ds-eshot--none { display: grid; place-items: center; padding: 12px; text-align: center; color: var(--ds-muted); font-size: 14px; }
+.ds-card--ink .ds-eshot { border-color: rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .06); } .ds-card--ink .ds-eshot--none { color: #B5B5B2; }
+.ds-envedit { display: grid; gap: 22px; } .ds-shotedit { display: grid; gap: 4px; padding-top: 18px; border-top: 1px solid var(--ds-line); } .ds-shotedit .ds-eshot { margin: 6px 0 8px; }
+.ds-shotedit .ds-sub2 { margin: 0; font: 600 12px/1 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--ds-muted); }
+@media (max-width: 599px) { .ds-eshot { aspect-ratio: 16 / 11; } }

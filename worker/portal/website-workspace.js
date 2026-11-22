@@ -64,12 +64,12 @@ ${shot(vm, s, s.hasScreenshot ? href(vm, `/website/${s.id}/screenshot`) : "", no
 
 function previewCard(vm, s, ws) {
   const url = ws && ws.stagingUrl, n = ws && ws.needsReview ? ws.needsReview : 0;
-  // No preview picture exists yet (automatic capture is a later step), so this card shows the neutral panel until Framework stores one.
-  const none = url ? { title: "No preview image yet", text: "A picture of your preview appears here once Framework captures it. You can still open it." } : { title: "No preview yet", text: "Framework will add the preview when there is something to review." };
+  // The preview picture is one Framework uploads by hand (the preview itself may be password protected); until then this card shows the neutral panel.
+  const none = url ? { title: "No preview image yet", text: "A picture of your preview appears here once Framework adds one. You can still open it." } : { title: "No preview yet", text: "Framework will add the preview when there is something to review." };
   const link = url ? `<a class="wd-btn wd-btn--solid" href="${e(url)}" target="_blank" rel="noopener noreferrer">Open preview${arrow}${newTab("preview")}</a>` : `<span class="wd-btn" aria-disabled="true">Not available yet</span>`;
   return `<article class="wd-card wd-card--ink wd-prev" aria-labelledby="wd-prev-h">
 <header class="wd-ct"><div><h2 id="wd-prev-h">Preview changes</h2><p class="wd-u">${url ? e(hostOf(url)) : "Not set up yet"}</p></div>${url ? (n ? st("ink", `${n} to review`) : st("live", "Available")) : st("open", "Not set up")}</header>
-${shot(vm, s, "", none)}
+${shot(vm, s, s.hasStagingScreenshot ? href(vm, `/website/${s.id}/screenshot/staging`) : "", none)}
 <footer class="wd-foot">${link}</footer></article>`;
 }
 
