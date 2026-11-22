@@ -27,6 +27,17 @@ const needsClient = (s) => (s.awaitingReview || 0) + (s.openTasks || 0);
 
 /* ======================================================================================================== list */
 
+const SITE_COLS = [
+  { label: "Website", cls: "ds-dl__c--main", render: (s) => h("span", { class: "ds-site" }, h("strong", { class: "ds-site__n", text: s.name }), h("span", { class: "ds-muted", text: s.organizationName })) },
+  { label: "Production", render: (s) => h("span", { class: "ds-env-mini" }, s.productionUrl ? h("span", { class: "ds-env-mini__h", text: host(s.productionUrl) }) : h("span", { class: "ds-muted", text: "No address yet" }), pill(isLive(s) ? "Live" : STATUS[s.status] || "—", isLive(s) ? "ok" : "quiet")) },
+  { label: "Staging", render: (s) => h("span", { class: "ds-env-mini" }, s.stagingUrl ? h("span", { class: "ds-env-mini__h", text: host(s.stagingUrl) }) : h("span", { class: "ds-muted", text: "Not set up" }), s.stagingUrl ? pill("Set up", "info") : null) },
+  { label: "Renews", render: (s) => { const r = nextRenewal(s); return r ? pill(r.label, r.tone) : h("span", { class: "ds-muted", text: "—" }); } },
+  { label: "Needs the client", render: (s) => needsClient(s) ? pill([s.awaitingReview ? `${s.awaitingReview} to review` : "", s.openTasks ? plural(s.openTasks, "task") : ""].filter(Boolean).join(" · "), "warn") : h("span", { class: "ds-muted", text: "Nothing" }) },
+  { label: "Connected", render: (s) => h("span", { class: "ds-conn" }, h("span", { class: "ds-conn__i" }, h("i", { class: "ds-dot ds-dot--" + (s.analytics.cloudflare ? "ok" : "quiet"), "aria-hidden": "true" }), "Traffic", h("span", { class: "rk-sr", text: s.analytics.cloudflare ? " connected" : " not connected" })), h("span", { class: "ds-conn__i" }, h("i", { class: "ds-dot ds-dot--" + (s.analytics.searchConsole ? "ok" : "quiet"), "aria-hidden": "true" }), "Search", h("span", { class: "rk-sr", text: s.analytics.searchConsole ? " connected" : " not connected" }))) },
+];
+
+
+
 async function renderList(ctx) {
   let data;
   const clientFilter = ctx.url.searchParams.get("client") || "";
@@ -47,14 +58,6 @@ async function renderList(ctx) {
     span(kpi({ label: "Staging set up", value: String(all.length - counts.nostaging), unit: `of ${all.length}`, note: counts.nostaging ? `${counts.nostaging} without a Staging address` : "Every website has one", tone: counts.nostaging ? "warn" : "ok" }), 3),
     span(kpi({ label: "Waiting on clients", value: String(waiting), note: renewals ? `${plural(renewals, "renewal")} due within 60 days` : "No renewals due soon", tone: waiting ? "warn" : "ok" }), 3));
 
-  const cols = [
-    { label: "Website", cls: "ds-dl__c--main", render: (s) => h("span", { class: "ds-site" }, h("strong", { class: "ds-site__n", text: s.name }), h("span", { class: "ds-muted", text: s.organizationName })) },
-    { label: "Production", render: (s) => h("span", { class: "ds-env-mini" }, s.productionUrl ? h("span", { class: "ds-env-mini__h", text: host(s.productionUrl) }) : h("span", { class: "ds-muted", text: "No address yet" }), pill(isLive(s) ? "Live" : STATUS[s.status] || "—", isLive(s) ? "ok" : "quiet")) },
-    { label: "Staging", render: (s) => h("span", { class: "ds-env-mini" }, s.stagingUrl ? h("span", { class: "ds-env-mini__h", text: host(s.stagingUrl) }) : h("span", { class: "ds-muted", text: "Not set up" }), s.stagingUrl ? pill("Set up", "info") : null) },
-    { label: "Renews", render: (s) => { const r = nextRenewal(s); return r ? pill(r.label, r.tone) : h("span", { class: "ds-muted", text: "—" }); } },
-    { label: "Needs the client", render: (s) => needsClient(s) ? pill([s.awaitingReview ? `${s.awaitingReview} to review` : "", s.openTasks ? plural(s.openTasks, "task") : ""].filter(Boolean).join(" · "), "warn") : h("span", { class: "ds-muted", text: "Nothing" }) },
-    { label: "Connected", render: (s) => h("span", { class: "ds-conn" }, h("span", { class: "ds-conn__i" }, h("i", { class: "ds-dot ds-dot--" + (s.analytics.cloudflare ? "ok" : "quiet"), "aria-hidden": "true" }), "Traffic", h("span", { class: "rk-sr", text: s.analytics.cloudflare ? " connected" : " not connected" })), h("span", { class: "ds-conn__i" }, h("i", { class: "ds-dot ds-dot--" + (s.analytics.searchConsole ? "ok" : "quiet"), "aria-hidden": "true" }), "Search", h("span", { class: "rk-sr", text: s.analytics.searchConsole ? " connected" : " not connected" }))) },
-  ];
   const listHost = h("div", { class: "ds-list-host" });
   const status = h("p", { class: "ds-muted", role: "status" });
   const draw = () => {
@@ -62,7 +65,7 @@ async function renderList(ctx) {
     const rows = all.filter((s) => (filter === "all" || (filter === "live" && s.status === "live") || (filter === "dev" && s.status === "in_development") || (filter === "attention" && (needsClient(s) > 0 || (nextRenewal(s) && nextRenewal(s).days <= 60))) || (filter === "nostaging" && !s.stagingUrl))
       && (!q || `${s.name} ${s.organizationName} ${s.productionUrl || ""} ${s.stagingUrl || ""}`.toLowerCase().includes(q)));
     status.textContent = `${plural(rows.length, "website")}${rows.length !== all.length ? ` of ${all.length}` : ""}.`;
-    listHost.replaceChildren(rows.length ? dataList({ label: "Websites", cls: "ds-dl--sites", columns: cols, rows: rows.map((s) => ({ ...s, href: "/admin/websites/" + enc(s.id) })) })
+    listHost.replaceChildren(rows.length ? dataList({ label: "Websites", cls: "ds-dl--sites", columns: SITE_COLS, rows: rows.map((s) => ({ ...s, href: "/admin/websites/" + enc(s.id) })) })
       : empty({ title: all.length ? "No website matches" : "No websites yet", body: all.length ? "Try another filter or search." : "Add a website with the button above, or from a client.", ic: "websites" }));
   };
   const find = h("input", { class: "input ds-find", type: "search", placeholder: "Find a website or client", "aria-label": "Find a website or client", autocomplete: "off", oninput: (e) => { query = e.target.value.trim(); draw(); } });
@@ -220,4 +223,14 @@ export async function render(ctx) {
   const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/websites(?:\/([^/]+)(?:\/([^/]+))?)?$/);
   if (m && m[1]) return renderSite(decodeURIComponent(m[1]), m[2] && TABS.some(([t]) => t === m[2]) ? m[2] : "", ctx);
   return renderList(ctx);
+}
+
+/** One client's websites, for the Websites tab of the client workspace: the same rows as the Websites list, for that client only. */
+export async function clientWebsites(orgId, ctx) {
+  let data;
+  try { data = await api("/websites"); } catch (err) { return h("div", { class: "ds-page" }, errorState(err, ctx.retry)); }
+  const mine = (data.websites || []).filter((w) => w.organizationId === orgId);
+  const add = button("Add website", { tone: "solid", icon: "plus", onClick: () => addDrawer(ctx, orgId) });
+  return h("div", null, card({ title: "Websites", sub: mine.length ? `${plural(mine.length, "website")}. Open one to edit its Production and Staging addresses, domain, hosting and more.` : undefined, actions: add,
+    body: mine.length ? dataList({ label: "Websites", cls: "ds-dl--sites", columns: SITE_COLS, rows: mine.map((s) => ({ ...s, href: "/admin/websites/" + enc(s.id) })) }) : empty({ title: "No website yet", body: "A client with no website simply has none listed. Add one when they have one, or when Framework starts building it.", ic: "websites" }) }));
 }

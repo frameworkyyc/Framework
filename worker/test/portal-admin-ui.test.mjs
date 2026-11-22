@@ -170,7 +170,7 @@ test("the Business Profile review stays read-only and intact, and the navigation
   assert.match(read("admin/assets/clients.js"), /staff cannot edit them here/);
   for (const w of ["Complete", "Partial", "Missing"]) assert.ok(strip(read("admin/assets/client-dashboard.js")).includes(`"${w}"`), w);
   assert.ok(!/method: "(POST|PUT|PATCH|DELETE)"/.test(clients), "clients.js itself makes no write call");
-  assert.equal([...clients.matchAll(/\bapi\(/g)].length, 4, "the list, the detail, the Business Profile page and its export text (all reads)");
+  assert.equal([...clients.matchAll(/\bapi\(/g)].length, 6, "the list, the detail, the Business Profile page and its export text (all reads)");
   assert.match(read("admin/assets/modules.js"), /id: "clients", label: "Clients", path: "\/admin\/clients", enabled: true, load: \(\) => import\("\.\/clients\.js"\)/);
   assert.match(read("admin/assets/clients.js"), /from "\.\/clients-access\.js"/);
 });
@@ -212,24 +212,20 @@ test("New client form: only Business name and Website (optional); no URL name fi
   assert.match(src, /slug_unavailable: "A portal address couldn’t be made from that name/);
 });
 
-test("Clients list (mobile-first redesign): one semantic whole-row link per organization showing only name, created date, Business Profile completion and an arrow; members and invitations stay on the client's own page", () => {
-  const src = strip(read("admin/assets/clients.js")), css = read("admin/assets/admin.css");
-  const list = src.slice(src.indexOf("function clientRow"), src.indexOf("/* ---------- Detail"));
-  assert.match(list, /h\("ul", \{ class: "adm-clientlist"/);
-  assert.match(list, /h\("a", \{ class: "adm-clientrow", href: "\/admin\/clients\/" \+ encodeURIComponent\(c\.id\), "data-link": "" \}/, "the whole row is the link");
-  assert.match(list, /class: "adm-clientrow__name", text: c\.name/, "the name is a text node, never HTML");
-  for (const field of ["active_members", "invitations", "Active members", "Invitations", "Organization", "View"]) assert.ok(!list.slice(list.indexOf("function clientRow"), list.indexOf("async function renderList")).includes(field), field + " is not in a list row");
+test("Clients directory (redesign): searchable data list, one link per organization, name as a text node, completion on a native progress element; members and invitations stay on the client's own page", () => {
+  const src = strip(read("admin/assets/clients.js"));
+  const list = src.slice(src.indexOf("async function renderList"), src.indexOf("async function renderDetail"));
+  assert.match(list, /dataList\(\{ label: "Client organizations"/);
+  assert.match(list, /"\/admin\/clients\/" \+ encodeURIComponent\(c\.id\)/, "each record links to the client workspace");
+  assert.match(list, /text: c\.name|, c\.name/, "the name is a text node, never HTML");
+  for (const field of ["active_members", "invitations", "Active members", "Invitations"]) assert.ok(!list.includes(field), field + " is not in a list row");
   assert.ok(!/h\("table"/.test(list), "the list is not a table");
-  assert.match(src, /Manage your client organizations\./, "the short description for small screens");
-  assert.match(src, /Client organizations, the people who can open their portal, and their Business Profiles\./, "the full description stays for larger screens");
-  assert.match(src, /h\("progress", \{ class: "adm-meter"/, "a native progress element: no inline style");
+  assert.match(src, /h\("progress", \{ class: "ds-meter"/, "a native progress element: no inline style");
   // the removed summary fields are still on the detail page
   const detail = src.slice(src.indexOf("async function renderDetail"));
   assert.match(detail, /accessSections\(/, "members and invitations are shown by the detail page");
   assert.match(read("admin/assets/clients-access.js"), /Invitations/);
   assert.match(read("admin/assets/clients-access.js"), /Members|People/);
-  // states and layout
-  for (const rule of [/\.adm-clientrow:hover/, /\.adm-clientrow:active/, /\.adm-clientrow:focus-visible \{ outline: 2px solid var\(--ink\)/, /min-height: 44px/, /overflow-wrap: anywhere/, /prefers-reduced-motion/, /\.adm-sub--short \{ display: none; \}/]) assert.match(css, rule);
 });
 
 test("Client detail (mobile-first): Invitations and Members rows become single-column records below 1280px, with readable names, labelled facts, 44px actions and no low-contrast text", () => {

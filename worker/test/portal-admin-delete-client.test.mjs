@@ -218,5 +218,6 @@ test("the Clients list has no navigation arrow: the row is the link and the thre
   const js = readFileSync(new URL("../../admin/assets/clients.js", import.meta.url), "utf8");
   const css = readFileSync(new URL("../../admin/assets/admin.css", import.meta.url), "utf8");
   assert.ok(!/ARROW|clientrow__arrow/.test(js + css));
-  assert.match(js, /h\("li", \{ class: "adm-clientitem" \}, clientRow\(c\),\s*writes \? actionsMenu/);
+  assert.match(js, /actionsMenu\(\{ label: `Actions for \$\{c\.name\}`/, "the three-dot menu sits beside the row in the new directory");
+  assert.match(js, /dataList\(\{ label: "Client organizations"/, "the row is the link (a dataList record)");
 });
