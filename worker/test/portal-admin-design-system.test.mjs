@@ -77,7 +77,7 @@ test("the rebuilt pages use the shared kit instead of their own markup for summa
 });
 
 test("pages that must stay read-only or form-free keep their controls in the kit, and the support conversation no longer collides with the requirements grid", () => {
-  assert.ok(!/h\("input"/.test(strip(read("admin/assets/clients.js"))), "clients.js has no form control of its own");
+  assert.ok(!/h\("input"/.test(strip(read("admin/assets/clients.js"))), "clients.js has no form control of its own (the search box comes from the kit)");
   assert.match(read("admin/assets/support.js"), /class: "adm-acc adm-sreq"/);
   assert.ok(!/class: "adm-acc adm-req"/.test(read("admin/assets/support.js")));
 });
