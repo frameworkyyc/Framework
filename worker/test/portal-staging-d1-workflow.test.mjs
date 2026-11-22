@@ -105,8 +105,8 @@ test("script: the screenshot fingerprint must be identical before and after", ()
   for (const o of [{ websites: 3 }, { with_screenshot: 0 }, { bytes: 99 }, { hashes: "cd" }]) throwsFail(() => compareFingerprints(a, fingerprint(row(o))), /changed/);
   throwsFail(() => fingerprint("[]"), /fingerprint|JSON/); throwsFail(() => fingerprint("x"), /JSON/);
 });
-test("this workflow, its script and its environment are the only Staging migration path and do not change the Production check list", () => {
+test("this workflow, its script and its environment are the only Staging migration path and are not used by the Production workflow", () => {
   assert.deepEqual(STAGING.applicable, ["0031_website_staging_screenshot.sql"]);
-  assert.ok(!PROD.migrations.includes(STAGING.applicable[0]), "Production's own list is untouched (0031 joins it only with its Production release)");
+  assert.ok(PROD.migrations.includes(STAGING.applicable[0]), "0031 is in the shared migration list like every migration file; applying it to Production still needs the Production workflow and its own approval");
   assert.ok(!/staging-portal-d1/.test(readFileSync(new URL(".github/workflows/portal-production-d1-migration.yml", root), "utf8")));
 });

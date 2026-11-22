@@ -140,15 +140,15 @@ test("script: remote info must match the expected name AND id", () => {
 });
 test("script: pending migrations - the pending list must be a tail of the known, ordered list; apply needs at least one", () => {
   const ALL = F;
-  assert.equal(ALL.length, 28);
+  assert.equal(ALL.length, 29);
   assert.match(checkPendingBefore(listOf(...ALL), "apply"), /0001.*0002.*0003.*0004.*0005.*0006.*0007.*0008.*0009.*0010.*0011.*0012.*0013.*0014.*0015.*0016.*0017.*0018.*0020.*0022.*0023/, "an empty database takes all twenty-five");
   throwsFail(() => checkPendingBefore(LIST_PENDING, "apply"), /not the next ones in order/, "0001 alone pending would mean 0002 onwards were applied without it");
   assert.match(checkPendingBefore(listOf(...ALL.slice(4)), "apply"), /0005.*0006.*0007.*0008.*0009.*0010.*0011.*0012.*0013.*0014.*0015.*0016.*0017.*0018.*0020.*0022.*0023/, "a database at 0004: 0005 to 0025 pending");
-  assert.match(checkPendingBefore(listOf(...ALL.slice(1)), "apply"), /0002.*0028/, "a database that has only 0001");
-  assert.match(checkPendingBefore(listOf(ALL[27]), "apply"), /0030/, "only the last one pending");
-  assert.match(checkPendingBefore(listOf(ALL[24], ALL[25], ALL[26], ALL[27]), "apply"), /0026.*0027.*0028.*0030/, "a database at 0025: outreach tracking, the call queue, website analytics and the website workspace pending");
-  assert.match(checkPendingBefore(listOf(ALL[21], ALL[22], ALL[23], ALL[24], ALL[25], ALL[26], ALL[27]), "apply"), /0021.*0024.*0025.*0026.*0027.*0028.*0030/, "a database at 0023 that never had 0021: 0021, 0024, 0025, 0026, 0027, 0028 and 0030 pending");
-  assert.match(checkPendingBefore(listOf(ALL[27]), "verify-only"), /0030/, "Production now (0028 applied): only 0030 pending");
+  assert.match(checkPendingBefore(listOf(...ALL.slice(1)), "apply"), /0002.*0031/, "a database that has only 0001");
+  assert.match(checkPendingBefore(listOf(ALL[28]), "apply"), /0031/, "only the last one pending");
+  assert.match(checkPendingBefore(listOf(ALL[24], ALL[25], ALL[26], ALL[27], ALL[28]), "apply"), /0026.*0027.*0028.*0030.*0031/, "a database at 0025: outreach tracking, the call queue, website analytics, the website workspace and the Staging screenshot columns pending");
+  assert.match(checkPendingBefore(listOf(ALL[21], ALL[22], ALL[23], ALL[24], ALL[25], ALL[26], ALL[27], ALL[28]), "apply"), /0021.*0024.*0025.*0026.*0027.*0028.*0030.*0031/, "a database at 0023 that never had 0021: 0021, 0024, 0025, 0026, 0027, 0028, 0030 and 0031 pending");
+  assert.match(checkPendingBefore(listOf(ALL[28]), "verify-only"), /0031/, "Production now (0028 and 0030 applied): only 0031 would be pending");
   throwsFail(() => checkPendingBefore(listOf(ALL[21], ALL[23], ALL[24]), "apply"), /not the next ones in order/, "0024 skipped");
   throwsFail(() => checkPendingBefore(listOf(ALL[19], ALL[22], ALL[23], ALL[24]), "apply"), /not the next ones in order/, "0022 pending while 0023 is applied is not a tail");
   assert.match(checkPendingBefore(listOf(...ALL.slice(4)), "verify-only"), /0005/);
@@ -199,7 +199,7 @@ test("script: every expected table, index and migration file is exactly what the
   const dir = new URL("migrations/portal/", root);
   const files = readdirSync(dir).filter((f) => /^\d{4}_.*\.sql$/.test(f)).sort();
   assert.deepEqual(files, [...EXPECTED.migrations].sort(), "the migration folder and the expected list are the same files (the expected list is in APPLICATION order: Production received 0021 after 0023, so the strict tail check still holds)");
-  assert.deepEqual(EXPECTED.migrations.slice(-7), ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql", "0027_call_queue.sql", "0028_website_analytics.sql", "0030_website_workspace.sql"], "the LeadGen migrations (outreach tracking and the call queue), then analytics and the website workspace, are the tail, in the order wrangler applies them");
+  assert.deepEqual(EXPECTED.migrations.slice(-8), ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql", "0027_call_queue.sql", "0028_website_analytics.sql", "0030_website_workspace.sql", "0031_website_staging_screenshot.sql"], "the LeadGen migrations (outreach tracking and the call queue), then analytics, the website workspace and the Staging screenshot columns, are the tail, in the order wrangler applies them");
   throwsFail(() => checkPendingBefore(listOf("0006_brand_name.sql"), "apply"), /not the next ones in order/);
   throwsFail(() => checkPendingBefore(listOf("0005_branding.sql", "0007_client_services.sql"), "apply"), /not the next ones in order/);
   for (const st of STAGES) {
