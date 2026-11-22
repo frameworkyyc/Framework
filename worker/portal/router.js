@@ -622,13 +622,8 @@ const WEBSITE_ROUTES = [
       const res = await clientPackageResponse(brandDeps(ctx), { ...who(a), websiteId: id });
       return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
     } },
-  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/screenshot$/, action: "website.view", run: async (ctx, a, id) => {
-      if (!UUID.test(id)) return notFoundPage(ctx);
-      if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
-      const res = await clientScreenshotResponse(brandDeps(ctx), { role: a.membership.role, organizationId: a.membership.organizationId, websiteId: id });
-      return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
-    },
-  },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/screenshot$/, action: "website.view", run: (ctx, a, id) => websiteShot(ctx, a, id, "production") },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/screenshot\/staging$/, action: "website.view", run: (ctx, a, id) => websiteShot(ctx, a, id, "staging") }, // the Preview card's picture
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/analytics$/, action: "website.view", run: async (ctx, a, id) => {
       if (!UUID.test(id)) return notFoundPage(ctx);
       const org = a.membership.organizationId;
@@ -649,6 +644,14 @@ const WEBSITE_ROUTES = [
     },
   },
 ];
+
+/** A website's picture for one environment, only of a published website of the member's own organization (anything else is "not found"). */
+async function websiteShot(ctx, a, id, env) {
+  if (!UUID.test(id)) return notFoundPage(ctx);
+  if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
+  const res = await clientScreenshotResponse(brandDeps(ctx), { role: a.membership.role, organizationId: a.membership.organizationId, websiteId: id, env });
+  return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
+}
 
 /** What one website's page adds to its basics: its real milestones (for the progress bar) and its published SEO information. Both are scoped to the member's own organization. */
 async function siteExtras(ctx, a, site) {
