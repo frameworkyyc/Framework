@@ -98,13 +98,18 @@ function seoTeaser(vm, s, seo) {
   return `<section class="ws-sec" aria-labelledby="ws-seo-h"><h2 class="h2" id="ws-seo-h">SEO &amp; Search Visibility</h2><p class="ws__badges"><span class="status status--${seo.status === "not_started" ? "idle" : seo.status === "in_progress" ? "active" : "live"}">${e(SEO_STATUS_LABEL[seo.status] || "")}</span></p>${seo.summary ? `<p class="ws-sec__lead">${e(seo.summary)}</p>` : ""}<p><a class="btn" href="${e(href(vm, `/website/${s.id}/seo`))}">View SEO details<span class="visually-hidden"> for ${e(s.name)}</span></a></p></section>`;
 }
 
-function detailBody(vm, s, preview, extra = {}) {
-  const wk = extra.workspace ? workspaceSections(vm, s, extra.workspace) : "";
-  // With the review workspace (environments, updates & requests, request changes) on the page it comes first and the rest becomes the quieter "Website details" group; "Request a change" is then the form above, not a second button.
-  const rest = `${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${extra.analytics ? analyticsTeaser(vm, s) : ""}${management(vm, s, extra.management && wk ? { ...extra.management, inline: true } : extra.management)}${serviceCatalogue(vm, extra.services)}`;
-  return `<div class="ws__badges">${statusChip(s)}${managedChip(s)}</div>
-<p class="lead ws__lead">${e(statement(s))}</p>
-${wk ? `${wk}<div class="wk-details"><h2 class="wk-h wk-h--quiet">Website details</h2>${rest}</div>` : rest}`;
+function detailBody(vm, s, preview, extra = {}, { title = false } = {}) {
+  const intro = `<div class="ws__badges">${statusChip(s)}${managedChip(s)}</div>
+<p class="lead ws__lead">${e(statement(s))}</p>`;
+  if (!extra.workspace) {
+    const all = `${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${extra.analytics ? analyticsTeaser(vm, s) : ""}${management(vm, s, extra.management)}${serviceCatalogue(vm, extra.services)}`;
+    return `${intro}${all}`;
+  }
+  // The dashboard (website-workspace.js) comes first; everything that used to fill the page is kept in two groups under it, closed until opened: Details, and Additional services. The Analytics teaser is
+  // replaced by the traffic card, which links to the same Analytics page.
+  const details = `${intro}${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${management(vm, s, extra.management ? { ...extra.management, inline: true } : extra.management)}`;
+  const services = serviceCatalogue(vm, extra.services);
+  return workspaceSections(vm, s, { ...extra.workspace, title, details, services, servicesOpen: Boolean(extra.services && extra.services.flash), traffic: extra.traffic || null, analyticsLink: Boolean(extra.analytics) });
 }
 
 /* ------------------------------------------------------------------ Website management and Additional Services */
@@ -148,7 +153,7 @@ const requestsLink = (vm, m) => (m && m.requests && m.requests.total ? `<p class
 export function websiteOverview(vm, sites, preview = null, extra = {}) {
   const head = `<header class="page-head page-head--compact">${crumb(vm, [["Website"]])}<h1 class="h1 h1--section">Website</h1></header>`;
   if (!sites.length) return `${head}${emptyState()}${serviceCatalogue(vm, extra.services)}`;
-  if (sites.length === 1) return `${head}<h2 class="h2 ws__name">${e(sites[0].name)}</h2>${detailBody(vm, sites[0], preview, extra)}`;
+  if (sites.length === 1) return extra.workspace ? detailBody(vm, sites[0], preview, extra, { title: true }) : `${head}<h2 class="h2 ws__name">${e(sites[0].name)}</h2>${detailBody(vm, sites[0], preview, extra)}`;
   return `${head}<p class="lead">${e(`${sites.length} websites are listed for your business.`)}</p><ul class="hubs ws__list">${sites.map((s) => card(vm, s)).join("")}</ul>${requestsLink(vm, extra.management)}${serviceCatalogue(vm, extra.services)}`;
 }
 

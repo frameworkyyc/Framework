@@ -653,7 +653,23 @@ const WEBSITE_ROUTES = [
 /** What one website's page adds to its basics: its real milestones (for the progress bar) and its published SEO information. Both are scoped to the member's own organization. */
 async function siteExtras(ctx, a, site) {
   const org = a.membership.organizationId;
-  return { milestones: await listClientMilestones(ctx.db, org, site.id), seo: await getSeoForClient(ctx.db, org, site.id), analytics: await analyticsReady(ctx.db, ctx.now.getTime()), workspace: await getWorkspaceForClient(ctx.db, org, site.id), workspaceMsg: { flash: viewFilters(ctx.url).wkFlash, error: viewFilters(ctx.url).wkError } };
+  const analytics = await analyticsReady(ctx.db, ctx.now.getTime());
+  return { milestones: await listClientMilestones(ctx.db, org, site.id), seo: await getSeoForClient(ctx.db, org, site.id), analytics, traffic: await trafficPreview(ctx, org, site.id, analytics), workspace: await getWorkspaceForClient(ctx.db, org, site.id), workspaceMsg: { flash: viewFilters(ctx.url).wkFlash, error: viewFilters(ctx.url).wkError } };
+}
+
+/**
+ * The traffic card on the Website dashboard: the Cloudflare Web Analytics answer for the default period, from the same analytics service as the Analytics page (cached 30 minutes, so most page views
+ * read the database only). The wait is short, so this page never hangs on Cloudflare; a slow or failed read says "couldn't load" and nothing is invented. null when analytics is not available here.
+ */
+async function trafficPreview(ctx, org, websiteId, ready) {
+  if (!ready) return null;
+  let timer;
+  try {
+    const slow = new Promise((res) => { timer = setTimeout(() => res("slow"), 3000); });
+    const model = await Promise.race([loadAnalytics({ env: ctx.env, db: ctx.db, organizationId: org, websiteId, range: DEFAULT_RANGE, now: ctx.now, fetch: ctx.fetch }), slow]);
+    if (model === "slow") return { state: "error", code: "slow" };
+    return model && model.sources ? model.sources.cloudflare : null;
+  } catch { return { state: "error", code: "failed" }; } finally { clearTimeout(timer); }
 }
 
 /** On the list of several websites: only the link to the website requests (each website's own page has its management actions). */
