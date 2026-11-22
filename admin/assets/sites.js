@@ -52,6 +52,10 @@ async function renderList(ctx) {
   };
   const renewals = all.filter((s) => { const r = nextRenewal(s); return r && r.days <= 60; }).length;
   const waiting = all.reduce((n, s) => n + needsClient(s), 0);
+  if (clientFilter && all.length) {
+    const addBtn = button("Add website", { icon: "plus", onClick: () => addDrawer(ctx, clientFilter) });
+    return { title: "Websites", node: h("div", { class: "ds-page" }, pageHead({ title: `Websites: ${clientName}`, sub: "Manage each website’s Production and Staging addresses, domain, hosting and more.", actions: addBtn, back: ["All websites", "/admin/websites"] }), manageGrid(all)), crumbs: [["Admin", "/admin"], ["Websites", "/admin/websites"], [clientName, null]] };
+  }
   const kpis = grid(
     span(kpi({ label: "Websites", value: String(counts.all), note: clientName ? `for ${clientName}` : "across all clients" }), 3),
     span(kpi({ label: "Live", value: String(counts.live), note: counts.dev ? `${plural(counts.dev, "website")} in development` : "None in development", tone: "ok" }), 3),
@@ -225,12 +229,31 @@ export async function render(ctx) {
   return renderList(ctx);
 }
 
-/** One client's websites, for the Websites tab of the client workspace: the same rows as the Websites list, for that client only. */
+/** One website as a management card (the single-client view): name and domain, Production and Staging status, analytics connection, renewal, and a clear Manage action. */
+function manageCard(s, only) {
+  const live = isLive(s), r = nextRenewal(s), cf = s.analytics.cloudflare, gsc = s.analytics.searchConsole, wait = needsClient(s);
+  const env = (label, url, pillNode, empty) => h("div", { class: "ds-mg__env" }, h("span", { class: "ds-mg__k", text: label }), pillNode, url ? h("span", { class: "ds-mg__host", text: host(url) }) : h("span", { class: "ds-muted", text: empty }));
+  const rows = [
+    env("Production", s.productionUrl, pill(live ? "Live" : s.productionUrl ? STATUS[s.status] || "Not live" : "No address yet", live ? "ok" : "quiet"), "Add the address in Environments"),
+    env("Staging", s.stagingUrl, pill(s.stagingUrl ? "Set up" : "Not set up", s.stagingUrl ? "info" : "quiet"), "No Staging address yet"),
+    h("div", { class: "ds-mg__env" }, h("span", { class: "ds-mg__k", text: "Analytics" }), h("span", { class: "ds-conn" }, h("span", { class: "ds-conn__i" }, h("i", { class: "ds-dot ds-dot--" + (cf ? "ok" : "quiet"), "aria-hidden": "true" }), "Traffic ", cf ? "connected" : "not connected"), h("span", { class: "ds-conn__i" }, h("i", { class: "ds-dot ds-dot--" + (gsc ? "ok" : "quiet"), "aria-hidden": "true" }), "Search ", gsc ? "connected" : "not connected"))),
+    h("div", { class: "ds-mg__env" }, h("span", { class: "ds-mg__k", text: "Renewals" }), r ? pill(r.label, r.tone) : h("span", { class: "ds-muted", text: "No renewal dates saved" })),
+  ];
+  const el = card({ cls: "ds-mg" + (only ? " ds-mg--only" : ""), title: s.name, sub: s.productionUrl ? host(s.productionUrl) : "No address yet",
+    actions: wait ? pill([s.awaitingReview ? `${s.awaitingReview} to review` : "", s.openTasks ? plural(s.openTasks, "task") : ""].filter(Boolean).join(" · "), "warn") : null,
+    body: h("div", { class: "ds-mg__rows" }, rows), foot: button("Manage website", { tone: "solid", href: "/admin/websites/" + enc(s.id) }) });
+  return el;
+}
+
+/** The single-client view: a grid of management cards (one website fills the width). */
+function manageGrid(mine) { return h("div", { class: "ds-mg__grid" + (mine.length === 1 ? " ds-mg__grid--one" : "") }, mine.map((s) => manageCard(s, mine.length === 1))); }
+
+/** One client's websites, for the Websites tab of the client workspace. */
 export async function clientWebsites(orgId, ctx) {
   let data;
   try { data = await api("/websites"); } catch (err) { return h("div", { class: "ds-page" }, errorState(err, ctx.retry)); }
   const mine = (data.websites || []).filter((w) => w.organizationId === orgId);
-  const add = button("Add website", { tone: "solid", icon: "plus", onClick: () => addDrawer(ctx, orgId) });
-  return h("div", null, card({ title: "Websites", sub: mine.length ? `${plural(mine.length, "website")}. Open one to edit its Production and Staging addresses, domain, hosting and more.` : undefined, actions: add,
-    body: mine.length ? dataList({ label: "Websites", cls: "ds-dl--sites", columns: SITE_COLS, rows: mine.map((s) => ({ ...s, href: "/admin/websites/" + enc(s.id) })) }) : empty({ title: "No website yet", body: "A client with no website simply has none listed. Add one when they have one, or when Framework starts building it.", ic: "websites" }) }));
+  const add = button("Add website", { tone: mine.length ? "" : "solid", icon: "plus", onClick: () => addDrawer(ctx, orgId) });
+  return h("div", null, h("div", { class: "ds-mg__bar" }, h("p", { class: "ds-muted", text: mine.length ? `${plural(mine.length, "website")}. Manage one to edit its Production and Staging addresses, domain, hosting and more.` : "" }), add),
+    mine.length ? manageGrid(mine) : card({ body: empty({ title: "No website yet", body: "A client with no website simply has none listed. Add one when they have one, or when Framework starts building it.", ic: "websites" }) }));
 }
