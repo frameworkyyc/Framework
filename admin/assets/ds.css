@@ -456,3 +456,8 @@ progress.ds-meter::-webkit-progress-bar { background: var(--ds-line); } progress
 .ds-main .adm-wsr .adm-actions__danger { margin-left: auto; }
 .ds-main .adm-wsr .btn.adm-small { min-height: 40px; padding: 0 18px; }
 @media (max-width: 599px) { .ds-main .adm-wsr .adm-acc__sum { padding: 14px 48px 14px 16px; } .ds-main .adm-wsr .adm-acc__sum::after { right: 16px; } .ds-main .adm-wsr .adm-acc__body { padding: 18px 16px 20px; } .ds-main .adm-wsr .adm-seo__row, .ds-main .adm-wsr__add { padding: 18px 16px 20px; grid-template-columns: minmax(0, 1fr); } .ds-main .adm-wsr .adm-actions__danger { margin-left: 0; } }
+.ds-main .adm-wsr > .acc__group { display: none; } /* the card above already says "Review with the client" */
+.ds-main .adm-wsr > .adm-muted { margin: 0 0 4px; max-width: 62em; font-size: 14px; line-height: 1.6; color: var(--ds-muted); }
+.ds-main .adm-wsr .adm-acc:first-of-type { margin-top: 16px; }
+.ds-main .adm-wsr .adm-acc__meta { font-size: 13px; }
+.ds-main .adm-wsr .adm-acc__body > .adm-muted { font-size: 14px; line-height: 1.6; color: var(--ds-muted); }

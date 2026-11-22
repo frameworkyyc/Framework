@@ -22,8 +22,8 @@ const noInline = (h) => !/ style=|<style|<script|javascript:|\son[a-z]+=["']/i.t
 test("cards: pending items under Needs your attention with a count, everything decided under Recent updates; every row is closed until chosen", () => {
   const ws = WS([U({ title: "Review homepage" }), U({ title: "Services page refined", status: "approved", decidedAt: "2026-11-12T10:00:00.000Z" }), U({ title: "Gallery added", kind: "info", status: "info" })], [T({ title: "Confirm service area", cta: "respond", dueDate: "2026-11-10" }), T({ title: "Send logo files", status: "done", updatedAt: "2026-10-22T10:00:00.000Z" })]);
   const h = workspaceSections(vm, SITE, O(ws, { title: true }));
-  const needs = /<section class="wd-card wd-needs"[\s\S]*?<\/section>/.exec(h)[0], recent = /<section class="wd-card wd-recent"[\s\S]*?<\/section>/.exec(h)[0];
-  assert.match(needs, /Needs your attention <span class="wd-count">2</);
+  const needs = /<section class="wd-card wd-needs[^"]*"[\s\S]*?<\/section>\s*<section class="wd-card wd-recent"|<section class="wd-card wd-needs[^"]*"[\s\S]*?<\/section>/.exec(h)[0], recent = /<section class="wd-card wd-recent"[\s\S]*?<\/section>/.exec(h)[0];
+  assert.match(needs, /<h2 id="wd-needs-h">Needs your attention<\/h2>/); assert.match(needs, /<span class="wd-count" aria-label="2 pending">2</); assert.match(needs, /2 items are waiting for you/); assert.equal((needs.match(/<article class="wd-item"/g) || []).length, 2, "each pending item is its own entry");
   assert.ok(needs.includes("Review homepage") && needs.includes("Confirm service area") && !needs.includes("Services page refined") && !needs.includes("Send logo files"));
   assert.ok(recent.includes("Services page refined") && recent.includes("Gallery added") && recent.includes("Send logo files") && !recent.includes("Review homepage"));
   assert.match(needs, /Overdue since Nov 10/); assert.match(needs, /wd-mk--late/, "an overdue task is marked, with words as well as colour");
@@ -126,4 +126,21 @@ test("the stylesheet: sharp corners, no shadow, no inline style hooks, reduced m
   assert.deepEqual(["needs", "req", "recent", "traffic"].map(order), [3, 4, 5, 6]);
   const js = src("worker/portal/website-workspace.js");
   assert.ok(!/style=|<script|innerHTML|fetch\(/.test(js), "the renderer writes no inline style or script and fetches nothing");
+});
+
+test("Needs your attention is an approval workspace: a prominent card with a pending count, one entry per item with details behind a disclosure, green Approve, red Reject that opens a required reason box, and the existing routes", () => {
+  const ws = WS([U({ title: "Review homepage", detail: "New hero and spacing." })], [T({ title: "Confirm service area", cta: "respond" })]);
+  const h = workspaceSections(vm, SITE, O(ws, { title: true, canDecide: true }));
+  const needs = /<section class="wd-card wd-needs wd-needs--live"[\s\S]*?<\/section>/.exec(h)[0];
+  assert.match(needs, /Action needed/); assert.match(needs, /aria-label="2 pending"/); assert.match(needs, /2 items are waiting for you\. Approve, or reject with a reason\./);
+  const item = /<article class="wd-item" id="update-[^"]+"[\s\S]*?<\/article>/.exec(needs)[0];
+  assert.match(item, /<h3 class="wd-item__t"[^>]*>Review homepage<\/h3>/); assert.match(item, /wd-s[^>]*>[\s\S]*Awaiting review/); assert.match(item, /<details class="wd-item__more"><summary class="wd-link">View details/); assert.match(item, /New hero and spacing\./);
+  assert.match(item, /<form class="wd-item__ap" method="post" action="[^"]*\/updates\/[^"/]+\/approve">[\s\S]*class="wd-btn wd-btn--approve"[^>]*>[\s\S]*Approve/);
+  assert.match(item, /<input class="wd-item__tgl visually-hidden" type="checkbox" id="rj-[^"]+"><label class="wd-btn wd-btn--reject" for="rj-[^"]+">[\s\S]*Reject/);
+  assert.match(item, /<form class="wd-item__rjf" method="post" action="[^"]*\/updates\/[^"/]+\/reject">[\s\S]*<textarea[^>]*name="note"[^>]*minlength="3"[^>]*required>[\s\S]*Confirm rejection/, "a reason is required before the rejection is sent");
+  assert.ok(!/<details[^>]*\sopen[\s>]/.test(h)); assert.ok(noInline(h));
+  const empty = workspaceSections(vm, SITE, O(WS([], []), { title: true }));
+  assert.match(empty, /class="wd-card wd-needs"/); assert.match(empty, /You are all caught up\./); assert.match(empty, /Nothing needs you right now/);
+  const member = workspaceSections(vm, SITE, O(ws, { title: true, canDecide: false }));
+  assert.ok(!/wd-btn--approve/.test(member), "a member who may not decide sees no Approve or Reject");
 });

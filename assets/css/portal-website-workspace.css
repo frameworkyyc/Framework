@@ -46,7 +46,8 @@
 
 /* the two website cards: the picture first, or a neutral panel that says why there is none */
 .wd-shot { position: relative; flex: none; width: 100%; aspect-ratio: 16 / 9; background: #F1F1EF; overflow: hidden; }
-.wd-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center; display: block; } /* the whole picture, never cropped or stretched, whatever its size or shape; the neutral ground shows around it */
+.wd-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; } /* full-bleed: the picture always fills the box (no side bars), anchored at the top where a website's header and hero are; a very wide or tall image is cropped, never stretched */
+.wd-shot::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .07); background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(0, 0, 0, 0) 38%); }
 .wd-shot--none { display: grid; align-content: center; justify-items: start; gap: 10px; padding: clamp(16px, 2vw, 28px); background: repeating-linear-gradient(135deg, #F1F1EF 0 10px, #E9E9E7 10px 20px); color: var(--slate); }
 .wd-none { margin: 0; max-width: 28em; font-size: 14px; line-height: 1.5; }
 .wd-foot { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
@@ -187,3 +188,41 @@ details[open] > summary > .wd-pl::after { transform: rotate(0); }
   .wd-moreg > summary { grid-template-columns: minmax(0, 1fr) 14px; grid-template-areas: "t p" "s s"; }
   .wd-moreg > summary b { grid-area: t; } .wd-moreg > summary span { grid-area: s; } .wd-moreg > summary .wd-pl { grid-area: p; }
 }
+
+/* ---------- Needs your attention: the approval workspace ---------- */
+.wd-needs { padding: 0; gap: 0; overflow: hidden; }
+.wd-needs__head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: clamp(18px, 2vw, 26px); border-bottom: 1px solid var(--wd-rule, #E4E4E1); }
+.wd-needs__k { margin: 0 0 6px; font: 600 11px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--slate); }
+.wd-needs__head h2 { margin: 0; }
+.wd-needs__sub { margin: 6px 0 0; font-size: 14px; line-height: 1.45; color: var(--slate); }
+.wd-needs--live .wd-needs__head { background: var(--ink); color: #fff; border-bottom: 0; }
+.wd-needs--live .wd-needs__k, .wd-needs--live .wd-needs__sub { color: #C9C9C6; }
+.wd-needs--live .wd-count { flex: none; display: grid; place-items: center; min-width: 44px; height: 44px; margin: 0; padding: 0 10px; background: #fff; color: var(--ink); font: 700 20px/1 var(--font-display); }
+.wd-needs__list { display: grid; gap: 14px; padding: clamp(14px, 1.8vw, 22px); background: #F4F4F2; }
+.wd-needs > .wd-empty { margin: 0; padding: clamp(18px, 2vw, 26px); }
+.wd-item { display: grid; gap: 14px; padding: 20px 22px 22px; border: 1px solid #E1E1DE; background: #fff; box-shadow: inset 4px 0 0 var(--ink); }
+.wd-item__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
+.wd-item__id { min-width: 0; flex: 1 1 220px; }
+.wd-item__t { margin: 0; font: 600 18px/1.25 var(--font-display); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.wd-item__m { margin: 4px 0 0; font-size: 13px; color: var(--slate); }
+.wd-item__more > summary { display: inline-flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; }
+.wd-item__more > summary::-webkit-details-marker { display: none; }
+.wd-item__d { margin-top: 12px; padding: 14px 16px; background: #F4F4F2; font-size: 15px; line-height: 1.55; }
+.wd-item__d p { margin: 0 0 8px; } .wd-item__d p:last-child { margin-bottom: 0; }
+.wd-item__acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+.wd-item__acts--task { display: block; }
+.wd-item__ap { display: contents; }
+.wd-item__ap .wd-btn, .wd-item__acts > .wd-btn--reject { width: 100%; justify-content: center; min-height: 48px; }
+.wd-btn--approve { background: #1E7B3F; border-color: #1E7B3F; color: #fff; }
+.wd-btn--approve:hover { background: #17622F; border-color: #17622F; }
+.wd-btn--reject, .wd-btn--reject-solid { background: #B42318; border-color: #B42318; color: #fff; }
+.wd-btn--reject:hover, .wd-btn--reject-solid:hover { background: #8F1B12; border-color: #8F1B12; }
+.wd-btn .wd-ic { flex: none; }
+.wd-item__tgl { position: absolute; }
+.wd-item__tgl:focus-visible + .wd-btn--reject { outline: 3px solid #B42318; outline-offset: 3px; }
+.wd-item__tgl:checked + .wd-btn--reject { background: #fff; color: #B42318; }
+.wd-item__rjf { display: none; grid-column: 1 / -1; margin-top: 4px; padding: 16px; border: 1px solid #F0C4BF; background: #FDF3F2; }
+.wd-item__tgl:checked ~ .wd-item__rjf { display: block; animation: wd-rise .22s var(--wd-ease, ease) both; }
+.wd-item__rjf textarea { width: 100%; min-height: 110px; padding: 12px 14px; box-sizing: border-box; }
+.wd-item__rjf .wd-acts { margin: 12px 0 0; }
+@media (max-width: 640px) { .wd-item { padding: 16px; } .wd-item__acts { grid-template-columns: 1fr; } .wd-needs__list { padding: 12px; } .wd-needs--live .wd-count { min-width: 40px; height: 40px; } }
