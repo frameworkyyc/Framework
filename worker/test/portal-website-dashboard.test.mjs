@@ -38,7 +38,7 @@ test("approval and tasks keep their controls: Approve, Reject with required note
   assert.match(owner, new RegExp(`action="/portal/o/alpha/website/${SITE.id}/updates/${u.id}/approve"`)); assert.match(owner, new RegExp(`action="/portal/o/alpha/website/${SITE.id}/updates/${u.id}/reject"`));
   assert.match(owner, /<textarea[^>]*name="note"[^>]*minlength="3"[^>]*required/); assert.match(owner, /name="csrf" value="tok"/);
   assert.match(owner, new RegExp(`/website/${SITE.id}/tasks/${rs.id}/respond`)); assert.match(owner, /requests\/new\?kind=change&amp;title=Upload%20project%20photos/);
-  assert.match(owner, /<a class="wd-link" href="https:\/\/staging\.alpha\.example\.ca\/?"[^>]*>Open preview ↗/);
+  assert.match(owner, /<a class="wd-link" href="https:\/\/staging\.alpha\.example\.ca\/?"[^>]*>Open preview <svg class="wd-ar"/);
   const member = workspaceSections(vm, SITE, O(WS([u], [rs]), { canDecide: false }));
   assert.ok(!/updates\/[^"]+\/approve/.test(member) && /An account owner can approve or reject this update\./.test(member));
   assert.match(member, new RegExp(`/tasks/${rs.id}/respond`), "any member can still answer a task");
@@ -78,7 +78,7 @@ test("website traffic: genuine figures only. Real data shows numbers; stale says
   assert.match(stale, /Showing the figures read on Nov 20/);
   for (const traffic of [null, { state: "not_enabled" }, { state: "not_connected" }]) {
     const h = workspaceSections(vm, SITE, O(WS([], []), { traffic, analyticsLink: false }));
-    assert.match(h, /Not connected yet/); assert.ok(!/wd-big|<svg|<rect |analytics"/.test(h), "no figures, no chart, and no link to a page that does not exist");
+    assert.match(h, /Not connected yet/); assert.ok(!/wd-big|<svg class="wd-spark"|<rect |analytics"/.test(h), "no figures, no chart, and no link to a page that does not exist");
   }
   const err = workspaceSections(vm, SITE, O(WS([], []), { traffic: { state: "error", code: "query_failed" }, analyticsLink: true }));
   assert.match(err, /Couldn’t load right now/); assert.ok(!/wd-big|<rect /.test(err));

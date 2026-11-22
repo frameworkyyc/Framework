@@ -119,11 +119,17 @@ body:not(.auth) .wd-card--tone { background: var(--ds-card); }
 body:not(.auth) .wd-card--ink { background: var(--ds-ink); border-color: var(--ds-ink); }
 body:not(.auth) .wd-prev.wd-card--ink { background: var(--ds-card); color: var(--ds-ink); border-color: var(--ds-line); }
 body:not(.auth) .wd-prev.wd-card--ink .wd-u, body:not(.auth) .wd-prev.wd-card--ink .wd-m { color: var(--ds-muted); }
-body:not(.auth) .wd-prev.wd-card--ink .wd-btn { background: var(--ds-ink); color: #fff; border-color: var(--ds-ink); }
 body:not(.auth) .wd-shot { border-radius: var(--ds-r); }
 body:not(.auth) .wd-shot--none { background: var(--ds-soft); border-radius: var(--ds-r); }
-body:not(.auth) .wd-btn { border-radius: var(--ds-pill); min-height: 44px; }
-body:not(.auth) .wd-btn--line { border-color: var(--ds-line-strong); background: var(--ds-card); }
+/* the two website action buttons ("Open live site", "Open preview") share one shape: pill, 44px, same padding, icon aligned; only the colour differs (outlined for Live, solid for Preview) */
+body:not(.auth) .wd-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 22px; border-radius: var(--ds-pill); border: 1px solid var(--ds-ink); line-height: 1; }
+body:not(.auth) .wd-btn .wd-ar { width: 14px; height: 14px; }
+body:not(.auth) .wd-card .wd-btn--line { background: var(--ds-card); color: var(--ds-ink); border-color: var(--ds-ink); }
+body:not(.auth) .wd-card .wd-btn--line:hover { background: var(--ds-ink); color: #fff; }
+body:not(.auth) .wd-card .wd-btn--solid, body:not(.auth) .wd-card--ink .wd-btn--solid { background: var(--ds-ink); color: #fff; border-color: var(--ds-ink); }
+body:not(.auth) .wd-card .wd-btn--solid:hover { background: #2a2a2a; }
+body:not(.auth) .wd-card--ink .wd-btn:not(.wd-btn--solid):not(.wd-btn--line) { background: #fff; color: var(--ds-ink); border-color: #fff; }
+body:not(.auth) .wd-link { gap: 6px; }
 body:not(.auth) .wd-need { border-radius: var(--ds-pill); background: #FBEFD9; color: var(--ds-warn); letter-spacing: .06em; }
 body:not(.auth) .wd-count { border-radius: var(--ds-pill); background: var(--ds-soft); color: var(--ds-ink); }
 body:not(.auth) .wd-tag { border-radius: var(--ds-pill); border-color: var(--ds-line-strong); letter-spacing: .08em; padding: 3px 9px; }
@@ -135,4 +141,5 @@ body:not(.auth) .wd-wrap { width: calc(100% - 2 * var(--gutter)); max-width: cal
 body:not(.auth) .wd-moreg { margin-top: 14px; border: 1px solid var(--ds-line); border-radius: var(--ds-r-lg); background: var(--ds-card); box-shadow: var(--ds-shadow-1); overflow: hidden; }
 body:not(.auth) .wd-moreg > summary { padding-left: 22px; padding-right: 22px; }
 body:not(.auth) .wd-row > summary { border-radius: var(--ds-r-sm); }
-body:not(.auth) .wd-rq > summary, body:not(.auth) .wd-card--ink .wd-btn { border-radius: var(--ds-r); }
+body:not(.auth) .wd-rq > summary { border-radius: var(--ds-pill); }
+@media (max-width: 640px) { body:not(.auth) .wd-foot .wd-btn { padding: 0 14px; font-size: 13px; white-space: nowrap; gap: 6px; } }
