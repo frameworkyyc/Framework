@@ -11,6 +11,7 @@ import * as views from "./views.js";
 import * as guided from "./guided.js";
 import * as live from "./profile-live.js";
 import * as brandingLive from "./branding-live.js";
+import * as bookLive from "./branding-book.js";
 import * as servicesLive from "./services-live.js";
 import * as websiteLive from "./website-live.js";
 import { frameSources } from "./website-preview.js";
@@ -72,7 +73,7 @@ function liveModel(ctx, { session, membership: m, returning }, data = {}) {
   };
 }
 
-async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, styles = [], ref = null, frameSrc = [] }) {
+async function shell(ctx, a, { title, active, body, status = 200, vm, script = null, styles = [], ref = null, frameSrc = [], bleed = false }) {
   const { session, membership: m } = a;
   const fx = transitionsOn(ctx.env);
   // Header navigation of the connected portal: Home and Account (and Team for owners). Every other page is reached from Home.
@@ -80,11 +81,11 @@ async function shell(ctx, a, { title, active, body, status = 200, vm, script = n
   const wide = requestsEnabled(ctx.env);
   const list = wide ? requestsNav(ctx.env, m.role) : [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
   const current = wide ? activeKey(String(ctx.url.pathname).slice(vm.base.length)) : active === "account" || active === "team" ? active : "home";
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}`, fx });
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}`, bleed, fx });
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null, fx = false }) {
-  if (fx) return signInPage({ continueHref, ended });
+  if (fx) return signInPage({ continueHref, ended }); // the editorial sign-in (PORTAL_TRANSITIONS): same Continue and notices, minimal copy (no demo link)
   const notice = ended ? `<p class="muted">Your previous session has ended. Please sign in again.</p>` : "";
   const demo = demoHref ? `<p class="auth__alt">Not signed in yet? <a class="text-link" href="${e(demoHref)}">See a demonstration of the portal</a>. It uses sample data for a fictional client.</p>` : "";
   return htmlPage({
@@ -188,6 +189,13 @@ export async function brandingPage(ctx, a, brand, o = {}) {
   const csrf = await csrfFor(ctx.cfg, a.session);
   return shell(ctx, a, { title: "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, { ...o, csrf }), vm, script: brand.published ? BRANDING_SCRIPT : null, styles: Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [], ref: "branding" });
 }
+/** The Brand Book PROTOTYPE (Staging only): the same published brand as the Branding page, as a deck of stacked cards. Read-only; see branding-book.js. */
+export async function brandingBookPage(ctx, a, brand, o = {}) {
+  const vm = liveModel(ctx, a, {});
+  const fonts = Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [];
+  const own = brand.published && bookLive.paletteCss(brand.colours) ? [`${vm.base}/branding/book.css`] : [];
+  return shell(ctx, a, { title: "Brand Book (prototype)", active: "home", body: bookLive.brandBook(vm, brand, o), vm, script: "/assets/js/portal-branding-book.js", styles: ["/assets/css/portal-branding-book.css", ...own, ...fonts], ref: "branding", bleed: true });
+}
 /** Brand Discovery (signed-in): the list of assessments and the step pages. `body` is built by discovery/routes.js and discovery/pages.js (every value escaped there). */
 export async function discoveryPage(ctx, a, { title = "Brand Discovery", body, status = 200 }) {
   const vm = liveModel(ctx, a, {});
@@ -201,13 +209,23 @@ export async function brandingUploadsPage(ctx, a, o = {}) {
 }
 
 /** The Website section: `sites` is every website Framework published for this organization (the empty list is the "no website" state); `one` is a single website's own page. */
-export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null, milestones = [], seo = null, analytics = false } = {}) {
+export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null, milestones = [], seo = null, analytics = false, traffic = null, workspace = undefined, workspaceMsg = {} } = {}) {
   const vm = liveModel(ctx, a, {});
   const single = one || (sites.length === 1 ? sites[0] : null);
   // The live preview needs the page to be allowed to frame that one website: its verified origins go into THIS response's CSP only (frame-src); no other page and no global policy changes.
   const frameSrc = single ? frameSources(preview) : [];
-  const extra = { management, milestones, seo, analytics, services: services ? { ...services, csrf: await csrfFor(ctx.cfg, a.session) } : null };
-  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", body: one ? websiteLive.websiteDetail(vm, one, preview, extra) : websiteLive.websiteOverview(vm, sites, preview, extra), vm, ref: "website", frameSrc });
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  const perms = permissionsFor(a.membership.role);
+  // The review workspace (environments, updates & requests, request changes) belongs to ONE website's page; the router passes `workspace` (null/{available:false} where migration 0030 is not applied: only the environments and the request form then show).
+  const workspaceOpts = single && workspace !== undefined ? {
+    workspace, csrf, staff: Boolean(a.staff), canDecide: perms.includes("website.request") && !a.staff, canRespond: perms.includes("support.submit") && !a.staff, canRequest: perms.includes("support.submit"),
+    flash: workspaceMsg.flash || "", error: workspaceMsg.error || "", now: ctx.now,
+    requestSummary: management && management.requests && management.requests.open ? `${management.requests.open} open` : "",
+  } : null;
+  const extra = { management, milestones, seo, analytics, traffic, workspace: workspaceOpts, services: services ? { ...services, csrf } : null };
+  const body = one ? websiteLive.websiteDetail(vm, one, preview, extra) : websiteLive.websiteOverview(vm, sites, preview, extra);
+  // With the dashboard the page sits on its own grey ground, edge to edge (the portal header above is unchanged); the content keeps the portal's width inside it.
+  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", styles: workspaceOpts ? ["/assets/css/portal-website-workspace.css"] : [], body: workspaceOpts ? `<div class="wd-ground"><div class="wd-wrap">${body}</div></div>` : body, vm, ref: "website", frameSrc, bleed: Boolean(workspaceOpts) });
 }
 /** SEO & Search Visibility: a subsection of one website (not a main navigation item). `seo` is only what Admin has published. */
 export async function websiteSeoPage(ctx, a, site, seo) {

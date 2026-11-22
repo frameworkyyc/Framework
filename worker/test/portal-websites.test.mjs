@@ -27,7 +27,7 @@ const MIGRATION = read("migrations/portal/0011_websites.sql");
 
 async function setup({ migrated = true, storage = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld({ skip: migrated ? [] : ["0011_websites.sql", "0012_website_management.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql"] }); // every test world starts fully migrated; "unmigrated" is a database as it was before 0011
+  const w = await makeWorld({ skip: migrated ? [] : ["0011_websites.sql", "0012_website_management.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql", "0030_website_workspace.sql"] }); // every test world starts fully migrated; "unmigrated" is a database as it was before 0011
   const bucket = fakeR2();
   Object.assign(w.env, { PORTAL_BRANDING: "1", PORTAL_ADMIN_WRITES: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   if (storage) w.env.PORTAL_FILES = bucket;
@@ -238,8 +238,8 @@ test("the Admin client page links to Websites with counts, and the client list a
   await s.create(s.A, { ...SITE, managed_by_framework: true }); await s.create(s.A, { name: "Build", origin: "framework", status: "in_development" }); await s.create(s.A, { name: "Old", url: "https://old.example.ca", origin: "client", status: "existing" });
   const d = await s.call(`/clients/${s.A.id}`); assert.deepEqual(d.json.websites, { total: 3, live: 1, inDevelopment: 1, existing: 1, managed: 1 });
   const bare = await setup({ migrated: false }); assert.equal((await bare.call(`/clients/${bare.A.id}`)).json.websites, null, "no migration: no tile, no error");
-  const ui = read("admin/assets/websites.js"), clients = read("admin/assets/clients.js"), dash = read("admin/assets/client-dashboard.js");
-  assert.match(clients, /\\\/website\|/); assert.match(clients, /import\("\.\/websites\.js"\)/); assert.match(dash, /label: "Website"/); assert.match(dash, /href: `\/admin\/clients\/\$\{encodeURIComponent\(org\.id\)\}\/website`/);
+  const ui = read("admin/assets/sites.js") + read("admin/assets/site-blocks.js"), clients = read("admin/assets/clients.js"), dash = read("admin/assets/client-dashboard.js");
+  assert.match(clients, /\\\/website\|/); assert.match(clients, /\/admin\/websites\?client=/); assert.match(dash, /label: "Website"/); assert.match(dash, /href: `\/admin\/clients\/\$\{encodeURIComponent\(org\.id\)\}\/website`/);
   assert.ok(!/innerHTML|insertAdjacentHTML|style:/.test(ui), "no HTML injection or inline styles"); assert.match(ui, /rel: "noopener noreferrer"/); assert.match(ui, /type: "file", accept: "\.png,\.jpg,\.jpeg,\.webp"/);
   assert.match(ui, /Separate from where it stands/); assert.match(ui, /Never put passwords or logins here/);
 });
@@ -295,7 +295,7 @@ test("Admin can see what the portal's live-preview check sees for a website: ver
 });
 
 test("the Admin page offers a Check live preview button, and its source is valid JavaScript", () => {
-  const src = read("admin/assets/websites.js");
+  const src = read("admin/assets/site-blocks.js");
   assert.match(src, /Check live preview/); assert.match(src, /preview-check/);
   assert.ok(!/innerHTML/.test(src), "server text is never inserted as HTML");
 });

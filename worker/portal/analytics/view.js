@@ -56,6 +56,8 @@ const mail = (site, what) => `mailto:${e(CONTACT_EMAIL)}?subject=${encodeURIComp
 const ERROR_TEXT = {
   unauthorized: "Framework’s access to this source needs attention, so the figures can’t be loaded right now.",
   reconnect_needed: "Framework’s access to this source needs attention, so the figures can’t be loaded right now.",
+  credentials_key_missing: "Framework’s access to this source needs attention, so the figures can’t be loaded right now.",
+  credentials_unreadable: "Framework’s access to this source needs attention, so the figures can’t be loaded right now.",
   no_access: "Framework’s access to this website’s search data needs attention, so the figures can’t be loaded right now.",
   property_not_found: "The Search Console property recorded for this website wasn’t found. Framework needs to check it.",
   rate_limited: "The source is busy right now. Please try again in a few minutes.",

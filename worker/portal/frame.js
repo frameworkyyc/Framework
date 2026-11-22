@@ -12,7 +12,7 @@ export const MARK = `<svg class="brand__mark" viewBox="0 0 1092 1092" aria-hidde
 
 export const head = (title, { script = null, styles = [], cover = false, fx = false } = {}) => `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1${cover ? ", viewport-fit=cover" : ""}">
 <meta name="robots" content="noindex, nofollow"><meta name="referrer" content="no-referrer"><meta name="color-scheme" content="light"><title>${e(title)} | Framework</title>
-<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="${FONTS}"><link rel="stylesheet" href="/assets/css/portal.css">${styles.map((h) => `<link rel="stylesheet" href="${e(h)}">`).join("")}${fx ? `<meta name="fw-fx" content="${fx === "app" ? "app" : "page"}"><link rel="stylesheet" href="/assets/css/portal-transition.css"><script src="/assets/js/portal-transition.js"></script>` : ""}${script ? `<script src="${e(script)}" defer></script>` : ""}`;
+<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="${FONTS}"><link rel="stylesheet" href="/assets/css/portal.css">${styles.map((h) => `<link rel="stylesheet" href="${e(h)}">`).join("")}<link rel="stylesheet" href="/assets/css/portal-ds.css">${fx ? `<meta name="fw-fx" content="${fx === "app" ? "app" : "page"}"><link rel="stylesheet" href="/assets/css/portal-transition.css"><script src="/assets/js/portal-transition.js"></script>` : ""}${script ? `<script src="${e(script)}" defer></script>` : ""}`;
 
 export const footer = `<footer class="foot"><div class="wrap"><span>Framework · Calgary, Alberta</span><span><a href="/privacy.html">Privacy</a> · <a href="mailto:hello@frameworkco.ca">hello@frameworkco.ca</a></span></div></footer>`;
 

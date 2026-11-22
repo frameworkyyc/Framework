@@ -9,11 +9,14 @@ const ID = /^[A-Za-z0-9-]{1,40}$/;
 /** @returns {{type: string|undefined, project: string|undefined, from: string|undefined}} `from` is a service-request id the caller then checks against its own list */
 export function viewFilters(url) {
   const q = url && url.searchParams;
-  if (!q) return { type: undefined, project: undefined, from: undefined, saved: false, nochange: false, sent: false, uploaded: false, removed: false, requested: false, requestDup: false, preview: false, font: false, flash: "", kind: undefined, range: undefined };
+  if (!q) return { type: undefined, project: undefined, from: undefined, saved: false, nochange: false, sent: false, uploaded: false, removed: false, requested: false, requestDup: false, preview: false, font: false, flash: "", kind: undefined, range: undefined , wkFlash: "", wkError: "", title: "" };
   const type = q.get("type");
   const project = q.get("project");
   const from = q.get("from");
   const saved = q.get("saved");
   const sent = q.get("sent");
-  return { type: TYPES.has(type) ? type : undefined, project: typeof project === "string" && ID.test(project) ? project : undefined, from: typeof from === "string" && ID.test(from) ? from : undefined, saved: saved === "1", nochange: saved === "0", sent: sent === "1", uploaded: q.get("uploaded") === "1", removed: q.get("removed") === "1", requested: q.get("requested") === "1", requestDup: q.get("requested") === "0", preview: q.get("preview") === "1", font: q.get("font") === "1", flash: ["sent", "replied", "partial"].includes(q.get("flash")) ? q.get("flash") : "", kind: ["change", "support"].includes(q.get("kind")) ? q.get("kind") : undefined, range: [7, 30, 90].includes(Number(q.get("range"))) ? Number(q.get("range")) : undefined };
+  return { type: TYPES.has(type) ? type : undefined, project: typeof project === "string" && ID.test(project) ? project : undefined, from: typeof from === "string" && ID.test(from) ? from : undefined, saved: saved === "1", nochange: saved === "0", sent: sent === "1", uploaded: q.get("uploaded") === "1", removed: q.get("removed") === "1", requested: q.get("requested") === "1", requestDup: q.get("requested") === "0", preview: q.get("preview") === "1", font: q.get("font") === "1", flash: ["sent", "replied", "partial"].includes(q.get("flash")) ? q.get("flash") : "", kind: ["change", "support"].includes(q.get("kind")) ? q.get("kind") : undefined, range: [7, 30, 90].includes(Number(q.get("range"))) ? Number(q.get("range")) : undefined,
+    // the Website review workspace: the outcome shown after an approve, reject or answer, and a prefilled request title (plain text, control characters removed, 120 characters at most; escaped wherever it is shown)
+    wkFlash: ["approved", "rejected", "answered"].includes(q.get("flash")) ? q.get("flash") : "", wkError: ["invalid_note", "invalid_text", "already_decided", "not_found", "unavailable"].includes(q.get("err")) ? q.get("err") : "",
+    title: typeof q.get("title") === "string" ? q.get("title").replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, 120) : "" };
 }

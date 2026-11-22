@@ -13,6 +13,7 @@ import { stageOf, milestoneProgress } from "./website-stage.js";
 import { serviceCatalogue } from "./service-catalogue.js";
 import { SEO_STATUS_LABEL } from "./repo/website-seo.js";
 import { analyticsTeaser } from "./analytics/view.js";
+import { workspaceSections } from "./website-workspace.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
 const isWebUrl = (u) => typeof u === "string" && /^https?:\/\/[^\s"'<>]+$/.test(u);
@@ -97,10 +98,18 @@ function seoTeaser(vm, s, seo) {
   return `<section class="ws-sec" aria-labelledby="ws-seo-h"><h2 class="h2" id="ws-seo-h">SEO &amp; Search Visibility</h2><p class="ws__badges"><span class="status status--${seo.status === "not_started" ? "idle" : seo.status === "in_progress" ? "active" : "live"}">${e(SEO_STATUS_LABEL[seo.status] || "")}</span></p>${seo.summary ? `<p class="ws-sec__lead">${e(seo.summary)}</p>` : ""}<p><a class="btn" href="${e(href(vm, `/website/${s.id}/seo`))}">View SEO details<span class="visually-hidden"> for ${e(s.name)}</span></a></p></section>`;
 }
 
-function detailBody(vm, s, preview, extra = {}) {
-  return `<div class="ws__badges">${statusChip(s)}${managedChip(s)}</div>
-<p class="lead ws__lead">${e(statement(s))}</p>
-${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${extra.analytics ? analyticsTeaser(vm, s) : ""}${management(vm, s, extra.management)}${serviceCatalogue(vm, extra.services)}`;
+function detailBody(vm, s, preview, extra = {}, { title = false } = {}) {
+  const intro = `<div class="ws__badges">${statusChip(s)}${managedChip(s)}</div>
+<p class="lead ws__lead">${e(statement(s))}</p>`;
+  if (!extra.workspace) {
+    const all = `${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${extra.analytics ? analyticsTeaser(vm, s) : ""}${management(vm, s, extra.management)}${serviceCatalogue(vm, extra.services)}`;
+    return `${intro}${all}`;
+  }
+  // The dashboard (website-workspace.js) comes first; everything that used to fill the page is kept in two groups under it, closed until opened: Details, and Additional services. The Analytics teaser is
+  // replaced by the traffic card, which links to the same Analytics page.
+  const details = `${intro}${visual(vm, s, preview)}${progressBlock(s, extra.milestones || [])}${facts(s)}${seoTeaser(vm, s, extra.seo)}${management(vm, s, extra.management ? { ...extra.management, inline: true } : extra.management)}`;
+  const services = serviceCatalogue(vm, extra.services);
+  return workspaceSections(vm, s, { ...extra.workspace, title, details, services, servicesOpen: Boolean(extra.services && extra.services.flash), traffic: extra.traffic || null, analyticsLink: Boolean(extra.analytics) });
 }
 
 /* ------------------------------------------------------------------ Website management and Additional Services */
@@ -123,7 +132,7 @@ function management(vm, s, m) {
   const r = m.requests;
   const summary = r && r.total ? `<p class="ws-sec__more"><a class="text-link" href="${e(href(vm, "/website/requests"))}">Your website requests</a> <span class="muted small">${[r.unread ? `${r.unread} new ${r.unread === 1 ? "reply" : "replies"}` : "", r.open ? `${r.open} open` : "None open"].filter(Boolean).join(" · ")}</span></p>` : "";
   return `<section class="ws-sec" aria-labelledby="ws-mgmt-h"><h2 class="h2" id="ws-mgmt-h">Website management</h2>
-<ul class="ws-actions">${action("Download website files", downloadText, download)}${action("Request a change", "Ask for an update to your website, with details and files.", ask("change", "Request a change"))}${action("Get support", "Report a problem or ask for technical help.", ask("support", "Get support"))}</ul>${summary}${m.canRequest ? "" : `<p class="muted small">Only people with access to this account can send requests.</p>`}</section>`;
+<ul class="ws-actions">${action("Download website files", downloadText, download)}${m.inline ? "" : action("Request a change", "Ask for an update to your website, with details and files.", ask("change", "Request a change"))}${action("Get support", "Report a problem or ask for technical help.", ask("support", "Get support"))}</ul>${summary}${m.canRequest ? "" : `<p class="muted small">Only people with access to this account can send requests.</p>`}</section>`;
 }
 
 /** The empty state: no website has been added for this organization. */
@@ -144,7 +153,7 @@ const requestsLink = (vm, m) => (m && m.requests && m.requests.total ? `<p class
 export function websiteOverview(vm, sites, preview = null, extra = {}) {
   const head = `<header class="page-head page-head--compact">${crumb(vm, [["Website"]])}<h1 class="h1 h1--section">Website</h1></header>`;
   if (!sites.length) return `${head}${emptyState()}${serviceCatalogue(vm, extra.services)}`;
-  if (sites.length === 1) return `${head}<h2 class="h2 ws__name">${e(sites[0].name)}</h2>${detailBody(vm, sites[0], preview, extra)}`;
+  if (sites.length === 1) return extra.workspace ? detailBody(vm, sites[0], preview, extra, { title: true }) : `${head}<h2 class="h2 ws__name">${e(sites[0].name)}</h2>${detailBody(vm, sites[0], preview, extra)}`;
   return `${head}<p class="lead">${e(`${sites.length} websites are listed for your business.`)}</p><ul class="hubs ws__list">${sites.map((s) => card(vm, s)).join("")}</ul>${requestsLink(vm, extra.management)}${serviceCatalogue(vm, extra.services)}`;
 }
 

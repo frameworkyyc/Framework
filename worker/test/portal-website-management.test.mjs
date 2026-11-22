@@ -149,7 +149,8 @@ test("Request a change / Get support: ordinary support requests linked to the we
   assert.equal(s.w.env.PORTAL_SERVICES, undefined);
   assert.equal((await s.ann.get("/portal/o/alpha/services/requests")).status, 404, "Client Services stays off");
   const page = await html(await s.ann.get("/portal/o/alpha/website"));
-  assert.ok(page.includes(`/website/${id}/requests/new?kind=change`) && page.includes(`/website/${id}/requests/new?kind=support`));
+  // The Website page's redesign: "Request a change" is now the form on the page itself (same endpoint, a type selector for change or support); "Get support" keeps its own link. The standalone form is still routed (below).
+  assert.ok(page.includes(`action="/portal/o/alpha/website/${id}/requests"`) && page.includes('<option value="change">') && page.includes('<option value="support">') && page.includes(`/website/${id}/requests/new?kind=support`));
   const form = await html(await s.ann.get(`/portal/o/alpha/website/${id}/requests/new?kind=change`));
   assert.match(form, /name="title"/); assert.match(form, /name="description"/); assert.match(form, /type="file"/); assert.match(form, /does not authorize any paid work/i);
   assert.equal((await s.ann.get(`/portal/o/alpha/website/${id}/requests/new?kind=bogus`)).status, 404);

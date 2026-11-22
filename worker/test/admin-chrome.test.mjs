@@ -23,12 +23,11 @@ test("Home Screen: the Admin page names the app Framework Admin and uses the sam
   assert.equal(png.readUInt32BE(16), 180); assert.equal(png.readUInt32BE(20), 180);
 });
 
-test("Sidebar: no empty trailing nav group, and the footer adds no second divider under the last item", () => {
-  const js = text("admin/assets/admin.js"), css = text("admin/assets/admin.css");
-  assert.match(js, /rest\.length \? h\("div", \{ class: "adm-nav__group" \}, h\("ul", null, rest\.map\(navItem\)\)\) : null/);
-  const foot = css.match(/^\.adm-side__foot \{([^}]*)\}/m)[1];
-  assert.ok(!/border/.test(foot) && !/padding-top/.test(foot), "the last nav row's rule is the one divider");
-  assert.match(css, /^\.adm-nav__link \{[^}]*border-bottom: 1px solid var\(--hairline\)/m, "every nav row, the last included, ends in the same rule");
+test("Sidebar: six sections, the signed-in address and sign out in the footer, sections that are not built yet are not shown", () => {
+  const js = text("admin/assets/admin.js");
+  assert.match(js, /h\("ul", \{ class: "ds-nav" \}, NAV\.filter/);
+  assert.match(js, /class: "ds-side__foot"/); assert.match(js, /href: "\/cdn-cgi\/access\/logout"/);
+  assert.match(js, /ds-top/, "the top bar carries breadcrumbs, search and attention");
 });
 
 test("Overview: the Clients section (with Business Profile completion) is gone; client information stays on the Clients page, and an odd card out takes the full width", () => {

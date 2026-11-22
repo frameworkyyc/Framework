@@ -23,6 +23,7 @@ import { listRequirementSettings } from "./repo/brand-requirement-settings.js";
 import { listClientMilestones } from "./repo/website-milestones.js";
 import { stageOf, milestoneProgress } from "./website-stage.js";
 import { getSeoForClient } from "./repo/website-seo.js";
+import { getWorkspaceForClient, decideUpdate, respondTask } from "./repo/website-workspace.js";
 import { loadServiceCatalogue } from "./service-catalogue.js";
 import { mediaResponse } from "./service-media-files.js";
 import { listProjects, getProject } from "./repo/projects.js";
@@ -60,6 +61,7 @@ import * as supportRepo from "./repo/support.js";
 import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./support-files.js";
 import { dispatchNotifications } from "./service-notifications.js";
 import { fontCss } from "./brand-type.js";
+import { paletteCss } from "./branding-book.js";
 import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, clientRequestService, limitsFor } from "./brand-files.js";
 
 /**
@@ -410,7 +412,25 @@ async function downloadBrandFile(ctx, a, id, kind) {
   return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
 }
 
+/** The Brand Book prototype: only where the Staging-only demo switch (PORTAL_DEMO) is on, so it is a 404 on Production even if this code is released there. */
+const bookOn = (ctx) => brandingOn(ctx) && demoEnabled(ctx.env, ctx.cfg);
+
 const BRANDING_ROUTES = [
+  // The Brand Book PROTOTYPE (Staging only; read-only, no new data, no posting): the same published brand as the Branding page, as a deck of stacked cards. See branding-book.js.
+  { when: bookOn, re: /^\/portal\/o\/([^/]+)\/branding\/book$/, action: "branding.view", run: async (ctx, a) => {
+      const org = a.membership.organizationId;
+      const brand = await getClientBrand(ctx.db, org);
+      const kit = brand.published ? await getBrandKit(ctx.db, org) : null;
+      const discovery = discoveryOn(ctx) ? await listClientDiscoveries(ctx.db, org) : [];
+      return pages.brandingBookPage(ctx, a, brand, { discovery, canUpload: can(a.membership.role, "branding.upload"), brandName: kit && kit.brandName ? kit.brandName : "", orgName: a.membership.name, requirementSettings: (await listRequirementSettings(ctx.db, org)).items });
+    },
+  },
+  { when: bookOn, re: /^\/portal\/o\/([^/]+)\/branding\/book\.css$/, action: "branding.view", run: async (ctx, a) => {
+      // The card colours (.bb-c0 to .bb-c7) from the client's own published brand colours (validated #rrggbb only); empty when there are fewer than three.
+      const brand = await getClientBrand(ctx.db, a.membership.organizationId);
+      return withPortalHeaders(new Response(brand.published ? paletteCss(brand.colours) : "", { status: 200, headers: securityHeaders({ "Content-Type": "text/css; charset=utf-8" }) }));
+    },
+  },
   {
     when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding$/, action: "branding.view",
     run: async (ctx, a) => {
@@ -422,7 +442,7 @@ const BRANDING_ROUTES = [
       for (const r of await listServiceRequests(ctx.db, org)) if (!newest[r.serviceKey]) newest[r.serviceKey] = r;
       const f = viewFilters(ctx.url);
       const discovery = discoveryOn(ctx) ? await listClientDiscoveries(ctx.db, org) : [];
-      return pages.brandingPage(ctx, a, brand, { discovery, canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, requirementSettings: (await listRequirementSettings(ctx.db, org)).items, pricing: await loadPricing(ctx.db), notice: f.requested ? "sent" : f.requestDup ? "dup" : "" });
+      return pages.brandingPage(ctx, a, brand, { bookHref: bookOn(ctx) && a.staff ? `/portal/o/${a.membership.slug}/branding/book` : "", discovery, canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, requirementSettings: (await listRequirementSettings(ctx.db, org)).items, pricing: await loadPricing(ctx.db), notice: f.requested ? "sent" : f.requestDup ? "dup" : "" });
     },
   },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/request$/, action: "branding.view", postAction: "branding.request", bucket: "branding", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/branding`), post: (ctx, a) => requestBrandSection(ctx, a) },
@@ -532,7 +552,37 @@ async function postWebsiteReply(ctx, a, id) {
   return redirect(`/portal/o/${a.membership.slug}/website/requests/${id}?${res.attachmentsFailed ? "flash=partial" : "flash=replied"}`);
 }
 
+/**
+ * The review workspace's three client actions: approve an update, reject it with revision notes, and answer a task. Owners decide on updates (website.request); everyone in the organization may answer a task
+ * (support.submit). Framework master access previews the page but never decides or answers for the client. A decision is one compare-and-set, so a replay or a second click is "already decided".
+ */
+async function postWorkspace(ctx, a, kind, siteId, itemId) {
+  if (!UUID.test(siteId) || !UUID.test(itemId)) return notFoundPage(ctx);
+  const read = await readForm(ctx.request, MAX_FEEDBACK_FORM_BYTES);
+  if (read.error) return errorPage(read.error, { ref: ctx.ref });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) return errorPage(403, { ref: ctx.ref });
+  if (a.staff) return errorPage(403, { ref: ctx.ref }); // a preview of the client's page: staff never approve, reject or answer on the client's behalf
+  const org = a.membership.organizationId;
+  const site = await getClientWebsite(ctx.db, org, siteId);
+  if (!site) return notFoundPage(ctx);
+  const who = { userId: a.session.userId, email: a.session.email };
+  const back = (q) => redirect(`/portal/o/${a.membership.slug}/website/${siteId}?${q}#${kind === "respond" ? "needed" : "updates"}`);
+  const res = kind === "respond"
+    ? await respondTask(ctx.db, org, siteId, itemId, { text: read.fields.get("text") || "" }, who, { now: ctx.now })
+    : await decideUpdate(ctx.db, org, siteId, itemId, { decision: kind, note: read.fields.get("note") || "" }, who, { now: ctx.now });
+  logEvent({ evt: "website.workspace", outcome: res.ok ? "saved" : "refused", reason: res.ok ? kind : res.error, status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org, user: a.session.userId });
+  if (res.ok) return back(`flash=${kind === "respond" ? "answered" : kind === "approve" ? "approved" : "rejected"}`);
+  if (res.error === "not_found" && kind !== "respond") return notFoundPage(ctx);
+  return back(`err=${res.error}`);
+}
+
 const WEBSITE_ROUTES = [
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/updates\/([^/]+)\/approve$/, action: "website.view", postAction: "website.request",
+    run: async (ctx, a, id) => redirect(`/portal/o/${a.membership.slug}/website/${id}`), post: (ctx, a, id, uid) => postWorkspace(ctx, a, "approve", id, uid) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/updates\/([^/]+)\/reject$/, action: "website.view", postAction: "website.request",
+    run: async (ctx, a, id) => redirect(`/portal/o/${a.membership.slug}/website/${id}`), post: (ctx, a, id, uid) => postWorkspace(ctx, a, "reject", id, uid) },
+  { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/tasks\/([^/]+)\/respond$/, action: "website.view", postAction: "support.submit",
+    run: async (ctx, a, id) => redirect(`/portal/o/${a.membership.slug}/website/${id}`), post: (ctx, a, id, tid) => postWorkspace(ctx, a, "respond", id, tid) },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website$/, action: "website.view", run: async (ctx, a) => {
       const sites = await listClientWebsites(ctx.db, a.membership.organizationId);
       const single = sites.length === 1 ? sites[0] : null;
@@ -561,7 +611,8 @@ const WEBSITE_ROUTES = [
       if (!UUID.test(id)) return notFoundPage(ctx);
       const kind = kindOf(viewFilters(ctx.url).kind || "");
       const site = await getClientWebsite(ctx.db, a.membership.organizationId, id);
-      return site && kind ? pages.websiteRequestFormPage(ctx, a, site, kind, {}) : notFoundPage(ctx);
+      const title = viewFilters(ctx.url).title; // a task's "Upload files" link names what the files are for: it only prefills the title field
+      return site && kind ? pages.websiteRequestFormPage(ctx, a, site, kind, title ? { values: { title } } : {}) : notFoundPage(ctx);
     } },
   { when: websiteOn, re: /^\/portal\/o\/([^/]+)\/website\/([^/]+)\/requests$/, action: "support.view", postAction: "support.submit", bucket: "support", maxBody: () => SUPPORT_BODY,
     run: async (ctx, a, id) => redirect(`/portal/o/${a.membership.slug}/website/${id}`), post: (ctx, a, id) => postWebsiteRequest(ctx, a, id) },
@@ -602,7 +653,23 @@ const WEBSITE_ROUTES = [
 /** What one website's page adds to its basics: its real milestones (for the progress bar) and its published SEO information. Both are scoped to the member's own organization. */
 async function siteExtras(ctx, a, site) {
   const org = a.membership.organizationId;
-  return { milestones: await listClientMilestones(ctx.db, org, site.id), seo: await getSeoForClient(ctx.db, org, site.id), analytics: await analyticsReady(ctx.db, ctx.now.getTime()) };
+  const analytics = await analyticsReady(ctx.db, ctx.now.getTime());
+  return { milestones: await listClientMilestones(ctx.db, org, site.id), seo: await getSeoForClient(ctx.db, org, site.id), analytics, traffic: await trafficPreview(ctx, org, site.id, analytics), workspace: await getWorkspaceForClient(ctx.db, org, site.id), workspaceMsg: { flash: viewFilters(ctx.url).wkFlash, error: viewFilters(ctx.url).wkError } };
+}
+
+/**
+ * The traffic card on the Website dashboard: the Cloudflare Web Analytics answer for the default period, from the same analytics service as the Analytics page (cached 30 minutes, so most page views
+ * read the database only). The wait is short, so this page never hangs on Cloudflare; a slow or failed read says "couldn't load" and nothing is invented. null when analytics is not available here.
+ */
+async function trafficPreview(ctx, org, websiteId, ready) {
+  if (!ready) return null;
+  let timer;
+  try {
+    const slow = new Promise((res) => { timer = setTimeout(() => res("slow"), 3000); });
+    const model = await Promise.race([loadAnalytics({ env: ctx.env, db: ctx.db, organizationId: org, websiteId, range: DEFAULT_RANGE, now: ctx.now, fetch: ctx.fetch }), slow]);
+    if (model === "slow") return { state: "error", code: "slow" };
+    return model && model.sources ? model.sources.cloudflare : null;
+  } catch { return { state: "error", code: "failed" }; } finally { clearTimeout(timer); }
 }
 
 /** On the list of several websites: only the link to the website requests (each website's own page has its management actions). */
