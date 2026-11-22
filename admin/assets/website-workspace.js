@@ -17,7 +17,7 @@ const ERROR = {
   writes_disabled: "Changes are switched off on this site, so nothing was changed.", session: "Your admin session has ended. Reload the page to sign in again.", denied: "This account isn’t allowed to make that change.",
 };
 const errorText = (err) => ERROR[err && err.code] || "That didn’t work and nothing was changed. Try again, and reload the page if it keeps happening.";
-const field = (id, label, input, hint) => h("div", { class: "adm-field" }, h("label", { for: id, text: label }), hint ? h("p", { class: "adm-field__hint", text: hint }) : null, input);
+const field = (id, label, input, hint, wide) => h("div", { class: "adm-field" + (wide ? " adm-field--wide" : "") }, h("label", { for: id, text: label }), hint ? h("p", { class: "adm-field__hint", text: hint }) : null, input);
 const select = (id, options, value) => h("select", { id, class: "input" }, Object.entries(options).map(([v, t]) => h("option", { value: v, selected: v === value ? true : null }, t)));
 const text = (id, value, props = {}) => h("input", { id, class: "input", type: "text", autocomplete: "off", value: value || "", ...props });
 const area = (id, value, max) => { const t = h("textarea", { id, class: "input adm-brand__textarea", rows: "3", maxlength: String(max) }); t.value = value || ""; return t; };
@@ -26,7 +26,7 @@ const day = (iso) => (iso ? String(iso).slice(0, 10) : "");
 
 /** @param {{ base: string, site: {id: string, name: string}, canWrite: () => boolean, say: Function }} o  base is "/clients/:org/websites". */
 export function workspacePanel({ base, site, canWrite, say, hideStaging = false }) {
-  const root = h("div", { class: "adm-ws__block adm-seo" });
+  const root = h("div", { class: "adm-ws__block adm-seo adm-wsr" });
   const url = `${base}/${encodeURIComponent(site.id)}/workspace`;
   const pre = "wk-" + site.id.slice(0, 8);
   let data = null, busy = false;
@@ -47,7 +47,7 @@ export function workspacePanel({ base, site, canWrite, say, hideStaging = false 
   }
   const save = (label, fn) => (canWrite() ? h("div", { class: "adm-actions" }, h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: fn }, label)) : null);
   const button = (label, fn, extra = "") => (canWrite() ? h("button", { class: "btn btn--secondary adm-small" + extra, type: "button", onclick: fn }, label) : null);
-  const check = (id, label, on) => { const c = h("input", { type: "checkbox", id, checked: on ? true : null }); return { input: c, row: h("div", { class: "adm-field" }, h("label", { class: "adm-choice", for: id }, c, h("span", { text: label }))) }; };
+  const check = (id, label, on) => { const c = h("input", { type: "checkbox", id, checked: on ? true : null }); return { input: c, row: h("div", { class: "adm-field adm-field--wide" }, h("label", { class: "adm-choice", for: id }, c, h("span", { text: label }))) }; };
 
   function stagingBlock() {
     const staging = text(pre + "-stg", data.stagingUrl, { maxlength: "300", inputmode: "url", placeholder: "https://staging.example.ca" });
@@ -63,7 +63,7 @@ export function workspacePanel({ base, site, canWrite, say, hideStaging = false 
       ? h("div", { class: "adm-field" }, badge(u.status === "approved" ? "Approved by the client" : "Rejected by the client", UPDATE_TONE[u.status]), h("p", { class: "adm-muted", text: `${u.decidedBy || "The client"} · ${day(u.decidedAt)}` }),
         u.decisionNote ? h("p", null, h("strong", { text: "Revision notes: " }), u.decisionNote) : null)
       : h("div", { class: "adm-field" }, badge(u.status === "awaiting_review" ? (u.published ? "Awaiting the client’s review" : "Draft: not shown to the client") : "Informational", u.status === "awaiting_review" && u.published ? "pending" : ""));
-    return h("li", { class: "adm-seo__row" }, decision, field(id + "-t", "Title", title), field(id + "-d", "What changed", detail), field(id + "-e", "Environment", env), field(id + "-k", "Type", kind), pub.row,
+    return h("li", { class: "adm-seo__row" }, decision, field(id + "-t", "Title", title, undefined, true), field(id + "-d", "What changed", detail, undefined, true), field(id + "-e", "Environment", env), field(id + "-k", "Type", kind), pub.row,
       canWrite() ? h("div", { class: "adm-actions" },
         button("Save", () => act(() => api(`${url}/updates/${u.id}/update`, { method: "POST", body: { title: title.value.trim(), detail: orNull(detail.value), environment: env.value, kind: kind.value, published: pub.input.checked } }), "Update saved.")),
         u.kind === "approval" && (u.status === "approved" || u.status === "rejected") ? button("Ask the client to review again", () => act(() => api(`${url}/updates/${u.id}/review`, { method: "POST", body: {} }), "The client is asked to review it again. The earlier decision stays on record.")) : null,
@@ -77,9 +77,9 @@ export function workspacePanel({ base, site, canWrite, say, hideStaging = false 
     const meta = [data.updates.length ? String(data.updates.length) : "None yet", waiting ? `${waiting} awaiting` : "", rejected ? `${rejected} rejected` : ""].filter(Boolean).join(" · ");
     return fold("updates", "Website updates", meta,
       h("p", { class: "adm-muted", text: "What you changed, for the client to look at. “Needs approval” shows Approve and Reject; a rejection always carries their notes." }),
-      data.updates.length ? h("ul", { class: "adm-seo__list" }, data.updates.map(updateRow)) : h("p", { class: "adm-muted", text: "None yet." }),
-      canWrite() ? [h("p", { class: "adm-field__hint", text: "Add an update:" }), field(id + "-t", "Title", title), field(id + "-d", "What changed", detail), field(id + "-e", "Environment", env), field(id + "-k", "Type", kind), pub.row,
-        save("Add update", () => { if (!title.value.trim()) { say(ERROR.invalid_title, "error"); title.focus(); return; } act(() => api(`${url}/updates`, { method: "POST", body: { title: title.value.trim(), detail: orNull(detail.value), environment: env.value, kind: kind.value, published: pub.input.checked } }), pub.input.checked ? "Update added and shown to the client." : "Update added as a draft."); })] : null);
+      h("h3", { class: "adm-wsr__h", text: "Existing updates" }), data.updates.length ? h("ul", { class: "adm-seo__list" }, data.updates.map(updateRow)) : h("p", { class: "adm-muted", text: "None yet." }),
+      canWrite() ? [h("section", { class: "adm-wsr__add" }, h("h3", { class: "adm-wsr__addh", text: "Add an update" }), field(id + "-t", "Title", title, undefined, true), field(id + "-d", "What changed", detail, undefined, true), field(id + "-e", "Environment", env), field(id + "-k", "Type", kind), pub.row,
+        save("Add update", () => { if (!title.value.trim()) { say(ERROR.invalid_title, "error"); title.focus(); return; } act(() => api(`${url}/updates`, { method: "POST", body: { title: title.value.trim(), detail: orNull(detail.value), environment: env.value, kind: kind.value, published: pub.input.checked } }), pub.input.checked ? "Update added and shown to the client." : "Update added as a draft."); }))] : null);
   }
 
   function taskRow(t) {
@@ -88,7 +88,7 @@ export function workspacePanel({ base, site, canWrite, say, hideStaging = false 
     const st = select(id + "-s", t.status === "submitted" ? { submitted: "Answered by the client", ...TASK_STATUS } : TASK_STATUS, t.status), pub = check(id + "-pub", "Show to the client", t.published);
     const answer = t.status === "submitted" ? h("div", { class: "adm-field" }, badge("The client answered", "pending"), h("p", { class: "adm-muted", text: `${t.respondedBy || "The client"} · ${day(t.respondedAt)}` }), h("p", null, h("strong", { text: "Their answer: " }), t.responseText || ""),
       h("p", { class: "adm-field__hint", text: "Mark it Done when you have what you need, or set it to Needed to ask again." })) : null;
-    return h("li", { class: "adm-seo__row" }, answer, field(id + "-t", "What is needed", title), field(id + "-d", "Explanation", detail), field(id + "-c", "What the client does", cta), field(id + "-due", "Due date (optional)", due), field(id + "-s", "Status", st), pub.row,
+    return h("li", { class: "adm-seo__row" }, answer, field(id + "-t", "What is needed", title, undefined, true), field(id + "-d", "Explanation", detail, undefined, true), field(id + "-c", "What the client does", cta), field(id + "-due", "Due date (optional)", due), field(id + "-s", "Status", st), pub.row,
       canWrite() ? h("div", { class: "adm-actions" },
         button("Save", () => act(() => api(`${url}/tasks/${t.id}/update`, { method: "POST", body: { title: title.value.trim(), detail: orNull(detail.value), cta: cta.value, due_date: due.value || null, ...(st.value !== t.status ? { status: st.value } : {}), published: pub.input.checked } }), "Task saved.")),
         button("Archive", () => act(() => api(`${url}/tasks/${t.id}/archive`, { method: "POST", body: {} }), "Archived."), " adm-actions__danger"),
@@ -101,9 +101,9 @@ export function workspacePanel({ base, site, canWrite, say, hideStaging = false 
     const meta = [data.tasks.length ? String(data.tasks.length) : "None yet", answered ? `${answered} answered` : "", open ? `${open} waiting on the client` : ""].filter(Boolean).join(" · ");
     return fold("tasks", "Needed from the client", meta,
       h("p", { class: "adm-muted", text: "What you need from them: a photo, a logo, a service description, an approval of copy. Files arrive through the website request form; a written answer arrives here." }),
-      data.tasks.length ? h("ul", { class: "adm-seo__list" }, data.tasks.map(taskRow)) : h("p", { class: "adm-muted", text: "None yet." }),
-      canWrite() ? [h("p", { class: "adm-field__hint", text: "Ask the client for something:" }), field(id + "-t", "What is needed", title), field(id + "-d", "Explanation", detail), field(id + "-c", "What the client does", cta), field(id + "-due", "Due date (optional)", due), pub.row,
-        save("Add task", () => { if (!title.value.trim()) { say(ERROR.invalid_title, "error"); title.focus(); return; } act(() => api(`${url}/tasks`, { method: "POST", body: { title: title.value.trim(), detail: orNull(detail.value), cta: cta.value, due_date: due.value || null, published: pub.input.checked } }), pub.input.checked ? "Task added and shown to the client." : "Task added as a draft."); })] : null);
+      h("h3", { class: "adm-wsr__h", text: "Existing requests" }), data.tasks.length ? h("ul", { class: "adm-seo__list" }, data.tasks.map(taskRow)) : h("p", { class: "adm-muted", text: "None yet." }),
+      canWrite() ? [h("section", { class: "adm-wsr__add" }, h("h3", { class: "adm-wsr__addh", text: "Ask the client for something" }), field(id + "-t", "What is needed", title, undefined, true), field(id + "-d", "Explanation", detail, undefined, true), field(id + "-c", "What the client does", cta), field(id + "-due", "Due date (optional)", due), pub.row,
+        save("Add task", () => { if (!title.value.trim()) { say(ERROR.invalid_title, "error"); title.focus(); return; } act(() => api(`${url}/tasks`, { method: "POST", body: { title: title.value.trim(), detail: orNull(detail.value), cta: cta.value, due_date: due.value || null, published: pub.input.checked } }), pub.input.checked ? "Task added and shown to the client." : "Task added as a draft."); }))] : null);
   }
 
   function draw() {

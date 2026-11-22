@@ -175,3 +175,17 @@ test("Admin UI: one Edit button per environment card, the screenshot lives in th
   assert.ok(!/innerHTML|style=|\.style\b|insertAdjacentHTML/.test(blocks + ui), "no HTML insertion or inline styles");
   assert.match(css, /\.ds-eshot \{[^}]*aspect-ratio: 16 \/ 10/); assert.match(css, /\.ds-card--ink \.ds-eshot/);
 });
+
+test("UI refinements: the two website cards are one shape (equal columns, 16:9, contain on a neutral ground, stacked on a phone); the Admin Review panels are padded and sectioned", () => {
+  const wd = read("assets/css/portal-website-workspace.css"), ds = read("assets/css/portal-ds.css"), adm = read("admin/assets/ds.css"), js = read("admin/assets/website-workspace.js");
+  assert.match(wd, /\.wd-live, \.wd-prev \{ grid-column: span 6;/, "identical width");
+  assert.match(wd, /\.wd-shot \{[^}]*aspect-ratio: 16 \/ 9;[^}]*background: #F1F1EF/); assert.match(wd, /\.wd-shot img \{[^}]*object-fit: contain/); assert.ok(!/\.wd-shot img \{[^}]*object-fit: cover/.test(wd), "never cropped");
+  assert.ok(!/\.wd-live \.wd-shot \{/.test(wd), "no card-specific picture size");
+  const phone = wd.slice(wd.indexOf("@media (max-width: 640px)"));
+  assert.match(phone, /\.wd-live, \.wd-prev \{ grid-column: span 12;/, "stacked on a phone");
+  assert.match(ds, /\.wd-live \.wd-foot \.wd-btn, [^{]*\.wd-prev \.wd-foot \.wd-btn \{ min-width: 176px/);
+  assert.match(adm, /\.ds-main \.adm-wsr \.adm-acc__body \{[^}]*padding: 22px 24px 24px/); assert.match(adm, /\.ds-main \.adm-wsr \.adm-seo__row, \.ds-main \.adm-wsr__add \{[^}]*padding: 22px 24px 24px/);
+  assert.match(adm, /\.ds-main \.adm-wsr \.adm-field \.input[^{]*\{[^}]*padding: 0 14px/);
+  assert.match(js, /adm-wsr__add/); assert.match(js, /"Existing updates"/); assert.match(js, /"Add an update"/); assert.match(js, /"Existing requests"/); assert.match(js, /"Ask the client for something"/);
+  assert.ok(!/innerHTML|style=|\.style\b/.test(js), "no HTML insertion or inline styles");
+});

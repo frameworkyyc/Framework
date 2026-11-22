@@ -135,3 +135,7 @@ The client portal uses the same visual system (soft grey ground, white cards wit
 ## Website environment cards
 
 Production and Staging are two cards of the same shape (`card` with class `ds-env`): the environment name and a status pill, the address, the screenshot (`.ds-eshot`, 16:10, or a neutral "No screenshot yet" panel; never an invented image), then **Open** and **Edit**. Edit opens that environment's settings drawer: the address form, then the screenshot control (`shotEditor` in `site-blocks.js`: preview, file input, Upload / Replace, Remove). There is no separate Screenshot card.
+
+## Review tab panels
+
+The Review tab's expanded panels (Website updates, Needed from the client; root class `adm-wsr`) follow one rhythm: a 1px bordered, rounded panel with 24px side padding in the summary and body (16px on a phone); a small uppercase section label ("Existing updates", "Add an update") above each group; each existing item as a soft card with 22-24px padding; the Add form as its own white card; fields in a grid (Title and long text full width, selects in equal columns of at least 260px, never stretched edge to edge); inputs, textareas and selects 48px tall with 14px side padding; one action row per item, separated by a hairline, Archive pushed to the right.
