@@ -97,3 +97,7 @@ test("staging-ready: READY only with the deployed commit equal to the Staging he
   const r = readHealth(bad); assert.equal(r.ready, false); assert.deepEqual(r.fails, ["smoke.login: sign-in page answers 500"]);
   assert.equal(readHealth("").ready, false);
 });
+test("staging-ready waits out a Cloudflare throttle (429 / 971) instead of reporting a failure", () => {
+  const src = read("scripts/ops/staging-ready.mjs");
+  assert.match(src, /429\|971/); assert.match(src, /setTimeout\(r, 90000\)/);
+});
