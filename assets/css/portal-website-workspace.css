@@ -64,7 +64,7 @@
 .wd-card--ink .wd-btn[aria-disabled="true"] { background: transparent; color: #8F8F8F; border-color: #555; }
 .wd-btn--solid { background: var(--ink); color: #fff; border-color: var(--ink); }
 .wd-card--ink .wd-btn--solid { background: #fff; color: var(--ink); }
-.wd-ar { display: inline-block; transition: transform .18s var(--wd-ease); }
+.wd-ar { display: inline-block; flex: none; width: 14px; height: 14px; transition: transform .18s var(--wd-ease); }
 .wd-btn:hover .wd-ar { transform: translate(2px, -2px); }
 .wd-btn:focus-visible, .wd-link:focus-visible, .wd-more:focus-visible, .wd-row > summary:focus-visible, .wd-moreg > summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 .wd-card--ink .wd-btn:focus-visible, .wd-card--ink summary:focus-visible { outline-color: #fff; }

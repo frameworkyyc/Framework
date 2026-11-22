@@ -40,7 +40,8 @@ export const WORKSPACE_ERRORS = Object.freeze({
 /** A status: a small square plus words (never colour alone). tone: ink (needs you), open (to do), late (overdue), done (finished). */
 const st = (tone, label) => `<span class="wd-s"><i class="wd-mk wd-mk--${e(tone)}" aria-hidden="true"></i>${e(label)}</span>`;
 const chev = `<i class="wd-pl" aria-hidden="true"></i>`;
-const arrow = `<span class="wd-ar" aria-hidden="true">↗</span>`;
+/** The external-link arrow as an SVG (a text arrow renders as a colour emoji in Safari on iPadOS). */
+const arrow = `<svg class="wd-ar" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 11l6-6M6 5h5v5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const newTab = (name) => `<span class="visually-hidden"> ${e(name)} (opens in a new tab)</span>`;
 
 /* ------------------------------------------------------------------ 1. the two website cards */
@@ -65,7 +66,7 @@ function previewCard(vm, s, ws) {
   const url = ws && ws.stagingUrl, n = ws && ws.needsReview ? ws.needsReview : 0;
   // No preview picture exists yet (automatic capture is a later step), so this card shows the neutral panel until Framework stores one.
   const none = url ? { title: "No preview image yet", text: "A picture of your preview appears here once Framework captures it. You can still open it." } : { title: "No preview yet", text: "Framework will add the preview when there is something to review." };
-  const link = url ? `<a class="wd-btn" href="${e(url)}" target="_blank" rel="noopener noreferrer">Open preview${arrow}${newTab("preview")}</a>` : `<span class="wd-btn" aria-disabled="true">Not available yet</span>`;
+  const link = url ? `<a class="wd-btn wd-btn--solid" href="${e(url)}" target="_blank" rel="noopener noreferrer">Open preview${arrow}${newTab("preview")}</a>` : `<span class="wd-btn" aria-disabled="true">Not available yet</span>`;
   return `<article class="wd-card wd-card--ink wd-prev" aria-labelledby="wd-prev-h">
 <header class="wd-ct"><div><h2 id="wd-prev-h">Preview changes</h2><p class="wd-u">${url ? e(hostOf(url)) : "Not set up yet"}</p></div>${url ? (n ? st("ink", `${n} to review`) : st("live", "Available")) : st("open", "Not set up")}</header>
 ${shot(vm, s, "", none)}
@@ -91,7 +92,7 @@ const flat = (title, date, status) => `<div class="wd-row wd-row--flat"><span cl
 function updateRow(vm, s, u, ws, o) {
   const when = shortDay((u.status === "approved" || u.status === "rejected") && u.decidedAt ? u.decidedAt : u.publishedAt || u.createdAt, o.today);
   const open = u.status === "awaiting_review";
-  const preview = open && u.environment === "staging" && ws.stagingUrl ? `<a class="wd-link" href="${e(ws.stagingUrl)}" target="_blank" rel="noopener noreferrer">Open preview ↗${newTab("preview")}</a>` : "";
+  const preview = open && u.environment === "staging" && ws.stagingUrl ? `<a class="wd-link" href="${e(ws.stagingUrl)}" target="_blank" rel="noopener noreferrer">Open preview ${arrow}${newTab("preview")}</a>` : "";
   const note = u.status === "rejected" && u.decisionNote ? `<p class="wd-note"><strong>Your notes:</strong> ${e(u.decisionNote)}</p><p class="wd-note wd-muted">Framework will revise this and ask you to look again.</p>` : "";
   const body = `${u.detail ? `<p>${e(u.detail)}</p>` : ""}${note}${decisionForms(vm, s, u, o)}${preview ? `<p class="wd-acts">${preview}</p>` : ""}`;
   const tone = open ? "ink" : u.status === "approved" ? "done" : u.status === "rejected" ? "open" : "done";
@@ -101,7 +102,7 @@ function updateRow(vm, s, u, ws, o) {
 function taskAction(vm, s, t, ws, o) {
   if (t.status === "done" || t.status === "cancelled" || t.cta === "none") return "";
   if (t.cta === "upload") return `<p class="wd-acts"><a class="wd-btn wd-btn--solid" href="${e(href(vm, `/website/${s.id}/requests/new?kind=change&title=${encodeURIComponent(t.title)}`))}">Upload files<span class="visually-hidden"> for ${e(t.title)}</span></a></p>`;
-  const stage = t.cta === "review" && ws && ws.stagingUrl ? `<a class="wd-link" href="${e(ws.stagingUrl)}" target="_blank" rel="noopener noreferrer">Open preview ↗${newTab("preview")}</a>` : "";
+  const stage = t.cta === "review" && ws && ws.stagingUrl ? `<a class="wd-link" href="${e(ws.stagingUrl)}" target="_blank" rel="noopener noreferrer">Open preview ${arrow}${newTab("preview")}</a>` : "";
   if (!o.canRespond) return stage ? `<p class="wd-acts">${stage}</p>` : "";
   const label = t.status === "submitted" ? "Change your answer" : t.cta === "review" ? "Send your review" : "Respond";
   return `<div class="wd-acts"><details class="wd-reject"><summary class="wd-btn wd-btn--solid">${e(label)}<span class="visually-hidden"> for ${e(t.title)}</span></summary>
