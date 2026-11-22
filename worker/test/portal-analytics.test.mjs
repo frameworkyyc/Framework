@@ -353,7 +353,7 @@ test("wiring: the client route sits under the website page behind website.view a
   assert.match(router, /when: websiteOn, re: \/\^\\\/portal\\\/o\\\/\(\[\^\/\]\+\)\\\/website\\\/\(\[\^\/\]\+\)\\\/analytics\$\//);
   assert.ok(router.indexOf("/analytics$/") < router.indexOf("website\\/([^/]+)$/, action: \"website.view\""), "matched before the generic website page");
   assert.match(src("worker/admin/router.js"), /handleWebsiteAnalyticsApi/);
-  assert.match(src("admin/assets/websites.js"), /analyticsPanel\(\{ base, site, canWrite, say \}\)/);
+  assert.match(src("admin/assets/sites.js"), /analyticsPanel\(\{ base, site, canWrite, say \}\)/);
   assert.match(src("worker/portal/website-live.js"), /extra\.analytics \? analyticsTeaser\(vm, s\) : ""/);
   for (const f of ["worker/portal/analytics/view.js", "worker/portal/analytics/service.js", "admin/assets/website-analytics.js"]) assert.ok(!/CF_ANALYTICS_API_TOKEN|GSC_OAUTH_|GSC_SERVICE_ACCOUNT/.test(src(f)), f + " never touches the secrets");
   for (const f of ["worker/portal/analytics/search-console.js", "worker/portal/analytics/service.js", "worker/portal/admin-website-analytics.js"]) assert.ok(!/GSC_SERVICE_ACCOUNT|private_key|RSASSA|importKey|signAssertion/.test(src(f)), f + " has no service account key code");

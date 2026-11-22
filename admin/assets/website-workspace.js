@@ -25,7 +25,7 @@ const orNull = (v) => { const t = String(v).trim(); return t === "" ? null : t; 
 const day = (iso) => (iso ? String(iso).slice(0, 10) : "");
 
 /** @param {{ base: string, site: {id: string, name: string}, canWrite: () => boolean, say: Function }} o  base is "/clients/:org/websites". */
-export function workspacePanel({ base, site, canWrite, say }) {
+export function workspacePanel({ base, site, canWrite, say, hideStaging = false }) {
   const root = h("div", { class: "adm-ws__block adm-seo" });
   const url = `${base}/${encodeURIComponent(site.id)}/workspace`;
   const pre = "wk-" + site.id.slice(0, 8);
@@ -110,7 +110,7 @@ export function workspacePanel({ base, site, canWrite, say }) {
     if (!data.available) { root.replaceChildren(h("p", { class: "acc__group" }, "Review workspace"), h("p", { class: "adm-muted", text: "The review workspace isn’t available on this site yet (a database change is waiting for approval)." })); return; }
     root.replaceChildren(h("p", { class: "acc__group" }, "Review workspace"),
       h("p", { class: "adm-muted", text: "Shown to the client under Website, in the order: Staging and Main, updates and what you need, then their own change requests. Drafts stay invisible until you show them." }),
-      stagingBlock(), updatesSection(), tasksSection());
+      ...(hideStaging ? [] : [stagingBlock()]), updatesSection(), tasksSection());
   }
 
   root.append(h("p", { class: "acc__group" }, "Review workspace"), h("button", { class: "btn btn--secondary adm-small", type: "button", onclick: (ev) => { ev.currentTarget.remove(); load(); } }, "Open review workspace"));
