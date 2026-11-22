@@ -31,3 +31,21 @@ Migration 0012 is applied to the Staging database (approved, verified); Producti
 
 ## Analytics (migration 0028, applied to Staging)
 Each website has an Analytics page (Cloudflare Web Analytics traffic and Google Search Console search performance, read through their APIs and cached). See `WEBSITE-ANALYTICS.md` for the design, the credentials and the owner checklist.
+
+## Review workspace (migration 0030, PROPOSED; not applied anywhere)
+The Website page is a review workspace in three areas, in this order (renderers in `website-workspace.js`, styles in `assets/css/portal-website-workspace.css`; Framework's own language: near monochrome, sharp corners, hairline cards, ruled headings, the portal's `.status` squares, no pills or shadows):
+1. **Environments**: two cards. *Staging* (the review environment, the stronger rule and the primary "View staging" action; "Not set up yet" until Admin adds an address) and *Main · Production* ("View live site" when the website is live or existing; "Not launched" while in development).
+2. **Updates & requests**: **Website updates** (title, description, environment, date, status: Awaiting review, Approved, Rejected, Informational; an approval update shows **Approve** and **Reject**, and Reject opens a native `<details>` form that requires revision notes, so it works without script) beside **Needed from you** (title, explanation, optional due date, status, and the action: *Upload files* opens the existing change-request form with the title prefilled, *Respond* and *Review* take a short written answer).
+3. **Request changes**: a short form (type, title, text, optional attachments) that posts to the existing `/website/<id>/requests` endpoint, so it creates an ordinary website change request in the same thread, status and Admin queue as before. "Request a change" is no longer a separate button; "Get support" and everything that was on the page stay, under a quieter "Website details" heading.
+
+### Data (additive, in `migrations/portal-proposed/0030_website_workspace.sql`)
+`websites.staging_url` (nullable https address), `website_updates` (kind `approval | info`, status `awaiting_review | approved | rejected | info`, the client's decision, time and who, `decision_note` required by a CHECK for a rejection, `published` draft flag, archive) and `website_tasks` (cta `upload | respond | review | none`, status `open | submitted | done | cancelled`, due date, the client's answer, `published`, archive). Both tables are tied to their website AND organization by a composite key. Nothing existing is changed.
+**Until 0030 is approved and applied the new parts are dormant**: the page shows the environments it can (Production, and "Not set up yet" for Staging) and the request form, with no updates or tasks; Admin reads say "unavailable" and writes answer 409. Production keeps working exactly as today.
+
+### Who can do what
+* **Admin** (`admin-website-workspace.js`, `admin/assets/website-workspace.js`; behind Cloudflare Access, the admin list and `PORTAL_ADMIN_WRITES`): set the Staging address; create updates (needs approval or informational; draft until "Show to the client"); ask for another review after a rejection (the earlier reason stays in `activity_log`); assign tasks, see the client's answers, mark them done or ask again; archive. Admin cannot fake a client's decision or answer.
+* **Owners** approve or reject updates (`website.request`). **Anyone in the organization** may answer a task (`support.submit`) and send change requests. A decision is one compare-and-set batched with its audit row, so a double click, a replay or a race decides at most once; a second attempt is "already decided". **Framework master access previews the page but can never decide or answer for the client** (the buttons are hidden and the server refuses).
+* A client sees only published, unarchived rows of a published website of their own organization.
+
+### Not built (decisions for review)
+Email to Framework when a client rejects or answers (today Admin sees it in the panel); linking an uploaded file to its task (an Upload task opens the ordinary request form and Admin marks it done); a Home "needs you" count (`workspaceAttention` is ready for it); a Production release (migration through the manual workflow first).

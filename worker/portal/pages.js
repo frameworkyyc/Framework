@@ -209,13 +209,21 @@ export async function brandingUploadsPage(ctx, a, o = {}) {
 }
 
 /** The Website section: `sites` is every website Framework published for this organization (the empty list is the "no website" state); `one` is a single website's own page. */
-export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null, milestones = [], seo = null, analytics = false } = {}) {
+export async function websitePage(ctx, a, { sites = [], one = null, preview = null, management = null, services = null, milestones = [], seo = null, analytics = false, workspace = undefined, workspaceMsg = {} } = {}) {
   const vm = liveModel(ctx, a, {});
   const single = one || (sites.length === 1 ? sites[0] : null);
   // The live preview needs the page to be allowed to frame that one website: its verified origins go into THIS response's CSP only (frame-src); no other page and no global policy changes.
   const frameSrc = single ? frameSources(preview) : [];
-  const extra = { management, milestones, seo, analytics, services: services ? { ...services, csrf: await csrfFor(ctx.cfg, a.session) } : null };
-  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", body: one ? websiteLive.websiteDetail(vm, one, preview, extra) : websiteLive.websiteOverview(vm, sites, preview, extra), vm, ref: "website", frameSrc });
+  const csrf = await csrfFor(ctx.cfg, a.session);
+  const perms = permissionsFor(a.membership.role);
+  // The review workspace (environments, updates & requests, request changes) belongs to ONE website's page; the router passes `workspace` (null/{available:false} where migration 0030 is not applied: only the environments and the request form then show).
+  const workspaceOpts = single && workspace !== undefined ? {
+    workspace, csrf, staff: Boolean(a.staff), canDecide: perms.includes("website.request") && !a.staff, canRespond: perms.includes("support.submit") && !a.staff, canRequest: perms.includes("support.submit"),
+    flash: workspaceMsg.flash || "", error: workspaceMsg.error || "", now: ctx.now,
+    requestSummary: management && management.requests && management.requests.open ? `${management.requests.open} open` : "",
+  } : null;
+  const extra = { management, milestones, seo, analytics, workspace: workspaceOpts, services: services ? { ...services, csrf } : null };
+  return shell(ctx, a, { title: one ? one.name : "Website", active: "home", styles: workspaceOpts ? ["/assets/css/portal-website-workspace.css"] : [], body: one ? websiteLive.websiteDetail(vm, one, preview, extra) : websiteLive.websiteOverview(vm, sites, preview, extra), vm, ref: "website", frameSrc });
 }
 /** SEO & Search Visibility: a subsection of one website (not a main navigation item). `seo` is only what Admin has published. */
 export async function websiteSeoPage(ctx, a, site, seo) {
