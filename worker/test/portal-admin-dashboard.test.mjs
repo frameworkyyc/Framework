@@ -64,11 +64,11 @@ test("client detail structure: header, next step, a single clickable Business Pr
   const src = strip(read("admin/assets/clients.js")), dash = strip(read("admin/assets/client-dashboard.js"));
   const start = src.indexOf("async function renderDetail"), end = src.indexOf("async function renderProfile");
   const detail = src.slice(start, end > start ? end : undefined);
-  assert.match(detail, /dash\.header,\s*deletedBanner,\s*dash\.overview,/, "header then overview first");
+  assert.match(detail, /deletedBanner,\s*[\s\S]*?dash\.overview/, "the client workspace shell supplies the header; the banner then the overview come first");
   assert.ok(!/sectionMap\(|stepAccordion|Saved answers|adm-mapsec|id: "adm-profile"/.test(detail), "no section map or saved answers on the dashboard");
   assert.ok(!/brandingRow|invoicesRow|supportRow/.test(detail), "Branding, Invoices and Support are cards in the dashboard overview, not separate rows");
-  assert.match(dash, /brandingTile, websiteTile, servicesTile, invoicesTile, supportTile/, "all areas share one tile grid");
-  assert.ok(detail.indexOf("dash.overview") < detail.indexOf("access,") && detail.indexOf("access,") < detail.lastIndexOf("info,"), "order: overview cards, team access, organization details last");
+  assert.match(dash, /brandingTile, websiteTile, servicesTile, invoicesTile\)/, "six tiles share one grid (3 by 2 on desktop); Support and Requests live on their own client tabs");
+  assert.ok(detail.indexOf("dash.overview") < detail.lastIndexOf("info]") && /view === "access"[\s\S]*?access/.test(detail), "order: overview cards then organization details last; team access has its own Access tab");
   assert.match(detail, /id: "org-details"[\s\S]*?"Portal address"[\s\S]*?"Website"[\s\S]*?"Created"/, "the low-priority details stay available inside a collapsed section");
   assert.ok(!/open: true/.test(detail), "nothing in the detail page is open by default");
   assert.match(dash, /profile \? "a" : "div"[\s\S]*?href: profileHref, "data-link": ""/, "the whole Business Profile card is one link to its page");
@@ -82,7 +82,7 @@ test("client detail structure: header, next step, a single clickable Business Pr
   assert.match(page, /Needs answers: /, "missing sections are named without opening anything");
   assert.match(dash, /h\("details", \{ class: "adm-acc "/, "native details/summary: keyboard and expanded state come from the platform");
   assert.match(dash, /Nothing saved here yet\. The client hasn’t answered this section\./, "a missing section explains itself in one line");
-  assert.equal([...src.matchAll(/\bapi\(/g)].length, 4, "the list, the detail, the Business Profile page and its export text (all reads)");
+  assert.equal([...src.matchAll(/\bapi\(/g)].length, 6, "the list and websites index, the detail (header and body), the Business Profile page and its export text (all reads)");
 });
 
 test("team and invitations: summary chips first, details inside labelled expandable sections, every management control still there", () => {

@@ -9,7 +9,7 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm,
 
 test("the design system is documented and the development instructions require it", () => {
   const doc = read("worker/admin/DESIGN-SYSTEM.md"), rules = read("CLAUDE.md");
-  for (const heading of ["## Framework identity", "## Usability standards", "## Tokens", "## Components", "## Navigation", "## Page patterns", "## Rules that are tested", "## Adding a page"]) assert.ok(doc.includes(heading), heading);
+  for (const heading of ["## Admin identity", "## Usability standards", "## Tokens", "## Components", "## Navigation", "## Page patterns", "## Rules that are tested", "## Adding a page"]) assert.ok(doc.includes(heading), heading);
   assert.match(rules, /admin\/DESIGN-SYSTEM\.md/);
   assert.match(rules, /Admin UI: every Admin screen follows/);
 });
@@ -25,26 +25,28 @@ test("every documented kit component exists and the status and spacing tokens ar
   for (const token of ["--ok:", "--warn:", "--bad:", "--pend:", "--adm-space-1:", "--adm-space-6:"]) assert.ok(layer.includes(token), token);
 });
 
-test("Framework identity: the kit layer has sharp corners, no shadows, no gradients and no radius token; the document states the rules", () => {
-  const css = read("admin/assets/admin.css"), doc = read("worker/admin/DESIGN-SYSTEM.md");
-  const layer = css.slice(css.indexOf("ADMIN KIT (admin/assets/kit.js)"));
-  assert.deepEqual([...layer.matchAll(/border-radius:\s*([^;}]+)/g)].map((m) => m[1].trim()).filter((v) => v !== "0"), [], "no rounded corners");
-  assert.ok(!/box-shadow|linear-gradient|radial-gradient|--adm-radius|--adm-card/.test(layer), "no shadows, gradients or radius tokens");
-  assert.ok(!/border-radius:\s*(?!0\b)/.test(read("admin/assets/kit.js")), "the kit sets no radius");
-  for (const phrase of ["## Framework identity", "Sharp corners only", "no pill-shaped", "## Usability standards", "Show, don't tell", "Switzer"]) assert.ok(doc.includes(phrase), phrase);
-  assert.match(read("CLAUDE.md"), /sharp corners, ruled lines, display type/);
+test("Admin identity: soft cards from tokens (radius, depth, motion), a reduced-motion rule, no third-party assets, and the portal scope is stated", () => {
+  const ds = read("admin/assets/ds.css"), doc = read("worker/admin/DESIGN-SYSTEM.md"), rules = read("CLAUDE.md");
+  for (const token of ["--ds-ground:", "--ds-card:", "--ds-r:", "--ds-r-lg:", "--ds-pill:", "--ds-shadow-1:", "--ds-shadow-2:", "--ds-ease:", "--ds-dur:", "--ds-ok:", "--ds-warn:", "--ds-bad:", "--ds-info:"]) assert.ok(ds.includes(token), token);
+  assert.match(ds, /@media \(prefers-reduced-motion: reduce\)[^}]*\{[^}]*animation: none !important; transition: none !important/s, "every animation and transition is switched off under reduced motion");
+  assert.ok(!/@import|url\(|https?:\/\//.test(strip(ds)), "no third-party fonts, images or imports in the design-system layer");
+  const shadows = strip(ds).split("\n").filter((l) => /box-shadow:/.test(l) && !/^\s*--/.test(l) && !/var\(--ds-shadow|inset|none|0 1px 2px rgba\(0, 0, 0, \.25\)/.test(l));
+  assert.deepEqual(shadows, [], "depth comes from the shadow tokens");
+  assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML/.test(strip(read("admin/assets/ds.js"))) && !/setAttribute\(["']style|\.style\./.test(strip(read("admin/assets/ds.js"))), "the components set text and attributes only");
+  for (const phrase of ["## Admin identity", "soft grey ground", "Gentle corners", "always with words", "Admin only", "prefers-reduced-motion", "Switzer"]) assert.ok(doc.includes(phrase), phrase);
+  assert.match(rules, /premium, card-based design system/); assert.match(rules, /client portal wears the same visual system through `assets\/css\/portal-ds\.css`/, "the portal adopts the Admin system through its own stylesheet; the public site and sign-in keep theirs");
 });
 
-test("the sidebar is grouped, every enabled module has an icon and a place, and nothing is dropped", () => {
-  const admin = read("admin/assets/admin.js"), kit = read("admin/assets/kit.js");
-  const groups = admin.match(/const NAV_GROUPS = (\[\[[\s\S]*?\]\]);/);
-  assert.ok(groups, "NAV_GROUPS exists");
-  const ids = [...groups[1].matchAll(/"([a-z-]+)"/g)].map((m) => m[1]);
-  for (const m of MODULES.filter((x) => x.enabled)) {
-    assert.ok(ids.includes(m.id), `${m.id} is in a navigation group`);
-    assert.ok(new RegExp(`(^|[\\s,{])"?${m.id}"?: "M`).test(kit), `${m.id} has an icon`);
-  }
-  assert.match(admin, /live\.filter\(\(m\) => !NAV_GROUPS\.some/, "a module not in a group still appears");
+test("six navigation sections, every enabled module has a section and an icon, and no address is dropped", async () => {
+  const { NAV, sectionOf } = await import("../../admin/assets/nav.js");
+  assert.deepEqual(NAV.map((n) => n.id), ["overview", "clients", "websites", "analytics", "operations", "settings"]);
+  const kit = read("admin/assets/kit.js"), ds = read("admin/assets/ds.js");
+  for (const n of NAV) assert.ok(new RegExp(`(^|[\\s,{])"?${n.icon}"?: "M`).test(kit + ds), `${n.id} has an icon`);
+  for (const m of MODULES.filter((x) => x.enabled)) assert.ok(sectionOf(m.path), `${m.id} (${m.path}) belongs to a section`);
+  for (const [, path] of NAV.flatMap((n) => n.children || [])) assert.ok(sectionOf(path), `${path} is in a section`);
+  const admin = read("admin/assets/admin.js");
+  assert.match(admin, /NAV\.filter\(\(n\) => MODULES\.some\(\(m\) => m\.enabled && m\.id === n\.id\)\)/, "a section shows only when its module exists");
+  for (const old of ["/admin/leads", "/admin/assessments", "/admin/discovery", "/admin/requests", "/admin/support", "/admin/feedback", "/admin/approved-emails", "/admin/settings/service-pricing", "/admin/settings/additional-services", "/admin/clients"]) assert.ok(MODULES.some((m) => m.enabled && (old === m.path || old.startsWith(m.path + "/"))), `${old} still resolves to a page`);
 });
 
 test("the kit and the review pages keep the rules: text only, no inline styles, no markup insertion, no low-contrast text", () => {
@@ -65,7 +67,7 @@ test("status colours in the design-system layer always have a text or icon partn
 
 test("the rebuilt pages use the shared kit instead of their own markup for summaries, folds and empty states", () => {
   const uses = { "overview.js": ["navIcon", "badge"], "feedback.js": ["statCard", "badge", "fold"], "support-global.js": ["statCard"], "assessments.js": ["badge", "fold", "statCard"], "discovery.js": ["statCard", "emptyState", "fold"],
-    "clients.js": ["statCard", "searchBox"], "invoices.js": ["statCard"], "approved-emails.js": ["fold"], "settings.js": ["linkCard", "fold"], "client-services.js": ["fold"], "websites.js": ["fold"] };
+    "clients.js": ["statCard", "searchBox"], "invoices.js": ["statCard"], "approved-emails.js": ["fold"], "settings.js": ["linkCard", "fold"], "client-services.js": ["fold"] };
   for (const [file, names] of Object.entries(uses)) {
     const src = read("admin/assets/" + file);
     const imp = src.match(/import \{([^}]*)\} from "\.\/kit\.js";/);
@@ -75,7 +77,7 @@ test("the rebuilt pages use the shared kit instead of their own markup for summa
 });
 
 test("pages that must stay read-only or form-free keep their controls in the kit, and the support conversation no longer collides with the requirements grid", () => {
-  assert.ok(!/h\("input"/.test(strip(read("admin/assets/clients.js"))), "clients.js has no form control of its own");
+  assert.ok(!/h\("input"/.test(strip(read("admin/assets/clients.js"))), "clients.js has no form control of its own (the search box comes from the kit)");
   assert.match(read("admin/assets/support.js"), /class: "adm-acc adm-sreq"/);
   assert.ok(!/class: "adm-acc adm-req"/.test(read("admin/assets/support.js")));
 });

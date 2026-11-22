@@ -7,6 +7,7 @@ import { contentEditor } from "./service-content.js";
 import { linkCard, fold, foldControls, badge } from "./kit.js";
 import { h, api, fmtDate, stateBlock, errorState } from "./ui.js";
 import { BRAND_SECTIONS } from "./brand-sections.js";
+import { pageHead, grid, span, card, pill, icon } from "./ds.js";
 
 const MAX_CAD = 1000000;
 const ERRORS = {
@@ -28,14 +29,27 @@ export async function render(ctx) {
   return { title: "Not found", node: h("div", { class: "adm-page" }, h("h1", { class: "adm-title", tabindex: "-1" }, "Not found"), h("p", { class: "adm-sub" }, "There is nothing at this address."), h("p", null, h("a", { class: "adm-link", href: "/admin/settings", "data-link": "" }, "Back to Settings"))) };
 }
 
-function hub() {
-  const item = (href, title, body, icon) => h("li", { class: "adm-settings__item" }, linkCard({ href, title, body, icon, cls: "adm-settings__link" }));
-  return { title: "Settings", node: h("div", { class: "adm-page adm-settings" },
-    h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Settings"), h("p", { class: "adm-sub" }, "Settings that apply to every client."))),
-    h("ul", { class: "adm-settings__list", "aria-label": "Settings" },
-      item("/admin/settings/service-pricing", "Service Pricing", "The starting price of each Branding design service, in Canadian dollars.", "service-pricing"),
-      item("/admin/settings/additional-services", "Additional Services", "The optional services listed on every client’s Website page: name, short description and order. Prices are set in Service Pricing.", "additional-services"),
-      item("/admin/approved-emails", "Approved Emails", "The addresses that may be invited to a client portal or receive its emails.", "approved-emails"))) };
+/** A settings group card: a title and a list of rows, each a link with a short description. */
+function group(title, sub, rows) {
+  return card({ title, sub, body: h("ul", { class: "ds-setrows" }, rows.map(([href, name, body]) => h("li", null, h("a", { class: "ds-setrow", href, "data-link": "" }, h("span", { class: "ds-setrow__t" }, h("strong", { text: name }), h("span", { class: "ds-muted", text: body })), icon("arrowright"))))) });
+}
+
+/** The Settings hub: grouped cards, what each integration is set up to do (booleans from the Analytics summary), and what is deliberately not tracked. */
+async function hub() {
+  const sum = await api("/analytics/summary").catch(() => null);
+  const p = sum && sum.platform ? sum.platform : null;
+  const conn = (label, on) => h("li", { class: "ds-statuslist__i" }, pill(p ? (on ? "Ready" : "Not set up") : "Unknown", p ? (on ? "ok" : "warn") : "quiet"), h("span", null, h("strong", { text: label })));
+  const integrations = card({ title: "Integrations", sub: "Whether the server is set up to read each service. These are settings, not data; the secrets themselves are never shown.", body: h("ul", { class: "ds-statuslist" },
+    conn("Cloudflare Web Analytics", p && p.cloudflare), conn("Google Search Console", p && p.search_console), conn("Clients’ own Cloudflare accounts", sum && sum.ownAccounts && sum.ownAccounts.available && sum.ownAccounts.key)),
+    foot: h("a", { class: "adm-link", href: "/admin/analytics", "data-link": "" }, "Open Analytics") });
+  const untracked = card({ title: "Not tracked yet", sub: "Framework does not store these, so Admin shows nothing rather than inventing it.", body: h("ul", { class: "ds-list" },
+    ["Deployment history and build status per website", "Uptime and environment health", "Preview screenshots with the time they were captured", "Billing beyond invoices", "Historical analytics (only the last read figures are kept)", "Admin roles per feature (every admin sees every Admin page)"].map((t) => h("li", { text: t }))) });
+  return { title: "Settings", node: h("div", { class: "ds-page" },
+    pageHead({ title: "Settings", sub: "Settings that apply to every client, and what is connected." }),
+    grid(
+      span(group("People and access", "Who can be invited and who receives email.", [["/admin/approved-emails", "Approved emails", "The addresses that may be invited to a client portal or receive its emails."]]), 6),
+      span(group("Services and pricing", "What clients can order and what it costs.", [["/admin/settings/additional-services", "Additional services", "The optional services on every client’s Website page: name, description and order."], ["/admin/settings/service-pricing", "Service pricing", "The starting price of each Branding design service, in Canadian dollars."]]), 6),
+      span(integrations, 6), span(untracked, 6))) };
 }
 
 async function pricingPage(ctx) {

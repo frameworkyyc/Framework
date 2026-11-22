@@ -315,6 +315,7 @@ a.adm-nav__link:hover { color: var(--ink); }
 .adm-field__hint { margin: -2px 0 0; font-size: 13px; color: var(--slate); max-width: 52em; }
 .adm-field__error { margin: 0; font-size: 14px; font-weight: 600; }
 .adm-field__error[hidden] { display: none; }
+.adm-an [hidden] { display: none; } /* website Analytics panel: the own-account fields when Framework's account is chosen */
 .adm-field.has-error .input { border: 2px solid var(--ink); }
 .adm-fieldset { gap: 10px; }
 .adm-choice { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 8px 0; font-weight: 400; cursor: pointer; }

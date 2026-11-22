@@ -12,8 +12,9 @@ test("one spacing token drives every action group, and destructive actions sit a
   assert.match(css, /--adm-gap-actions:\s*12px/);
   assert.match(css, /\.adm-actions\s*\{[^}]*gap:\s*var\(--adm-gap-actions\)/);
   assert.match(css, /\.adm-actions__danger\s*\{[^}]*margin-inline-start:\s*auto/);
-  const ws = read("admin/assets/websites.js");
-  for (const label of ["Remove file", "Remove screenshot", "Archive"]) assert.match(ws, new RegExp(`adm-actions__danger[^\\n]*${label}|${label}[^\\n]*adm-actions__danger`), label);
+  const blocks = read("admin/assets/site-blocks.js"), sites = read("admin/assets/sites.js");
+  for (const label of ["Remove file", "Remove"]) assert.match(blocks, new RegExp(`button\\("${label}", \\{ tone: "danger"`), label);
+  assert.match(sites, /button\("Archive website", \{ tone: "danger"/, "Archive is a danger-tone action, kept apart in its own Manage card");
 });
 
 test("Additional Services and Service Pricing are separate, directly reachable Admin entries", () => {
@@ -21,7 +22,6 @@ test("Additional Services and Service Pricing are separate, directly reachable A
   assert.match(mods, /id: "additional-services"[^}]*path: "\/admin\/settings\/additional-services"/);
   assert.match(mods, /id: "service-pricing"[^}]*path: "\/admin\/settings\/service-pricing"/);
   assert.ok(mods.indexOf('id: "additional-services"') < mods.indexOf('id: "settings"'), "listed before the Settings hub so the longer path matches first");
-  assert.match(read("admin/assets/websites.js"), /additional-services/);
 });
 
 test("the editor reorders services one place at a time and shows each price read-only", async () => {

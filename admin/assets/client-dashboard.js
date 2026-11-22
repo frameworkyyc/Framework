@@ -181,15 +181,11 @@ export function dashboard({ org, profile, members, invitations, branding = null,
     href: invoicesHref, label: "Invoices", big: String(invoices.total), unit: invoices.total === 1 ? "invoice" : "invoices",
     note: invoices.total ? "Archived invoices are kept, not shown here." : "None entered yet.",
     chips: [invoices.drafts ? chip("pending", plural(invoices.drafts, "draft") + " to publish", "info") : null, invoices.overdue ? chip("warn", `${invoices.overdue} past due`, "warn") : null, !invoices.drafts && !invoices.overdue ? chip("plain", invoices.total ? "Nothing to do" : "No invoices yet") : null] });
-  const supportTile = support && linkTile({
-    href: supportHref, label: "Support & Change Requests", big: String(support.open), unit: "open",
-    note: support.total ? `of ${plural(support.total, "request")} in all` : "No requests yet.",
-    chips: [support.unseen ? chip("pending", plural(support.unseen, "request") + " with new activity", "info") : support.total ? chip("plain", "All seen") : null] });
 
   paint(teamFacts(members, invitations));
   return {
     header,
-    overview: h("div", { class: "adm-dash" }, next, h("div", { class: "adm-tiles" }, prof, team, brandingTile, websiteTile, servicesTile, invoicesTile, supportTile)),
+    overview: h("div", { class: "adm-dash" }, next, h("div", { class: "adm-tiles" }, prof, team, brandingTile, websiteTile, servicesTile, invoicesTile)),
     update: (m, i) => paint(teamFacts(m, i)),
   };
 }

@@ -6,21 +6,51 @@ import { statCard, searchBox } from "./kit.js";
 import { newClientPanel, accessSections } from "./clients-access.js";
 import { actionsMenu, deleteClient, restoreClient } from "./clients-delete.js";
 import { dashboard, sectionMap, stepAccordion, disclosure, chip, icon, STATE_TEXT } from "./client-dashboard.js";
+import { pageHead, grid, span, card, kpi, pill, tabs, segmented, dataList, empty, icon as dsIcon } from "./ds.js";
 
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 const statusWord = (s) => (s === "archived" ? "Deleted" : cap(s));
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 
+/** The client workspace: one header and one row of tabs around every page of a client. The pages keep their own addresses; Websites and Access are new tabs. */
+const CLIENT_TABS = [["", "Overview"], ["websites", "Websites"], ["branding", "Branding"], ["invoices", "Billing"], ["support", "Support"], ["requests", "Requests"], ["additional-services", "Services"], ["access", "Access"], ["profile", "Profile"]];
+
 export async function render(ctx) {
-  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding|\/website|\/profile|\/invoices|\/support|\/requests|\/additional-services)?$/);
-  if (m && m[2] === "/branding") return (await import("./branding.js")).render(decodeURIComponent(m[1]), ctx);
-  if (m && m[2] === "/website") return (await import("./websites.js")).render(decodeURIComponent(m[1]), ctx);
-  if (m && m[2] === "/additional-services") return (await import("./client-services.js")).render(decodeURIComponent(m[1]), ctx);
-  if (m && m[2] === "/requests") return (await import("./requests.js")).render(ctx);
-  if (m && m[2] === "/support") return (await import("./support.js")).render(decodeURIComponent(m[1]), ctx);
-  if (m && m[2] === "/invoices") return (await import("./invoices.js")).render(decodeURIComponent(m[1]), ctx);
-  if (m && m[2] === "/profile") return renderProfile(decodeURIComponent(m[1]), ctx);
-  return m ? renderDetail(decodeURIComponent(m[1]), ctx) : renderList(ctx);
+  const m = ctx.url.pathname.replace(/\/+$/, "").match(/^\/admin\/clients\/([^/]+)(\/branding|\/website|\/websites|\/profile|\/invoices|\/support|\/requests|\/additional-services|\/access)?$/);
+  if (!m) return renderList(ctx);
+  const id = decodeURIComponent(m[1]), tab = (m[2] || "").slice(1);
+  if (tab === "website") { ctx.navigate("/admin/websites?client=" + m[1], { replace: true }); return { title: "Websites", node: document.createElement("div") }; } // the old address
+  const [hdr, inner] = await Promise.all([api("/clients/" + encodeURIComponent(id)).catch(() => null), innerPage(id, tab, ctx)]);
+  if (!hdr || !hdr.organization) return inner; // a client that cannot be read: the page's own error state
+  return clientShell(hdr, tab, inner, ctx);
+}
+
+async function innerPage(id, tab, ctx) {
+  if (tab === "branding") return (await import("./branding.js")).render(id, ctx);
+  if (tab === "additional-services") return (await import("./client-services.js")).render(id, ctx);
+  if (tab === "requests") return (await import("./requests.js")).render(ctx);
+  if (tab === "support") return (await import("./support.js")).render(id, ctx);
+  if (tab === "invoices") return (await import("./invoices.js")).render(id, ctx);
+  if (tab === "profile") return renderProfile(id, ctx);
+  if (tab === "websites") return renderClientWebsites(id, ctx);
+  return renderDetail(id, ctx, tab === "access" ? "access" : "overview");
+}
+
+function clientShell(data, tab, inner, ctx) {
+  const o = data.organization, deleted = o.status === "archived", writes = Boolean(data.capabilities && data.capabilities.writes);
+  const menu = writes && !deleted ? actionsMenu({ label: `Actions for ${o.name}`, items: [{ label: "Delete client", danger: true, run: () => deleteClient(o, { notify: ctx.notify, after: () => ctx.navigate("/admin/clients") }) }] }) : null;
+  const label = (CLIENT_TABS.find(([t]) => t === tab) || [])[1] || "Overview";
+  const node = h("div", { class: "ds-page ds-clientshell" },
+    pageHead({ title: o.name, back: ["All clients", "/admin/clients"], actions: menu }),
+    h("p", { class: "ds-sub ds-sub--row" }, pill(deleted ? "Deleted" : "Active", deleted ? "warn" : "ok"), h("span", { class: "ds-muted", text: "Created " + fmtDate(o.created_at) }), o.website_url ? h("a", { class: "ds-link", href: o.website_url, target: "_blank", rel: "noopener noreferrer", text: o.website_url.replace(/^https?:\/\//, "") }) : null),
+    tabs({ label: "Client sections", current: tab, items: CLIENT_TABS.map(([t, l]) => ({ id: t, label: l, href: `/admin/clients/${encodeURIComponent(o.id)}${t ? "/" + t : ""}` })) }),
+    h("div", { class: "ds-clientshell__body" }, inner.node));
+  return { title: `${label} | ${o.name}`, node, crumbs: [["Admin", "/admin"], ["Clients", "/admin/clients"], [o.name, tab ? `/admin/clients/${encodeURIComponent(o.id)}` : null], ...(tab ? [[label, null]] : [])] };
+}
+
+async function renderClientWebsites(id, ctx) {
+  const { clientWebsites } = await import("./sites.js");
+  return { title: "Websites", node: await clientWebsites(id, ctx) };
 }
 
 /* ---------- List ---------- */
@@ -37,61 +67,59 @@ function completion(p) {
 }
 
 /** One whole row is the link (no arrow: the actions menu sits beside it): name first (full width), then when it was created and how far the Business Profile is. Members and invitations live on the client's own page. */
-function clientRow(c) {
-  const created = c.status === "active" ? "Created " + fmtDate(c.created_at) : `${statusWord(c.status)} · created ${fmtDate(c.created_at)}`;
-  return h("a", { class: "adm-clientrow", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "" },
-    h("span", { class: "adm-clientrow__name", text: c.name, "data-mono": String(c.name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() }),
-    h("span", { class: "adm-clientrow__date", text: created }),
-    completion(c.profile));
-}
+const initials = (name) => String(name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
 async function renderList(ctx) {
-  const data = await api("/clients");
+  const [data, sitesData] = await Promise.all([api("/clients"), api("/websites").catch(() => null)]);
   const rows = data.clients.filter((c) => c.status !== "archived");
   const deleted = data.clients.filter((c) => c.status === "archived");
   const writes = Boolean(data.capabilities && data.capabilities.writes);
   const done = () => ctx.retry();
-  const list = h("ul", { class: "adm-clientlist", "aria-label": "Client organizations" }, rows.map((c) => h("li", { class: "adm-clientitem" }, clientRow(c),
-    writes ? actionsMenu({ label: `Actions for ${c.name}`, items: [{ label: "Delete client", danger: true, run: () => deleteClient(c, { notify: ctx.notify, after: done }) }] }) : null)));
-  const trash = deleted.length ? disclosure({ id: "deleted-clients", title: "Deleted clients", className: "adm-acc--quiet", meta: String(deleted.length),
-    children: h("ul", { class: "adm-clientlist adm-clientlist--deleted", "aria-label": "Deleted clients" }, deleted.map((c) => h("li", { class: "adm-deleteditem" },
-      h("div", { class: "adm-deleteditem__text" },
-        h("a", { class: "adm-link", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "" }, c.name),
-        h("span", { class: "adm-clientrow__date", text: "Deleted " + fmtDate(c.archived_at) })),
-      writes ? h("button", { class: "btn btn--secondary adm-small", type: "button", "aria-label": `Restore ${c.name}`, onclick: () => restoreClient(c, { notify: ctx.notify, after: done }) }, "Restore") : null))) }) : null;
+  const bySite = new Map();
+  if (sitesData && sitesData.available) for (const w of sitesData.websites) { const e = bySite.get(w.organizationId) || { n: 0, staging: 0 }; e.n += 1; if (w.stagingUrl) e.staging += 1; bySite.set(w.organizationId, e); }
   const create = newClientPanel({ navigate: ctx.navigate, writesEnabled: writes });
-  // At a glance: how many clients, how far their Business Profiles are, and who has not started. Filtering by name only hides rows on this page; nothing is changed.
   const pcts = rows.map((c) => (c.profile ? Math.max(0, Math.min(100, Number(c.profile.percent) || 0)) : null)).filter((n) => n !== null);
   const avgPct = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null, notStarted = pcts.filter((n) => n === 0).length;
-  const stats = rows.length ? h("div", { class: "rk-stats", role: "group", "aria-label": "Summary" },
-    statCard({ label: "Clients", value: String(rows.length), hint: deleted.length ? `${deleted.length} deleted` : "active" }),
-    avgPct === null ? null : statCard({ label: "Business Profile", value: avgPct + "%", hint: "average completion", meter: avgPct / 100 }),
-    avgPct === null ? null : statCard({ label: "Not started", value: String(notStarted), hint: notStarted ? "no Business Profile answers yet" : "everyone has started", tone: notStarted ? "warn" : "ok" })) : null;
-  const find = rows.length >= 6 ? searchBox({ label: "Find a client", onInput: (q) => {
-    let n = 0;
-    list.querySelectorAll("li.adm-clientitem").forEach((li) => { const hit = !q || li.textContent.toLowerCase().includes(q); li.hidden = !hit; if (hit) n += 1; });
-    status.textContent = q ? `${plural(n, "organization")} match.` : `${plural(rows.length, "organization")}.`;
-  } }) : null;
-  const status = h("p", { class: "adm-sub", role: "status" }, `${plural(rows.length, "organization")}.`);
-  const node = h("div", { class: "adm-page" },
-    h("div", { class: "adm-head" }, h("div", null, h("span", { class: "eyebrow" }, "Framework Admin"), h("h1", { class: "adm-title", tabindex: "-1" }, "Clients"),
-      h("p", { class: "adm-sub" }, h("span", { class: "adm-sub--full" }, "Client organizations, the people who can open their portal, and their Business Profiles."), h("span", { class: "adm-sub--short" }, "Manage your client organizations."))), h("div", { class: "adm-actions" }, create.button)),
-    writes ? null : h("p", { class: "adm-banner" }, "Changes are switched off on this site: you can look at clients, but not create them or change who has access."),
+  const withSites = rows.filter((c) => bySite.has(c.id)).length;
+  const kpis = rows.length ? grid(
+    span(kpi({ label: "Clients", value: String(rows.length), note: deleted.length ? `${deleted.length} deleted` : "active" }), 3),
+    sitesData && sitesData.available ? span(kpi({ label: "With a website", value: String(withSites), unit: `of ${rows.length}`, note: `${[...bySite.values()].reduce((a, e) => a + e.n, 0)} websites in all`, href: "/admin/websites" }), 3) : null,
+    avgPct === null ? null : span(kpi({ label: "Business Profile", value: avgPct + "%", note: "average completion" }), 3),
+    avgPct === null ? null : span(kpi({ label: "Not started", value: String(notStarted), note: notStarted ? "no Business Profile answers yet" : "Everyone has started", tone: notStarted ? "warn" : "ok" }), 3)) : null;
+  const cols = [
+    { label: "Client", cls: "ds-dl__c--main", render: (c) => h("span", { class: "ds-client" }, h("span", { class: "ds-avatar", "aria-hidden": "true", text: initials(c.name) }), h("span", { class: "ds-site" }, h("a", { class: "ds-site__n ds-site__a", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "", text: c.name }), h("span", { class: "ds-muted", text: "Created " + fmtDate(c.created_at) }))) },
+    { label: "Websites", render: (c) => { const e = bySite.get(c.id); return e ? h("span", { class: "ds-env-mini" }, `${e.n} ${e.n === 1 ? "website" : "websites"}`, e.staging === e.n ? pill("Staging set up", "info") : pill(`${e.n - e.staging} without Staging`, "quiet")) : h("span", { class: "ds-muted", text: "None" }); } },
+    { label: "Business Profile", render: (c) => (c.profile ? h("span", { class: "ds-prof" }, h("progress", { class: "ds-meter", max: 100, value: Math.max(0, Math.min(100, Number(c.profile.percent) || 0)), "aria-hidden": "true" }), h("span", { text: `${c.profile.percent}%` }), h("span", { class: "rk-sr", text: ` Business Profile ${c.profile.percent}% complete` })) : h("span", { class: "ds-muted", text: "Not available" })) },
+    { label: "", cls: "ds-dl__c--end", render: (c) => (writes ? actionsMenu({ label: `Actions for ${c.name}`, items: [{ label: "Delete client", danger: true, run: () => deleteClient(c, { notify: ctx.notify, after: done }) }] }) : null) },
+  ];
+  const listHost = h("div", { class: "ds-list-host" });
+  const status = h("p", { class: "ds-muted", role: "status", text: `${plural(rows.length, "organization")}.` });
+  const draw = (q) => {
+    const shown = rows.filter((c) => !q || c.name.toLowerCase().includes(q));
+    status.textContent = q ? `${plural(shown.length, "organization")} match.` : `${plural(rows.length, "organization")}.`;
+    listHost.replaceChildren(shown.length ? dataList({ label: "Client organizations", cls: "ds-dl--clients", columns: cols, rows: shown }) : empty({ title: rows.length ? "No client matches" : "No client organizations yet", body: rows.length ? "Try another name." : writes ? "Use New client to add the first one, then invite its first owner." : "Nothing has been created yet. Changes are switched off on this site.", ic: "clients" }));
+  };
+  const find = searchBox({ label: "Find a client", placeholder: "Find a client", onInput: draw });
+  draw("");
+  const trash = deleted.length ? disclosure({ id: "deleted-clients", title: "Deleted clients", className: "adm-acc--quiet", meta: String(deleted.length),
+    children: h("ul", { class: "adm-clientlist adm-clientlist--deleted", "aria-label": "Deleted clients" }, deleted.map((c) => h("li", { class: "adm-deleteditem" },
+      h("div", { class: "adm-deleteditem__text" }, h("a", { class: "adm-link", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "" }, c.name), h("span", { class: "adm-clientrow__date", text: "Deleted " + fmtDate(c.archived_at) })),
+      writes ? h("button", { class: "btn btn--secondary adm-small", type: "button", "aria-label": `Restore ${c.name}`, onclick: () => restoreClient(c, { notify: ctx.notify, after: done }) }, "Restore") : null))) }) : null;
+  const node = h("div", { class: "ds-page" },
+    pageHead({ title: "Clients", sub: "Client organizations, the people who can open their portal, and their websites.", actions: create.button || null }),
+    writes ? null : h("p", { class: "ds-banner" }, "Changes are switched off on this site: you can look at clients, but not create them or change who has access."),
     create.panel,
-    data.profile_available ? null : h("p", { class: "adm-banner" }, "Business Profile data isn’t available on this deployment (its database migration hasn’t been applied)."),
-    stats, find,
-    rows.length ? list : stateBlock({ title: "No client organizations yet", body: writes ? "Use New client to add the first one, then invite its first owner." : "Nothing has been created yet. Changes are switched off on this site." }),
-    rows.length ? status : null,
-    trash,
-  );
-  return { title: "Clients", node };
+    data.profile_available ? null : h("p", { class: "ds-banner" }, "Business Profile data isn’t available on this deployment (its database migration hasn’t been applied)."),
+    kpis,
+    h("div", { class: "ds-toolbar" }, find), card({ body: [listHost, status] }), trash);
+  return { title: "Clients", node, crumbs: [["Admin", "/admin"], ["Clients", null]] };
 }
 
 /* ---------- Detail ---------- */
 
 const spec = (rows) => h("dl", { class: "adm-spec" }, rows.filter(Boolean).map(([k, v]) => h("div", null, h("dt", { text: k }), h("dd", null, v))));
 
-async function renderDetail(id, ctx) {
+async function renderDetail(id, ctx, view = "overview") {
   const data = await api("/clients/" + encodeURIComponent(id));
   const o = data.organization;
   const p = data.profile;
@@ -119,12 +147,8 @@ async function renderDetail(id, ctx) {
   const access = deletedOrg ? null : accessSections({ orgId: o.id, orgName: o.name, welcome, onData: (d) => dash.update(d.members, d.invitations) });
 
   const node = h("div", { class: "adm-page adm-detail" },
-    h("div", { class: "adm-detailbar" }, h("a", { class: "adm-back", href: "/admin/clients", "data-link": "" }, "← All clients"), menu),
-    dash.header,
     deletedBanner,
-    dash.overview,
-    access,
-    info,
+    ...(view === "access" ? [access || h("p", { class: "adm-muted" }, "Access isn’t managed for a deleted client.")] : [dash.overview, info]),
   );
   return { title: o.name + " — Clients", node };
 }

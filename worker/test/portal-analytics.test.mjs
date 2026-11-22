@@ -194,7 +194,8 @@ test("settings: validated, per website, scoped to the organization; disconnectin
   const w = world();
   assert.equal(store.validSiteTag(TAG.toUpperCase()), TAG); assert.equal(store.validSiteTag("xyz"), null);
   assert.equal(store.validProperty("sc-domain:Example.com"), "sc-domain:example.com"); assert.equal(store.validProperty("https://example.com/"), "https://example.com/"); assert.equal(store.validProperty("https://example.com"), null); assert.equal(store.validProperty("http://example.com/"), null); assert.equal(store.validProperty("example.com"), null);
-  assert.deepEqual(await store.getConfig(w.db, ORG_A, SITE_A), { cfSiteTag: null, gscProperty: null, updatedAt: null });
+  // without proposed migration 0029 the own-account fields read as empty and accountsReady is false (see portal-analytics-accounts.test.mjs)
+  assert.deepEqual(await store.getConfig(w.db, ORG_A, SITE_A), { cfSiteTag: null, gscProperty: null, updatedAt: null, cfAccountId: null, cfTokenEnc: null, cfTokenSetAt: null, accountsReady: false });
   assert.equal((await store.saveConfig(w.db, ORG_A, SITE_A, { cf_site_tag: TAG, gsc_property: PROP }, "owner@frameworkco.ca", { now: NOW })).ok, true);
   assert.equal((await store.getConfig(w.db, ORG_A, SITE_A)).cfSiteTag, TAG);
   assert.equal((await store.saveConfig(w.db, ORG_A, SITE_A, { cf_site_tag: "nope" }, "o", { now: NOW })).error, "invalid_site_tag");
@@ -317,10 +318,12 @@ test("Admin API: read, save, validate, test; credentials never returned; writes 
   assert.equal(noOrigin.status, 403);
   assert.equal((await adminCall(w, "GET", `/clients/${ORG_B}/websites/${SITE_A}/analytics`)).status, 404, "a website under the wrong organization is not found");
   assert.equal(await adminCall(w, "GET", "/clients/x/websites/y/analytics").then((x) => x.status), 404);
-  r = await adminCall(w, "POST", path + "/test", { source: "cloudflare" }, { env: ENV, fetch: async () => respond(CF_ANSWER()) });
-  assert.deepEqual(await r.json(), { ok: true, through: "2026-11-10" });
+  // the Cloudflare test now tells receiving data, zero traffic and setup problems apart (its own cases are in portal-analytics-accounts.test.mjs) and says which account it used
+  const diag = { data: { viewer: { accounts: [{ recent: [{ count: 42 }], history: [{ count: 900 }] }] } } };
+  r = await adminCall(w, "POST", path + "/test", { source: "cloudflare" }, { env: ENV, fetch: async () => respond(diag) });
+  assert.deepEqual(await r.json(), { ok: true, status: "receiving", through: "2026-11-10", pageViews: 42, account: "framework" });
   r = await adminCall(w, "POST", path + "/test", { source: "cloudflare" }, { env: ENV, fetch: async () => respond({}, 403) });
-  assert.deepEqual(await r.json(), { ok: false, code: "unauthorized" });
+  assert.deepEqual(await r.json(), { ok: false, code: "unauthorized", account: "framework" });
   r = await adminCall(w, "POST", path + "/test", { source: "search_console" }, { env: {} });
   assert.deepEqual(await r.json(), { ok: false, code: "not_enabled" });
   assert.equal((await adminCall(w, "POST", path + "/test", { source: "nope" })).status, 422);
@@ -350,7 +353,7 @@ test("wiring: the client route sits under the website page behind website.view a
   assert.match(router, /when: websiteOn, re: \/\^\\\/portal\\\/o\\\/\(\[\^\/\]\+\)\\\/website\\\/\(\[\^\/\]\+\)\\\/analytics\$\//);
   assert.ok(router.indexOf("/analytics$/") < router.indexOf("website\\/([^/]+)$/, action: \"website.view\""), "matched before the generic website page");
   assert.match(src("worker/admin/router.js"), /handleWebsiteAnalyticsApi/);
-  assert.match(src("admin/assets/websites.js"), /analyticsPanel\(\{ base, site, canWrite, say \}\)/);
+  assert.match(src("admin/assets/sites.js"), /analyticsPanel\(\{ base, site, canWrite, say \}\)/);
   assert.match(src("worker/portal/website-live.js"), /extra\.analytics \? analyticsTeaser\(vm, s\) : ""/);
   for (const f of ["worker/portal/analytics/view.js", "worker/portal/analytics/service.js", "admin/assets/website-analytics.js"]) assert.ok(!/CF_ANALYTICS_API_TOKEN|GSC_OAUTH_|GSC_SERVICE_ACCOUNT/.test(src(f)), f + " never touches the secrets");
   for (const f of ["worker/portal/analytics/search-console.js", "worker/portal/analytics/service.js", "worker/portal/admin-website-analytics.js"]) assert.ok(!/GSC_SERVICE_ACCOUNT|private_key|RSASSA|importKey|signAssertion/.test(src(f)), f + " has no service account key code");
@@ -389,7 +392,7 @@ test("route: owners and members of the organization see the page; setup messages
     assert.match(html, /\/assets\/js\/portal-analytics\.js/); assert.match(html, /\/assets\/css\/portal-analytics\.css/);
   }
   const page = await (await s.ann.get(`/portal/o/alpha/website/${id}`)).text();
-  assert.match(page, new RegExp(`href="/portal/o/alpha/website/${id}/analytics"`)); assert.match(page, /View analytics/);
+  assert.match(page, new RegExp(`href="/portal/o/alpha/website/${id}/analytics"`)); assert.match(page, /Open analytics/);
   assert.equal((await s.anon.get(`/portal/o/alpha/website/${id}/analytics`)).status, 303, "signed-out visitors are sent to sign in");
 });
 test("route: another organization's, unpublished and unknown websites are all 'not found'; dormant without the migration; range is allow-listed", async () => {

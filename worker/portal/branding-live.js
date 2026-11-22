@@ -287,7 +287,9 @@ export function brandingOverview(vm, brand, o = {}) {
     : dState === "progress" ? (live ? `${approved} is below. Finish your Brand Discovery when you can: it guides what Framework builds next.` : "You are part-way through your Brand Discovery. Continue below, then Framework will design your brand from your answers. Your approved brand will appear here when it is ready.")
     : dState === "sent" && !live ? "Thank you for completing your Brand Discovery. Framework is working from your answers, and your approved brand will appear here when it is ready. Anything else can be requested below."
     : live ? `${approved}: logos, typography, colours and more. Download what you need, any time.` : "Your brand kit in nine parts. Anything that isn’t here yet can be requested below.";
-  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1><p class="lead">${leadText}</p></header>`;
+  // The Brand Book prototype (Staging): only given to Framework master access, and only where the prototype is on; the link stays inside the visit, so the client's organization and the staff session carry over.
+  const bookLink = o.bookHref ? `<p class="bk-preview"><a class="btn btn--small" href="${e(o.bookHref)}">Preview Brand Book</a> <span class="muted small">Prototype for review · visible to Framework master access only</span></p>` : "";
+  const head = `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1><p class="lead">${leadText}</p>${bookLink}</header>`;
   const banner = notice === "sent" ? `<p class="form-banner" role="status">Request sent. Framework will follow up.</p>` : notice === "dup" ? `<p class="form-banner" role="status">That request is already open, so we didn’t send it twice.</p>` : "";
 
   const assets = live ? brand.assets || [] : [];

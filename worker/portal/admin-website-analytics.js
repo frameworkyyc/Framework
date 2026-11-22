@@ -2,9 +2,15 @@
  * Framework Admin: Analytics settings of a client's website. Behind Cloudflare Access and ADMIN_EMAILS like every Admin route; writes also need PORTAL_ADMIN_WRITES and a same-origin
  * request with the X-Framework-Admin header. Clients never reach any of this.
  *
- *   GET  /clients/:org/websites/:id/analytics        { available, config: { cf_site_tag, gsc_property }, platform: { cloudflare, search_console }, google_account, website }
- *   POST /clients/:org/websites/:id/analytics        { cf_site_tag?, gsc_property? }   (empty or null disconnects that source)
+ *   GET  /clients/:org/websites/:id/analytics        { available, config: { cf_site_tag, gsc_property, cf_account_id, cf_token_set, cf_token_set_at }, platform: { cloudflare, search_console },
+ *                                                     own_accounts: { available, key }, google_account, website }
+ *   POST /clients/:org/websites/:id/analytics        { cf_site_tag?, gsc_property?, cf_account_id?, cf_api_token? }   (empty or null disconnects that source)
  *   POST /clients/:org/websites/:id/analytics/test   { source: "cloudflare" | "search_console" }   one live read with the saved setting; answers ok or a short code, never data or secrets
+ *
+ * Own Cloudflare account (migration 0029): cf_account_id is the client's account; cf_api_token is that account's READ-ONLY token. The token is WRITE-ONLY: it is encrypted here
+ * (AES-256-GCM, secret-box.js, key ANALYTICS_CREDENTIALS_KEY) before it is stored, and no answer ever contains it or its encrypted form; Admin sees only whether one is saved and
+ * when. Absent or empty cf_api_token keeps the saved token; empty cf_account_id removes the own account and its token (the website goes back to Framework's account).
+ * `own_accounts` says whether migration 0029 is applied (available) and whether the encryption key is set up (key): booleans only.
  * `platform` says only whether the server has each source's credentials (booleans); the values are never returned. `google_account` is the email of the Google account Framework signed in with
  * (the optional plain setting GSC_ACCOUNT_EMAIL, display only): Admin has to add it as a Restricted user in the client's Search Console; it is not a secret. A database without migration 0028
  * answers { available: false }.
@@ -14,9 +20,12 @@ import { getOrganizationById } from "./repo/orgs.js";
 import { getWebsiteAdmin } from "./repo/websites.js";
 import * as store from "./repo/website-analytics.js";
 import { platform, testSource } from "./analytics/service.js";
+import { sealToken, keyReady } from "./analytics/secret-box.js";
+import { validApiToken } from "./analytics/cloudflare.js";
 import { json, err, sameOriginWrite, readJson } from "./admin-branding.js";
 
-const STATUS = { not_found: 404, unavailable: 409, invalid_site_tag: 422, invalid_property: 422, invalid_actor: 422, invalid_source: 422 };
+const STATUS = { not_found: 404, unavailable: 409, invalid_site_tag: 422, invalid_property: 422, invalid_actor: 422, invalid_source: 422,
+  accounts_unavailable: 409, credentials_key_missing: 409, invalid_account_id: 422, invalid_token: 422, token_required: 422, account_required: 422 };
 /** The Google account shown to Admin (display only; never used to sign in): a plain email address from the optional GSC_ACCOUNT_EMAIL setting, else null. */
 const googleAccount = (env) => { const v = env && typeof env.GSC_ACCOUNT_EMAIL === "string" ? env.GSC_ACCOUNT_EMAIL.trim() : ""; return /^[^\s@<>"]{1,64}@[^\s@<>"]{3,190}$/.test(v) ? v : null; };
 const fromFailure = (r) => (STATUS[r.error] ? err(STATUS[r.error], r.error, "The change was not made.") : err(500, "server_error", "Something went wrong. Nothing was changed."));
@@ -47,21 +56,30 @@ export async function handleWebsiteAnalyticsApi(request, env, principal, path, d
     if (route.kind === "view") {
       if (!ready) return json({ available: false, website: { id: site.id, name: site.name } });
       const cfg = await store.getConfig(db, org.id, websiteId);
-      return json({ available: true, website: { id: site.id, name: site.name }, config: { cf_site_tag: cfg.cfSiteTag, gsc_property: cfg.gscProperty }, platform: platform(env), google_account: googleAccount(env), capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1" } });
+      // the token is write-only: whether one is saved and when, never the token or its encrypted form
+      return json({ available: true, website: { id: site.id, name: site.name },
+        config: { cf_site_tag: cfg.cfSiteTag, gsc_property: cfg.gscProperty, cf_account_id: cfg.cfAccountId, cf_token_set: !!cfg.cfTokenEnc, cf_token_set_at: cfg.cfTokenEnc ? cfg.cfTokenSetAt : null },
+        platform: platform(env), own_accounts: { available: cfg.accountsReady, key: keyReady(env) }, google_account: googleAccount(env), capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1" } });
     }
     if (!ready) return err(409, "unavailable", "Analytics isn’t available on this site yet (a database change is waiting), so nothing was changed.");
     if (route.kind === "save") {
-      const read = await readJson(request, ["cf_site_tag", "gsc_property"]);
+      const read = await readJson(request, ["cf_site_tag", "gsc_property", "cf_account_id", "cf_api_token"]);
       if (read.response) return read.response;
-      const r = await store.saveConfig(db, org.id, websiteId, read.body, actor, { now });
+      const { cf_api_token: plain, ...input } = read.body;
+      if (plain !== undefined && plain !== null && !(typeof plain === "string" && plain.trim() === "")) {
+        const token = validApiToken(plain);
+        if (!token) return fromFailure({ error: "invalid_token" });
+        if (!keyReady(env)) return fromFailure({ error: "credentials_key_missing" });
+        input.cf_token_enc = await sealToken(env, { organizationId: org.id, websiteId, token });
+      }
+      const r = await store.saveConfig(db, org.id, websiteId, input, actor, { now });
       return r.ok ? json({ ok: true }) : fromFailure(r);
     }
     const read = await readJson(request, ["source"]);
     if (read.response) return read.response;
     if (!store.SOURCES.includes(read.body.source)) return err(422, "invalid_source", "Choose a source to test.");
     const cfg = await store.getConfig(db, org.id, websiteId);
-    const ref = read.body.source === "cloudflare" ? cfg.cfSiteTag : cfg.gscProperty;
-    return json(await testSource({ env, source: read.body.source, ref, fetch: deps.fetch || fetch, now }));
+    return json(await testSource({ env, source: read.body.source, config: cfg, organizationId: org.id, websiteId, fetch: deps.fetch || fetch, now }));
   } catch (e) {
     console.error("admin website analytics api error:", e && e.name); // never the message
     return err(500, "server_error", "Something went wrong. Nothing was changed.");
