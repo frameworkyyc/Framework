@@ -25,7 +25,7 @@ const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8")
 
 async function setup({ migrated = true } = {}) {
   resetKeyCacheForTests();
-  const w = await makeWorld({ proposed: migrated ? [MIG] : [] });
+  const w = await makeWorld({ skip: migrated ? [] : [MIG] }); // 0031 lives with the migrations Staging may apply; "without 0031" is how Staging and Production are until it is applied
   const bucket = fakeR2();
   Object.assign(w.env, { PORTAL_FILES: bucket, PORTAL_ADMIN_WRITES: "1", PORTAL_WEBSITE: "1", ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ADMIN_EMAILS: ADMIN, ACCESS_JWKS_JSON: JSON.stringify({ keys: [jwk] }) });
   const A = await w.org("alpha", "Alpha Co"), Bo = await w.org("beta", "Beta Co");
@@ -50,8 +50,8 @@ async function setup({ migrated = true } = {}) {
   return { w, bucket, A, Bo, ann, bob, call, base, site, upload, remove, view, stage };
 }
 
-test("migration 0031 waits in migrations/portal-proposed, only adds six nullable columns, and leaves every existing screenshot untouched", async () => {
-  const sql = read("migrations/portal-proposed/" + MIG);
+test("migration 0031 (approved for Staging; Production not yet) only adds six nullable columns, and leaves every existing screenshot untouched", async () => {
+  const sql = read("migrations/portal/" + MIG);
   const code = sql.replace(/--.*$/gm, "");
   assert.deepEqual([...code.matchAll(/ALTER TABLE (\w+) ADD COLUMN (\w+)/g)].map((m) => `${m[1]}.${m[2]}`), ["key", "name", "format", "type", "size", "sha256"].map((c) => `websites.staging_screenshot_${c}`));
   assert.ok(!/\bDROP\b|\bUPDATE\b|\bDELETE\b|\bRENAME\b|NOT NULL|\bCREATE\b/i.test(code), "additive: nothing removed, rewritten or required");
