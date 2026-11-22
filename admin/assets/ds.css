@@ -338,3 +338,25 @@ progress.ds-meter::-webkit-progress-bar { background: var(--ds-line); } progress
 .ds-setrow__t { display: grid; gap: 2px; min-width: 0; font-size: 14px; } .ds-setrow .rk-ico { flex: none; width: 18px; height: 18px; }
 @media (hover: hover) { .ds-setrow:hover { background: var(--ds-soft); } }
 .ds-setrow:focus-visible { outline: 2px solid var(--ds-ink); outline-offset: -2px; }
+
+/* Search inputs share one inner padding across the Admin */
+.ds-main input[type="search"], .ds-main .ds-find, .ds-main .adm-search__input { padding-left: 16px; padding-right: 16px; }
+.ds-main .adm-tiles { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .ds-main .adm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .ds-main .adm-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* ---------- Website management cards (single-client view) ---------- */
+.ds-mg__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 14px; } .ds-mg__bar p { margin: 0; font-size: 14px; }
+.ds-mg__grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .ds-mg__grid:not(.ds-mg__grid--one) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ds-mg .ds-card__title, .ds-mg h2 { font-size: 20px; }
+.ds-mg__rows { display: grid; gap: 0; }
+.ds-mg__env { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 14px; align-items: center; padding: 14px 0; border-top: 1px solid var(--ds-line); }
+.ds-mg__env:first-child { border-top: 0; }
+.ds-mg__env > .ds-pill + .ds-mg__host, .ds-mg__env > .ds-pill + .ds-muted { grid-column: 2; }
+.ds-mg__k { font-size: 13px; color: var(--ds-muted); font-weight: 500; }
+.ds-mg__host { font-size: 14px; overflow-wrap: anywhere; }
+.ds-mg--only .ds-mg__rows { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+.ds-mg--only .ds-mg__env:nth-child(2) { border-top: 0; }
+@media (max-width: 700px) { .ds-mg--only .ds-mg__rows { grid-template-columns: minmax(0, 1fr); } .ds-mg--only .ds-mg__env:nth-child(2) { border-top: 1px solid var(--ds-line); } .ds-mg__env { grid-template-columns: 96px minmax(0, 1fr); } }
+.ds-mg__env > .ds-pill { justify-self: start; }
