@@ -82,11 +82,11 @@ test("script: remote info must be the Staging name AND id; Production is refused
   for (const bad of [{ uuid: PROD.id, name: PROD.name }, { uuid: PROD.id, name: STAGING.name }, { uuid: STAGING.id, name: PROD.name }, { uuid: STAGING.id, name: "other" }, { name: STAGING.name }, {}]) throwsFail(() => checkInfo(JSON.stringify(bad)), /name|id|Production/i);
   throwsFail(() => checkInfo("no json"), /JSON/);
 });
-test("script: only the applicable migration may be pending; apply needs one; anything else fails closed", () => {
-  const f = STAGING.applicable[0];
+test("script: only migrations on the reviewed list may be pending; apply needs one; anything else fails closed", () => {
+  const f = "0031_website_staging_screenshot.sql";
   assert.equal(checkPendingBefore(listOf(f), "apply"), "pending: " + f); assert.equal(checkPendingBefore(listOf(f), "verify-only"), "pending: " + f);
   assert.equal(checkPendingBefore(NONE, "verify-only"), "pending: none"); throwsFail(() => checkPendingBefore(NONE, "apply"), /at least one/);
-  throwsFail(() => checkPendingBefore(listOf(f, "0099_unknown.sql"), "apply"), /unexpected/); throwsFail(() => checkPendingBefore(listOf("0030_website_workspace.sql"), "apply"), /unexpected/); throwsFail(() => checkPendingBefore(listOf("0029_website_analytics_accounts.sql"), "apply"), /unexpected/);
+  throwsFail(() => checkPendingBefore(listOf(f, "0099_unknown.sql"), "apply"), /unexpected/); assert.match(checkPendingBefore(listOf("0030_website_workspace.sql", f), "apply"), /0030.*0031/, "any reviewed migration may be pending"); throwsFail(() => checkPendingBefore(listOf("0029_website_analytics_accounts.sql"), "apply"), /unexpected/);
   throwsFail(() => checkPendingBefore("garbage", "apply"), /could not read/);
   assert.equal(checkPendingAfter(NONE), "no pending migrations"); throwsFail(() => checkPendingAfter(listOf(f)), /still pending/);
 });
@@ -94,9 +94,9 @@ test("script: tables must include everything applied (extras are left alone), st
   const all = PROD.tables;
   assert.match(checkTablesBefore(exec("d1_migrations", "_cf_KV", ...all, "demo_extra")), /extra, left alone: demo_extra/);
   throwsFail(() => checkTablesBefore(exec(...all.slice(1))), /missing/);
-  assert.match(checkTablesAfter(exec(...all), exec(...all)), /unchanged/); throwsFail(() => checkTablesAfter(exec(...all, "new_table"), exec(...all)), /changed/);
-  assert.match(checkColumnsAfter(exec("id", ...STAGING.newColumns, ...STAGING.keptColumns)), /6 new, 6 kept/);
-  throwsFail(() => checkColumnsAfter(exec("id", ...STAGING.keptColumns)), /missing columns/); throwsFail(() => checkColumnsAfter(exec("id", ...STAGING.newColumns)), /missing columns/);
+  assert.match(checkTablesAfter(exec(...all), exec(...all), ["0031_website_staging_screenshot.sql"]), /unchanged/); throwsFail(() => checkTablesAfter(exec(...all, "new_table"), exec(...all), ["0031_website_staging_screenshot.sql"]), /not what the migration declares/); assert.match(checkTablesAfter(exec(...all), exec(...all.filter((t) => t !== "website_tasks")), ["0030_website_workspace.sql"]), /new: website_tasks/, "a table the applied migration declares is expected");
+  assert.match(checkColumnsAfter(exec("id", ...STAGING.newColumns, ...STAGING.keptColumns), ["0031_website_staging_screenshot.sql"]), /columns ok: 12/); assert.match(checkColumnsAfter(exec("id"), ["0030_website_workspace.sql"]), /no column expectations/);
+  throwsFail(() => checkColumnsAfter(exec("id", ...STAGING.keptColumns), ["0031_website_staging_screenshot.sql"]), /missing columns/); throwsFail(() => checkColumnsAfter(exec("id", ...STAGING.newColumns), ["0031_website_staging_screenshot.sql"]), /missing columns/);
 });
 test("script: the screenshot fingerprint must be identical before and after", () => {
   const row = (o) => JSON.stringify([{ results: [{ websites: 2, with_screenshot: 1, bytes: 100, hashes: "ab", ...o }], success: true }]);
@@ -106,7 +106,6 @@ test("script: the screenshot fingerprint must be identical before and after", ()
   throwsFail(() => fingerprint("[]"), /fingerprint|JSON/); throwsFail(() => fingerprint("x"), /JSON/);
 });
 test("this workflow, its script and its environment are the only Staging migration path and are not used by the Production workflow", () => {
-  assert.deepEqual(STAGING.applicable, ["0031_website_staging_screenshot.sql"]);
-  assert.ok(PROD.migrations.includes(STAGING.applicable[0]), "0031 is in the shared migration list like every migration file; applying it to Production still needs the Production workflow and its own approval");
+  assert.ok(PROD.migrations.includes("0031_website_staging_screenshot.sql"), "0031 is in the shared reviewed list like every migration file; applying it to Production still needs the Production workflow and its own approval");
   assert.ok(!/staging-portal-d1/.test(readFileSync(new URL(".github/workflows/portal-production-d1-migration.yml", root), "utf8")));
 });
