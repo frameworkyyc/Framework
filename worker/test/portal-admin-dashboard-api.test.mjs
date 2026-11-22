@@ -101,7 +101,7 @@ test("the Overview page: loads each part independently, no HTML injection, no nu
   const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   const ui = strip(readFileSync(new URL("../../admin/assets/overview.js", import.meta.url), "utf8"));
   assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML/.test(ui));
-  assert.match(ui, /Promise\.all\(\[quiet\("\/dashboard"\), quiet\("\/overview"\), quiet\("\/services\/attention"\), quiet\("\/assessments\/summary"\), quiet\("\/dashboard\/trends"\)\]\)/);
+  assert.match(ui, /Promise\.all\(\[quiet\("\/dashboard"\), quiet\("\/overview"\), quiet\("\/services\/attention"\), quiet\("\/assessments\/summary"\), quiet\("\/dashboard\/trends"\), quiet\("\/activity"\)\]\)/);
   assert.match(ui, /\]\.filter\(Boolean\),\n/, "optional parts are filtered out before they reach the DOM");
   const modules = readFileSync(new URL("../../admin/assets/modules.js", import.meta.url), "utf8");
   assert.ok(!/testimonials/i.test(modules), "Testimonials is removed from Coming later (Client Feedback covers it)");
