@@ -9,7 +9,7 @@ import { portalMode, portalConfigProblems, readPortalConfig, demoEnabled, brandi
 import { handleGuest, isGuestPath, memberApi, MAX_REVIEW_BODY } from "./discovery/routes.js";
 import { listClientAssessments as listClientDiscoveries } from "./repo/discovery.js";
 import { errorPage, newRef, redirect, checkSameSiteMutation, securityHeaders, serializeCookie, safeReturnPath, VIEW_ROLE_COOKIE } from "./http.js";
-import { handleLogin, handleCallback, handleLogout } from "./auth.js";
+import { handleLogin, handleCallback, handleLogout, withSharePreview } from "./auth.js";
 import { requireSession, requireOrgAccess, dbCall, Unavailable, unavailablePage, notFoundPage } from "./guard.js";
 import { checkRateLimit } from "./ratelimit.js";
 import { logEvent, routeName } from "./log.js";
@@ -969,6 +969,7 @@ export async function handlePortal(request, env, deps = {}) {
         if (request.method !== "GET" && request.method !== "HEAD") return errorPage(405, { ref, headers: { Allow: "GET, HEAD" } });
       }
       response = await SIMPLE[path](ctx);
+      if (path === "/portal") response = withSharePreview(ctx, response);
     } else {
       response = (await orgRoute(ctx, path)) || errorPage(404, { ref });
     }

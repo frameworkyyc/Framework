@@ -54,7 +54,7 @@ body.adm { background: var(--ds-ground); color: var(--ds-text); }
 @media (min-width: 1024px) {
   .adm-shell { grid-template-columns: 268px minmax(0, 1fr); }
   .ds-mobilebar { display: none; }
-  .adm-side { display: flex; position: sticky; top: 0; inset: auto; height: 100vh; padding: 22px 16px 16px; }
+  .adm-side { display: flex; position: sticky; inset: auto; top: 0; align-self: start; height: 100vh; padding: 22px 16px 16px; }
   .ds-top { display: flex; }
 }
 
@@ -360,3 +360,62 @@ progress.ds-meter::-webkit-progress-bar { background: var(--ds-line); } progress
 .ds-mg--only .ds-mg__env:nth-child(2) { border-top: 0; }
 @media (max-width: 700px) { .ds-mg--only .ds-mg__rows { grid-template-columns: minmax(0, 1fr); } .ds-mg--only .ds-mg__env:nth-child(2) { border-top: 1px solid var(--ds-line); } .ds-mg__env { grid-template-columns: 96px minmax(0, 1fr); } }
 .ds-mg__env > .ds-pill { justify-self: start; }
+
+/* ---------- Overview: Needs attention as compact cards ---------- */
+.ds-main .adm-dash__top.adm-dash__sec { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0 0 14px; }
+.ds-main .adm-dash__top .rk-card__head { margin-bottom: 10px; }
+.ds-main .adm-todo.ds-ncs { list-style: none; margin: 0; padding: 0; border: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.ds-main .ds-nc.adm-todo__item { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 4px 12px; align-items: start; padding: 14px 46px 14px 14px; border: 1px solid var(--ds-line); border-radius: var(--ds-r); background: var(--ds-card); box-shadow: var(--ds-shadow-1); }
+.ds-main .ds-nc.adm-todo__item.is-dismissed { grid-template-columns: minmax(0, 1fr) auto; align-items: center; background: rgba(255, 255, 255, .55); box-shadow: none; padding: 12px 14px; }
+.ds-nc__ico { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--ds-soft); color: var(--ds-muted); }
+.ds-nc__ico .rk-ico { width: 18px; height: 18px; }
+.adm-todo__item--bad .ds-nc__ico { background: #F7E4E4; color: var(--ds-bad); } .adm-todo__item--warn .ds-nc__ico { background: #FBEFD9; color: var(--ds-warn); }
+.ds-nc__text { font-size: 14px; font-weight: 600; line-height: 1.4; min-width: 0; overflow-wrap: anywhere; align-self: center; }
+.ds-nc__acts { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+.ds-nc__go { font-weight: 600; }
+.ds-main .adm-todo__dismiss.ds-nc__x { position: absolute; top: 10px; right: 10px; display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ds-muted); cursor: pointer; transition: background var(--ds-dur) var(--ds-ease), color var(--ds-dur) var(--ds-ease); }
+.ds-main .adm-todo__dismiss.ds-nc__x:hover { background: var(--ds-soft); color: var(--ds-ink); }
+.ds-main .adm-todo__dismiss.ds-nc__x .rk-ico { width: 14px; height: 14px; }
+.ds-nc__undo { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; cursor: pointer; }
+.ds-main .adm-todo__clear { margin: 0; padding: 14px 16px; }
+
+/* ---------- Overview: Client activity feed ---------- */
+.ds-actcard { margin: 0 0 14px; }
+.ds-act__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 6px; } .ds-act__sum { margin: 0; font-size: 13px; }
+.ds-act { list-style: none; margin: 0; padding: 0; }
+.ds-act__row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--ds-line); }
+.ds-act__row:first-child { border-top: 0; }
+.ds-act__dot { width: 8px; height: 8px; border-radius: 50%; background: transparent; }
+.ds-act__row.is-new .ds-act__dot { background: var(--ds-ink); }
+.ds-act__main { display: grid; gap: 4px; min-width: 0; }
+.ds-act__what { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; } .ds-act__row:not(.is-new) .ds-act__what { color: var(--ds-muted); } .ds-act__row:not(.is-new) .ds-act__what strong { color: var(--ds-text); font-weight: 600; }
+.ds-act__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12.5px; }
+.ds-act__acts { display: flex; align-items: center; gap: 4px 12px; font-size: 13px; }
+.ds-act__go { font-weight: 600; white-space: nowrap; }
+.ds-act__btn { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ds-muted); cursor: pointer; transition: background var(--ds-dur) var(--ds-ease), color var(--ds-dur) var(--ds-ease); }
+.ds-act__btn:hover { background: var(--ds-soft); color: var(--ds-ink); } .ds-act__btn .rk-ico { width: 16px; height: 16px; }
+.ds-act__btn--text { width: auto; padding: 0 10px; border-radius: var(--ds-pill); font: 600 13px/1 var(--font-body); }
+.ds-act__none { margin: 14px 0 4px; font-size: 14px; }
+@media (max-width: 560px) { .ds-act__row { grid-template-columns: 10px minmax(0, 1fr); } .ds-act__acts { grid-column: 2; justify-content: flex-start; } }
+
+/* ---------- Recent feedback (Overview and the Feedback list): one tidy card per response ---------- */
+.ds-main .rk-fbcards { list-style: none; margin: 0; padding: 0; border: 0; display: grid; gap: 10px; }
+.ds-main .rk-fbcards > li { border: 0; }
+.ds-main .rk-fbcard { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(120px, auto); gap: 6px 28px; align-items: center; padding: 16px 20px; border: 1px solid var(--ds-line); border-radius: var(--ds-r); background: var(--ds-card); box-shadow: var(--ds-shadow-1); transition: box-shadow var(--ds-dur) var(--ds-ease), transform var(--ds-dur) var(--ds-ease); }
+@media (hover: hover) { .ds-main .rk-fbcard:hover { box-shadow: var(--ds-shadow-2); transform: translateY(-1px); } }
+.ds-main .rk-fbcard__top { grid-column: 1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+.ds-main .rk-fbcard__sub { grid-column: 1; grid-row: 2; font-size: 13px; color: var(--ds-muted); margin: 0; }
+.ds-main .rk-fbcard__bar { grid-row: 1 / span 2; align-self: center; grid-template-columns: minmax(0, 1fr) 44px; letter-spacing: 0; text-transform: none; font-size: 12.5px; color: var(--ds-muted); }
+.ds-main .rk-fbcard__bar span { text-transform: none; letter-spacing: 0; }
+.ds-main .rk-fbcard__bar progress { height: 6px; border-radius: var(--ds-pill); background: var(--ds-soft); overflow: hidden; }
+.ds-main .rk-fbcard__bar progress::-webkit-progress-bar { background: var(--ds-soft); border-radius: var(--ds-pill); } .ds-main .rk-fbcard__bar progress::-webkit-progress-value { background: var(--ds-ink); border-radius: var(--ds-pill); } .ds-main .rk-fbcard__bar progress::-moz-progress-bar { background: var(--ds-ink); border-radius: var(--ds-pill); }
+.ds-main .rk-fbcard__tags { grid-row: 1 / span 2; justify-content: flex-end; align-self: center; gap: 6px; }
+@media (max-width: 900px) { .ds-main .rk-fbcard { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 14px 16px; } .ds-main .rk-fbcard__top, .ds-main .rk-fbcard__sub { grid-column: 1 / -1; grid-row: auto; } .ds-main .rk-fbcard__bar, .ds-main .rk-fbcard__tags { grid-row: auto; } .ds-main .rk-fbcard__tags { grid-column: 1 / -1; justify-content: flex-start; } }
+
+/* ---------- Sidebar: the account footer stays anchored at the bottom and the navigation scrolls above it ---------- */
+.adm-side { overflow: hidden; }
+.adm-side .adm-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.adm-side .ds-side__foot { flex: none; margin-top: 0; }
+.adm-side { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 1024px) { .adm-side { height: 100vh; height: 100dvh; } }
+.ds-main .ds-nc__acts { justify-content: flex-start; }
