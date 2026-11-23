@@ -150,11 +150,9 @@ body:not(.auth):not(.si-body) .wd-row > summary { border-radius: var(--ds-r-sm);
 body:not(.auth):not(.si-body) .wd-rq > summary { border-radius: var(--ds-pill); }
 @media (max-width: 640px) { body:not(.auth):not(.si-body) .wd-foot .wd-btn { padding: 0 14px; font-size: 13px; white-space: nowrap; gap: 6px; } }
 
-/* Needs your attention (approval workspace): the generic .wd-count pill above must not apply to the large count badge */
-body:not(.auth):not(.si-body) .wd-needs--live .wd-count { background: #fff; color: var(--ds-ink); border-radius: 999px; }
-body:not(.auth):not(.si-body) .wd-needs--live .wd-needs__head { border-radius: var(--ds-r-lg) var(--ds-r-lg) 0 0; }
-body:not(.auth):not(.si-body) .wd-needs { border-radius: var(--ds-r-lg); }
-body:not(.auth):not(.si-body) .wd-needs--live { border-color: var(--ds-ink); box-shadow: 0 10px 30px rgba(10, 10, 10, .12); }
-body:not(.auth):not(.si-body) .wd-item { border-radius: var(--ds-r); }
-body:not(.auth):not(.si-body) .wd-item__d, body:not(.auth):not(.si-body) .wd-item__rjf { border-radius: 12px; }
-body:not(.auth):not(.si-body) .wd-item__acts .wd-btn { border-radius: var(--ds-pill); }
+/* Needs your attention (approval workspace): white card, restrained amber accent, compact item cards */
+body:not(.auth):not(.si-body) .wd-needs--live { border-top-color: #D9A441; }
+body:not(.auth):not(.si-body) .wd-needs--live .wd-count { background: #FBEFD9; color: var(--ds-warn, #8A5A00); border-radius: var(--ds-pill); }
+body:not(.auth):not(.si-body) .wd-item { border-radius: var(--ds-r); border-color: var(--ds-line); background: var(--ds-card); }
+body:not(.auth):not(.si-body) .wd-item__d, body:not(.auth):not(.si-body) .wd-item__rjf, body:not(.auth):not(.si-body) .wd-item__pv { border-radius: 12px; }
+body:not(.auth):not(.si-body) .wd-item .wd-btn { border-radius: var(--ds-pill); }
