@@ -493,3 +493,8 @@ progress.ds-meter::-webkit-progress-bar { background: var(--ds-line); } progress
 .ds-main .ds-clientshell__acts { display: inline-flex; align-items: center; gap: 8px; }
 @media (max-width: 599px) { .ds-main .ds-clientshell__rename { display: none; } }
 @media (prefers-reduced-motion: reduce) { .ds-main .adm-menubtn, .ds-main .adm-menu__item { transition: none; } }
+
+/* Environment label and switch link (Staging shows a small "Staging" pill beside the logo; the switch link sits under Sign out). */
+.ds-envtag { margin-left: 10px; padding: 3px 9px; border-radius: var(--ds-pill); background: #FBEFD5; color: #7A4B00; font: 600 11px/1.3 var(--font-body); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.ds-side__foot .ds-envlink { padding-top: 8px; border-top: 1px solid var(--ds-line); }
+.ds-envtag--side { margin: 0; justify-self: start; }

@@ -149,3 +149,8 @@ The Review tab's expanded panels (Website updates, Needed from the client; root 
 - `body.auth` pages (the portal's own sign-in step, no access, errors and the master-access client directory) use the portal skin in `portal-ds.css`: grey ground, one white rounded card, pill buttons and fields. The editorial black sign-in (`body.si-body`) is separate. The directory lists clients as `dir__card` tiles (initial, name, arrow) and has a labelled empty state.
 - AuthKit (hosted by WorkOS) can only be themed from WorkOS branding: large radius, grey page ground, black pill buttons, rounded card and fields (custom CSS elements). It is set per WorkOS environment; Staging only so far.
 - Request a change is one full-width black pill with a plus (`wd-rq__btn`); the form opens in a white card beneath it.
+
+## Environment label and switch link
+- On Staging both portals show a small amber "Staging" pill (Admin: top of the sidebar footer and the mobile bar; client portal: beside the logo in the one-row header). Production shows no label.
+- Framework staff get "Switch to Production" (on Staging) or "Switch to Staging" (on Production): Admin sidebar footer under Sign out; client portal account bar on desktop and the Menu dropdown on mobile, above Sign out. Client accounts never get it (server-side staff check, `worker/portal/env-switch.js`).
+- Links are fixed entry points (`/admin`, `/portal`) on the verified hosts `frameworkco.ca` and `staging.frameworkco.ca`; no session, token, query or client path is carried, and the destination enforces its own sign-in and permissions. Other hosts (workers.dev, localhost) show nothing.
