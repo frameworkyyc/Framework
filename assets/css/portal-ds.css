@@ -39,6 +39,31 @@ body:not(.auth):not(.si-body) .brand__word { letter-spacing: 0.22em; }
   body:not(.auth):not(.si-body) .primary ul { width: max-content; }
 }
 
+/* ---------- phone and tablet header: one compact row (below 1024px, where the Menu button replaces the link row) ----------
+   The brand sits on the left and the rounded Menu pill on the right; the account controls (Sign out) live at the foot of the menu, under a hairline,
+   so the sticky bar is a single 60px row. The same Sign out form is in the bar for wide screens (hidden here) and in the menu (hidden there), so exactly one is ever on screen or in the tab order.
+   The open menu is a rounded white card that overlays the page, right-aligned under the pill, and scrolls inside itself if the screen is short. */
+.primary__out { display: none; }
+@media (max-width: 1023px) {
+  body:not(.auth):not(.si-body) .bar--wide { padding-bottom: 0; }
+  body:not(.auth):not(.si-body) .bar--wide .bar__in { display: flex; flex-wrap: nowrap; align-items: center; min-height: 60px; padding-top: 0; }
+  body:not(.auth):not(.si-body) .bar--wide .brand { order: 1; min-height: 44px; }
+  body:not(.auth):not(.si-body) .bar--wide .who { display: none; }
+  body:not(.auth):not(.si-body) .bar--wide .primary--wide { order: 2; flex: none; margin: 0 0 0 auto; padding: 0; overflow: visible; }
+  body:not(.auth):not(.si-body) .primary__menu summary { min-height: 44px; padding: 0 18px; border: 1px solid var(--ds-line-strong); background: var(--ds-card); color: var(--ds-ink); }
+  body:not(.auth):not(.si-body) .primary__menu summary::after { border-color: var(--ds-ink); }
+  body:not(.auth):not(.si-body) .primary__menu[open] summary { background: var(--ds-ink); color: #fff; border-color: var(--ds-ink); }
+  body:not(.auth):not(.si-body) .primary__menu[open] summary::after { border-color: #fff; }
+  body:not(.auth):not(.si-body) .primary__menu > ul { left: auto; right: 0; top: calc(100% + 10px); width: min(320px, calc(100vw - 2 * var(--gutter))); max-width: none; max-height: calc(100vh - 96px); max-height: calc(100dvh - 96px); overflow-y: auto; overscroll-behavior: contain; padding: 8px; gap: 2px; border: 1px solid var(--ds-line); border-radius: var(--ds-r-lg); background: var(--ds-card); box-shadow: var(--ds-shadow-2); }
+  body:not(.auth):not(.si-body) .primary__menu > ul a { min-height: 48px; padding: 0 14px; border: 0; border-radius: var(--ds-r); font-size: 16px; color: var(--ds-ink); }
+  body:not(.auth):not(.si-body) .primary__menu > ul a:hover { background: var(--ds-soft); }
+  body:not(.auth):not(.si-body) .primary__menu > ul a[aria-current="page"] { background: var(--ds-ink); color: #fff; border-left: 0; }
+  .primary__out { display: block; position: sticky; bottom: -8px; margin: 6px -8px -8px; padding: 8px 8px 8px; border-top: 1px solid var(--ds-line); background: var(--ds-card); border-radius: 0 0 var(--ds-r-lg) var(--ds-r-lg); }   /* stays in reach when the menu has to scroll on a short screen */
+  .primary__out .signout { margin: 0; }
+  body:not(.auth):not(.si-body) .primary__out .btn { width: 100%; min-height: 48px; justify-content: flex-start; padding: 0 14px; border: 0; border-radius: var(--ds-r); background: transparent; box-shadow: none; font-size: 16px; font-weight: 500; color: var(--ds-muted); }
+  body:not(.auth):not(.si-body) .primary__out .btn:hover { background: var(--ds-soft); color: var(--ds-ink); }
+}
+
 /* ---------- buttons ---------- */
 body:not(.auth):not(.si-body) .btn { min-height: 44px; border-radius: var(--ds-pill); border: 1px solid var(--ds-line-strong); background: var(--ds-card); color: var(--ds-ink); font-weight: 600; transition: background var(--ds-dur) var(--ds-ease), color var(--ds-dur) var(--ds-ease), box-shadow var(--ds-dur) var(--ds-ease), transform var(--ds-dur) var(--ds-ease); }
 body:not(.auth):not(.si-body) .btn:hover { background: var(--ds-soft); color: var(--ds-ink); box-shadow: var(--ds-shadow-1); }
