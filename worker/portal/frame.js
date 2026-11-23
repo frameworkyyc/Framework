@@ -33,10 +33,10 @@ export const footerWithFeedback = (feedbackHref) => `<footer class="foot"><div c
 export const CURTAIN = `<div class="fw-curtain" aria-hidden="true"><svg class="fw-curtain__mark" viewBox="200 300 320 374" focusable="false"><path class="fw-f fw-f--1" pathLength="1" d="M215.2 312.1 L512.7 312.1 L512.7 371.3 L278.4 371.3 L278.4 599.8 L215.2 663.6 Z"/><path class="fw-f fw-f--2" pathLength="1" d="M292.3 469.9 L337.0 425.2 L512.7 425.2 L512.7 486.1 L349.7 486.1 L349.7 658.4 L292.3 658.4 Z"/></svg></div><p class="visually-hidden" role="status" data-fw-status></p>`;
 
 /** The sign-in / system page frame: brand, one column of content. `bodyHtml` must already be escaped by the caller; `title` is escaped here. */
-export function authFrame({ title, bodyHtml = "", ref = null, fx = false, share = null }) {
+export function authFrame({ title, bodyHtml = "", ref = null, fx = false, share = null, wide = false }) {
   const refLine = ref ? `<p class="muted small">Reference: <strong>${e(ref)}</strong></p>` : "";
   return `<!DOCTYPE html>
 <html lang="en-CA"><head>${head(title, { fx, share })}</head>
 <body class="auth">${fx ? CURTAIN : ""}<header class="auth__top"><div class="wrap"><a class="brand" href="/portal/login" aria-label="Framework client portal">${MARK}<span class="brand__word">Framework</span></a></div></header>
-<main id="main" class="auth__main" tabindex="-1"><div class="wrap"><div class="auth__panel"><span class="eyebrow">Client portal</span><h1 class="h1">${e(title)}</h1>${bodyHtml}${refLine}</div></div></main>${footer}</body></html>`;
+<main id="main" class="auth__main" tabindex="-1"><div class="wrap"><div class="auth__panel${wide ? " auth__panel--wide" : ""}"><span class="eyebrow">Client portal</span><h1 class="h1">${e(title)}</h1>${bodyHtml}${refLine}</div></div></main>${footer}</body></html>`;
 }

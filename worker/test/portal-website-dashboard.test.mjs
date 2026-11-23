@@ -92,7 +92,9 @@ test("website traffic: genuine figures only. Real data shows numbers; stale says
 
 test("request a change: a closed expander holding the same form as before; hidden for people who cannot send requests", () => {
   const h = workspaceSections(vm, SITE, O(WS([], [])));
-  assert.match(h, /<details class="wd-rq"><summary class="wd-btn">Request a change/);
+  assert.match(h, /<details class="wd-rq"><summary class="wd-btn wd-rq__btn"><i class="wd-pl" aria-hidden="true"><\/i><span>Request a change<\/span><\/summary>/);
+  assert.ok(!/class="wd-card wd-card--ink wd-req"/.test(h), "no outer black container: one black pill, the form opens in a white card");
+  assert.match(h, /<section class="wd-req" id="request"/); assert.match(h, /Need something changed\?/);
   assert.match(h, new RegExp(`<form class="wd-form" method="post" action="/portal/o/alpha/website/${SITE.id}/requests" enctype="multipart/form-data">`)); assert.match(h, /type="file"/); assert.match(h, /<option value="change">/); assert.match(h, /<option value="support">/);
   assert.ok(!/id="wd-rq-h"/.test(workspaceSections(vm, SITE, O(WS([], []), { canRequest: false }))));
 });
@@ -145,4 +147,17 @@ test("Needs your attention is a compact approval workspace: a white card with an
   assert.match(empty, /class="wd-card wd-needs"/); assert.match(empty, /You are all caught up\./); assert.match(empty, /Nothing needs you right now/);
   const member = workspaceSections(vm, SITE, O(ws, { title: true, canDecide: false }));
   assert.ok(!/wd-btn--approve/.test(member), "a member who may not decide sees no Approve or Reject");
+});
+
+test("Request a change is one full-width black pill with a plus, and the portal's system pages and master-access directory wear the same system", async () => {
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../../assets/css/portal-ds.css", import.meta.url), "utf8");
+  assert.match(css, /\.wd-rq__btn \{ width: 100%; min-height: 52px; background: var\(--ds-ink\); color: #fff/);
+  assert.match(css, /body\.auth \.auth__panel \{[^}]*border-radius: var\(--ds-r-lg\)/, "system pages are one white rounded card");
+  assert.match(css, /body\.auth input\[type="text"\][^{]*\{[^}]*border-radius: var\(--ds-pill\)/);
+  assert.match(css, /\.dir__card \{[^}]*border-radius: var\(--ds-r\)/);
+  assert.ok(!/body\.si-body[^{]*\{[^}]*border-radius/.test(css), "the editorial sign-in is untouched");
+  const pages = readFileSync(new URL("../portal/pages.js", import.meta.url), "utf8");
+  assert.match(pages, /class="dir__card"/); assert.match(pages, /wide: true/);
+  assert.ok(!/class="rows"/.test(pages.slice(pages.indexOf("staffDirectoryPage"), pages.indexOf("liveAreasFor"))), "the old plain list is gone");
 });

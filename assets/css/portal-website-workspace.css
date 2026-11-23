@@ -124,7 +124,7 @@ details[open] > summary > .wd-pl::after { transform: rotate(0); }
 
 /* request a change: a closed expander on the black card */
 .wd-rq-sub { margin: 0; }
-.wd-rq > summary { list-style: none; width: 100%; justify-content: space-between; }
+.wd-rq > summary { list-style: none; width: 100%; justify-content: center; }
 .wd-rq > summary::-webkit-details-marker { display: none; }
 .wd-form { display: grid; gap: 18px; padding: 22px 0 4px; animation: wd-rise .24s var(--wd-ease); }
 .wd-form .field { margin: 0; }
@@ -174,8 +174,7 @@ details[open] > summary > .wd-pl::after { transform: rotate(0); }
   .wd-req { grid-column: span 12; order: 4; }
   .wd-recent { grid-column: span 12; order: 5; }
   .wd-traffic { grid-column: span 12; order: 6; }
-  .wd-req .wd-ct, .wd-req .wd-rq-sub { display: none; }
-  .wd-req { padding: 14px; }
+  .wd-req .wd-rq-sub { display: none; }
   .wd-t { font-size: 17px; }
   .wd-row > summary { grid-template-columns: minmax(0, 1fr) 14px; padding: 13px 0; min-height: 0; }
   .wd-row > summary .wd-s { grid-column: 1; grid-row: 2; color: var(--slate); }
