@@ -21,10 +21,17 @@ let navLinks = [];
 
 /* ---------- Navigation: six sections; Operations and Settings group the older pages (their addresses do not change) ---------- */
 
-function brand() {
+/* Environment switch (Framework staff only: Admin sits behind Cloudflare Access). Which environment this is comes from the verified Framework hostnames alone; the link is the other
+   environment's fixed /admin entry point, so no session, token, query or client path is carried across and the destination does its own sign-in. Other hosts show nothing. */
+const ENV_HOSTS = { production: ["frameworkco.ca", "www.frameworkco.ca"], staging: ["staging.frameworkco.ca"] };
+const ENV_HERE = Object.keys(ENV_HOSTS).find((k) => ENV_HOSTS[k].includes(location.hostname.toLowerCase())) || null;
+const ENV_SWITCH = ENV_HERE === "staging" ? { label: "Switch to Production", href: "https://frameworkco.ca/admin" } : ENV_HERE === "production" ? { label: "Switch to Staging", href: "https://staging.frameworkco.ca/admin" } : null;
+
+function brand(tag = false) {
   const a = h("a", { class: "adm-brand", href: "/admin", "data-link": "", "aria-label": "Framework Admin home" });
   a.insertAdjacentHTML("afterbegin", MARK); // constant markup, no data involved
   a.append(h("span", { class: "adm-brand__word" }, "Framework"));
+  if (tag && ENV_HERE === "staging") a.append(h("span", { class: "ds-envtag", text: "Staging" }));
   return a;
 }
 
@@ -37,13 +44,14 @@ function navItem(n) {
 function buildShell() {
   toggle = h("button", { class: "menu-toggle ds-iconbtn", type: "button", "aria-expanded": "false", "aria-controls": "adm-side", "aria-label": "Menu" }, icon("menu"));
   const searchBtn = (cls) => h("button", { class: "ds-searchbtn " + cls, type: "button", onclick: () => openSearch(), "aria-label": "Search clients, websites and pages" }, icon("search"), h("span", { text: "Search" }), h("kbd", { text: "/" }));
-  const bar = h("header", { class: "ds-mobilebar" }, brand(), h("button", { class: "ds-iconbtn", type: "button", "aria-label": "Search", onclick: () => openSearch() }, icon("search")), toggle);
+  const bar = h("header", { class: "ds-mobilebar" }, brand(true), h("button", { class: "ds-iconbtn", type: "button", "aria-label": "Search", onclick: () => openSearch() }, icon("search")), toggle);
 
   const userLine = h("p", { id: "adm-user" }, "");
+  const envBadge = ENV_HERE === "staging" ? h("span", { class: "ds-envtag ds-envtag--side", text: "Staging" }) : null;
   side = h("aside", { class: "adm-side", id: "adm-side" },
     h("div", { class: "adm-side__head ds-side__head" }, brand()),
     h("nav", { class: "adm-nav", "aria-label": "Admin" }, h("ul", { class: "ds-nav" }, NAV.filter((n) => MODULES.some((m) => m.enabled && m.id === n.id)).map(navItem))),
-    h("div", { class: "ds-side__foot" }, userLine, h("a", { href: "/", target: "_blank", rel: "noopener" }, "View website"), h("a", { href: "/cdn-cgi/access/logout" }, "Sign out")));
+    h("div", { class: "ds-side__foot" }, envBadge, userLine, h("a", { href: "/", target: "_blank", rel: "noopener" }, "View website"), h("a", { href: "/cdn-cgi/access/logout" }, "Sign out"), ENV_SWITCH ? h("a", { class: "ds-envlink", href: ENV_SWITCH.href, rel: "noopener noreferrer", text: ENV_SWITCH.label }) : null));
 
   topCrumbs = h("div", { class: "ds-top__crumbs" });
   attn = h("a", { class: "ds-attn", href: "/admin/support", "data-link": "", hidden: true });
