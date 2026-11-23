@@ -121,41 +121,47 @@ function taskRow(vm, s, t, ws, o) {
   return { open, row: row(`task-${t.id}`, t.title, meta, st(tone, TASK_STATUS_LABEL[t.status]), body), sort: t.updatedAt || t.createdAt, flat: !body.trim() ? flat(t.title, shortDay(t.updatedAt || t.createdAt, o.today), st(tone, TASK_STATUS_LABEL[t.status])) : "" };
 }
 
-/** One pending item of the approval workspace: a short title, its status, the details behind a native disclosure, and the actions. An approval gets Approve (green) and Reject (red; the reason box opens in place and a reason is required).
- *  No script: the Reject toggle is a visually hidden checkbox with a label styled as the button; the form that follows it shows while it is checked. Posts go to the same routes as before. */
+/** One pending item of the approval workspace: a compact card with a short title, its status, the actions on the card itself, and the details behind a native disclosure.
+ *  An approval gets a green Approve and a red Reject; Reject opens a feedback box in place (required) with Cancel and Submit rejection. No script: the Reject toggle is a visually hidden checkbox
+ *  that the Reject and Cancel labels flip. Posts go to the same routes as before, and the server still decides who may act (owners only; Framework staff previewing a client never can).
+ *  o.canDecide: the signed-in owner (live buttons). o.previewDecide: Framework staff previewing as an owner (the same buttons, disabled and labelled, never hidden). Anyone else sees a plain note. */
+const NEED_NOTE_STAFF = "Preview only: Framework staff can’t approve or reject for a client. A real account owner sees these buttons active.";
 function needUpdate(vm, s, u, ws, o) {
   const when = shortDay(u.publishedAt || u.createdAt, o.today);
   const preview = u.environment === "staging" && ws.stagingUrl ? `<p class="wd-acts"><a class="wd-link" href="${e(ws.stagingUrl)}" target="_blank" rel="noopener noreferrer">Open preview ${arrow}${newTab("preview")}</a></p>` : "";
   const details = `${u.detail ? `<p>${e(u.detail)}</p>` : `<p class="wd-muted">No further details.</p>`}${preview}`;
-  let acts;
-  if (!o.canDecide) acts = `<p class="wd-note wd-muted">${o.staff ? "Only the client’s account owner can approve or reject updates." : "An account owner can approve or reject this update."}</p>`;
-  else {
-    const base = `/website/${s.id}/updates/${u.id}`, csrf = `<input type="hidden" name="csrf" value="${e(o.csrf)}">`, rj = `rj-${e(u.id)}`;
-    acts = `<div class="wd-item__acts">
-<form class="wd-item__ap" method="post" action="${e(href(vm, `${base}/approve`))}">${csrf}<button class="wd-btn wd-btn--approve" type="submit">${tick}Approve<span class="visually-hidden"> ${e(u.title)}</span></button></form>
-<input class="wd-item__tgl visually-hidden" type="checkbox" id="${rj}"><label class="wd-btn wd-btn--reject" for="${rj}">${cross}Reject<span class="visually-hidden"> ${e(u.title)}</span></label>
-<form class="wd-item__rjf" method="post" action="${e(href(vm, `${base}/reject`))}">${csrf}<div class="field"><label for="${rj}-n">Why are you rejecting this?</label><span class="field__hint" id="${rj}-h">Tell us what is wrong or what you would like instead. A reason is required. We will revise it and ask you to look again.</span><textarea id="${rj}-n" name="note" rows="4" minlength="3" maxlength="1000" aria-describedby="${rj}-h" required></textarea></div>
-<p class="wd-acts"><button class="wd-btn wd-btn--reject-solid" type="submit">Confirm rejection</button></p></form></div>`;
+  const id = `update-${u.id}`, rj = `rj-${e(u.id)}`, label = e(u.title);
+  if (o.canDecide) {
+    const base = `/website/${s.id}/updates/${u.id}`, csrf = `<input type="hidden" name="csrf" value="${e(o.csrf)}">`;
+    const acts = `<form class="wd-item__ap" method="post" action="${e(href(vm, `${base}/approve`))}">${csrf}<button class="wd-btn wd-btn--approve" type="submit">${tick}Approve<span class="visually-hidden"> ${label}</span></button></form><label class="wd-btn wd-btn--reject" for="${rj}">${cross}Reject<span class="visually-hidden"> ${label}</span></label>`;
+    const form = `<form class="wd-item__rjf" method="post" action="${e(href(vm, `${base}/reject`))}">${csrf}<div class="field"><label for="${rj}-n">Why are you rejecting this?</label><span class="field__hint" id="${rj}-h">Tell us what is wrong or what you would like instead. Feedback is required. We will revise it and ask you to look again.</span><textarea id="${rj}-n" name="note" rows="3" minlength="3" maxlength="1000" aria-describedby="${rj}-h" required></textarea></div>
+<p class="wd-acts"><button class="wd-btn wd-btn--reject" type="submit">Submit rejection</button><label class="wd-btn wd-btn--ghost" for="${rj}">Cancel</label></p></form>`;
+    return needItem(id, u.title, `${ENV_LABEL[u.environment] || "Update"} · ${e(when)}`, st("ink", UPDATE_STATUS_LABEL[u.status]), details, { toggle: `<input class="wd-item__tgl visually-hidden" type="checkbox" id="${rj}">`, acts, after: form });
   }
-  return needItem(`update-${u.id}`, u.title, `${ENV_LABEL[u.environment] || "Update"} · ${e(when)}`, st("ink", UPDATE_STATUS_LABEL[u.status]), details, acts);
+  if (o.previewDecide) {
+    const acts = `<button class="wd-btn wd-btn--approve" type="button" disabled aria-disabled="true">${tick}Approve<span class="visually-hidden"> ${label} (preview only)</span></button><button class="wd-btn wd-btn--reject" type="button" disabled aria-disabled="true">${cross}Reject<span class="visually-hidden"> ${label} (preview only)</span></button>`;
+    return needItem(id, u.title, `${ENV_LABEL[u.environment] || "Update"} · ${e(when)}`, st("ink", UPDATE_STATUS_LABEL[u.status]), details, { acts, after: `<p class="wd-item__pv" role="note">${NEED_NOTE_STAFF}</p>` });
+  }
+  return needItem(id, u.title, `${ENV_LABEL[u.environment] || "Update"} · ${e(when)}`, st("ink", UPDATE_STATUS_LABEL[u.status]), details, { after: `<p class="wd-note wd-muted">An account owner can approve or reject this update.</p>` });
 }
 function needTask(vm, s, t, ws, o) {
   const overdue = t.dueDate && t.status === "open" && t.dueDate < o.today;
   const due = t.dueDate ? `<span class="${overdue ? "wd-late" : ""}">${overdue ? "Overdue since " : "Due "}${e(shortDay(t.dueDate, o.today))}</span>` : "";
   const details = t.detail ? `<p>${e(t.detail)}</p>` : `<p class="wd-muted">No further details.</p>`;
-  return needItem(`task-${t.id}`, t.title, `Task${due ? ` · ${due}` : ""}`, st(overdue ? "late" : "open", TASK_STATUS_LABEL[t.status]), details, `<div class="wd-item__acts wd-item__acts--task">${taskAction(vm, s, t, ws, o)}</div>`);
+  const action = taskAction(vm, s, t, ws, o);
+  return needItem(`task-${t.id}`, t.title, `Task${due ? ` · ${due}` : ""}`, st(overdue ? "late" : "open", TASK_STATUS_LABEL[t.status]), details, { after: action ? `<div class="wd-item__task">${action}</div>` : "" });
 }
 const tick = `<svg class="wd-ic" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const cross = `<svg class="wd-ic" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-function needItem(id, title, meta, status, details, acts) {
-  return `<article class="wd-item" id="${e(id)}" aria-labelledby="${e(id)}-t"><div class="wd-item__top"><div class="wd-item__id"><h3 class="wd-item__t" id="${e(id)}-t">${e(title)}</h3><p class="wd-item__m">${meta}</p></div>${status}</div>
-<details class="wd-item__more"><summary class="wd-link">View details${chev}</summary><div class="wd-item__d">${details}</div></details>${acts}</article>`;
+function needItem(id, title, meta, status, details, { toggle = "", acts = "", after = "" } = {}) {
+  return `<article class="wd-item" id="${e(id)}" aria-labelledby="${e(id)}-t">${toggle}<div class="wd-item__top"><div class="wd-item__id"><h3 class="wd-item__t" id="${e(id)}-t">${e(title)}</h3><p class="wd-item__m">${status}<span>${meta}</span></p></div>${acts ? `<div class="wd-item__acts">${acts}</div>` : ""}</div>
+<details class="wd-item__more"><summary class="wd-link">View details${chev}</summary><div class="wd-item__d">${details}</div></details>${after}</article>`;
 }
 
 function needsCard(vm, s, ws, o) {
   const items = [...ws.updates.filter((u) => u.status === "awaiting_review" && u.kind === "approval").map((u) => needUpdate(vm, s, u, ws, o)), ...ws.tasks.filter((t) => t.status === "open").map((t) => needTask(vm, s, t, ws, o))];
   const count = items.length;
-  const head = `<header class="wd-needs__head"><div><p class="wd-needs__k">Action needed</p><h2 id="wd-needs-h">Needs your attention</h2><p class="wd-needs__sub">${count ? `${count} ${count === 1 ? "item is" : "items are"} waiting for you. Approve, or reject with a reason.` : "You are all caught up."}</p></div>${count ? `<span class="wd-count" aria-label="${count} pending">${count}<span class="visually-hidden"> pending</span></span>` : ""}</header>`;
+  const head = `<header class="wd-needs__head"><div><h2 id="wd-needs-h">Needs your attention</h2><p class="wd-needs__sub">${count ? (o.canDecide ? "Approve, or reject with feedback." : "Waiting for a decision or an answer.") : "You are all caught up."}</p></div>${count ? `<span class="wd-count" aria-label="${count} pending">${count}<span class="visually-hidden"> pending</span></span>` : ""}</header>`;
   const list = count ? `<div class="wd-needs__list">${items.join("")}</div>` : `<p class="wd-empty">Nothing needs you right now. Past decisions are listed under Recent updates.</p>`;
   return `<section class="wd-card wd-needs${count ? " wd-needs--live" : ""}" id="needed" aria-labelledby="wd-needs-h">${head}${list}</section>`;
 }

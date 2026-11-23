@@ -218,7 +218,7 @@ export async function websitePage(ctx, a, { sites = [], one = null, preview = nu
   const perms = permissionsFor(a.membership.role);
   // The review workspace (environments, updates & requests, request changes) belongs to ONE website's page; the router passes `workspace` (null/{available:false} where migration 0030 is not applied: only the environments and the request form then show).
   const workspaceOpts = single && workspace !== undefined ? {
-    workspace, csrf, staff: Boolean(a.staff), canDecide: perms.includes("website.request") && !a.staff, canRespond: perms.includes("support.submit") && !a.staff, canRequest: perms.includes("support.submit"),
+    workspace, csrf, staff: Boolean(a.staff), canDecide: perms.includes("website.request") && !a.staff, previewDecide: perms.includes("website.request") && Boolean(a.staff), canRespond: perms.includes("support.submit") && !a.staff, canRequest: perms.includes("support.submit"),
     flash: workspaceMsg.flash || "", error: workspaceMsg.error || "", now: ctx.now,
     requestSummary: management && management.requests && management.requests.open ? `${management.requests.open} open` : "",
   } : null;
