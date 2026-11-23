@@ -144,3 +144,8 @@ The Review tab's expanded panels (Website updates, Needed from the client; root 
 - **Edit client name** sits beside the client heading (hidden under 600px) and is the first item of the three-dot menu. It posts `POST /api/admin/clients/:id/rename {name}` and only changes `organizations.name`; id, slug, status, people and records are untouched, and an `org.renamed` audit row records the old and new name. A same-name save is a no-op.
 - **Disclosure cards** (`.adm-acc--quiet`, `.adm-acc--step`: Organization details, Business Profile sections) use 24px side padding on desktop and 16px under 600px, a hairline under the open summary, and hairline row separators without a trailing one.
 - **Actions menu** (`.adm-menu`) is a rounded white card with soft depth, 44px rounded items, a hover/focus tint, and a separated destructive item (`adm-menu__item--sep`, `--danger`). The typed-DELETE confirmation is unchanged.
+
+## Environment label and switch link
+- On Staging both portals show a small amber "Staging" pill (Admin: top of the sidebar footer and the mobile bar; client portal: beside the logo in the one-row header). Production shows no label.
+- Framework staff get "Switch to Production" (on Staging) or "Switch to Staging" (on Production): Admin sidebar footer under Sign out; client portal account bar on desktop and the Menu dropdown on mobile, above Sign out. Client accounts never get it (server-side staff check, `worker/portal/env-switch.js`).
+- Links are fixed entry points (`/admin`, `/portal`) on the verified hosts `frameworkco.ca` and `staging.frameworkco.ca`; no session, token, query or client path is carried, and the destination enforces its own sign-in and permissions. Other hosts (workers.dev, localhost) show nothing.

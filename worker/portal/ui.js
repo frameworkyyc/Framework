@@ -113,6 +113,9 @@ export const NAV = Object.freeze([
   { key: "account", label: "Account", path: "/account" },
 ]);
 
+/** The staff-only environment switch: a plain link to the other environment's fixed entry point (worker/portal/env-switch.js). */
+const envLinkHtml = (l) => `<a class="envlink" href="${e(l.href)}" rel="noopener noreferrer">${e(l.label)}</a>`;
+
 /**
  * The signed-in application page.
  * @param nav     {base, active, items?} base = "/portal/o/<slug>" or "/portal/demo"; items = extra nav entries [{key,label,path}] for owners
@@ -120,15 +123,15 @@ export const NAV = Object.freeze([
  * @param actions HTML for the right side of the bar (sign-out form, or the demo exit link) - already escaped by the caller
  * @param banner  HTML shown above the bar (the demo banner) - already escaped by the caller
  */
-export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions = "", banner = "", headers = {}, cookies = [], script = null, styles = [], feedbackHref = null, frameSrc = [], bleed = false, fx = false }) {
+export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions = "", banner = "", headers = {}, cookies = [], script = null, styles = [], feedbackHref = null, frameSrc = [], bleed = false, fx = false, envTag = "", envLink = null }) {
   const items = nav.list || [...NAV, ...(nav.items || [])];
   const links = items.map((n) => `<li><a href="${e(nav.base + n.path)}"${n.key === nav.active ? ' aria-current="page"' : ""}>${e(n.label)}</a></li>`).join("");
   const html = `<!DOCTYPE html>
 <html lang="en-CA"><head>${head(title, { script, styles, cover: bleed, fx: fx ? "app" : false })}</head>
 <body><a class="skip-link" href="#main">Skip to content</a>${fx ? CURTAIN : ""}${banner}
-<header class="bar${nav.menu ? " bar--wide" : ""}"><div class="wrap bar__in"><a class="brand" href="${e(nav.base)}" aria-label="Framework client portal home">${MARK}<span class="brand__word">Framework</span></a>
-${nav.menu ? `<nav class="primary primary--wide" aria-label="Portal"><ul class="primary__list">${links}</ul><details class="primary__menu"><summary>Menu</summary><ul>${links}${actions ? `<li class="primary__out">${actions}</li>` : ""}</ul></details></nav>` : `<nav class="primary" aria-label="Portal"><ul>${links}</ul></nav>`}
-<div class="who"><span class="who__org">${e(who.org)}</span><span class="who__user">${e(who.user)}</span><div class="who__act">${actions}</div></div></div></header>
+<header class="bar${nav.menu ? " bar--wide" : ""}"><div class="wrap bar__in"><a class="brand" href="${e(nav.base)}" aria-label="Framework client portal home">${MARK}<span class="brand__word">Framework</span></a>${envTag ? `<span class="envtag">${e(envTag)}</span>` : ""}
+${nav.menu ? `<nav class="primary primary--wide" aria-label="Portal"><ul class="primary__list">${links}</ul><details class="primary__menu"><summary>Menu</summary><ul>${links}${envLink ? `<li class="primary__env">${envLinkHtml(envLink)}</li>` : ""}${actions ? `<li class="primary__out">${actions}</li>` : ""}</ul></details></nav>` : `<nav class="primary" aria-label="Portal"><ul>${links}</ul></nav>`}
+<div class="who"><span class="who__org">${e(who.org)}</span><span class="who__user">${e(who.user)}</span><div class="who__act">${envLink ? envLinkHtml(envLink) : ""}${actions}</div></div></div></header>
 <main id="main" class="${bleed ? "page page--bleed" : "wrap page"}" tabindex="-1">${bodyHtml}</main>${feedbackHref ? footerWithFeedback(feedbackHref) : footer}</body></html>`;
   return new Response(html, { status: code, headers: securityHeaders({ ...headers, "Content-Type": "text/html; charset=utf-8", "Set-Cookie": cookies }, { scripts: !!script || !!fx, frameSrc }) });
 }

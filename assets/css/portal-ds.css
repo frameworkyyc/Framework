@@ -181,3 +181,26 @@ body:not(.auth):not(.si-body) .wd-needs--live .wd-count { background: #FBEFD9; c
 body:not(.auth):not(.si-body) .wd-item { border-radius: var(--ds-r); border-color: var(--ds-line); background: var(--ds-card); }
 body:not(.auth):not(.si-body) .wd-item__d, body:not(.auth):not(.si-body) .wd-item__rjf, body:not(.auth):not(.si-body) .wd-item__pv { border-radius: 12px; }
 body:not(.auth):not(.si-body) .wd-item .wd-btn { border-radius: var(--ds-pill); }
+
+/* ---------- environment label and staff switch link ---------- */
+.bar--wide .envtag { order: 1; }
+.who__act { display: flex; align-items: center; gap: 8px; }
+.envtag { flex: none; margin-left: 10px; padding: 3px 9px; border-radius: var(--ds-pill); background: #FBEFD5; color: #7A4B00; font: 600 11px/1.3 var(--font-body); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.envlink { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border: 1px solid var(--ds-line-strong); border-radius: var(--ds-pill); background: var(--ds-card); color: var(--ds-ink); font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.envlink:hover { background: var(--ds-soft); box-shadow: var(--ds-shadow-1); }
+.primary__env { display: none; }
+@media (max-width: 1023px) {
+  .bar--wide .envtag { order: 1; margin-left: 8px; padding: 2px 7px; font-size: 10px; }
+  .primary__env { display: block; }
+  body:not(.auth):not(.si-body) .primary__menu > ul .primary__env .envlink { width: 100%; min-height: 48px; padding: 0 14px; border: 0; border-radius: var(--ds-r); font-size: 16px; font-weight: 500; color: var(--ds-muted); }
+  body:not(.auth):not(.si-body) .primary__menu > ul .primary__env .envlink:hover { background: var(--ds-soft); color: var(--ds-ink); box-shadow: none; }
+}
+@media (max-width: 420px) {
+  .bar--wide .brand { gap: 10px; }
+  .bar--wide .brand__word { letter-spacing: .12em; font-size: 12px; }
+  .bar--wide .envtag { margin-left: 6px; padding: 2px 6px; letter-spacing: .04em; }
+}
+@media (max-width: 380px) {
+  .bar--wide .brand__word { letter-spacing: .08em; }
+  body:not(.auth):not(.si-body) .primary__menu summary { padding: 0 14px; }
+}
