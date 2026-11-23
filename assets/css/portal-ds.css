@@ -181,3 +181,55 @@ body:not(.auth):not(.si-body) .wd-needs--live .wd-count { background: #FBEFD9; c
 body:not(.auth):not(.si-body) .wd-item { border-radius: var(--ds-r); border-color: var(--ds-line); background: var(--ds-card); }
 body:not(.auth):not(.si-body) .wd-item__d, body:not(.auth):not(.si-body) .wd-item__rjf, body:not(.auth):not(.si-body) .wd-item__pv { border-radius: 12px; }
 body:not(.auth):not(.si-body) .wd-item .wd-btn { border-radius: var(--ds-pill); }
+
+/* ---------- Request a change: one full-width black pill; the form opens in a white card beneath it ---------- */
+body:not(.auth):not(.si-body) .wd-req { margin: 0; }
+body:not(.auth):not(.si-body) .wd-rq__btn { width: 100%; min-height: 52px; background: var(--ds-ink); color: #fff; border-color: var(--ds-ink); font-size: 15px; }
+body:not(.auth):not(.si-body) .wd-rq__btn:hover { background: #2a2a2a; color: #fff; }
+body:not(.auth):not(.si-body) .wd-rq__btn:focus-visible { outline: 2px solid var(--ds-ink); outline-offset: 3px; }
+body:not(.auth):not(.si-body) .wd-rq__panel { margin-top: 12px; padding: 22px 24px 24px; }
+body:not(.auth):not(.si-body) .wd-rq__panel .wd-rq-sub { margin: 0 0 4px; color: var(--ds-muted); }
+body:not(.auth):not(.si-body) .wd-rq__panel .wd-form { padding-top: 12px; }
+body:not(.auth):not(.si-body) .wd-rq__panel .wd-form label { color: var(--ds-muted); }
+body:not(.auth):not(.si-body) .wd-rq__panel .wd-form .field__hint, body:not(.auth):not(.si-body) .wd-rq__panel .wd-form .field__opt, body:not(.auth):not(.si-body) .wd-rq__panel .wd-form .wd-m { color: var(--ds-muted); }
+body:not(.auth):not(.si-body) .wd-rq__panel .wd-form select, body:not(.auth):not(.si-body) .wd-rq__panel .wd-form input[type="text"], body:not(.auth):not(.si-body) .wd-rq__panel .wd-form textarea, body:not(.auth):not(.si-body) .wd-rq__panel .wd-form input[type="file"] { background: var(--ds-card); color: var(--ds-ink); border: 1px solid var(--ds-line-strong); border-radius: var(--ds-r); padding: 12px 14px; font-size: 16px; }
+body:not(.auth):not(.si-body) .wd-rq__panel .wd-form select option { color: var(--ds-ink); }
+body:not(.auth):not(.si-body) .wd-rq__panel .wd-form .wd-link { color: var(--ds-ink); }
+@media (max-width: 640px) { body:not(.auth):not(.si-body) .wd-rq__panel { padding: 18px 16px 20px; } }
+
+/* ---------- sign-in and system pages (body.auth: the portal's own sign-in step, no-access, errors and the master-access client directory) ----------
+   The same visual system: soft grey ground, one white card with soft depth, pill buttons, rounded fields. The editorial black sign-in (body.si-body) is a different page and is untouched. */
+body.auth { background: var(--ds-ground); color: #1A1A1A; }
+body.auth :focus-visible { border-radius: var(--ds-r-sm); outline: 2px solid var(--ds-ink); outline-offset: 3px; }
+body.auth .auth__top { padding: 20px 0; border-bottom: 1px solid rgba(10, 10, 10, .07); }
+body.auth .auth__main { padding: clamp(28px, 6vw, 72px) 0; align-items: start; }
+body.auth .auth__panel { max-width: 560px; margin: 0 auto; padding: clamp(24px, 4vw, 40px); background: var(--ds-card); border: 1px solid var(--ds-line); border-radius: var(--ds-r-lg); box-shadow: var(--ds-shadow-1); }
+body.auth .auth__panel--wide { max-width: 760px; }
+body.auth .auth__panel .h1 { font-size: clamp(30px, 4.4vw, 44px); letter-spacing: -.02em; margin-bottom: 12px; }
+body.auth .auth__panel .lead { font-size: 17px; line-height: 1.5; color: var(--ds-muted); margin-bottom: 20px; }
+body.auth .eyebrow { color: var(--ds-muted); }
+body.auth .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 22px; border-radius: var(--ds-pill); border: 1px solid var(--ds-line-strong); background: var(--ds-card); color: var(--ds-ink); font-weight: 600; transition: background var(--ds-dur) var(--ds-ease), box-shadow var(--ds-dur) var(--ds-ease); }
+body.auth .btn:hover { background: var(--ds-soft); box-shadow: var(--ds-shadow-1); color: var(--ds-ink); }
+body.auth .btn--primary, body.auth .auth__panel > .btn:only-of-type { background: var(--ds-ink); border-color: var(--ds-ink); color: #fff; }
+body.auth input[type="text"], body.auth input[type="email"], body.auth input[type="search"], body.auth select, body.auth textarea { min-height: 46px; padding: 0 16px; border: 1px solid var(--ds-line-strong); border-radius: var(--ds-pill); background: var(--ds-card); color: var(--ds-ink); font: inherit; font-size: 16px; }
+body.auth input::placeholder { color: var(--ds-muted); }
+body.auth .staff-search { max-width: none; margin: 0 0 20px; flex-wrap: nowrap; }
+body.auth .staff-search .btn { background: var(--ds-ink); border-color: var(--ds-ink); color: #fff; }
+body.auth .staff-search .btn:hover { background: #2a2a2a; }
+body.auth .auth__alt { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--ds-line); }
+body.auth .muted, body.auth .small { color: var(--ds-muted); }
+body.auth .foot { border-top: 0; color: var(--ds-muted); }
+
+.dir { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.dir__card { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--ds-line); border-radius: var(--ds-r); background: var(--ds-soft); color: var(--ds-ink); text-decoration: none; transition: background var(--ds-dur) var(--ds-ease), box-shadow var(--ds-dur) var(--ds-ease), transform var(--ds-dur) var(--ds-ease); }
+.dir__card:hover, .dir__card:focus-visible { background: var(--ds-card); box-shadow: var(--ds-shadow-2); transform: translateY(-1px); }
+.dir__avatar { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--ds-pill); background: var(--ds-ink); color: #fff; font: 600 17px/1 var(--font-display); }
+.dir__text { display: grid; gap: 2px; min-width: 0; }
+.dir__name { font: 600 17px/1.25 var(--font-display); overflow-wrap: anywhere; }
+.dir__meta { font-size: 14px; color: var(--ds-muted); }
+.dir__go { font-size: 18px; color: var(--ds-muted); transition: transform var(--ds-dur) var(--ds-ease); }
+.dir__card:hover .dir__go { transform: translateX(3px); color: var(--ds-ink); }
+.dir__empty { display: grid; gap: 4px; padding: 24px; border: 1px dashed var(--ds-line-strong); border-radius: var(--ds-r); background: var(--ds-soft); text-align: center; color: var(--ds-muted); }
+.dir__empty strong { color: var(--ds-ink); font-size: 17px; }
+@media (max-width: 560px) { body.auth .staff-search { flex-wrap: wrap; } body.auth .staff-search input { flex: 1 1 100%; } body.auth .staff-search .btn { width: 100%; } .dir { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .dir__card, .dir__go, body.auth .btn { transition: none; } .dir__card:hover { transform: none; } }

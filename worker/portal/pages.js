@@ -41,12 +41,14 @@ async function staffBanner(ctx, a) {
 }
 
 export async function staffDirectoryPage(ctx, session, orgs, q = "") {
-  const items = orgs.map((o) => `<li><a class="row" href="/portal/o/${e(o.slug)}"><span class="row__title">${e(o.name)}</span><span class="row__meta">Open portal</span></a></li>`).join("");
-  const none = `<p class="muted">${q ? "No client matches that search." : "There are no active clients yet."}</p>`;
+  const initial = (n) => e((String(n).trim()[0] || "?").toUpperCase());
+  const items = orgs.map((o) => `<li class="dir__item"><a class="dir__card" href="/portal/o/${e(o.slug)}"><span class="dir__avatar" aria-hidden="true">${initial(o.name)}</span><span class="dir__text"><span class="dir__name">${e(o.name)}</span><span class="dir__meta">Open portal</span></span><span class="dir__go" aria-hidden="true">&rarr;</span></a></li>`).join("");
+  const none = `<div class="dir__empty" role="status"><strong>${q ? "No client matches that search" : "No active clients yet"}</strong><span>${q ? "Try another name, or clear the search." : "Clients appear here once they are created in Admin."}</span></div>`;
   return htmlPage({
     title: "Client portals",
+    wide: true,
     fx: transitionsOn(ctx.env) ? "app" : false,
-    bodyHtml: `<p class="lead">Framework master access. Choose a client to open their portal exactly as their team sees it.</p><form method="get" action="/portal" class="staff-search field"><label class="visually-hidden" for="staff-q">Search clients</label><input id="staff-q" type="text" name="q" value="${e(q)}" maxlength="80" placeholder="Search clients"><button class="btn" type="submit">Search</button></form>${orgs.length ? `<ul class="rows">${items}</ul>` : none}<div class="auth__alt">${await signOutForm(ctx, session)}</div>`,
+    bodyHtml: `<p class="lead">Framework master access. Choose a client to open their portal exactly as their team sees it.</p><form method="get" action="/portal" class="staff-search field"><label class="visually-hidden" for="staff-q">Search clients</label><input id="staff-q" type="text" name="q" value="${e(q)}" maxlength="80" placeholder="Search clients"><button class="btn" type="submit">Search</button></form>${orgs.length ? `<ul class="dir">${items}</ul>` : none}<div class="auth__alt">${await signOutForm(ctx, session)}</div>`,
   });
 }
 

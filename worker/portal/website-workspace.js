@@ -213,15 +213,15 @@ function trafficCard(vm, s, o) {
 
 function requestCard(vm, s, o) {
   if (!o.canRequest) return "";
-  return `<section class="wd-card wd-card--ink wd-req" id="request" aria-labelledby="wd-rq-h"><header class="wd-ct"><h2 id="wd-rq-h">Need something changed?</h2></header>
-<p class="wd-m wd-rq-sub">Tell us what to update. We reply on the request.</p>
-<details class="wd-rq"><summary class="wd-btn">Request a change${chev}</summary>
+  return `<section class="wd-req" id="request" aria-labelledby="wd-rq-h"><h2 id="wd-rq-h" class="visually-hidden">Need something changed?</h2>
+<details class="wd-rq"><summary class="wd-btn wd-rq__btn">${chev}<span>Request a change</span></summary>
+<div class="wd-card wd-rq__panel"><p class="wd-m wd-rq-sub">Tell us what to update. We reply on the request.</p>
 <form class="wd-form" method="post" action="${e(href(vm, `/website/${s.id}/requests`))}" enctype="multipart/form-data"><input type="hidden" name="csrf" value="${e(o.csrf)}">
 <div class="field"><label for="wk-kind">About</label><select id="wk-kind" name="kind"><option value="change">A change to my website</option><option value="support">A problem or technical help</option></select></div>
 <div class="field"><label for="wk-title">Title</label><input id="wk-title" name="title" type="text" maxlength="120" required></div>
 <div class="field"><label for="wk-desc">What would you like?</label><textarea id="wk-desc" name="description" rows="5" maxlength="${MAX_BODY}" required></textarea></div>
 <div class="field"><label for="wk-files">Attachments <span class="field__opt">Optional</span></label><span class="field__hint" id="wk-files-h">Up to ${MAX_ATTACHMENTS} files, ${MAX_ATTACHMENT_BYTES / 1048576} MB each: images, PDF, text, Word, Excel, PowerPoint or ZIP.</span><input id="wk-files" name="file" type="file" multiple aria-describedby="wk-files-h"></div>
-<p class="wd-acts"><button class="wd-btn wd-btn--solid" type="submit">Send request</button><a class="wd-link" href="${e(href(vm, "/website/requests"))}">Your website requests${o.requestSummary ? ` <span class="wd-m">${e(o.requestSummary)}</span>` : ""}</a></p></form></details></section>`;
+<p class="wd-acts"><button class="wd-btn wd-btn--solid" type="submit">Send request</button><a class="wd-link" href="${e(href(vm, "/website/requests"))}">Your website requests${o.requestSummary ? ` <span class="wd-m">${e(o.requestSummary)}</span>` : ""}</a></p></form></div></details></section>`;
 }
 
 /* ------------------------------------------------------------------ the whole dashboard */

@@ -144,3 +144,8 @@ The Review tab's expanded panels (Website updates, Needed from the client; root 
 - **Edit client name** sits beside the client heading (hidden under 600px) and is the first item of the three-dot menu. It posts `POST /api/admin/clients/:id/rename {name}` and only changes `organizations.name`; id, slug, status, people and records are untouched, and an `org.renamed` audit row records the old and new name. A same-name save is a no-op.
 - **Disclosure cards** (`.adm-acc--quiet`, `.adm-acc--step`: Organization details, Business Profile sections) use 24px side padding on desktop and 16px under 600px, a hairline under the open summary, and hairline row separators without a trailing one.
 - **Actions menu** (`.adm-menu`) is a rounded white card with soft depth, 44px rounded items, a hover/focus tint, and a separated destructive item (`adm-menu__item--sep`, `--danger`). The typed-DELETE confirmation is unchanged.
+
+## Client Portal system pages and Request a change
+- `body.auth` pages (the portal's own sign-in step, no access, errors and the master-access client directory) use the portal skin in `portal-ds.css`: grey ground, one white rounded card, pill buttons and fields. The editorial black sign-in (`body.si-body`) is separate. The directory lists clients as `dir__card` tiles (initial, name, arrow) and has a labelled empty state.
+- AuthKit (hosted by WorkOS) can only be themed from WorkOS branding: large radius, grey page ground, black pill buttons, rounded card and fields (custom CSS elements). It is set per WorkOS environment; Staging only so far.
+- Request a change is one full-width black pill with a plus (`wd-rq__btn`); the form opens in a white card beneath it.
