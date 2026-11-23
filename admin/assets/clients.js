@@ -4,7 +4,7 @@
 import { h, api, fmtDate, stateBlock } from "./ui.js";
 import { statCard, searchBox } from "./kit.js";
 import { newClientPanel, accessSections } from "./clients-access.js";
-import { actionsMenu, deleteClient, restoreClient } from "./clients-delete.js";
+import { actionsMenu, renameClient, deleteClient, restoreClient } from "./clients-delete.js";
 import { dashboard, sectionMap, stepAccordion, disclosure, chip, icon, STATE_TEXT } from "./client-dashboard.js";
 import { pageHead, grid, span, card, kpi, pill, tabs, segmented, dataList, empty, icon as dsIcon } from "./ds.js";
 
@@ -38,7 +38,10 @@ async function innerPage(id, tab, ctx) {
 
 function clientShell(data, tab, inner, ctx) {
   const o = data.organization, deleted = o.status === "archived", writes = Boolean(data.capabilities && data.capabilities.writes);
-  const menu = writes && !deleted ? actionsMenu({ label: `Actions for ${o.name}`, items: [{ label: "Delete client", danger: true, run: () => deleteClient(o, { notify: ctx.notify, after: () => ctx.navigate("/admin/clients") }) }] }) : null;
+  const rename = () => renameClient(o, { notify: ctx.notify, after: () => ctx.retry() });
+  const menu = writes && !deleted ? h("div", { class: "ds-clientshell__acts" },
+    h("button", { class: "btn btn--secondary adm-small ds-clientshell__rename", type: "button", onclick: rename }, "Edit client name"),
+    actionsMenu({ label: `Actions for ${o.name}`, items: [{ label: "Edit client name", run: rename }, { label: "Delete client", danger: true, separated: true, run: () => deleteClient(o, { notify: ctx.notify, after: () => ctx.navigate("/admin/clients") }) }] })) : null;
   const label = (CLIENT_TABS.find(([t]) => t === tab) || [])[1] || "Overview";
   const node = h("div", { class: "ds-page ds-clientshell" },
     pageHead({ title: o.name, back: ["All clients", "/admin/clients"], actions: menu }),
@@ -90,7 +93,7 @@ async function renderList(ctx) {
     { label: "Client", cls: "ds-dl__c--main", render: (c) => h("span", { class: "ds-client" }, h("span", { class: "ds-avatar", "aria-hidden": "true", text: initials(c.name) }), h("span", { class: "ds-site" }, h("a", { class: "ds-site__n ds-site__a", href: "/admin/clients/" + encodeURIComponent(c.id), "data-link": "", text: c.name }), h("span", { class: "ds-muted", text: "Created " + fmtDate(c.created_at) }))) },
     { label: "Websites", render: (c) => { const e = bySite.get(c.id); return e ? h("span", { class: "ds-env-mini" }, `${e.n} ${e.n === 1 ? "website" : "websites"}`, e.staging === e.n ? pill("Staging set up", "info") : pill(`${e.n - e.staging} without Staging`, "quiet")) : h("span", { class: "ds-muted", text: "None" }); } },
     { label: "Business Profile", render: (c) => (c.profile ? h("span", { class: "ds-prof" }, h("progress", { class: "ds-meter", max: 100, value: Math.max(0, Math.min(100, Number(c.profile.percent) || 0)), "aria-hidden": "true" }), h("span", { text: `${c.profile.percent}%` }), h("span", { class: "rk-sr", text: ` Business Profile ${c.profile.percent}% complete` })) : h("span", { class: "ds-muted", text: "Not available" })) },
-    { label: "", cls: "ds-dl__c--end", render: (c) => (writes ? actionsMenu({ label: `Actions for ${c.name}`, items: [{ label: "Delete client", danger: true, run: () => deleteClient(c, { notify: ctx.notify, after: done }) }] }) : null) },
+    { label: "", cls: "ds-dl__c--end", render: (c) => (writes ? actionsMenu({ label: `Actions for ${c.name}`, items: [{ label: "Edit client name", run: () => renameClient(c, { notify: ctx.notify, after: done }) }, { label: "Delete client", danger: true, separated: true, run: () => deleteClient(c, { notify: ctx.notify, after: done }) }] }) : null) },
   ];
   const listHost = h("div", { class: "ds-list-host" });
   const status = h("p", { class: "ds-muted", role: "status", text: `${plural(rows.length, "organization")}.` });

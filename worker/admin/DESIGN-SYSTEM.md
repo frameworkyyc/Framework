@@ -139,3 +139,8 @@ Production and Staging are two cards of the same shape (`card` with class `ds-en
 ## Review tab panels
 
 The Review tab's expanded panels (Website updates, Needed from the client; root class `adm-wsr`) follow one rhythm: a 1px bordered, rounded panel with 24px side padding in the summary and body (16px on a phone); a small uppercase section label ("Existing updates", "Add an update") above each group; each existing item as a soft card with 22-24px padding; the Add form as its own white card; fields in a grid (Title and long text full width, selects in equal columns of at least 260px, never stretched edge to edge); inputs, textareas and selects 48px tall with 14px side padding; one action row per item, separated by a hairline, Archive pushed to the right.
+
+## Client workspace: renaming, card padding, actions menu
+- **Edit client name** sits beside the client heading (hidden under 600px) and is the first item of the three-dot menu. It posts `POST /api/admin/clients/:id/rename {name}` and only changes `organizations.name`; id, slug, status, people and records are untouched, and an `org.renamed` audit row records the old and new name. A same-name save is a no-op.
+- **Disclosure cards** (`.adm-acc--quiet`, `.adm-acc--step`: Organization details, Business Profile sections) use 24px side padding on desktop and 16px under 600px, a hairline under the open summary, and hairline row separators without a trailing one.
+- **Actions menu** (`.adm-menu`) is a rounded white card with soft depth, 44px rounded items, a hover/focus tint, and a separated destructive item (`adm-menu__item--sep`, `--danger`). The typed-DELETE confirmation is unchanged.
