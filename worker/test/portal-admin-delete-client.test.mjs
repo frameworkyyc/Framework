@@ -221,3 +221,69 @@ test("the Clients list has no navigation arrow: the row is the link and the thre
   assert.match(js, /actionsMenu\(\{ label: `Actions for \$\{c\.name\}`/, "the three-dot menu sits beside the row in the new directory");
   assert.match(js, /dataList\(\{ label: "Client organizations"/, "the row is the link (a dataList record)");
 });
+
+test("rename: changes only the display name, audits it, keeps id, slug, status, people and records, and shows in portal and Admin", async () => {
+  const s = await setup();
+  const ren = (o, json, opts) => s.call(`/api/admin/clients/${o.id}/rename`, { json, ...opts });
+  const keep = ["memberships", "business_profile_answers", "portal_users", "invitations"];
+  const snap = () => JSON.stringify(keep.map((t) => sql(s.w.db, `SELECT * FROM ${t} ORDER BY 1, 2`)));
+  const before = snap();
+  const r = await ren(s.A, { name: "  Alpha Companies  " });
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.equal(body.renamed, true);
+  assert.equal(body.changed, true);
+  const row = sql(s.w.db, "SELECT id, slug, name, status FROM organizations WHERE id = ?", s.A.id)[0];
+  assert.deepEqual(row, { id: s.A.id, slug: "alpha", name: "Alpha Companies", status: "active" });
+  assert.equal(snap(), before, "people, invitations and answers are untouched");
+  assert.equal(sql(s.w.db, "SELECT name FROM organizations WHERE id = ?", s.B.id)[0].name, "Bravo Co");
+  const log = sql(s.w.db, "SELECT actor_ref, action, detail FROM activity_log WHERE organization_id = ? AND action = 'org.renamed'", s.A.id);
+  assert.equal(log.length, 1);
+  assert.equal(log[0].actor_ref, ADMIN);
+  assert.deepEqual(JSON.parse(log[0].detail), { from: "Alpha Co", to: "Alpha Companies" });
+  assert.equal((await s.ann.get("/portal/o/alpha/profile/business")).status, 200, "the portal address and the member's access still work");
+  const detail = await (await s.call(`/api/admin/clients/${s.A.id}`, { method: "GET" })).json();
+  assert.equal(detail.organization.name, "Alpha Companies");
+  const list = await (await s.call(`/api/admin/clients`, { method: "GET" })).json();
+  assert.ok(list.clients.some((c) => c.id === s.A.id && c.name === "Alpha Companies"));
+});
+
+test("rename: the same name is a no-op, bad names and extra fields are refused, unknown clients 404, and writes, auth and CSRF are enforced", async () => {
+  const s = await setup();
+  const ren = (o, json, opts) => s.call(`/api/admin/clients/${o.id}/rename`, { json, ...opts });
+  const same = await ren(s.A, { name: "Alpha Co" });
+  assert.equal(same.status, 200);
+  assert.equal((await same.json()).changed, false);
+  assert.equal(sql(s.w.db, "SELECT COUNT(*) AS n FROM activity_log WHERE action = 'org.renamed'")[0].n, 0, "no audit row for a no-op");
+  for (const json of [{}, { name: "" }, { name: "   " }, { name: 5 }, { name: "x".repeat(500) }, { name: "Ok", extra: 1 }]) {
+    const r = await ren(s.A, json);
+    assert.ok([400, 422].includes(r.status), JSON.stringify(json).slice(0, 40));
+  }
+  assert.equal(sql(s.w.db, "SELECT name FROM organizations WHERE id = ?", s.A.id)[0].name, "Alpha Co");
+  assert.equal((await ren({ id: "00000000-0000-4000-8000-000000000000" }, { name: "Ghost" })).status, 404);
+  assert.equal((await ren({ id: "not-a-uuid" }, { name: "Ghost" })).status, 404);
+  for (const opts of [{ token: null }, { token: "garbage" }, { headers: { Origin: "https://evil.example" } }, { headers: { "X-Framework-Admin": "0" } }, { headers: { "Content-Type": "text/plain" } }]) {
+    assert.ok([401, 403, 415].includes((await ren(s.A, { name: "Hacked" }, opts)).status), JSON.stringify(opts));
+  }
+  assert.equal((await s.call(`/api/admin/clients/${s.A.id}/rename`, { method: "GET" })).status, 405);
+  const off = await setup({ writes: false });
+  assert.equal((await off.call(`/api/admin/clients/${off.A.id}/rename`, { json: { name: "Nope" } })).status, 403);
+  assert.equal(sql(s.w.db, "SELECT name FROM organizations WHERE id = ?", s.A.id)[0].name, "Alpha Co");
+});
+
+test("rename interface: a visible Edit client name action beside the heading and in the menu, save only when changed, no HTML injection, and the rounded menu and card padding rules exist", async () => {
+  const { readFileSync } = await import("node:fs");
+  const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const rd = (p) => strip(readFileSync(new URL("../../admin/assets/" + p, import.meta.url), "utf8"));
+  const ui = rd("clients-delete.js"), clients = rd("clients.js"), css = readFileSync(new URL("../../admin/assets/ds.css", import.meta.url), "utf8");
+  assert.match(ui, /save\.disabled = !v \|\| v === name/, "Save is off until the name really changes");
+  assert.ok(ui.indexOf("await renameDialog") < ui.indexOf('"rename"'), "the dialog comes before the request");
+  assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML/.test(ui));
+  assert.match(clients, /ds-clientshell__rename[^]*"Edit client name"/, "visible action beside the heading");
+  assert.match(clients, /\{ label: "Edit client name", run: rename \}/, "menu item");
+  assert.match(clients, /ctx\.retry\(\)/);
+  assert.ok(!/\bapi\([^)]*\/rename/.test(clients), "the page goes through the helper");
+  assert.match(css, /\.ds-main \.adm-acc--quiet > \.adm-acc__body, \.ds-main \.adm-acc--step > \.adm-acc__body \{ padding: 8px 24px 24px/);
+  assert.match(css, /\.ds-main \.adm-menu \{[^}]*border-radius: var\(--ds-r\)/);
+  assert.match(css, /\.ds-main \.adm-menu__item--danger:hover/);
+});
