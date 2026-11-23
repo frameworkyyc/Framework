@@ -26,6 +26,8 @@ if (import.meta.url === "file://" + process.argv[1]) {
     let text = "";
     try { text = execFileSync("node", [HEALTH], { encoding: "utf8", env: { ...process.env, NODE_USE_ENV_PROXY: "1" }, timeout: 120000 }); } catch (e) { text = String(e.stdout || "") + String(e.stderr || ""); }
     last = readHealth(text);
+    // Cloudflare throttles bursts (HTTP 429, code 971): that is not a Staging problem. Wait and look again until the time runs out.
+    if (last.fails.length && last.fails.every((f) => /429|971|Cloudflare authentication failed/.test(f)) && /429|971/.test(text) && Date.now() < end) { await new Promise((r) => setTimeout(r, 90000)); continue; }
     if (last.fails.length) { console.log(`NOT READY: ${last.summary}\n${last.fails.join("\n")}\nNEXT: fix the failing check above (nothing was changed by this script), then run it again.`); process.exit(1); }
     if (last.ready) { console.log(`READY: ${last.summary}; ${last.deploy}`); process.exit(0); }
     if (/failure|failed/i.test(last.build)) { console.log(`NOT READY: the Staging build failed (${last.build}).\nNEXT: open the Workers Builds log for the Staging commit, fix the build error, push the fix.`); process.exit(1); }
