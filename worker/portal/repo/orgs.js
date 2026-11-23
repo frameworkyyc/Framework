@@ -134,6 +134,25 @@ export async function archiveOrganizationAudited(db, id, actor, { now = new Date
   return changeLifecycle(db, id, actor, now, { from: "active", to: "archived", action: "org.deleted" });
 }
 
+/** Change a client's display name only. The id, the portal slug (so every portal URL), the status, the members and every record are untouched; the change and who made it are written to the audit log in the same batch.
+ *  Works on any status (a deleted client keeps its name too). An unchanged name is a successful no-op. */
+export async function renameOrganizationAudited(db, id, rawName, actor, { now = new Date() } = {}) {
+  requireOrgId(id);
+  if (!validActor(actor)) return fail("invalid_actor", { message: "An administrator must be named for this change." });
+  const name = validateName(rawName);
+  if (!name) return fail("invalid_name");
+  const before = await getOrganizationById(db, id);
+  if (!before) return fail("not_found");
+  if (before.name === name) return ok({ organization: before, changed: false });
+  const t = isoTime(now);
+  await db.batch([
+    db.prepare("UPDATE organizations SET name = ?, updated_at = ? WHERE id = ?").bind(name, t, id),
+    db.prepare("INSERT INTO activity_log (id, organization_id, actor_type, actor_ref, action, entity_type, entity_id, detail, visibility, created_at) SELECT ?, ?, 'admin', ?, 'org.renamed', 'organization', ?, ?, 'internal', ? WHERE changes() > 0")
+      .bind(newId(), id, actor.trim(), id, JSON.stringify({ from: before.name, to: name }), t),
+  ]);
+  return ok({ organization: await getOrganizationById(db, id), changed: true });
+}
+
 /** Bring a deleted client back (status active again). Same audit rules as deleting. */
 export async function restoreOrganizationAudited(db, id, actor, { now = new Date() } = {}) {
   return changeLifecycle(db, id, actor, now, { from: "archived", to: "active", action: "org.restored" });
