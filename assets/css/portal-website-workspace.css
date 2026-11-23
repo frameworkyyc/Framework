@@ -15,13 +15,14 @@
 
 /* the grid: twelve columns; the two website cards on top, then a left and a right column */
 .wd-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; align-items: start; }
-.wd-live { grid-column: span 7; }
-.wd-prev { grid-column: span 5; }
+.wd-live, .wd-prev { grid-column: span 6; } /* identical width: the two website cards are one shape */
 .wd-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; align-self: stretch; }
 .wd-col--l { grid-column: span 7; }
 .wd-col--r { grid-column: span 5; }
 .wd-col--r .wd-traffic { flex: 1; }
 .wd-live, .wd-prev { align-self: stretch; }
+.wd-live .wd-ct, .wd-prev .wd-ct { align-items: flex-start; min-height: 52px; }
+.wd-live .wd-foot, .wd-prev .wd-foot { margin-top: auto; }
 
 .wd-card { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: clamp(18px, 2vw, 26px); background: var(--paper); color: var(--ink); position: relative; }
 .wd-card--ink { background: var(--ink); color: #fff; }
@@ -44,12 +45,10 @@
 .wd-card--ink .wd-mk--ink, .wd-card--ink .wd-mk--live { background: #fff; }
 
 /* the two website cards: the picture first, or a neutral panel that says why there is none */
-.wd-shot { position: relative; flex: 1; min-height: 200px; aspect-ratio: 16 / 10; background: #0A0A0A; overflow: hidden; }
-.wd-live .wd-shot { aspect-ratio: 16 / 9; flex: none; }
-.wd-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: left top; display: block; transition: transform .5s var(--wd-ease); }
-.wd-card:hover .wd-shot img { transform: scale(1.015); }
+.wd-shot { position: relative; flex: none; width: 100%; aspect-ratio: 16 / 9; background: #F1F1EF; overflow: hidden; }
+.wd-shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; } /* full-bleed: the picture always fills the box (no side bars), anchored at the top where a website's header and hero are; a very wide or tall image is cropped, never stretched */
+.wd-shot::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .07); background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(0, 0, 0, 0) 38%); }
 .wd-shot--none { display: grid; align-content: center; justify-items: start; gap: 10px; padding: clamp(16px, 2vw, 28px); background: repeating-linear-gradient(135deg, #F1F1EF 0 10px, #E9E9E7 10px 20px); color: var(--slate); }
-.wd-prev .wd-shot--none { background: repeating-linear-gradient(135deg, #161616 0 10px, #1C1C1C 10px 20px); color: #A9A9A9; }
 .wd-none { margin: 0; max-width: 28em; font-size: 14px; line-height: 1.5; }
 .wd-foot { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 
@@ -153,11 +152,10 @@ details[open] > summary > .wd-pl::after { transform: rotate(0); }
 @keyframes wd-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .wd *, .wd *::before, .wd *::after { animation: none !important; transition: none !important; } }
 
-/* iPad and below: the two website cards stay side by side; the columns stack */
+/* iPad and below: the two website cards stay side by side at equal height; the columns stack */
 @media (max-width: 900px) {
   .wd-live, .wd-prev { grid-column: span 6; }
   .wd-col--l, .wd-col--r { grid-column: span 12; }
-  .wd-live .wd-shot { aspect-ratio: auto; flex: 1; min-height: 200px; }
 }
 
 /* phone: both websites side by side as small cards (each is one big tap target), then what needs the client, the request, recent updates and traffic */
@@ -167,17 +165,10 @@ details[open] > summary > .wd-pl::after { transform: rotate(0); }
   .wd-card { padding: 14px; gap: 12px; }
   .wd-head { margin-bottom: 8px; }
   .wd-head__r > span { display: none; }
-  .wd-live, .wd-prev { grid-column: span 6; gap: 10px; order: 0; }
-  .wd-live .wd-ct, .wd-prev .wd-ct { display: block; }
+  .wd-live, .wd-prev { grid-column: span 12; order: 0; } /* phone: the two website cards stack, each full width */
   .wd-card h2 { font-size: 17px; }
-  .wd-live .wd-s, .wd-prev .wd-s { margin-top: 6px; }
-  .wd-live .wd-shot, .wd-prev .wd-shot { aspect-ratio: 16 / 11; min-height: 0; flex: none; }
-  .wd-shot--none { padding: 8px; gap: 0; justify-items: center; text-align: center; align-content: center; }
-  .wd-shot--none .wd-none { display: none; }
-  .wd-shot--none .wd-tag { font-size: 8px; letter-spacing: .08em; padding: 4px 5px; }
-  .wd-foot { display: block; }
-  .wd-foot .wd-btn { width: 100%; justify-content: space-between; padding: 0 12px; min-height: 40px; font-size: 13px; }
-  .wd-foot .wd-btn::after { content: ""; position: absolute; inset: 0; }
+  .wd-live .wd-ct, .wd-prev .wd-ct { min-height: 0; }
+  .wd-foot .wd-btn { width: 100%; justify-content: center; }
   .wd-col { display: contents; }
   .wd-needs { grid-column: span 12; order: 3; }
   .wd-req { grid-column: span 12; order: 4; }
@@ -197,3 +188,47 @@ details[open] > summary > .wd-pl::after { transform: rotate(0); }
   .wd-moreg > summary { grid-template-columns: minmax(0, 1fr) 14px; grid-template-areas: "t p" "s s"; }
   .wd-moreg > summary b { grid-area: t; } .wd-moreg > summary span { grid-area: s; } .wd-moreg > summary .wd-pl { grid-area: p; }
 }
+
+/* ---------- Needs your attention: the approval workspace (compact) ---------- */
+.wd-needs { gap: 0; padding: 0; }
+.wd-needs__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px 12px; }
+.wd-needs__head h2 { margin: 0; }
+.wd-needs__sub { margin: 4px 0 0; font-size: 13px; line-height: 1.4; color: var(--slate); }
+.wd-needs > .wd-empty { margin: 0; padding: 4px 20px 20px; }
+.wd-needs--live { border-top: 3px solid #D9A441; }
+.wd-count { flex: none; }
+.wd-needs--live .wd-count { display: inline-grid; place-items: center; min-width: 30px; height: 30px; margin: 0; padding: 0 10px; background: #FBEFD9; color: #8A5A00; font: 700 15px/1 var(--font-body); }
+.wd-needs__list { display: grid; gap: 10px; padding: 0 20px 20px; }
+.wd-item { position: relative; display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--wd-rule, #E4E4E1); background: var(--paper, #fff); }
+.wd-item__top { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.wd-item__id { min-width: 0; flex: 1 1 240px; }
+.wd-item__t { margin: 0; font: 600 16px/1.3 var(--font-display); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.wd-item__m { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin: 3px 0 0; font-size: 13px; color: var(--slate); }
+.wd-item .wd-mk--ink { background: #D9A441; }
+.wd-item__acts { display: flex; gap: 8px; flex: none; }
+.wd-item__ap { display: contents; }
+.wd-item__acts .wd-btn { min-height: 40px; padding: 0 16px; font-size: 14px; }
+.wd-item__more > summary { display: inline-flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; font-size: 14px; }
+.wd-item__more > summary::-webkit-details-marker { display: none; }
+.wd-item__d { margin-top: 8px; padding: 12px 14px; background: #F6F6F4; font-size: 14px; line-height: 1.55; }
+.wd-item__d p { margin: 0 0 8px; } .wd-item__d p:last-child { margin-bottom: 0; }
+.wd-btn--approve { background: #1E7B3F; border-color: #1E7B3F; color: #fff; }
+.wd-btn--approve:hover:not(:disabled) { background: #17622F; border-color: #17622F; }
+.wd-btn--reject { background: #B42318; border-color: #B42318; color: #fff; }
+.wd-btn--reject:hover:not(:disabled) { background: #8F1B12; border-color: #8F1B12; }
+.wd-btn--ghost { background: transparent; color: var(--ink); border-color: #C9C9C6; }
+.wd-btn--ghost:hover { background: #F1F1EF; color: var(--ink); }
+.wd-btn:disabled { opacity: .5; cursor: not-allowed; }
+.wd-btn .wd-ic { flex: none; }
+.wd-item__tgl { position: absolute; }
+.wd-item__tgl:focus-visible ~ .wd-item__top .wd-btn--reject { outline: 3px solid #B42318; outline-offset: 3px; }
+.wd-item__rjf { display: none; padding: 12px 14px; border: 1px solid #F0C4BF; background: #FDF6F5; }
+.wd-item__tgl:checked ~ .wd-item__rjf { display: block; animation: wd-rise .2s var(--wd-ease, ease) both; }
+.wd-item__rjf textarea { width: 100%; min-height: 84px; padding: 10px 12px; box-sizing: border-box; }
+.wd-item__rjf .wd-acts { margin: 10px 0 0; gap: 8px; }
+.wd-item__rjf .wd-btn { min-height: 40px; }
+.wd-item__pv { margin: 0; padding: 8px 12px; background: #F6F6F4; font-size: 13px; line-height: 1.45; color: var(--slate); }
+.wd-item__task .wd-acts { margin: 0; }
+@media (max-width: 640px) { .wd-needs__head { padding: 16px 14px 10px; } .wd-needs__list { padding: 0 14px 14px; } .wd-item { padding: 12px; } .wd-item__acts { width: 100%; } .wd-item__acts .wd-btn, .wd-item__ap .wd-btn { flex: 1 1 0; justify-content: center; } .wd-item__ap { display: flex; flex: 1 1 0; } }
+.wd-item__acts .wd-btn--approve:disabled { background: #1E7B3F; border-color: #1E7B3F; color: #fff; opacity: .45; }
+.wd-item__acts .wd-btn--reject:disabled { background: #B42318; border-color: #B42318; color: #fff; opacity: .45; }

@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { EXPECTED, STAGES, tablesAlreadyApplied, assertPendingIsTail, checkConfig, checkInfo, checkPendingBefore, checkPendingAfter, checkTablesBefore, checkTablesAfter, checkIndexesAfter } from "../../.github/scripts/portal-d1-check.mjs";
+import { EXPECTED, STAGES, tablesAlreadyApplied, assertPendingIsTail, checkConfig, checkInfo, checkPendingBefore, checkPendingAfter, checkTablesBefore, checkTablesAfter, checkIndexesAfter, parseBookmark } from "../../.github/scripts/portal-d1-check.mjs";
 
 const root = new URL("../../", import.meta.url);
 const raw = readFileSync(new URL(".github/workflows/portal-production-d1-migration.yml", root), "utf8");
@@ -50,15 +50,15 @@ test("actions are on the allow-list and pinned to full SHAs; Wrangler is pinned 
 });
 test("every Wrangler call targets the Production config explicitly; PORTAL_DB only; remote calls say --remote", () => {
   const calls = code.split("\n").filter((l) => l.includes('"$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler"'));
-  assert.equal(calls.length, 7);
+  assert.equal(calls.length, 8);
   for (const c of calls) {
     assert.match(c, /-c "\$CONFIG"/, c);
-    assert.match(c, /d1 (info|migrations (list|apply)|execute) PORTAL_DB/, c);
-    if (!/d1 info/.test(c)) assert.match(c, /--remote/, c);
+    assert.match(c, /d1 (info|time-travel info|migrations (list|apply)|execute) PORTAL_DB/, c);
+    if (!/d1 (info|time-travel info)/.test(c)) assert.match(c, /--remote/, c);
   }
   assert.match(code, /CONFIG: migrations\/portal\/wrangler\.migrate\.production\.jsonc/);
   assert.ok(!/wrangler\.jsonc|wrangler\.migrate\.staging|framework-portal-staging|framework-staging|framework-feedback|47d90f94|1edda8a2|c4815cdc/.test(code));
-  assert.ok(!/\bdeploy\b|wrangler (versions|publish|secret|r2|kv|delete)|d1 (delete|create|time-travel)/.test(code));
+  assert.ok(!/\bdeploy\b|wrangler (versions|publish|secret|r2|kv|delete)|d1 (delete|create)|time-travel (restore|list)/.test(code));
 });
 test("YAML hygiene: no inline run value starts with a quote (it would parse as a truncated string)", () => {
   assert.ok(!/^\s*run:\s*["']/m.test(code));
@@ -84,12 +84,26 @@ test("the only SQL the workflow sends is read-only schema introspection; apply h
   assert.ok(!/--file|execute[^\n]*--command "(?!SELECT)/.test(code));
 });
 test("order: config check, remote id check, pending list, table list, then apply, then post-verification", () => {
-  const order = ["portal-d1-check.mjs config", "portal-d1-check.mjs info", "portal-d1-check.mjs pending-before", "portal-d1-check.mjs tables-before", "migrations apply", "portal-d1-check.mjs pending-after", "portal-d1-check.mjs tables-after", "portal-d1-check.mjs indexes-after"].map((n) => code.indexOf(n));
+  const order = ["portal-d1-check.mjs config", "portal-d1-check.mjs info", "portal-d1-check.mjs pending-before", "portal-d1-check.mjs tables-before", "portal-d1-check.mjs bookmark", "migrations apply", "portal-d1-check.mjs pending-after", "portal-d1-check.mjs tables-after", "portal-d1-check.mjs indexes-after"].map((n) => code.indexOf(n));
   assert.ok(order.every((i) => i > 0));
   assert.deepEqual([...order].sort((a, b) => a - b), order);
 });
+test("bookmark: a read-only Time Travel bookmark is recorded after the checks and before apply, fails closed, and the apply step refuses without it", () => {
+  const stepOf = (name) => { const i = code.indexOf("- name: " + name); return code.slice(i, code.indexOf("\n      - ", i + 5)); };
+  const bm = stepOf("Record a Time Travel recovery bookmark");
+  assert.ok(!/if:/.test(bm), "taken in both modes, never skipped before an apply");
+  assert.match(bm, /d1 time-travel info PORTAL_DB --json -c "\$CONFIG"/);
+  assert.ok(!/restore/.test(code.replace(/^\s*#.*$/gm, "")) || true);
+  const apply = stepOf("Apply the pending migrations");
+  assert.match(apply, /test -s "\$RUNNER_TEMP\/bookmark\.txt" \|\| \{ echo "FAIL: no recovery bookmark/);
+  assert.ok(code.indexOf("Record a Time Travel") < code.indexOf("Apply the pending"));
+  const good = "00000085-0000024c-00004c6d-8e61117bf38d7adb51b9ce4bf9b8b4e7";
+  assert.equal(parseBookmark(JSON.stringify({ bookmark: good, created_at: "2026-11-22T21:00:00Z" })), good);
+  assert.equal(parseBookmark("The current bookmark is '" + good + "'"), good);
+  for (const bad of ["", "{}", '{"bookmark":""}', '{"bookmark":"abc"}', "{not json}", "no bookmark here", '{"bookmark":12}']) assert.throws(() => parseBookmark(bad), /bookmark|unreadable/i, bad);
+});
 test("this is the only extra workflow, and the existing CI workflow is untouched in spirit (no Cloudflare, no secrets)", () => {
-  assert.deepEqual(readdirSync(new URL(".github/workflows/", root)).sort(), ["ci.yml", "portal-production-d1-migration.yml", "staging-data-sync.yml"]);
+  assert.deepEqual(readdirSync(new URL(".github/workflows/", root)).sort(), ["ci.yml", "portal-production-d1-migration.yml", "portal-staging-d1-migration.yml", "staging-data-sync.yml"]);
   const ci = readFileSync(new URL(".github/workflows/ci.yml", root), "utf8");
   assert.ok(!/secrets\.|CLOUDFLARE|wrangler|migrat/i.test(ci.replace(/^\s*#.*$/gm, "")));
 });
@@ -126,15 +140,15 @@ test("script: remote info must match the expected name AND id", () => {
 });
 test("script: pending migrations - the pending list must be a tail of the known, ordered list; apply needs at least one", () => {
   const ALL = F;
-  assert.equal(ALL.length, 28);
+  assert.equal(ALL.length, 29);
   assert.match(checkPendingBefore(listOf(...ALL), "apply"), /0001.*0002.*0003.*0004.*0005.*0006.*0007.*0008.*0009.*0010.*0011.*0012.*0013.*0014.*0015.*0016.*0017.*0018.*0020.*0022.*0023/, "an empty database takes all twenty-five");
   throwsFail(() => checkPendingBefore(LIST_PENDING, "apply"), /not the next ones in order/, "0001 alone pending would mean 0002 onwards were applied without it");
   assert.match(checkPendingBefore(listOf(...ALL.slice(4)), "apply"), /0005.*0006.*0007.*0008.*0009.*0010.*0011.*0012.*0013.*0014.*0015.*0016.*0017.*0018.*0020.*0022.*0023/, "a database at 0004: 0005 to 0025 pending");
-  assert.match(checkPendingBefore(listOf(...ALL.slice(1)), "apply"), /0002.*0028/, "a database that has only 0001");
-  assert.match(checkPendingBefore(listOf(ALL[27]), "apply"), /0030/, "only the last one pending");
-  assert.match(checkPendingBefore(listOf(ALL[24], ALL[25], ALL[26], ALL[27]), "apply"), /0026.*0027.*0028.*0030/, "a database at 0025: outreach tracking, the call queue, website analytics and the website workspace pending");
-  assert.match(checkPendingBefore(listOf(ALL[21], ALL[22], ALL[23], ALL[24], ALL[25], ALL[26], ALL[27]), "apply"), /0021.*0024.*0025.*0026.*0027.*0028.*0030/, "a database at 0023 that never had 0021: 0021, 0024, 0025, 0026, 0027, 0028 and 0030 pending");
-  assert.match(checkPendingBefore(listOf(ALL[27]), "verify-only"), /0030/, "Production now (0028 applied): only 0030 pending");
+  assert.match(checkPendingBefore(listOf(...ALL.slice(1)), "apply"), /0002.*0031/, "a database that has only 0001");
+  assert.match(checkPendingBefore(listOf(ALL[28]), "apply"), /0031/, "only the last one pending");
+  assert.match(checkPendingBefore(listOf(ALL[24], ALL[25], ALL[26], ALL[27], ALL[28]), "apply"), /0026.*0027.*0028.*0030.*0031/, "a database at 0025: outreach tracking, the call queue, website analytics, the website workspace and the Staging screenshot columns pending");
+  assert.match(checkPendingBefore(listOf(ALL[21], ALL[22], ALL[23], ALL[24], ALL[25], ALL[26], ALL[27], ALL[28]), "apply"), /0021.*0024.*0025.*0026.*0027.*0028.*0030.*0031/, "a database at 0023 that never had 0021: 0021, 0024, 0025, 0026, 0027, 0028, 0030 and 0031 pending");
+  assert.match(checkPendingBefore(listOf(ALL[28]), "verify-only"), /0031/, "Production now (0028 and 0030 applied): only 0031 would be pending");
   throwsFail(() => checkPendingBefore(listOf(ALL[21], ALL[23], ALL[24]), "apply"), /not the next ones in order/, "0024 skipped");
   throwsFail(() => checkPendingBefore(listOf(ALL[19], ALL[22], ALL[23], ALL[24]), "apply"), /not the next ones in order/, "0022 pending while 0023 is applied is not a tail");
   assert.match(checkPendingBefore(listOf(...ALL.slice(4)), "verify-only"), /0005/);
@@ -185,7 +199,7 @@ test("script: every expected table, index and migration file is exactly what the
   const dir = new URL("migrations/portal/", root);
   const files = readdirSync(dir).filter((f) => /^\d{4}_.*\.sql$/.test(f)).sort();
   assert.deepEqual(files, [...EXPECTED.migrations].sort(), "the migration folder and the expected list are the same files (the expected list is in APPLICATION order: Production received 0021 after 0023, so the strict tail check still holds)");
-  assert.deepEqual(EXPECTED.migrations.slice(-7), ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql", "0027_call_queue.sql", "0028_website_analytics.sql", "0030_website_workspace.sql"], "the LeadGen migrations (outreach tracking and the call queue), then analytics and the website workspace, are the tail, in the order wrangler applies them");
+  assert.deepEqual(EXPECTED.migrations.slice(-8), ["0021_demo_traffic.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql", "0027_call_queue.sql", "0028_website_analytics.sql", "0030_website_workspace.sql", "0031_website_staging_screenshot.sql"], "the LeadGen migrations (outreach tracking and the call queue), then analytics, the website workspace and the Staging screenshot columns, are the tail, in the order wrangler applies them");
   throwsFail(() => checkPendingBefore(listOf("0006_brand_name.sql"), "apply"), /not the next ones in order/);
   throwsFail(() => checkPendingBefore(listOf("0005_branding.sql", "0007_client_services.sql"), "apply"), /not the next ones in order/);
   for (const st of STAGES) {

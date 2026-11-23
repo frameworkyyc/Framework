@@ -130,3 +130,12 @@ The client portal uses the same visual system (soft grey ground, white cards wit
 - **Client activity** (`GET /api/admin/activity`) lists what clients did in the portal, built only from events the portal already writes to `activity_log` (support requests and replies, Branding and other requests, brand files, website update decisions and task answers, feedback, profile changes, accepted invitations). It never shows staff actions, page views or sign-ins, shows nothing older than 30 days and invents nothing. A burst of the same event for one client is one entry with a count. Each entry has the client, the action, the time and a link; "Action needed" entries are told apart from "For your information" ones.
 - **State without a new table**: read, unread and dismissed are appended to `activity_log` as internal, organization-less admin rows (`admin.activity.read|unread|dismissed`, `admin.attention.dismissed|restored`); the newest mark wins and nothing is deleted. A dedicated table would only be worth adding if the log grows large; it is not needed now.
 - **Sidebar**: the account footer is anchored to the bottom of the sidebar (the navigation scrolls above it) and the sidebar is sticky on desktop (`inset` before `top`, or the shorthand resets `top`).
+
+
+## Website environment cards
+
+Production and Staging are two cards of the same shape (`card` with class `ds-env`): the environment name and a status pill, the address, the screenshot (`.ds-eshot`, 16:10, or a neutral "No screenshot yet" panel; never an invented image), then **Open** and **Edit**. Edit opens that environment's settings drawer: the address form, then the screenshot control (`shotEditor` in `site-blocks.js`: preview, file input, Upload / Replace, Remove). There is no separate Screenshot card.
+
+## Review tab panels
+
+The Review tab's expanded panels (Website updates, Needed from the client; root class `adm-wsr`) follow one rhythm: a 1px bordered, rounded panel with 24px side padding in the summary and body (16px on a phone); a small uppercase section label ("Existing updates", "Add an update") above each group; each existing item as a soft card with 22-24px padding; the Add form as its own white card; fields in a grid (Title and long text full width, selects in equal columns of at least 260px, never stretched edge to edge); inputs, textareas and selects 48px tall with 14px side padding; one action row per item, separated by a hairline, Archive pushed to the right.

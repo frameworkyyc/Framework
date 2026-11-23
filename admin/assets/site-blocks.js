@@ -1,8 +1,8 @@
-/* Framework Admin: the building blocks of a website's workspace that are more than a form: the downloadable website files, the screenshot, the development milestones and the live-preview check.
+/* Framework Admin: the building blocks of a website's workspace that are more than a form: the downloadable website files, the per-environment screenshot picture and editor, the development milestones and the live-preview check.
    Ported from the old per-client Websites page with the same API calls and the same rules; only the look changed (design-system buttons and cards). `ctx` is { base, data, canWrite, perform, say }:
    `perform` runs one change (confirmation, a lock against double submits, a message, then a refresh). Server text is never inserted as HTML. */
-import { h, api } from "./ui.js";
-import { card, button, field, empty, pill } from "./ds.js";
+import { h, api, confirmDialog } from "./ui.js";
+import { card, button, field, empty, pill, toast } from "./ds.js";
 
 const orNull = (v) => { const t = String(v).trim(); return t === "" ? null : t; };
 const STATUS = { existing: "Existing website", in_development: "In development", live: "Live" };
@@ -68,22 +68,51 @@ export function filesCard(site, { base, data, canWrite, perform, say }) {
     ] : null });
 }
 
-/** The screenshot of the live site: shown to the client as the picture of their website, and as the Live card's picture in the Websites section. */
-export function screenshotCard(site, { base, data, canWrite, perform, say }) {
-  const sid = encodeURIComponent(site.id);
-  const input = h("input", { id: "ws-shot-" + site.id.slice(0, 8), class: "input", type: "file", accept: ".png,.jpg,.jpeg,.webp" });
-  const url = `/api/admin${base}/${sid}/screenshot?v=${encodeURIComponent(site.updatedAt || "")}`;
-  const can = canWrite() && data.capabilities.storage;
-  return card({ title: "Screenshot", sub: site.screenshot ? `${site.screenshot.name} · ${fmtSize(site.screenshot.size)}` : "No screenshot yet. Clients see a neutral panel until one is added; automatic capture is a later step.",
-    body: [site.screenshot ? h("img", { class: "ds-shot", src: url, alt: `Screenshot of ${site.name}`, loading: "lazy" }) : empty({ title: "No screenshot", body: "Add a PNG, JPG or WebP picture of the live homepage.", ic: "websites" }),
-      can ? field(input.id, site.screenshot ? "Replace the screenshot" : "Add a screenshot", input, "PNG, JPG or WebP, up to 5 MB.") : null],
-    foot: can ? [button(site.screenshot ? "Replace screenshot" : "Add screenshot", { tone: "solid", onClick: () => {
-      const f = input.files && input.files[0];
-      if (!f) { say(ERROR_TEXT.no_file, "error"); input.focus(); return; }
-      if (f.size > MAX_SHOT) { say(ERROR_TEXT.file_too_large, "error"); return; }
-      const body = new FormData(); body.append("file", f, f.name);
-      perform({ request: () => api(`${base}/${sid}/screenshot`, { method: "POST", body }), success: "Screenshot saved." });
-    } }), site.screenshot ? button("Remove", { tone: "danger", onClick: () => perform({ confirm: { title: "Remove the screenshot?", body: "The picture is deleted from storage.", details: [["Website", site.name]], confirmLabel: "Remove screenshot" }, request: () => api(`${base}/${sid}/screenshot/remove`, { method: "POST", body: {} }), success: "Screenshot removed." }) }) : null] : null });
+/* ---- the picture of each environment (Production and Staging), shown on its environment card and edited in that card's Edit panel ---- */
+const SHOT = { production: { key: "screenshot", path: "screenshot", label: "Production" }, staging: { key: "stagingScreenshot", path: "screenshot/staging", label: "Staging" } };
+
+/** The picture on an environment card: the uploaded screenshot, else a neutral panel that says there is none (never an invented image). */
+export function shotPicture(site, env, base) {
+  const m = SHOT[env], rec = site[m.key];
+  if (!rec) return h("div", { class: "ds-eshot ds-eshot--none" }, h("span", { text: "No screenshot yet" }));
+  const src = `/api/admin${base}/${encodeURIComponent(site.id)}/${m.path}?v=${encodeURIComponent(site.updatedAt || "")}`;
+  return h("div", { class: "ds-eshot" }, h("img", { src, alt: `Screenshot of the ${m.label} site of ${site.name}`, loading: "lazy" }));
+}
+
+/** The upload, replace and remove control inside an environment's Edit panel. PNG, JPG or WebP up to 5 MB, uploaded by hand (a Staging site is often password protected, so nothing is captured automatically).
+    `done` runs after a change was saved (it closes the panel and refreshes the page). */
+export function shotEditor(site, env, { base, data, canWrite, done }) {
+  const m = SHOT[env], sid = encodeURIComponent(site.id), rec = site[m.key];
+  const id = `shot-${env}-${site.id.slice(0, 8)}`;
+  const input = h("input", { id, class: "input", type: "file", accept: ".png,.jpg,.jpeg,.webp" });
+  const msg = h("p", { class: "ds-hint", role: "status" });
+  const can = canWrite() && data.capabilities.storage && (env !== "staging" || data.capabilities.stagingScreenshots);
+  let busy = false;
+  const run = async (request, success) => {
+    if (busy) return; busy = true; msg.textContent = "";
+    try { await request(); toast(success); done(); } catch (err) { msg.textContent = errorText(err); }
+    busy = false;
+  };
+  const notice = env === "staging" && !data.capabilities.stagingScreenshots ? "Staging screenshots need a small database update that has not been applied yet, so they can’t be added here for now."
+    : !data.capabilities.storage ? "File storage isn’t available on this site." : !canWrite() ? "Changes are switched off on this site." : null;
+  return h("section", { class: "ds-shotedit", "aria-label": `${m.label} screenshot` },
+    h("h3", { class: "ds-sub2", text: "Screenshot" }),
+    shotPicture(site, env, base),
+    rec ? h("p", { class: "ds-hint", text: `${rec.name} · ${fmtSize(rec.size)}` }) : null,
+    can ? field(id, rec ? "Replace the screenshot" : "Add a screenshot", input, env === "staging" ? "PNG, JPG or WebP, up to 5 MB. Upload it yourself: the Staging site may be password protected." : "PNG, JPG or WebP, up to 5 MB.") : h("p", { class: "ds-hint", text: notice || "" }),
+    msg,
+    can ? h("div", { class: "ds-actions" },
+      button(rec ? "Replace screenshot" : "Upload screenshot", { onClick: () => {
+        const f = input.files && input.files[0];
+        if (!f) { msg.textContent = ERROR_TEXT.no_file; input.focus(); return; }
+        if (f.size > MAX_SHOT) { msg.textContent = ERROR_TEXT.file_too_large; return; }
+        const body = new FormData(); body.append("file", f, f.name);
+        run(() => api(`${base}/${sid}/${m.path}`, { method: "POST", body }), `${m.label} screenshot saved.`);
+      } }),
+      rec ? button("Remove", { tone: "danger", onClick: async () => {
+        if (!(await confirmDialog({ title: `Remove the ${m.label} screenshot?`, body: "The picture is deleted from storage. The address is not changed.", details: [["Website", site.name]], confirmLabel: "Remove screenshot" }))) return;
+        run(() => api(`${base}/${sid}/${m.path}/remove`, { method: "POST", body: {} }), `${m.label} screenshot removed.`);
+      } }) : null) : null);
 }
 
 /** The development milestones: the progress bar clients see is computed from these. Only a website in development has a bar. */

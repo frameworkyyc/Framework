@@ -1,8 +1,8 @@
 // Safety checks for the manually triggered Production portal D1 migration workflow (.github/workflows/portal-production-d1-migration.yml).
 // Each check reads Wrangler's output on stdin (or the migration config file) and exits non-zero on ANY mismatch or surprise ("fail closed").
 // It never prints secrets: the only values it handles are database names/ids, migration file names and table names.
-// Usage: node portal-d1-check.mjs <config|info|pending-before|pending-after|tables-before|tables-after|indexes-after> [arg] < wrangler-output
-import { readFileSync } from "node:fs";
+// Usage: node portal-d1-check.mjs <config|info|pending-before|pending-after|tables-before|tables-after|indexes-after|bookmark> [arg] < wrangler-output
+import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
 
 // The migrations Production may receive, IN ORDER, with exactly the tables and indexes each one creates. A run is allowed only when the pending list is a tail of this
 // list (for example 0002, 0003, 0004 on a database that already has 0001), and the tables already in the database must equal what the already-applied migrations create.
@@ -50,6 +50,7 @@ export const STAGES = Object.freeze([
   { file: "0027_call_queue.sql", tables: [], indexes: ["idx_outreach_leads_call"] }, // three nullable columns on outreach_leads and one partial index (Call Queue); needs 0024. Applied to Staging; Production only through this workflow, after approval
   { file: "0028_website_analytics.sql", tables: ["website_analytics", "website_analytics_cache"], indexes: ["idx_website_analytics_cache_org"] }, // two tables for Website Analytics (which Cloudflare site and Search Console property to read; cached aggregates); needs 0011. Applied to Staging; Production only through this workflow, after approval
   { file: "0030_website_workspace.sql", tables: ["website_tasks", "website_updates"], indexes: ["idx_website_tasks_site", "idx_website_updates_site"] }, // one nullable column on websites (staging_url) and two tables for the Website review workspace; needs 0011. Applied to Staging; Production only through this workflow, after approval
+  { file: "0031_website_staging_screenshot.sql", tables: [], indexes: [] }, // six nullable staging_screenshot_* columns on websites (no table or index); needs 0011. Approved for Staging (applied through the Staging workflow); Production only through this workflow, after its own approval
 ]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",
@@ -147,6 +148,20 @@ export function checkIndexesAfter(text) {
   return "indexes ok: " + names.length;
 }
 
+/** `wrangler d1 time-travel info --json` output -> the current restore bookmark (read-only). Fails closed on anything that is not a plausible bookmark. */
+const BOOKMARK = /^[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{16,}$/;
+export function parseBookmark(text) {
+  const start = text.indexOf("{"), end = text.lastIndexOf("}");
+  let value;
+  if (start >= 0 && end > start) {
+    let info;
+    try { info = JSON.parse(text.slice(start, end + 1)); } catch { fail("time-travel info returned unreadable JSON"); }
+    value = info.bookmark;
+  } else value = (text.match(/\b[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{16,}\b/) ?? [])[0];
+  if (typeof value !== "string" || !BOOKMARK.test(value)) fail("no Time Travel bookmark was obtained; nothing may be applied");
+  return value;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [cmd, arg, arg2] = process.argv.slice(2);
   try {
@@ -159,6 +174,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       "tables-before": () => checkTablesBefore(input(), arg, pendingMigrations(readFileSync(arg2, "utf8"))),
       "tables-after": () => checkTablesAfter(input()),
       "indexes-after": () => checkIndexesAfter(input()),
+      bookmark: () => {
+        const b = parseBookmark(input());
+        writeFileSync(arg, b + "\n");
+        if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, "### Production D1 recovery bookmark (framework-portal)\n\n`" + b + "`\n\nRestore point recorded before any migration. Recovery (manual, owner-approved only): `wrangler d1 time-travel restore PORTAL_DB --bookmark=<value>` with the Production migration config.\n");
+        return "bookmark recorded: " + b;
+      },
     }[cmd];
     if (!out) fail("unknown check");
     console.log(out());

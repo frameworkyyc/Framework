@@ -7,7 +7,7 @@ import { pageHead, grid, span, card, kpi, pill, fact, facts, tabs, segmented, bu
 import { seoPanel } from "./website-seo.js";
 import { analyticsPanel } from "./website-analytics.js";
 import { workspacePanel } from "./website-workspace.js";
-import { STATUS, PHASE, STAGE_LABEL, ORIGIN, PARTY, errorText, orNull, select, text, date, filesCard, screenshotCard, milestonesCard, previewCard } from "./site-blocks.js";
+import { STATUS, PHASE, STAGE_LABEL, ORIGIN, PARTY, errorText, orNull, select, text, date, filesCard, shotPicture, shotEditor, milestonesCard, previewCard } from "./site-blocks.js";
 
 const enc = encodeURIComponent;
 const host = (u) => String(u || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
@@ -131,8 +131,8 @@ async function renderSite(id, tab, ctx) {
   const bctx = { base, data, canWrite, perform, say };
   const archived = Boolean(site.archivedAt);
 
-  /* ---- the two addresses: one card each, one Edit button each ---- */
-  function addressDrawer(kind) {
+  /* ---- the two environments: one card each (address and screenshot), one Edit button each that opens that environment's settings ---- */
+  function envDrawer(kind) {
     const prod = kind === "production";
     const input = text("addr-" + kind, prod ? site.url : s.stagingUrl, { maxlength: "300", inputmode: "url", spellcheck: "false", autocapitalize: "none", placeholder: prod ? "example.ca" : "https://staging.example.ca" });
     const msg = h("p", { class: "ds-hint", role: "status" });
@@ -144,14 +144,14 @@ async function renderSite(id, tab, ctx) {
       } catch (err) { msg.textContent = errorText(err); }
     } }, field("addr-" + kind, prod ? "Production address" : "Staging address", input, prod ? "The public website your customers see. Leave it empty only while the website is still being built." : "Where the client reviews changes before they go live. https only. Leave it empty if there is no Staging version yet."), msg,
       canWrite() ? h("div", { class: "ds-actions" }, button("Save address", { tone: "solid", type: "submit" })) : h("p", { class: "ds-hint", text: "Changes are switched off on this site." }));
-    const dr = drawer({ title: prod ? "Production address" : "Staging address", sub: site.name, body: form });
+    const dr = drawer({ title: prod ? "Production settings" : "Staging settings", sub: site.name, body: h("div", { class: "ds-envedit" }, form, shotEditor(site, kind, { base, data, canWrite, done: () => { dr.close(); ctx.retry(); } })) });
   }
   const envCard = (kind) => {
     const prod = kind === "production", url = prod ? site.url : s.stagingUrl, live = prod ? isLive(s) : Boolean(url);
     return card({ tone: prod ? "" : "ink", cls: "ds-env", title: prod ? "Production" : "Staging", sub: prod ? "What customers see" : "Where changes are reviewed",
       actions: pill(prod ? (live ? "Live" : "Not launched") : (live ? "Set up" : "Not set up"), prod ? (live ? "ok" : "quiet") : (live ? "info" : "quiet")),
-      body: [url ? h("a", { class: "ds-host", href: url, target: "_blank", rel: "noopener noreferrer" }, host(url), h("span", { class: "rk-sr", text: " (opens in a new tab)" })) : h("p", { class: "ds-host ds-host--none", text: prod ? "No address yet" : "No Staging address yet" })],
-      foot: [url ? button(prod ? "Open site" : "Open Staging", { icon: "external", href: url, external: true }) : null, canWrite() && !archived ? button(url ? "Edit address" : prod ? "Add address" : "Add Staging address", { icon: "edit", tone: url ? "" : "solid", onClick: () => addressDrawer(kind) }) : null] });
+      body: [url ? h("a", { class: "ds-host", href: url, target: "_blank", rel: "noopener noreferrer" }, host(url), h("span", { class: "rk-sr", text: " (opens in a new tab)" })) : h("p", { class: "ds-host ds-host--none", text: prod ? "No address yet" : "No Staging address yet" }), shotPicture(site, kind, base)],
+      foot: [url ? button(prod ? "Open site" : "Open Staging", { icon: "external", href: url, external: true }) : null, canWrite() && !archived ? button("Edit", { icon: "edit", tone: url ? "" : "solid", label: `Edit ${prod ? "Production" : "Staging"} settings`, onClick: () => envDrawer(kind) }) : null] });
   };
 
   const manage = canWrite() ? (archived
@@ -167,10 +167,9 @@ async function renderSite(id, tab, ctx) {
       span(kpi({ label: "Next renewal", value: r ? (r.days < 0 ? "Overdue" : r.days + "d") : "—", note: r ? r.label : "No renewal dates recorded", tone: r ? r.tone : null, href: `/admin/websites/${enc(id)}/domain` }), 3),
       span(kpi({ label: "SEO", value: s.seoStatus ? { not_started: "Not started", in_progress: "In progress", optimised: "Optimised", monitoring: "Monitoring" }[s.seoStatus] : "—", note: s.seoStatus ? "Status shown to the client when published" : "Not set up", href: `/admin/websites/${enc(id)}/seo` }), 3),
       span(kpi({ label: "Traffic and search", value: s.analytics.cloudflare || s.analytics.searchConsole ? "Connected" : "Not connected", note: [s.analytics.cloudflare ? "Cloudflare" : "", s.analytics.searchConsole ? "Search Console" : ""].filter(Boolean).join(" · ") || "Set up in the Analytics tab", tone: s.analytics.cloudflare || s.analytics.searchConsole ? "ok" : null, href: `/admin/websites/${enc(id)}/analytics` }), 3),
-      span(screenshotCard(site, bctx), 6),
       span(card({ title: "About this website", body: facts([fact("Where it stands", STAGE_LABEL[site.stage] || STATUS[site.status]), fact("Built by", ORIGIN[site.origin]), fact("Managed by Framework", site.managedByFramework ? "Yes" : "No"), fact("Launch date", site.launchDate ? fmtDate(site.launchDate + "T00:00:00Z", "long") : ""), fact("Shown to the client", site.published ? "Yes" : "Not yet")]),
         foot: button("Edit details", { icon: "edit", href: `/admin/websites/${enc(id)}/environments` }) }), 6),
-      manage ? span(card({ tone: "tone", title: "Manage", sub: archived ? "This website is archived and hidden from the lists." : "Archiving hides this website from the lists. Nothing is deleted, and you can restore it later.", foot: manage }), 12) : null);
+      manage ? span(card({ tone: "tone", title: "Manage", sub: archived ? "This website is archived and hidden from the lists." : "Archiving hides this website from the lists. Nothing is deleted, and you can restore it later.", foot: manage }), 6) : null);
   };
 
   const environments = () => {
@@ -206,7 +205,7 @@ async function renderSite(id, tab, ctx) {
   const review = () => wrapPanel("Review with the client", "Updates for the client to approve, and tasks for them. Shown in their Website section; drafts stay invisible until shown.", workspacePanel({ base, site, canWrite, say, hideStaging: true }));
   const seo = () => wrapPanel("SEO and search visibility", "What Framework publishes for the client about search.", seoPanel({ base, site, canWrite, say }));
   const analytics = () => wrapPanel("Analytics", "Which Cloudflare Web Analytics site and Search Console property this website reads.", analyticsPanel({ base, site, canWrite, say }));
-  const files = () => grid(span(filesCard(site, bctx), 6), span(screenshotCard(site, bctx), 6));
+  const files = () => grid(span(filesCard(site, bctx), 12));
   const milestones = () => grid(span(milestonesCard(site, bctx), 12));
   const BODY = { "": overview, environments, domain, review, seo, analytics, files, milestones };
   const body = (BODY[tab] || overview)();
