@@ -54,6 +54,49 @@ export async function deleteClient(org, { notify, after }) {
   return true;
 }
 
+/** Modal with the current name pre-filled. Resolves the trimmed new name on Save, or null on Cancel or when nothing changed. */
+export function renameDialog(name) {
+  return new Promise((resolve) => {
+    const input = h("input", { class: "input", id: "adm-rename-name", type: "text", value: name, maxlength: "120", autocomplete: "off", required: true, "aria-describedby": "adm-rename-help" });
+    const save = h("button", { class: "btn btn--primary", type: "submit", value: "save" }, "Save name");
+    input.addEventListener("input", () => { const v = input.value.trim(); save.disabled = !v || v === name; });
+    save.disabled = true;
+    const dialog = h("dialog", { class: "adm-dialog", "aria-labelledby": "adm-rename-title" },
+      h("form", { method: "dialog" },
+        h("h2", { id: "adm-rename-title", text: "Edit client name" }),
+        h("label", { class: "adm-delete__label", for: "adm-rename-name" }, "Client name"),
+        input,
+        h("p", { id: "adm-rename-help", class: "adm-delete__help" }, "Changes the name shown in Admin and the client portal. The portal address, people, permissions and history stay the same."),
+        h("div", { class: "adm-dialog__actions" },
+          h("button", { class: "btn btn--secondary", type: "submit", value: "cancel", formnovalidate: true }, "Cancel"),
+          save)));
+    dialog.addEventListener("close", () => {
+      const v = input.value.trim();
+      const ok = dialog.returnValue === "save" && v && v !== name;
+      dialog.remove();
+      resolve(ok ? v : null);
+    });
+    document.body.append(dialog);
+    dialog.showModal();
+    input.focus(); input.select();
+  });
+}
+
+/** Ask for a new display name, save it, then `after`. Only the name changes: id, portal address, people and records are untouched. */
+export async function renameClient(org, { notify, after }) {
+  const name = await renameDialog(org.name);
+  if (!name) return false;
+  try {
+    await api(orgPath(org.id, "rename"), { method: "POST", body: { name } });
+  } catch (e) {
+    notify(e && e.data && e.data.error === "invalid_name" ? "Enter the client’s name." : friendly(e));
+    return false;
+  }
+  notify(`Client name changed to ${name}.`);
+  after();
+  return true;
+}
+
 export async function restoreClient(org, { notify, after }) {
   try {
     await api(orgPath(org.id, "restore"), { method: "POST", body: {} });
@@ -73,7 +116,7 @@ const DOTS = () => { const svg = document.createElementNS("http://www.w3.org/200
 export function actionsMenu({ label, items }) {
   const menuId = "adm-menu-" + Math.random().toString(36).slice(2, 9);
   const button = h("button", { class: "adm-menubtn", type: "button", "aria-haspopup": "menu", "aria-expanded": "false", "aria-controls": menuId, "aria-label": label }, DOTS());
-  const buttons = items.map((it) => h("button", { class: "adm-menu__item" + (it.danger ? " adm-menu__item--danger" : ""), type: "button", role: "menuitem", tabindex: "-1", text: it.label, onclick: () => { close(true); it.run(); } }));
+  const buttons = items.map((it) => h("button", { class: "adm-menu__item" + (it.danger ? " adm-menu__item--danger" : "") + (it.separated ? " adm-menu__item--sep" : ""), type: "button", role: "menuitem", tabindex: "-1", text: it.label, onclick: () => { close(true); it.run(); } }));
   const menu = h("div", { class: "adm-menu", id: menuId, role: "menu", "aria-label": label, hidden: true }, buttons);
   const wrap = h("div", { class: "adm-menuwrap" }, button, menu);
   function close(refocus) {
