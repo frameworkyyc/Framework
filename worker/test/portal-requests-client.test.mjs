@@ -63,6 +63,7 @@ test("flag on: the full navigation (ten entries for an owner, Invoices only for 
   assert.deepEqual(navOf(await text(mia, "")), NAV_LABELS.filter((l) => l !== "Invoices"), "a member has no Invoices entry");
   assert.match(home, /<details class="primary__menu"><summary>Menu<\/summary>/);
   assert.equal([...home.matchAll(/<details class="primary__menu">[\s\S]*?<\/details>/g)][0][0].match(/<a /g).length, NAV_LABELS.length, "the menu lists every entry");
+  assert.match([...home.matchAll(/<details class="primary__menu">[\s\S]*?<\/details>/g)][0][0], /<li class="primary__out"><form method="post" action="\/portal\/logout" class="signout">/, "Sign out sits at the foot of the menu (the bar carries it on wide screens)");
   assert.match(home, /href="\/assets\/css\/portal-requests\.css"/);
   const cur = async (p) => /<ul class="primary__list">[\s\S]*?<a href="[^"]*" aria-current="page">([^<]+)<\/a>/.exec(await text(ann, p))[1];
   assert.equal(await cur(""), "Home"); assert.equal(await cur("/deliverables"), "Deliverables"); assert.equal(await cur("/seo"), "SEO"); assert.equal(await cur("/development"), "Custom Development");
