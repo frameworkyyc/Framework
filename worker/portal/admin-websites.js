@@ -13,6 +13,7 @@
  *   POST /clients/:org/websites/:id/milestones/:mid/update | delete | move   { ...fields } | {} | { direction: "up"|"down" }
  *   POST /clients/:org/websites/:id/screenshot        multipart: file (png, jpg or webp, up to 5 MB)   set or replace the screenshot
  *   POST /clients/:org/websites/:id/screenshot/remove removes the screenshot (the stored image is deleted at once)
+ *   GET | POST /clients/:org/websites/:id/screenshot/staging, POST .../screenshot/staging/remove   the same three for the Staging site's own picture (uploaded by hand; needs migration 0031)
  *   GET  /clients/:org/websites/:id/preview-check     what the portal's live-preview check sees for this website, from the Worker (verdict, redirect chain, framing headers; never cached)
  *   GET  /clients/:org/websites/:id/screenshot        the screenshot as an inline picture
  * "No website" is not stored: a client with no rows simply has none. A database without migration 0011 answers { available: false }: nothing else runs.
@@ -48,7 +49,7 @@ async function view(env, org) {
   return {
     available: true,
     organization: { id: org.id, name: org.name, slug: org.slug },
-    capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", storage: Boolean(env.PORTAL_FILES) },
+    capabilities: { writes: env.PORTAL_ADMIN_WRITES === "1", storage: Boolean(env.PORTAL_FILES), stagingScreenshots: await sites.stagingScreenshotAvailable(db) },
     limits: { maxWebsites: sites.MAX_WEBSITES, screenshotMaxBytes: wfiles.SCREENSHOT_MAX_BYTES, packageMaxBytes: wfiles.PACKAGE_MAX_BYTES },
     websites: await Promise.all((await sites.listWebsitesAdmin(db, org.id)).map(async (w) => {
       const milestones = await miles.listMilestonesAdmin(db, org.id, w.id);
@@ -67,6 +68,8 @@ export async function handleWebsitesApi(request, env, principal, path, deps = {}
   let route = null;
   if (rest.length === 0) route = request.method === "GET" ? { kind: "view", method: "GET" } : { kind: "create", method: "POST" };
   else if (rest.length === 2 && ["update", "archive", "restore"].includes(rest[1])) route = { kind: rest[1], method: "POST", target: rest[0] };
+  else if (rest.length === 3 && rest[1] === "screenshot" && rest[2] === "staging") route = request.method === "GET" ? { kind: "screenshot_view", method: "GET", target: rest[0], env: "staging" } : { kind: "screenshot_set", method: "POST", target: rest[0], env: "staging" };
+  else if (rest.length === 4 && rest[1] === "screenshot" && rest[2] === "staging" && rest[3] === "remove") route = { kind: "screenshot_remove", method: "POST", target: rest[0], env: "staging" };
   else if (rest.length === 2 && rest[1] === "screenshot") route = request.method === "GET" ? { kind: "screenshot_view", method: "GET", target: rest[0] } : { kind: "screenshot_set", method: "POST", target: rest[0] };
   else if (rest.length === 2 && rest[1] === "package") route = { kind: "package_set", method: "POST", target: rest[0] };
   else if (rest.length === 3 && rest[1] === "package" && ["publish", "remove"].includes(rest[2])) route = { kind: "package_" + rest[2], method: "POST", target: rest[0] };
@@ -145,11 +148,11 @@ export async function handleWebsitesApi(request, env, principal, path, deps = {}
     if (route.kind === "screenshot_set") {
       const read = await readUpload(request, { withMeta: false, max: MAX_UPLOAD });
       if (read.response) return read.response;
-      const r = await wfiles.adminSetScreenshot(svc, { organizationId: orgRow.id, websiteId: route.target, actor, file: read.file });
+      const r = await wfiles.adminSetScreenshot(svc, { organizationId: orgRow.id, websiteId: route.target, actor, file: read.file, env: route.env || "production" });
       return r.ok ? json({ ok: true, name: r.name }) : (r.error === "invalid_name" ? err(422, "invalid_name_file", "The change was not made.") : fromFailure(r));
     }
     if (route.kind === "screenshot_remove") {
-      const r = await wfiles.adminRemoveScreenshot(svc, { organizationId: orgRow.id, websiteId: route.target, actor });
+      const r = await wfiles.adminRemoveScreenshot(svc, { organizationId: orgRow.id, websiteId: route.target, actor, env: route.env || "production" });
       return r.ok ? json({ ok: true }) : fromFailure(r);
     }
     if (route.kind === "preview_check") {
@@ -181,7 +184,7 @@ export async function handleWebsitesApi(request, env, principal, path, deps = {}
       return r.ok ? json({ ok: true }) : fromFailure(r);
     }
     if (route.kind === "screenshot_view") {
-      const r = await wfiles.adminScreenshotResponse(svc, { organizationId: orgRow.id, websiteId: route.target });
+      const r = await wfiles.adminScreenshotResponse(svc, { organizationId: orgRow.id, websiteId: route.target, env: route.env || "production" });
       return r.ok ? r.response : fromFailure(r);
     }
     return null;

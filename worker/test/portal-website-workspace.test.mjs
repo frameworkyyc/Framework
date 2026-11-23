@@ -10,6 +10,8 @@ import { fakeR2 } from "./helpers/fake-r2.mjs";
 import * as sites from "../portal/repo/websites.js";
 import * as wk from "../portal/repo/website-workspace.js";
 import { PORTAL_CSP } from "../portal/http.js";
+import { readFileSync } from "node:fs";
+const read = (f) => readFileSync(new URL("../../" + f, import.meta.url), "utf8");
 
 const TEAM = "framework.cloudflareaccess.com", AUD = "a".repeat(64), ADMIN_ORIGIN = "https://staging.frameworkco.ca", ADMIN = "owner@frameworkco.ca";
 const pair = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -168,7 +170,7 @@ test("security: CSRF is required, another organization and master access can nev
   // master access previews the page but does not decide for the client
   const staff = s.w.browser(); await staff.signIn(s.w.user(9, "hello@frameworkco.ca"));
   const sp = await staff.get(`/portal/o/alpha/website/${id}`); const sh = await sp.text(); assert.equal(sp.status, 200);
-  assert.ok(!/updates\/[^"]+\/approve/.test(sh) && /Only the client’s account owner can approve or reject/.test(sh), "staff see the update but get no decision buttons");
+  assert.ok(!/updates\/[^"]+\/approve/.test(sh) && /Preview only: Framework staff can’t approve or reject/.test(sh) && /wd-btn--approve" type="button" disabled/.test(sh), "staff see the update and the buttons, disabled and labelled as preview only; no live form");
   const tok = /name="csrf" value="([^"]+)"/.exec(sh)[1];
   assert.equal((await staff.post(`/portal/o/alpha/website/${id}/updates/${uid}/approve`, { csrf: tok })).status, 403, "and the server refuses a forged one");
   assert.equal(rows(s.w, "SELECT status FROM website_updates WHERE id = ?", uid)[0].status, "awaiting_review");
@@ -251,4 +253,42 @@ test("the migration is additive and applied to Staging only: one column and two 
   const id = await s.site(s.A);
   assert.throws(() => s.w.db.raw.prepare("INSERT INTO website_updates (id, organization_id, website_id, title, kind, status, decided_at, decision_note) VALUES (?, ?, ?, 'x', 'approval', 'rejected', ?, NULL)").run(crypto.randomUUID(), s.A.id, id, "2026-01-01T00:00:00Z"), /constraint/i, "the database itself refuses a rejection without a reason");
   assert.throws(() => s.w.db.raw.prepare("INSERT INTO website_updates (id, organization_id, website_id, title) VALUES (?, ?, ?, 'x')").run(crypto.randomUUID(), s.B.id, id), /FOREIGN KEY|constraint/i, "and a row naming another organization's website");
+});
+
+test("approval workspace end to end: an authorized owner approves and rejects (feedback required), the pending count falls, the decision is kept in history and reaches Admin's activity feed; a member and master access never decide", async () => {
+  const s = await setup();
+  const id = await s.site(s.A);
+  const mk = async (title) => { const r = await s.call(s.ws(s.A, id, "/updates"), { method: "POST", json: { title, detail: "Details for " + title, environment: "staging", kind: "approval", published: true } }); assert.equal(r.status, 201); return r.json.id; };
+  const u1 = await mk("First change"), u2 = await mk("Second change"), u3 = await mk("Third change");
+  const count = async (b) => { const h = await text(await s.page(b, "alpha", id)); return { n: Number((/aria-label="(\d+) pending"/.exec(h) || [])[1] || 0), h }; };
+  const before = await count(s.ann); assert.equal(before.n, 3, "three pending items for the owner");
+  assert.equal((before.h.match(/<article class="wd-item"/g) || []).length, 3); assert.equal((before.h.match(/wd-btn--approve" type="submit"/g) || []).length, 3, "the owner has live Approve buttons");
+  // member: sees the items, no buttons, and the server refuses a forged post
+  const mem = await count(s.mia); assert.equal(mem.n, 3); assert.ok(!/wd-btn--approve|wd-btn--reject/.test(mem.h));
+  const tokM = /name="csrf" value="([^"]+)"/.exec(mem.h)[1];
+  assert.equal((await s.mia.post(`/portal/o/alpha/website/${id}/updates/${u1}/approve`, { csrf: tokM })).status, 403, "a member can't approve");
+  // master access (staff) sees disabled preview buttons, and the server refuses
+  const staff = s.w.browser(); await staff.signIn(s.w.user(9, "hello@frameworkco.ca"));
+  const sh = await text(await staff.get(`/portal/o/alpha/website/${id}`));
+  assert.equal((sh.match(/wd-btn--approve" type="button" disabled/g) || []).length, 3, "staff see the buttons, disabled"); assert.match(sh, /Preview only/);
+  assert.equal((await staff.post(`/portal/o/alpha/website/${id}/updates/${u1}/approve`, { csrf: /name="csrf" value="([^"]+)"/.exec(sh)[1] })).status, 403);
+  assert.equal(rows(s.w, "SELECT count(*) n FROM website_updates WHERE status = 'awaiting_review'")[0].n, 3, "nothing changed by member or staff");
+  // owner: approve
+  const ap = await s.post(s.ann, "alpha", `/website/${id}/updates/${u1}/approve`, {}, { id }); assert.ok([302, 303].includes(ap.status));
+  assert.equal(rows(s.w, "SELECT status FROM website_updates WHERE id = ?", u1)[0].status, "approved");
+  assert.equal((await count(s.ann)).n, 2, "the pending count falls");
+  // owner: reject needs feedback
+  const bad = await s.post(s.ann, "alpha", `/website/${id}/updates/${u2}/reject`, { note: "" }, { id }); assert.ok([302, 303, 422].includes(bad.status));
+  assert.equal(rows(s.w, "SELECT status FROM website_updates WHERE id = ?", u2)[0].status, "awaiting_review", "no feedback, no rejection");
+  const rj = await s.post(s.ann, "alpha", `/website/${id}/updates/${u2}/reject`, { note: "The hero is too dark on my phone." }, { id }); assert.ok([302, 303].includes(rj.status));
+  const r2 = rows(s.w, "SELECT status, decision_note FROM website_updates WHERE id = ?", u2)[0]; assert.deepEqual([r2.status, r2.decision_note], ["rejected", "The hero is too dark on my phone."]);
+  const after = await count(s.ann); assert.equal(after.n, 1); assert.ok(!/Second change<\/h3>/.test(after.h.slice(after.h.indexOf('id="needed"'), after.h.indexOf('id="updates"'))), "decided items leave the active queue");
+  const recent = after.h.slice(after.h.indexOf('id="updates"')); assert.ok(recent.includes("First change") && recent.includes("Second change") && /Approved/.test(recent) && /Rejected/.test(recent) && recent.includes("The hero is too dark on my phone."), "both decisions are kept in the history, with the feedback");
+  // Admin sees it
+  // Admin's feed (admin-activity.js) lists exactly these two actions with the labels "approved a website update" and "sent revision notes on a website update" (pinned in portal-admin-activity.test.mjs);
+  // here the rows it reads exist, each tied to its update and the organization, written by the client's decision (the test clock is older than the feed's 30-day window, so the rows are checked directly)
+  const ev = rows(s.w, "SELECT action, entity_id, organization_id, actor_type FROM activity_log WHERE action IN ('website.update.approved', 'website.update.rejected') ORDER BY created_at");
+  assert.deepEqual(ev.map((e) => [e.action, e.entity_id, e.organization_id, e.actor_type]), [["website.update.approved", u1, s.A.id, "client"], ["website.update.rejected", u2, s.A.id, "client"]], "Admin's activity feed reads these");
+  assert.match(read("worker/portal/admin-activity.js"), /"website\.update\.rejected": \{ label: "sent revision notes on a website update"/); assert.match(read("worker/portal/admin-activity.js"), /"website\.update\.approved": \{ label: "approved a website update"/);
+  assert.equal(rows(s.w, "SELECT count(*) n FROM activity_log WHERE action IN ('website.update.approved', 'website.update.rejected')")[0].n >= 2, true);
 });
