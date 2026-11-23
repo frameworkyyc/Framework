@@ -22,6 +22,7 @@ import { requestsNav, activeKey } from "./requests/nav.js";
 import { unifiedHome as requestsUnifiedHome } from "./requests/views.js";
 import { LIVE_AREAS } from "./guided-data.js";
 import { specimenSlots } from "./brand-type.js";
+import { envTag, switchLink } from "./env-switch.js";
 
 /** The one portal script: tidies website fields and warns about unsaved Business Profile changes, and moves keyboard focus to a form's error summary after a refused save. Loaded only where it has a job. */
 const FOCUS_SCRIPT = "/assets/js/portal-profile.js";
@@ -83,7 +84,7 @@ async function shell(ctx, a, { title, active, body, status = 200, vm, script = n
   const wide = requestsEnabled(ctx.env);
   const list = wide ? requestsNav(ctx.env, m.role) : [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
   const current = wide ? activeKey(String(ctx.url.pathname).slice(vm.base.length)) : active === "account" || active === "team" ? active : "home";
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}`, bleed, fx });
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), envTag: envTag(ctx.url.hostname), envLink: a.staff ? switchLink(ctx.url.hostname, "portal") : null, banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}`, bleed, fx });
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null, fx = false, share = null }) {
