@@ -186,11 +186,18 @@ export async function feedbackPage(ctx, a, o = {}) {
 }
 
 const BRANDING_SCRIPT = "/assets/js/portal-branding.js";
+const LOGO_UPLOAD_SCRIPT = "/assets/js/portal-logo-upload.js";
+const BRANDING_HUB_CSS = "/assets/css/portal-branding-hub.css";
+const BRANDING_VIEW_TITLE = { hub: "Branding", logos: "Logos", typography: "Typography", colours: "Brand Colours", kit: "Brand Kit", all: "Branding" };
 /** The Branding page: the five sections (always), the request controls and the Full Brand Kit request. `o`: see branding-live.js brandingOverview. */
 export async function brandingPage(ctx, a, brand, o = {}) {
   const vm = liveModel(ctx, a, {});
   const csrf = await csrfFor(ctx.cfg, a.session);
-  return shell(ctx, a, { title: "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, { ...o, csrf }), vm, script: brand.published ? BRANDING_SCRIPT : null, styles: Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [], ref: "branding" });
+  const view = o.view || "all";
+  const hubViews = view !== "all";
+  const fonts = Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [];
+  const script = view === "logos" ? LOGO_UPLOAD_SCRIPT : brand.published || view === "colours" ? BRANDING_SCRIPT : null;
+  return shell(ctx, a, { title: BRANDING_VIEW_TITLE[view] || "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, { ...o, csrf }), vm, status: o.status || 200, script, styles: [...(hubViews ? [BRANDING_HUB_CSS] : []), ...fonts], ref: "branding" });
 }
 /** The Brand Book PROTOTYPE (Staging only): the same published brand as the Branding page, as a deck of stacked cards. Read-only; see branding-book.js. */
 export async function brandingBookPage(ctx, a, brand, o = {}) {

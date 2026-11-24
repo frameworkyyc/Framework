@@ -56,7 +56,7 @@ async function setup() {
   };
   return { w, A, bucket, ann, mia, call, adminUpload, clientUpload };
 }
-const page = async (b, p = "") => (await b.get("/portal/o/alpha/branding" + p)).text();
+const page = async (b, p = "/all") => (await b.get("/portal/o/alpha/branding" + p)).text();
 
 test("Admin to client, end to end: nothing shows until published; publishing, unpublishing and deleting in Admin are reflected for the client immediately; downloads return the exact bytes", async () => {
   const { w, A, ann, mia, call, adminUpload } = await setup();

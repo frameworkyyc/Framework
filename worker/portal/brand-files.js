@@ -47,13 +47,16 @@ async function noteCleanupFailure(deps, organizationId, entityType, entityId) {
 /** deps: { db, bucket, env?, now? } */
 export const limitsFor = (deps) => limitsFromEnv(deps.env || {});
 
-export async function clientUploadFile(deps, { role, organizationId, userId, asStaff = false, category, fontRightsAck, file }) {
+export async function clientUploadFile(deps, { role, organizationId, userId, asStaff = false, category, fontRightsAck, file, logo = null }) {
   if (!can(role, "branding.upload")) return denied();
   const limits = limitsFor(deps);
   const usage = await brand.uploadUsage(deps.db, organizationId);
   if (usage.files >= limits.maxFiles) return fail("file_limit");
   const inspected = await inspectUpload({ bytes: file && file.bytes, originalName: file && file.name, profile: "brand_client", maxBytes: limits.maxFileBytes });
   if (!inspected.ok) return fail(inspected.error);
+  // The same bytes already uploaded: a retry after a lost response (or a second tap) saves nothing twice and reports the file that is already there.
+  const same = logo ? await brand.findUploadBySha(deps.db, organizationId, inspected.sha256) : null;
+  if (same) return ok({ id: same.id, name: inspected.name, size: inspected.size, duplicate: true });
   if (usage.bytes + inspected.size > limits.quotaBytes) return fail("quota_exceeded");
   const key = makeKey(organizationId, "brand-uploads");
   try {
@@ -67,6 +70,7 @@ export async function clientUploadFile(deps, { role, organizationId, userId, asS
     throw err;
   }
   if (!rec.ok) { await cleanup(deps, organizationId, key); return rec; }
+  if (logo) await brand.setUploadLogoDetails(deps.db, organizationId, rec.id, logo);
   return ok({ id: rec.id, name: inspected.name, size: inspected.size });
 }
 
@@ -89,11 +93,12 @@ async function stream(deps, { organizationId, row, actorType, actorRef, entityTy
 }
 
 /** Download of a client's own organization's upload. Held files are not downloadable by anyone until Admin releases them. */
-export async function clientDownloadUpload(deps, { role, organizationId, userId, uploadId }) {
+export async function clientDownloadUpload(deps, { role, organizationId, userId, uploadId, inline = false }) {
   if (!can(role, "branding.view")) return denied();
   const row = await brand.getDownloadableUpload(deps.db, organizationId, uploadId);
   if (!row) return fail("not_found");
-  return stream(deps, { organizationId, row, actorType: "client", actorRef: userId, entityType: "brand_upload" });
+  const asPicture = inline && row.category === "logo" && ["svg", "png", "webp", "jpg", "jpeg"].includes(row.format); // only the client's own logo pictures are ever shown inline (a thumbnail, not counted as a download); anything else is the ordinary attachment
+  return stream(deps, { organizationId, row, actorType: "client", actorRef: userId, entityType: "brand_upload", inline: asPicture, record: !asPicture });
 }
 
 /** Download of a published deliverable. Not published (asset or kit), deleted, another organization's, or an unlicensed font: all the same "not_found". */

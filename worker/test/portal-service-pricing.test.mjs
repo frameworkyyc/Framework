@@ -36,7 +36,7 @@ async function setup({ migrated = true } = {}) {
   const ann = w.browser(), mia = w.browser(), bob = w.browser();
   await ann.signIn(w.user(1, "ann@alpha.test")); await mia.signIn(w.user(2, "mia@alpha.test")); await bob.signIn(w.user(3, "bob@beta.test"));
   if (!migrated) w.db.raw.exec("DROP TABLE service_prices; ALTER TABLE service_requests DROP COLUMN price_snapshot"); // a database as it is before migration 0010 (every test world starts fully migrated)
-  const csrf = async (b, slug) => csrfOf(await (await b.get(base(slug))).text());
+  const csrf = async (b, slug) => csrfOf(await (await b.get(base(slug) + "/all")).text());
   const send = async (b, slug, fields = {}) => b.post(`${base(slug)}/request`, { csrf: await csrf(b, slug), ...fields });
   const admin = async (path, { method = "GET", json, headers = {} } = {}) => {
     const h = { Origin: ORIGIN, "Cf-Access-Jwt-Assertion": sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, exp: nowS() + 600, iat: nowS() }), ...(method !== "GET" ? { "X-Framework-Admin": "1", "Content-Type": "application/json" } : {}), ...headers };
@@ -168,7 +168,7 @@ test("Admin API guards: writes need PORTAL_ADMIN_WRITES and the admin header; re
 test("client Branding with nothing added: every section offers its design service with a quiet price beside the request button, never in a heading, and always the free upload", async () => {
   const s = await setup();
   await s.publish(s.alpha);
-  const html = await (await s.ann.get(base("alpha"))).text();
+  const html = await (await s.ann.get(base("alpha") + "/all")).text();
   const esc = (t) => t.replace(/[$.]/g, "\\$&");
   const price = (key) => `Starting at ${new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(PRICES[key])} CAD`;
   const logo = sectionHtml(html, "logo");
@@ -191,7 +191,7 @@ test("client Branding with nothing added: every section offers its design servic
 test("completed branding gets no pricing prompt: a section with the client's content, or a logo variation they have, shows no offer", async () => {
   const s = await setup();
   await s.publish(s.alpha, { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }], typography: [{ role: "heading", slot: "primary", family: "Inter", weights: [400], styles: ["normal"], usage: "", source_url: "https://example.com", file_ids: [] }], sections: { tagline: { primary: "Clear thinking.", alternates: [], guidelines: "" } } });
-  const html = await (await s.ann.get(base("alpha"))).text();
+  const html = await (await s.ann.get(base("alpha") + "/all")).text();
   for (const sec of ["colours", "typography", "tagline"]) assert.ok(!/bk-offer/.test(sectionHtml(html, sec)) && /<span class="bk-done">/.test(sectionHtml(html, sec)), sec + " is done: a checkmark and Complete, and no offer");
   assert.match(sectionHtml(html, "imagery"), /bk-offer/, "an empty section still offers it");
   assert.match(html.slice(html.indexOf('class="brand-kit"')), /bk-kitprice__price/, "the complete kit is still offered while sections are missing");
@@ -202,13 +202,13 @@ test("prices follow Admin: a changed price, Custom Quote and Included show at on
   await s.publish(s.alpha); await s.publish(s.beta);
   assert.equal((await s.setPrices([{ key: "layout", type: "starting_at", priceCad: 425 }, { key: "textures", type: "custom_quote" }, { key: "iconography", type: "included" }])).status, 200);
   for (const [b, slug] of [[s.ann, "alpha"], [s.bob, "beta"]]) {
-    const html = await (await b.get(base(slug))).text();
+    const html = await (await b.get(base(slug) + "/all")).text();
     assert.match(sectionHtml(html, "layout"), /bk-offer__price">Starting at \$425 CAD</); assert.match(sectionHtml(html, "textures"), /bk-offer__price">Custom quote</); assert.match(sectionHtml(html, "iconography"), /bk-offer__price">Included</);
     assert.match(sectionHtml(html, "imagery"), /Starting at \$300 CAD/, "global: both clients see the same");
   }
   const bare = await setup({ migrated: false });
   await bare.publish(bare.alpha);
-  const html = await (await bare.ann.get(base("alpha"))).text();
+  const html = await (await bare.ann.get(base("alpha") + "/all")).text();
   assert.ok(!/Starting at|bk-offer__price|bk-offer__estimate|bk-kitprice/.test(html), "without the table: no price and no estimate wording anywhere");
   assert.match(sectionHtml(html, "colours"), /<summary class="btn btn--primary">Request Design<span/, "the offer and its request button remain, without a price");
   assert.match(sectionHtml(html, "colours"), /Already have your brand colours\? <a [^>]*>Upload them for free<\/a>/);
@@ -218,12 +218,12 @@ test("requesting a priced service records the service and the price shown, takes
   const s = await setup();
   await s.publish(s.alpha);
   const res = await s.send(s.ann, "alpha", { section: "brand-svc-logo-secondary", note: "Horizontal please.", price: "1", price_snapshot: '{"label":"Free"}' });
-  assert.equal(res.status, 303); assert.equal(res.headers.get("Location"), `${base("alpha")}?requested=1`);
+  assert.equal(res.status, 303); assert.equal(res.headers.get("Location").replace(/\/(logos|typography|colours|brand-kit)\?/, "?"), `${base("alpha")}?requested=1`);
   const r = rowsOf(s.w, "SELECT organization_id, service_key, status, note, price_snapshot FROM service_requests");
   assert.equal(r.length, 1); assert.deepEqual([r[0].organization_id, r[0].service_key, r[0].status, r[0].note], [s.alpha.id, "brand-svc-logo-secondary", "new", "Horizontal please."]);
   assert.deepEqual(JSON.parse(r[0].price_snapshot), { service: "logo-secondary", name: "Secondary Logo", type: "starting_at", priceCad: 150, label: "Starting at $150 CAD" }, "the server's price, not anything from the form");
   assert.equal(rowsOf(s.w, "SELECT count(*) n FROM activity_log WHERE action = 'service.requested' AND organization_id = ?", s.alpha.id)[0].n, 1);
-  const html = await (await s.ann.get(res.headers.get("Location"))).text();
+  const html = await (await s.ann.get(res.headers.get("Location").replace("/logos?", "/all?"))).text();
   assert.match(sectionHtml(html, "logo"), /class="tag">Requested</, "the page shows the request's status");
   const view = await s.admin(`/clients/${s.alpha.id}/branding`);
   const req = view.json.requests.find((x) => x.serviceKey === "brand-svc-logo-secondary");
@@ -231,9 +231,9 @@ test("requesting a priced service records the service and the price shown, takes
   await s.setPrices([{ key: "logo-secondary", type: "starting_at", priceCad: 999 }]);
   assert.match(rowsOf(s.w, "SELECT price_snapshot FROM service_requests")[0].price_snapshot, /Starting at \$150 CAD/, "a later price change never rewrites what was shown");
   const dup = await s.send(s.ann, "alpha", { section: "brand-svc-logo-secondary" });
-  assert.equal(dup.headers.get("Location"), `${base("alpha")}?requested=0`); assert.equal(rowsOf(s.w, "SELECT count(*) n FROM service_requests")[0].n, 1, "no duplicate while one is open");
+  assert.equal(dup.headers.get("Location").replace(/\/(logos|typography|colours|brand-kit)\?/, "?"), `${base("alpha")}?requested=0`); assert.equal(rowsOf(s.w, "SELECT count(*) n FROM service_requests")[0].n, 1, "no duplicate while one is open");
   const kit = await s.send(s.ann, "alpha", { section: "brand-full-kit" });
-  assert.equal(kit.headers.get("Location"), `${base("alpha")}?requested=1`);
+  assert.equal(kit.headers.get("Location").replace(/\/(logos|typography|colours|brand-kit)\?/, "?"), `${base("alpha")}?requested=1`);
   assert.equal(JSON.parse(rowsOf(s.w, "SELECT price_snapshot FROM service_requests WHERE service_key = 'brand-full-kit'")[0].price_snapshot).label, "Starting at $2,500 CAD");
   await s.send(s.ann, "alpha", { section: "brand-colours" });
   assert.equal(rowsOf(s.w, "SELECT price_snapshot FROM service_requests WHERE service_key = 'brand-colours'")[0].price_snapshot, null, "a request that was shown no price records none");
@@ -252,8 +252,8 @@ test("request safety: members cannot request, unknown services are refused, anot
   await s.send(s.ann, "alpha", { section: "brand-svc-typography" });
   const bobHtml = await (await s.bob.get(base("beta"))).text();
   assert.ok(!/class="tag">Requested</.test(sectionHtml(bobHtml, "typography")), "another organization sees no trace of it");
-  assert.equal((await s.bob.get(base("alpha"))).status >= 400 || !/Alpha Co/.test(await (await s.bob.get(base("alpha"))).text()), true);
-  const mia = await (await s.mia.get(base("alpha"))).text();
+  assert.equal((await s.bob.get(base("alpha") + "/all")).status >= 400 || !/Alpha Co/.test(await (await s.bob.get(base("alpha") + "/all")).text()), true);
+  const mia = await (await s.mia.get(base("alpha") + "/all")).text();
   assert.match(sectionHtml(mia, "typography"), /Requested/, "members see the status");
   assert.match(sectionHtml(mia, "imagery"), /Ask an owner of your organization to send a request/, "and are told an owner sends requests");
   assert.equal((await s.ann.get(`${base("alpha")}/uploads`)).status, 200, "the upload area is untouched and free");
