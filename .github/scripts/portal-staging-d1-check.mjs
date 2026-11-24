@@ -86,12 +86,16 @@ export function checkTablesAfter(afterText, beforeText, applied = []) {
   return "tables ok: " + userTables(afterText).length + (declared.length ? ` (new: ${declared.join(", ")})` : " (unchanged)");
 }
 /** Column expectations per migration (only for migrations that add columns): after it is applied, the new columns exist and the older ones are still there. */
-const COLUMN_EXPECTATIONS = Object.freeze({ "0031_website_staging_screenshot.sql": [...STAGING.newColumns, ...STAGING.keptColumns] });
+const COLUMN_EXPECTATIONS = Object.freeze({
+  "0031_website_staging_screenshot.sql": [...STAGING.newColumns, ...STAGING.keptColumns],
+  // 0032 adds three nullable logo_* columns to brand_uploads; the columns that hold a client's files must still be there (listed as brand_uploads.<column> by the columns query).
+  "0032_brand_upload_logo_details.sql": ["brand_uploads.logo_type", "brand_uploads.logo_colour", "brand_uploads.logo_background", "brand_uploads.original_name", "brand_uploads.sha256", "brand_uploads.storage_key"],
+});
 export function checkColumnsAfter(text, applied = ["0031_website_staging_screenshot.sql"]) {
   const want = applied.flatMap((f) => COLUMN_EXPECTATIONS[f] || []);
   if (!want.length) return "no column expectations for the applied migrations";
   const have = namesFromExecute(text), missing = want.filter((c) => !have.includes(c));
-  if (missing.length) fail("websites is missing columns: " + missing.join(", "));
+  if (missing.length) fail("missing columns: " + missing.join(", "));
   return "columns ok: " + want.length;
 }
 

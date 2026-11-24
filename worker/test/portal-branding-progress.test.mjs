@@ -45,7 +45,7 @@ async function setup() {
   let seq = 0;
   const section = async (key, published = true) => assert.equal((await upload({ kind: "other", title: key + seq, section: key, published }, `${key}${seq}.png`, S.png(10 + ++seq, 10))).status, 201);
   const publish = async (kit = {}) => { assert.ok((await brand.saveBrandKit(w.db, A.id, kit, ADMIN)).ok); assert.ok((await brand.setBrandKitStatus(w.db, A.id, "published", ADMIN)).ok); };
-  const page = async () => (await ann.get(base)).text();
+  const page = async () => (await ann.get(base + "/all")).text();
   return { w, A, ann, call, upload, logo, section, publish, page };
 }
 /** The navigation entries: { key: { mark: "1/4" | "check" | "", sr: visually-hidden text } }. */
@@ -241,7 +241,7 @@ test("existing requests, prices and snapshots are preserved: an open whole-secti
   assert.match(bodyOf(html, "typography"), /Starting at \$250 CAD/, "the price is still shown with the offer");
   const logo = bodyOf(html, "logo");
   assert.match(logo, /class="tag">Requested</); assert.ok(!/<summary class="btn btn--primary">Request Design/.test(logo), "an open logos request covers the section");
-  assert.equal(await (async () => { const r = await s.ann.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-svc-tagline", note: "Please" }); return r.headers.get("Location"); })(), `${base}?requested=1`);
+  assert.equal(await (async () => { const r = await s.ann.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-svc-tagline", note: "Please" }); return r.headers.get("Location").replace(/\/(logos|typography|colours|brand-kit)\?/, "?"); })(), `${base}?requested=1`);
   const row = s.w.db.raw.prepare("SELECT service_key, price_snapshot FROM service_requests WHERE service_key = 'brand-svc-tagline'").get();
   assert.equal(JSON.parse(row.price_snapshot).label, "Starting at $250 CAD");
   html = await s.page();
@@ -265,7 +265,7 @@ test("dependencies are minimal and never block: only genuine necessities are lis
   await s.publish();
   const csrf = csrfOf(await s.page());
   for (const section of ["business-card-design", "email-signature-design", "brand-svc-iconography", "brand-svc-style", "brand-svc-textures", "brand-svc-logo-submark", "brand-full-kit"]) {
-    assert.equal((await s.ann.post(`${base}/request`, { csrf, section })).headers.get("Location"), `${base}?requested=1`, section + " is accepted with nothing complete and every dependency missing");
+    assert.equal((await s.ann.post(`${base}/request`, { csrf, section })).headers.get("Location").replace(/\/(logos|typography|colours|brand-kit)\?/, "?"), `${base}?requested=1`, section + " is accepted with nothing complete and every dependency missing");
   }
   const html = await s.page();
   assert.ok(KEYS.every((k) => nav(html)[k].mark === ""), "and none of it completes a section");

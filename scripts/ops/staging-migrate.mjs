@@ -21,7 +21,7 @@ export const WRANGLER_VERSION = "4.147.0";
 export const CONFIG = "migrations/portal/wrangler.migrate.staging.jsonc";
 const FINGERPRINT_SQL = "SELECT count(*) AS websites, count(screenshot_key) AS with_screenshot, COALESCE(sum(screenshot_size), 0) AS bytes, COALESCE(group_concat(screenshot_sha256, ','), '') AS hashes FROM (SELECT screenshot_key, screenshot_size, screenshot_sha256 FROM websites ORDER BY id)";
 const TABLES_SQL = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name";
-const COLUMNS_SQL = "SELECT name FROM pragma_table_info('websites') ORDER BY name";
+const COLUMNS_SQL = "SELECT name FROM pragma_table_info('websites') UNION ALL SELECT 'brand_uploads.' || name FROM pragma_table_info('brand_uploads') ORDER BY 1";
 
 /** Runs the whole sequence. `wr(args)` runs Wrangler with the Staging config and returns stdout; `read(path)` reads a repository file. Returns { ok, lines, bookmark?, applied? }. */
 export async function run({ mode, wr, read = (p) => readFileSync(join(ROOT, p), "utf8") }) {

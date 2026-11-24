@@ -101,7 +101,7 @@ test("edge to edge: only the Brand Book page leaves the portal's centred contain
 
 test("the existing Branding page is unchanged and does not carry the deck", async () => {
   const s = await setup();
-  const page = await (await s.ann.get(`/portal/o/alpha/branding`)).text();
+  const page = await (await s.ann.get(`/portal/o/alpha/branding/all`)).text();
   assert.ok(!/bb-card|brand-book/.test(page)); assert.match(page, /id="logo"/); assert.match(page, /bk-nav/);
 });
 
@@ -148,7 +148,7 @@ test("master access: directory, client, Branding page, the Preview Brand Book bu
   const s = await staffSetup();
   const dir = await (await s.hello.get("/portal")).text(); assert.match(dir, /Client portals/); assert.match(dir, /href="\/portal\/o\/alpha"/);
   const home = await s.hello.get("/portal/o/alpha"); assert.equal(home.status, 200); assert.match(await home.text(), /Framework master access/);
-  const page = await (await s.hello.get("/portal/o/alpha/branding")).text();
+  const page = await (await s.hello.get("/portal/o/alpha/branding/all")).text();
   assert.ok(page.includes(BOOK_LINK), "the button is on the regular Branding page, pointing at the SAME organization's book");
   assert.equal([...page.matchAll(/Preview Brand Book/g)].length, 1);
   const href = /href="([^"]*)">Preview Brand Book/.exec(page)[1];
@@ -163,10 +163,10 @@ test("master access: directory, client, Branding page, the Preview Brand Book bu
 test("master access: previewing as Owner or Member keeps the button and the book (the role only chooses what is shown)", async () => {
   const s = await staffSetup();
   for (const role of ["member", "owner"]) {
-    const csrf = csrfOf(await (await s.hello.get("/portal/o/alpha/branding")).text());
+    const csrf = csrfOf(await (await s.hello.get("/portal/o/alpha/branding/all")).text());
     const sw = await s.hello.post("/portal/staff/view-as", { csrf, role, next: "/portal/o/alpha/branding" });
     assert.ok([302, 303].includes(sw.status), "view-as " + role);
-    const page = await (await s.hello.get("/portal/o/alpha/branding")).text();
+    const page = await (await s.hello.get("/portal/o/alpha/branding/all")).text();
     assert.ok(page.includes(BOOK_LINK), "button as " + role);
     assert.equal((await s.hello.get(BOOK("alpha"))).status, 200, "book as " + role);
   }
@@ -174,20 +174,20 @@ test("master access: previewing as Owner or Member keeps the button and the book
 
 test("master access: only Framework master access sees the button; clients, strangers and revoked or unbound people get nothing new", async () => {
   const s = await staffSetup();
-  assert.ok(!(await (await s.ann.get("/portal/o/alpha/branding")).text()).includes("Preview Brand Book"), "a client member does not see the prototype button");
+  assert.ok(!(await (await s.ann.get("/portal/o/alpha/branding/all")).text()).includes("Preview Brand Book"), "a client member does not see the prototype button");
   assert.equal((await s.ann.get(BOOK("alpha"))).status, 200, "(a member can still open their own prototype by address, as before)");
   const stranger = s.w.browser(); await stranger.signIn(s.w.user(8, "stranger@example.test"));
   assert.equal((await stranger.get(BOOK("alpha"))).status, 404, "no grant, no membership: the same 404 as for any organization page");
   assert.equal((await stranger.get(BOOK("alpha") + ".css")).status, 404);
   assert.ok((await revokeStaff(s.w.db, STAFF, "admin@framework.test")).ok);
   assert.equal((await s.hello.get(BOOK("alpha"))).status, 404, "a revoked grant loses it on the very next request (the guard re-reads it every time)");
-  assert.ok(!(await (await s.hello.get("/portal/o/alpha/branding")).text()).includes("Preview Brand Book"));
+  assert.ok(!(await (await s.hello.get("/portal/o/alpha/branding/all")).text()).includes("Preview Brand Book"));
 });
 
 test("master access: where the prototype is off (Production), there is no button and no route, even for master access", async () => {
   const s = await staffSetup({ demo: false });
-  assert.equal((await s.hello.get("/portal/o/alpha/branding")).status, 200);
-  assert.ok(!(await (await s.hello.get("/portal/o/alpha/branding")).text()).includes("Preview Brand Book"));
+  assert.equal((await s.hello.get("/portal/o/alpha/branding/all")).status, 200);
+  assert.ok(!(await (await s.hello.get("/portal/o/alpha/branding/all")).text()).includes("Preview Brand Book"));
   assert.equal((await s.hello.get(BOOK("alpha"))).status, 404);
 });
 

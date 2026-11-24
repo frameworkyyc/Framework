@@ -79,7 +79,7 @@ test("the four Framework example images are static public assets: real 16:9 PNGs
   // not client data: nothing in the data layer, the file service or the backup refers to the example directory, and no migration or row holds them
   for (const f of ["worker/portal/repo/brand.js", "worker/portal/brand-files.js", "worker/portal/files/storage.js", "worker/portal/file-backup.js", "worker/portal/backup-purge.js", "worker/portal/admin-branding.js"]) assert.ok(!/logo-examples/.test(read(f)), f + " does not know the examples");
   const s = await setup();
-  await s.ann.get(base);
+  await s.ann.get(base + "/all");
   assert.equal(s.w.db.raw.prepare("SELECT count(*) n FROM brand_assets").get().n, 0, "showing the examples creates no asset record");
   assert.equal([...s.w.env.PORTAL_FILES.store.keys()].length, 0, "and nothing in the private bucket");
   assert.deepEqual((await s.call(`/clients/${s.A.id}/branding`)).json.assets, [], "the Admin inventory never lists them");
@@ -88,7 +88,7 @@ test("the four Framework example images are static public assets: real 16:9 PNGs
 test("with nothing published every client sees the four Framework examples, labelled 'Example: Framework' with the status 'Not added yet', in a fixed order and one frame, with no download", async () => {
   const { ann, mia, bob } = await setup();
   for (const b of [ann, mia]) {
-    const html = await (await b.get(base)).text();
+    const html = await (await b.get(base + "/all")).text();
     const c = cards(html);
     assert.deepEqual(c.map((x) => x.title), ["Primary Logo", "Secondary Logo", "Simplified Logo", "Sub-mark"]);
     assert.deepEqual([...sectionHtml(html, "logo").matchAll(/class="lv-card__no" aria-hidden="true">(\d\d)</g)].map((m) => m[1]), ["01", "02", "03", "04"]);
@@ -103,7 +103,7 @@ test("with nothing published every client sees the four Framework examples, labe
     assert.match(html, /Cards labelled “Example: Framework” show Framework’s own logo to illustrate that variation\. They are not your logos and are not available to download\./);
     assert.match(html, /<h2 class="bk-sec__title" id="h-logo"><span class="visually-hidden">01 <\/span>Logo <span class="bk-req bk-req--required">/);
   }
-  assert.deepEqual(cards(await (await bob.get("/portal/o/beta/branding")).text()).map((x) => x.title), ["Primary Logo", "Secondary Logo", "Simplified Logo", "Sub-mark"]);
+  assert.deepEqual(cards(await (await bob.get("/portal/o/beta/branding/all")).text()).map((x) => x.title), ["Primary Logo", "Secondary Logo", "Simplified Logo", "Sub-mark"]);
 });
 
 test("Admin assigns each file with 'Logo type': every type lands on its own card and replaces only that placeholder; the rest stay examples until their files are added", async () => {
@@ -115,16 +115,16 @@ test("Admin assigns each file with 'Logo type': every type lands on its own card
     const up = await s.upload(s.A, s.logo(role, { orientation: role === "secondary" ? "horizontal" : "square" }), `${role}.png`, S.png(20, 20));
     assert.equal(up.status, 201, JSON.stringify(up.json));
     filled.add(title);
-    const html = await (await s.ann.get(base)).text();
+    const html = await (await s.ann.get(base + "/all")).text();
     const c = cards(html);
     assert.deepEqual(c.map((x) => [x.title, x.has]), order.map(([, t]) => [t, filled.has(t)]), `after adding ${role}`);
     const card = c.find((x) => x.title === title);
     assert.match(card.html, /<img src="[^"]*\/branding\/files\/[0-9a-f-]{36}\?preview=1" alt="/);
-    assert.equal([...sectionHtml(await (await s.ann.get(base)).text(), "logo").matchAll(/logo-examples\/framework-/g)].length, 4 - filled.size, "only the other examples remain"); assert.match(card.html, /<span class="tag">Available<\/span>/); assert.match(card.html, /Download PNG/);
+    assert.equal([...sectionHtml(await (await s.ann.get(base + "/all")).text(), "logo").matchAll(/logo-examples\/framework-/g)].length, 4 - filled.size, "only the other examples remain"); assert.match(card.html, /<span class="tag">Available<\/span>/); assert.match(card.html, /Download PNG/);
     assert.ok(!/Example: Framework|logo-examples/.test(card.html), "the Framework example is gone from a real logo");
   }
-  assert.deepEqual(cards(await (await s.ann.get(base)).text()).map((x) => x.has), [true, true, true, true]);
-  assert.ok(!/Example: Framework|logo-examples/.test(sectionHtml(await (await s.ann.get(base)).text(), "logo")), "no example text or image once all four are real");
+  assert.deepEqual(cards(await (await s.ann.get(base + "/all")).text()).map((x) => x.has), [true, true, true, true]);
+  assert.ok(!/Example: Framework|logo-examples/.test(sectionHtml(await (await s.ann.get(base + "/all")).text(), "logo")), "no example text or image once all four are real");
 });
 
 test("Secondary needs no migration: it is stored as an unset logo_role with a 'secondary-' variant key, shown to Admin as Secondary, named Secondary, and a bad type is refused", async () => {
@@ -138,7 +138,7 @@ test("Secondary needs no migration: it is stored as an unset logo_role with a 's
   assert.throws(() => s.w.db.raw.prepare("INSERT INTO brand_assets (id, organization_id, kind, title, logo_role, format, content_type, size_bytes, sha256, storage_key, original_name, created_by) VALUES (?, ?, 'logo', 't', 'secondary', 'png', 'image/png', 1, ?, ?, 'x.png', 'a')").run(crypto.randomUUID(), s.A.id, "a".repeat(64), "org/" + "a".repeat(40)), "the database CHECK still allows only the three older values, which is why no migration is needed");
   const bad = await s.upload(s.A, s.logo("tertiary"), "x.png", S.png());
   assert.deepEqual([bad.status, bad.json.error], [422, "invalid_logo_role"]);
-  assert.deepEqual(readdirSync(new URL("../../migrations/portal/", import.meta.url)).filter((f) => f.endsWith(".sql")).sort(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql", "0010_service_pricing.sql", "0011_websites.sql", "0012_website_management.sql", "0013_staff_access.sql", "0014_brand_requirements.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql", "0018_discovery.sql", "0020_requests.sql", "0021_demo_traffic.sql", "0022_seo_keywords.sql", "0023_client_service_links.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql", "0027_call_queue.sql", "0028_website_analytics.sql", "0030_website_workspace.sql", "0031_website_staging_screenshot.sql"], "no new migration");
+  assert.deepEqual(readdirSync(new URL("../../migrations/portal/", import.meta.url)).filter((f) => f.endsWith(".sql")).sort(), ["0001_portal_foundation.sql", "0002_business_profile.sql", "0003_portal_feedback.sql", "0004_invitation_delivery.sql", "0005_branding.sql", "0006_brand_name.sql", "0007_client_services.sql", "0008_approved_emails.sql", "0009_brand_sections.sql", "0010_service_pricing.sql", "0011_websites.sql", "0012_website_management.sql", "0013_staff_access.sql", "0014_brand_requirements.sql", "0015_website_status_seo.sql", "0016_service_catalogue.sql", "0017_service_client_settings.sql", "0018_discovery.sql", "0020_requests.sql", "0021_demo_traffic.sql", "0022_seo_keywords.sql", "0023_client_service_links.sql", "0024_leads.sql", "0025_seo_leads.sql", "0026_outreach_tracking.sql", "0027_call_queue.sql", "0028_website_analytics.sql", "0030_website_workspace.sql", "0031_website_staging_screenshot.sql", "0032_brand_upload_logo_details.sql"], "no new migration");
 });
 
 test("several formats in one variation: every format downloads, the preview uses an image format, and a PDF-only variation shows a plain tile with its download", async () => {
@@ -147,7 +147,7 @@ test("several formats in one variation: every format downloads, the preview uses
   const ids = {};
   for (const [name, bytes] of [["p.pdf", S.pdf()], ["p.eps", S.eps()], ["p.png", S.png(30, 30)], ["p.svg", S.svg()]]) { const r = await s.upload(s.A, s.logo("primary"), name, bytes); assert.equal(r.status, 201, JSON.stringify(r.json)); ids[name] = r.json.id; }
   const pdfOnly = await s.upload(s.A, s.logo("simplified"), "s.pdf", S.pdf()); assert.equal(pdfOnly.status, 201);
-  const c = cards(await (await s.ann.get(base)).text());
+  const c = cards(await (await s.ann.get(base + "/all")).text());
   const primary = c[0].html, simplified = c[2].html;
   assert.deepEqual([...primary.matchAll(/Download ([A-Z]+)</g)].map((m) => m[1]), ["SVG", "PNG", "EPS", "PDF"], "SVG and PNG first, then the other formats, all on ONE card");
   assert.equal([...c.map((x) => x.title)].length, 4, "formats never add cards");
@@ -167,7 +167,7 @@ test("more than one version of a variation (for example light and dark): the car
   await s.upload(s.A, s.logo("primary", { tone: "dark" }), "dark.png", S.png(10, 10));
   await s.upload(s.A, s.logo("primary", { tone: "light" }), "light.png", S.png(11, 11));
   await s.upload(s.A, s.logo("primary", { tone: "light" }), "light.svg", S.svg());
-  const primary = cards(await (await s.ann.get(base)).text())[0].html;
+  const primary = cards(await (await s.ann.get(base + "/all")).text())[0].html;
   assert.match(primary, /<summary>All versions \(2\)<\/summary>/);
   assert.match(primary, /2 versions/);
   assert.equal([...primary.matchAll(/For light backgrounds/g)].length >= 1 && [...primary.matchAll(/For dark backgrounds/g)].length >= 1, true);
@@ -178,13 +178,13 @@ test("more than one version of a variation (for example light and dark): the car
 test("only published files count: a draft file, an unpublished kit and an archived file leave the example in place", async () => {
   const s = await setup();
   await s.upload(s.A, s.logo("primary", { published: false }), "draft.png", S.png());
-  assert.ok(cards(await (await s.ann.get(base)).text()).every((x) => !x.has), "kit not published: all examples");
+  assert.ok(cards(await (await s.ann.get(base + "/all")).text()).every((x) => !x.has), "kit not published: all examples");
   await s.publishKit(s.A);
-  assert.ok(cards(await (await s.ann.get(base)).text()).every((x) => !x.has), "a draft file is not shown");
+  assert.ok(cards(await (await s.ann.get(base + "/all")).text()).every((x) => !x.has), "a draft file is not shown");
   const pub = await s.upload(s.A, s.logo("simplified"), "s.png", S.png());
-  assert.deepEqual(cards(await (await s.ann.get(base)).text()).map((x) => x.has), [false, false, true, false]);
+  assert.deepEqual(cards(await (await s.ann.get(base + "/all")).text()).map((x) => x.has), [false, false, true, false]);
   await s.call(`/clients/${s.A.id}/branding/assets/${pub.json.id}/delete`, { method: "POST", json: {} });
-  assert.deepEqual(cards(await (await s.ann.get(base)).text()).map((x) => x.has), [false, false, false, false], "deleted: back to the example");
+  assert.deepEqual(cards(await (await s.ann.get(base + "/all")).text()).map((x) => x.has), [false, false, false, false], "deleted: back to the example");
 });
 
 test("existing logos keep working: files with an explicit older type land on their card, files with no type are listed as 'Other logo files' and stay downloadable, nothing is guessed", async () => {
@@ -199,7 +199,7 @@ test("existing logos keep working: files with an explicit older type land on the
   const inspected = { sha256: [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join(""), contentType: "image/png" };
   await putObject(s.w.env.PORTAL_FILES, { key, organizationId: s.A.id, bytes, sha256: inspected.sha256, contentType: inspected.contentType });
   s.w.db.raw.prepare("INSERT INTO brand_assets (id, organization_id, kind, title, variant_key, logo_role, orientation, tone, transparent, format, content_type, size_bytes, sha256, storage_key, original_name, published, created_by) VALUES (?, ?, 'logo', 'Legacy logo', 'legacy-mark', NULL, 'square', 'light', 0, 'png', 'image/png', ?, ?, ?, 'Legacy-Mark.png', 1, 'seed')").run("11111111-1111-4111-8111-111111111111", s.A.id, bytes.length, inspected.sha256, key);
-  const html = await (await s.ann.get(base)).text();
+  const html = await (await s.ann.get(base + "/all")).text();
   const c = cards(html);
   assert.deepEqual(c.map((x) => x.has), [true, false, false, false], "only Primary is filled; the older horizontal primary is not moved to Secondary and the untyped file takes no card");
   assert.match(html, /<p class="acc__group">Other logo files<\/p>/);
@@ -209,7 +209,7 @@ test("existing logos keep working: files with an explicit older type land on the
   // Admin can place the untyped file on a card by choosing a type; it then leaves the list
   const fixed = await s.call(`/clients/${s.A.id}/branding/assets/11111111-1111-4111-8111-111111111111/update`, { method: "POST", json: { logo_role: "icon" } });
   assert.equal(fixed.status, 200, JSON.stringify(fixed.json));
-  const after = await (await s.ann.get(base)).text();
+  const after = await (await s.ann.get(base + "/all")).text();
   assert.deepEqual(cards(after).map((x) => x.has), [true, false, false, true]);
   assert.ok(!/Other logo files/.test(after));
   assert.equal(deps.db, s.w.db);
@@ -220,11 +220,11 @@ test("Admin can move a file to another card: choosing a different Logo type rena
   await s.publishKit(s.A);
   const up = await s.upload(s.A, s.logo("icon"), "m.png", S.png());
   assert.equal(up.json.name, "Alpha-Co-Submark-Square-Light.png", "new Sub-mark files are named Submark");
-  assert.deepEqual(cards(await (await s.ann.get(base)).text()).map((x) => x.has), [false, false, false, true]);
+  assert.deepEqual(cards(await (await s.ann.get(base + "/all")).text()).map((x) => x.has), [false, false, false, true]);
   const moved = await s.call(`/clients/${s.A.id}/branding/assets/${up.json.id}/update`, { method: "POST", json: { logo_role: "secondary", orientation: "horizontal" } });
   assert.equal(moved.status, 200, JSON.stringify(moved.json));
   assert.equal(s.w.db.raw.prepare("SELECT original_name FROM brand_assets WHERE id = ?").get(up.json.id).original_name, "Alpha-Co-Secondary-Horizontal-Light.png");
-  assert.deepEqual(cards(await (await s.ann.get(base)).text()).map((x) => x.has), [false, true, false, false]);
+  assert.deepEqual(cards(await (await s.ann.get(base + "/all")).text()).map((x) => x.has), [false, true, false, false]);
   const ui = read("admin/assets/branding.js");
   assert.match(ui, /const LOGO_ROLE = \{ primary: "Primary", secondary: "Secondary", simplified: "Simplified", icon: "Sub-mark" \}/);
   assert.match(ui, /Which of the four logo cards on the client’s Branding page this file belongs to/);
@@ -234,19 +234,19 @@ test("Admin can move a file to another card: choosing a different Logo type rena
 
 test("the request workflow is unchanged under the cards: an owner can request logos (or more variations), the status replaces the button, duplicates are refused and a member is told to ask an owner", async () => {
   const s = await setup();
-  let html = await (await s.ann.get(base)).text();
+  let html = await (await s.ann.get(base + "/all")).text();
   const logosEmpty = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
   assert.match(logosEmpty, /<summary class="btn btn--primary">Request Design<span/, "each missing variation has its own black Request Design button");
-  assert.match(await (await s.mia.get(base)).text(), /Ask an owner of your organization to send a request for this section/);
+  assert.match(await (await s.mia.get(base + "/all")).text(), /Ask an owner of your organization to send a request for this section/);
   const send = (b, extra = {}) => b.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-logos", ...extra });
-  assert.equal((await send(s.ann)).headers.get("Location"), `${base}?requested=1`);
-  assert.equal((await send(s.ann)).headers.get("Location"), `${base}?requested=0`, "a second press is the friendly 'already open'");
-  assert.equal((await send(s.mia, { csrf: csrfOf(await (await s.mia.get(base)).text()) })).status, 403, "members cannot request");
-  html = await (await s.ann.get(base)).text();
+  assert.equal((await send(s.ann)).headers.get("Location").replace(/\/(logos|typography|colours|brand-kit)\?/, "?"), `${base}?requested=1`);
+  assert.equal((await send(s.ann)).headers.get("Location").replace(/\/(logos|typography|colours|brand-kit)\?/, "?"), `${base}?requested=0`, "a second press is the friendly 'already open'");
+  assert.equal((await send(s.mia, { csrf: csrfOf(await (await s.mia.get(base + "/all")).text()) })).status, 403, "members cannot request");
+  html = await (await s.ann.get(base + "/all")).text();
   assert.match(html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"')), /class="tag">Requested</);
   // with a real logo the button offers additions or changes
   const s2 = await setup(); await s2.publishKit(s2.A); await s2.upload(s2.A, s2.logo("primary"), "p.png", S2());
-  assert.match((await (await s2.ann.get(base)).text()).slice(0), /Request additions or changes/);
+  assert.match((await (await s2.ann.get(base + "/all")).text()).slice(0), /Request additions or changes/);
 });
 const S2 = () => S.png(12, 12);
 
@@ -260,7 +260,7 @@ test("layout and a11y wiring: one column on a phone, two on a tablet, four on a 
   assert.match(css, /--hairline: #E0E0E0/);
   assert.ok(!/\.lv-card \{[^}]*(border:|box-shadow|border-radius)/.test(css), "no box around the card, no shadow, sharp corners");
   const s = await setup();
-  const html = await (await s.ann.get(base)).text();
+  const html = await (await s.ann.get(base + "/all")).text();
   assert.ok(!/\sstyle=|<script[^>]*>[^<]|onclick=/i.test(html.replace(/<script[^>]*src=[^>]*><\/script>/g, "")), "no inline style, script or handler");
   const logos = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
   assert.equal([...logos.matchAll(/<h3 class="lv-card__title">/g)].length, 4);
@@ -295,7 +295,7 @@ test("a logo is uploaded without a version: the card's type and the shape are en
     const r = await s.upload(s.A, meta, n, bytes); assert.equal(r.status, 201, n + JSON.stringify(r.json)); assert.equal(r.json.name, "Alpha-Co-Primary-Square." + ext);
   }
   assert.equal(s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM brand_assets WHERE tone IS NOT NULL").get().n, 0, "no version is stored for new files");
-  const html = await (await s.ann.get(base)).text();
+  const html = await (await s.ann.get(base + "/all")).text();
   assert.deepEqual(cards(html).map((x) => x.has), [true, false, false, false], "all six formats sit on the Primary card; the others keep their examples");
   assert.equal((await s.call(`/clients/${s.A.id}/branding/assets/${png.json.id}/download`)).status, 200);
   assert.equal((await s.upload(s.A, meta, "dup.png", S.png(9, 9))).json.error, "duplicate_name", "the same type, shape and format is never silently overwritten");
@@ -314,7 +314,7 @@ test("existing records keep their version: files with a stored background keep t
   const moved = await s.call(`/clients/${s.A.id}/branding/assets/${old.json.id}/update`, { method: "POST", json: { logo_role: "secondary", orientation: "square", transparent: false } });
   assert.equal(moved.status, 200);
   assert.equal(s.w.db.raw.prepare("SELECT tone FROM brand_assets WHERE id = ?").get(old.json.id).tone, "dark", "a move between cards keeps the stored value");
-  assert.deepEqual(cards(await (await s.ann.get(base)).text()).map((x) => x.has), [false, true, false, false]);
+  assert.deepEqual(cards(await (await s.ann.get(base + "/all")).text()).map((x) => x.has), [false, true, false, false]);
 });
 
 test("Admin picture preview: a logo image is shown inline from the existing download route, is not counted as a download, other kinds and other clients are refused", async () => {
@@ -347,7 +347,7 @@ test("the nine sections are one shared catalogue: exact numbers, names and order
   assert.ok(ui.indexOf("logoSection(), typographySection()") < ui.lastIndexOf("otherFilesSection()"), "documents and other files come after the nine");
   const s = await setup();
   for (const b of [s.ann, s.mia]) {
-    const html = await (await b.get(base)).text();
+    const html = await (await b.get(base + "/all")).text();
     assert.deepEqual([...html.matchAll(/<section class="bk-sec" id="(\w+)"/g)].map((m) => m[1]), SECTIONS.map((x) => x[1]));
     assert.deepEqual([...html.matchAll(/<p class="bk-sec__no" aria-hidden="true">(\d\d)</g)].map((m) => m[1]), SECTIONS.map((x) => x[0]));
   }
@@ -355,7 +355,7 @@ test("the nine sections are one shared catalogue: exact numbers, names and order
 
 test("empty sections show a muted Framework example, labelled 'Example: Framework' with 'Not added yet', with no link, copy button or download; Typography shows its own example cards", async () => {
   const s = await setup();
-  const html = await (await s.ann.get(base)).text();
+  const html = await (await s.ann.get(base + "/all")).text();
   const { BRAND_SECTIONS } = await import("../../admin/assets/brand-sections.js");
   for (const d of BRAND_SECTIONS.filter((x) => !["logo", "typography"].includes(x.key))) {
     const sec = sectionHtml(html, d.key);
@@ -380,7 +380,7 @@ test("files Admin places in sections 05 to 09 show in that section only: preview
   for (const r of [img, lay, tex, ico, sty]) assert.equal(r.status, 201, JSON.stringify(r.json));
   const legacy = await s.upload(s.A, { kind: "other", title: "Old brochure", published: true }, "brochure.pdf", S.pdf());
   const theirs = await put(s.B, "imagery", "Beta.png", S.png(7, 7), { title: "Beta photo" });
-  const html = await (await s.ann.get(base)).text();
+  const html = await (await s.ann.get(base + "/all")).text();
   const inSec = (key, id) => sectionHtml(html, key).includes(`/branding/files/${id}`);
   assert.ok(inSec("imagery", img.json.id) && inSec("layout", lay.json.id) && inSec("textures", tex.json.id) && inSec("iconography", ico.json.id) && inSec("style", sty.json.id));
   assert.ok(!inSec("imagery", lay.json.id) && !inSec("layout", img.json.id), "each file only in its own section");
@@ -407,7 +407,7 @@ test("Admin places, moves and removes a file from a section explicitly: nothing 
   assert.equal((await move("textures")).status, 200);
   const row = () => s.w.db.raw.prepare("SELECT variant_key, original_name, kind FROM brand_assets WHERE id = ?").get(old.json.id);
   assert.deepEqual([row().variant_key, row().original_name, row().kind], ["section-textures", nameBefore, "other"], "only the placement changes, not the name or kind");
-  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "textures"), /branding\/files\//);
+  assert.match(sectionHtml(await (await s.ann.get(base + "/all")).text(), "textures"), /branding\/files\//);
   assert.equal((await move("style")).status, 200); assert.equal(row().variant_key, "section-style");
   const renamed = await s.call(`/clients/${s.A.id}/branding/assets/${old.json.id}/update`, { method: "POST", json: { title: "Better name" } });
   assert.equal(renamed.status, 200); assert.equal(row().variant_key, "section-style", "renaming keeps the section");
@@ -425,7 +425,7 @@ test("typography and colours: families, weights, example text and codes render; 
   await brand.saveBrandKit(s.w.db, s.A.id, { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }, { name: "Signal", role: "accent", hex: "#B3261E", note: "" }], typography: [{ role: "heading", family: "Switzer", weights: [400, 700], usage: "Headings", source_url: null }] }, ADMIN);
   await s.upload(s.A, { kind: "font", title: "Switzer Regular", downloadable: true, license_note: "OFL", published: true }, "f.ttf", S.ttf());
   assert.ok((await brand.setBrandKitStatus(s.w.db, s.A.id, "published", ADMIN)).ok);
-  const html = await (await s.ann.get(base)).text();
+  const html = await (await s.ann.get(base + "/all")).text();
   const type = sectionHtml(html, "typography");
   assert.match(type, /type__family">Switzer</); assert.match(type, /Regular <span class="muted">400<\/span>/); assert.match(type, /Bold <span class="muted">700<\/span>/);
   assert.match(type, /bk-type__sample">The quick brown fox/); assert.match(type, /Download TTF/);
@@ -436,14 +436,14 @@ test("typography and colours: families, weights, example text and codes render; 
 
 test("requests, uploads and permissions are unchanged by the nine-section layout", async () => {
   const s = await setup();
-  const html = await (await s.ann.get(base)).text();
+  const html = await (await s.ann.get(base + "/all")).text();
   assert.match(sectionHtml(html, "logo"), /<summary class="btn btn--primary">Request Design<span/);
   assert.match(sectionHtml(html, "typography"), /<summary class="btn btn--primary">Request Design<span/);
   assert.match(sectionHtml(html, "colours"), /<summary class="btn btn--primary">Request Design<span/);
   assert.match(html.slice(html.indexOf('id="guidelines"')), /<summary class="btn btn--small">Request<span/);
   assert.match(html, /href="\/portal\/o\/alpha\/branding\/uploads"/);
-  assert.match(await (await s.mia.get(base)).text(), /Ask an owner of your organization/);
-  assert.equal((await s.bob.get("/portal/o/alpha/branding")).status, 404, "another organization still can't open it");
+  assert.match(await (await s.mia.get(base + "/all")).text(), /Ask an owner of your organization/);
+  assert.equal((await s.bob.get("/portal/o/alpha/branding/all")).status, 404, "another organization still can't open it");
 });
 
 /* ------------------------------------------------------------------ 02 Typography: three slots, specimens, hierarchy; pricing presentation (inactive) */
@@ -481,7 +481,7 @@ test("Admin assigns typefaces to Primary, Secondary and Accent and picks their f
 test("client page: the three slots show their typeface or a restrained empty card; the Accent slot says it is optional; Primary alone shows normally", async () => {
   const s = await setup(); await publishOnly(s, s.A);
   await saveType(s, s.A, [TF({ slot: "primary" })]);
-  const html = await (await s.ann.get(base)).text();
+  const html = await (await s.ann.get(base + "/all")).text();
   const type = sectionHtml(html, "typography");
   const cards = type.split('<li class="tf-card ').slice(1);
   assert.equal(cards.length, 3);
@@ -498,7 +498,7 @@ test("specimens: with a downloadable font file the specimen is set in the real f
   const s = await setup(); await publishOnly(s, s.A);
   const file = (await font(s, s.A, "Switzer Bold")).json.id;
   await saveType(s, s.A, [TF({ slot: "primary", file_ids: [file] }), TF({ family: "Inter", role: "body", slot: "secondary", weights: [400] })]);
-  const res = await s.ann.get(base); const html = await res.text();
+  const res = await s.ann.get(base + "/all"); const html = await res.text();
   assert.match(html, new RegExp('<link rel="stylesheet" href="/portal/o/alpha/branding/fonts.css">'));
   assert.ok(!/ style="/.test(html), "no inline style");
   const [p, sec] = sectionHtml(html, "typography").split('<li class="tf-card ').slice(1);
@@ -529,7 +529,7 @@ test("fonts are served for specimens only when the licence allows sharing the fi
   assert.equal((await s.ann.get(`${base}/files/${theirs}?font=1`)).status, 404, "another organization's font");
   assert.equal((await s.bob.get(`${base}/files/${ok}?font=1`)).status, 404);
   assert.equal((await s.ann.get(`${base}/files/${ok}`)).status, 200); assert.equal(count(), before + 1, "a real download is still recorded");
-  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "typography"), /licence doesn’t allow sharing the file/);
+  assert.match(sectionHtml(await (await s.ann.get(base + "/all")).text(), "typography"), /licence doesn’t allow sharing the file/);
   const bobCss = await (await s.bob.get("/portal/o/beta/branding/fonts.css")).text();
   assert.ok(!bobCss.includes(ok), "a stylesheet only names its own organization's fonts");
   assert.equal((await s.mia.get(`${base}/fonts.css`)).status, 200, "members may view");
@@ -539,7 +539,7 @@ test("older typefaces with no slot stay visible under 'Other typefaces' with the
   const s = await setup(); await publishOnly(s, s.A);
   await font(s, s.A, "Switzer Regular");
   await brand.saveBrandKit(s.w.db, s.A.id, { typography: [{ role: "heading", family: "Switzer", weights: [400, 600], usage: "Headlines", source_url: null }] }, ADMIN);
-  const html = await (await s.ann.get(base)).text();
+  const html = await (await s.ann.get(base + "/all")).text();
   const type = sectionHtml(html, "typography");
   assert.equal([...type.matchAll(/tf-card--has/g)].length, 0, "no slot is filled by guesswork");
   assert.equal([...type.matchAll(/tf-card--example/g)].length, 3, "empty slots show muted Framework examples");
@@ -550,7 +550,7 @@ test("older typefaces with no slot stay visible under 'Other typefaces' with the
 test("Typography Hierarchy: five levels in order, illustrative (no approved scale invented), no sizes shown as specifications, a missing role is a labelled Framework example (never the client's other typeface), fallback is stated", async () => {
   const s = await setup(); await publishOnly(s, s.A);
   await saveType(s, s.A, [TF({ slot: "primary" })]);
-  const type = sectionHtml(await (await s.ann.get(base)).text(), "typography");
+  const type = sectionHtml(await (await s.ann.get(base + "/all")).text(), "typography");
   const hier = type.slice(type.indexOf('id="typography-hierarchy"'));
   assert.deepEqual([...hier.matchAll(/tf-level__name">([^<]+)</g)].map((m) => m[1]), ["Heading 1", "Heading 2", "Heading 3", "Body Text", "Caption / Small Label"]);
   assert.match(hier, /Typography Hierarchy/); assert.match(hier, /<strong>Illustrative preview\.<\/strong>/); assert.match(hier, /not approved specifications/);
@@ -562,22 +562,22 @@ test("Typography Hierarchy: five levels in order, illustrative (no approved scal
   assert.match(hier, /use a standard typeface here, because no font file is available/);
   const f = (await font(s, s.A, "Switzer Bold")).json.id;
   await saveType(s, s.A, [TF({ slot: "primary", file_ids: [f] }), TF({ family: "Inter", role: "body", slot: "secondary", weights: [400] })]);
-  const real = sectionHtml(await (await s.ann.get(base)).text(), "typography"); const h2 = real.slice(real.indexOf('id="typography-hierarchy"'));
+  const real = sectionHtml(await (await s.ann.get(base + "/all")).text(), "typography"); const h2 = real.slice(real.indexOf('id="typography-hierarchy"'));
   assert.match(h2, /tf-l-h1 sp-primary fw-w700/); assert.match(h2, /Secondary Typeface · Inter/); assert.doesNotMatch(h2, /tf-level--example/, "with both roles set there are no examples"); assert.doesNotMatch(h2, /tf-l-body sp-secondary/, "Inter has no file, so it is not shown as Inter");
 });
 
 test("empty typography: a restrained empty state with the existing request button and a way to share fonts; no price is shown by default; a member is told to ask an owner", async () => {
   const s = await setup(); await publishOnly(s, s.A);
   s.w.db.raw.exec("DROP TABLE service_prices"); // a database without the pricing migration: no price anywhere
-  const html = await (await s.ann.get(base)).text(); const type = sectionHtml(html, "typography");
+  const html = await (await s.ann.get(base + "/all")).text(); const type = sectionHtml(html, "typography");
   assert.match(type, /No typefaces have been added yet\./); assert.match(type, /<summary class="btn btn--primary">Request Design<span/); assert.match(type, /href="\/portal\/o\/alpha\/branding\/uploads">Upload them for free/); assert.ok(!/Share them with Framework/.test(type), "one upload link, not two");
   assert.equal([...type.matchAll(/tf-card--example/g)].length, 3, "three muted Framework examples"); assert.ok(!/tf-card--has/.test(type), "nothing is presented as the client's");
   assert.match(type, /Switzer/); assert.match(type, /General Sans/); assert.match(type, /Semibold <span class="muted">600/); assert.match(type, /Medium <span class="muted">500/);
   assert.match(type, /This uses Framework’s typography/); assert.ok(!/Download|data-copy/.test(type.replace(/Download or install/g, "")), "examples are never downloadable");
   assert.ok(!/\$\s?\d|CAD|Starting at|bk-price/.test(html), "no price anywhere on the page by default");
-  assert.match(sectionHtml(await (await s.mia.get(base)).text(), "typography"), /Ask an owner of your organization/);
+  assert.match(sectionHtml(await (await s.mia.get(base + "/all")).text(), "typography"), /Ask an owner of your organization/);
   assert.equal((await s.ann.post(`${base}/request`, { csrf: csrfOf(html), section: "brand-typography" })).status, 303, "the existing request workflow");
-  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "typography"), /class="tag">Requested</);
+  assert.match(sectionHtml(await (await s.ann.get(base + "/all")).text(), "typography"), /class="tag">Requested</);
 });
 
 test("Admin typography wiring: slots, styles, file choice and hierarchy-free save; the three roles come from one shared catalogue", () => {
@@ -606,7 +606,7 @@ test("navigation dividers: one dark line above and one dark line below, same thi
 test("examples are application content: not client records, not assets, not downloadable; approved content always replaces them; the other examples stay", async () => {
   const s = await setup(); await publishOnly(s, s.A);
   // an organization with nothing: examples everywhere, and nothing in its records or its files
-  const empty = await (await s.bob.get("/portal/o/beta/branding")).text();
+  const empty = await (await s.bob.get("/portal/o/beta/branding/all")).text();
   for (const k of ["typography", "colours", "tagline", "imagery", "layout", "textures", "iconography", "style"]) assert.ok(/Example: Framework/.test(sectionHtml(empty, k)), k + " shows an example");
   assert.equal((await s.call(`/clients/${s.B.id}/branding`)).json.assets.length, 0, "Admin sees no placeholder files");
   assert.equal(s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM brand_assets").get().n, 0); assert.equal(s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM brand_uploads").get().n, 0);
@@ -615,7 +615,7 @@ test("examples are application content: not client records, not assets, not down
   // real content replaces only its own example
   await brand.saveBrandKit(s.w.db, s.A.id, { colours: [{ name: "Moss", role: "primary", hex: "#3A5A40", note: "" }], typography: [TF({ slot: "primary" })] }, ADMIN);
   const img = await s.upload(s.A, { kind: "other", title: "Hero", section: "imagery", published: true }, "hero.png", S.png());
-  const html = await (await s.ann.get(base)).text();
+  const html = await (await s.ann.get(base + "/all")).text();
   assert.match(sectionHtml(html, "colours"), /Moss/); assert.doesNotMatch(sectionHtml(html, "colours"), /Example: Framework|swatch--example/, "the client's palette replaces the example");
   assert.match(sectionHtml(html, "imagery"), new RegExp(img.json.id)); assert.doesNotMatch(sectionHtml(html, "imagery"), /Example: Framework|arch-/);
   const type = sectionHtml(html, "typography");
@@ -623,7 +623,7 @@ test("examples are application content: not client records, not assets, not down
   for (const k of ["tagline", "layout", "textures", "iconography", "style"]) assert.match(sectionHtml(html, k), /Example: Framework/, k + " keeps its example");
   assert.ok(!/Example: Framework/.test(sectionHtml(html, "colours")));
   // other organization's page is unaffected and exposes none of Alpha's content
-  const theirs = await (await s.bob.get("/portal/o/beta/branding")).text();
+  const theirs = await (await s.bob.get("/portal/o/beta/branding/all")).text();
   assert.ok(!theirs.includes("Moss") && !theirs.includes(img.json.id));
 });
 
@@ -689,7 +689,7 @@ test("tagline storage is optional until migration 0009 is applied: the code work
   assert.equal(s.w.db.raw.prepare("SELECT COUNT(*) AS n FROM brand_kits WHERE organization_id = ?").get(s.A.id).n, 0, "a refused tagline creates and changes nothing");
   assert.equal((await s.call(`/clients/${s.A.id}/branding/kit`, { method: "PUT", json: { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }] } })).status, 200, "colours still save");
   await publishOnly(s, s.A);
-  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "tagline"), /bk-eg--tagline/, "the client keeps the labelled example");
+  assert.match(sectionHtml(await (await s.ann.get(base + "/all")).text(), "tagline"), /bk-eg--tagline/, "the client keeps the labelled example");
 });
 
 test("Admin saves, edits and removes a tagline; the client sees it only once the kit is published, with a Copy button beside each tagline; other kit content is untouched both ways", async () => {
@@ -700,9 +700,9 @@ test("Admin saves, edits and removes a tagline; the client sees it only once the
   assert.deepEqual(saved.json.kit.sections.tagline, TAG);
   const kit = (await s.call(`/clients/${s.A.id}/branding`)).json.kit;
   assert.deepEqual(kit.sections.tagline, TAG); assert.equal(kit.colours.length, 1); assert.equal(kit.typography.length, 1); assert.equal(kit.brandName, "Alpha", "saving a tagline leaves the rest of the kit alone");
-  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "tagline"), /bk-eg--tagline/, "a draft kit shows the example, not the tagline");
+  assert.match(sectionHtml(await (await s.ann.get(base + "/all")).text(), "tagline"), /bk-eg--tagline/, "a draft kit shows the example, not the tagline");
   await publishOnly(s, s.A);
-  const html = sectionHtml(await (await s.ann.get(base)).text(), "tagline");
+  const html = sectionHtml(await (await s.ann.get(base + "/all")).text(), "tagline");
   assert.ok(!/bk-eg/.test(html), "the example is gone once a tagline is approved");
   assert.match(html, /<p class="bk-tag__primary">Clear thinking, beautifully made\.<\/p>/);
   assert.deepEqual([...html.matchAll(/data-copy="([^"]*)"/g)].map((m) => m[1]), [TAG.primary, ...TAG.alternates], "a Copy button beside each tagline");
@@ -714,14 +714,14 @@ test("Admin saves, edits and removes a tagline; the client sees it only once the
   // saving colours afterwards keeps the tagline
   await s.call(`/clients/${s.A.id}/branding/kit`, { method: "PUT", json: { colours: [{ name: "Moss", role: "primary", hex: "#3A5A40", note: "" }] } });
   assert.equal((await s.call(`/clients/${s.A.id}/branding`)).json.kit.sections.tagline.primary, "Made with care.");
-  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "tagline"), /Made with care\./);
+  assert.match(sectionHtml(await (await s.ann.get(base + "/all")).text(), "tagline"), /Made with care\./);
   // an alternate without a primary is shown honestly
   await saveTag(s, s.A, { primary: "", alternates: ["Only an alternate"], guidelines: null });
-  const partial = sectionHtml(await (await s.ann.get(base)).text(), "tagline");
+  const partial = sectionHtml(await (await s.ann.get(base + "/all")).text(), "tagline");
   assert.match(partial, /The primary tagline hasn’t been added yet/); assert.match(partial, /Only an alternate/);
   // remove everything: the example returns
   assert.equal((await saveTag(s, s.A, { primary: "", alternates: [], guidelines: "" })).status, 200);
-  assert.match(sectionHtml(await (await s.ann.get(base)).text(), "tagline"), /bk-eg--tagline/);
+  assert.match(sectionHtml(await (await s.ann.get(base + "/all")).text(), "tagline"), /bk-eg--tagline/);
   assert.equal((await saveTag(s, s.A, null)).status, 200);
   assert.equal(s.w.db.raw.prepare("SELECT activity_log.action FROM activity_log WHERE action = 'brand.kit.sections_saved' LIMIT 1").get().action, "brand.kit.sections_saved", "tagline changes are audited");
 });
@@ -740,7 +740,7 @@ test("tagline text is escaped everywhere it is shown, a client can't change it, 
   const s = await setup(); await publishOnly(s, s.A); await publishOnly(s, s.B);
   const evil = { primary: `<img src=x onerror="alert(1)"> & "quoted"`, alternates: [`</p><script>alert(2)</script>`, `'single' <b>bold</b>`], guidelines: `<script>alert(3)</script>\n<a href="javascript:alert(4)">x</a>` };
   assert.equal((await saveTag(s, s.A, evil)).status, 200);
-  const html = await (await s.ann.get(base)).text(); const sec = sectionHtml(html, "tagline");
+  const html = await (await s.ann.get(base + "/all")).text(); const sec = sectionHtml(html, "tagline");
   assert.ok(!/<img src=x|<script>alert|<b>bold|href="javascript/.test(html), "no markup from the tagline reaches the page");
   assert.match(sec, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt; &amp; &quot;quoted&quot;/);
   assert.match(sec, /data-copy="&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt; &amp; &quot;quoted&quot;"/, "the copied text is the plain text, safely quoted in the attribute");
@@ -749,12 +749,12 @@ test("tagline text is escaped everywhere it is shown, a client can't change it, 
   assert.equal((await s.ann.post(`${base}/kit`, { sections: JSON.stringify({ tagline: { primary: "hijack" } }) })).status, 404);
   const noAccess = await handleAdmin(new Request(ORIGIN + `/api/admin/clients/${s.A.id}/branding/kit`, { method: "PUT", headers: { Origin: ORIGIN, "Content-Type": "application/json", "X-Framework-Admin": "1" }, body: JSON.stringify({ sections: { tagline: { primary: "hijack" } } }) }), s.w.env, {});
   assert.ok([401, 403].includes(noAccess.status), "the Admin API needs Access");
-  assert.ok(!(await (await s.ann.get(base)).text()).includes("hijack"));
+  assert.ok(!(await (await s.ann.get(base + "/all")).text()).includes("hijack"));
   // organization isolation
-  const theirs = await (await s.bob.get("/portal/o/beta/branding")).text();
+  const theirs = await (await s.bob.get("/portal/o/beta/branding/all")).text();
   assert.ok(!theirs.includes("quoted") && !theirs.includes("alert(")); assert.match(sectionHtml(theirs, "tagline"), /bk-eg--tagline/);
   assert.equal((await saveTag(s, s.B, { primary: "Beta line" })).status, 200);
-  const both = [await (await s.ann.get(base)).text(), await (await s.bob.get("/portal/o/beta/branding")).text()];
+  const both = [await (await s.ann.get(base + "/all")).text(), await (await s.bob.get("/portal/o/beta/branding/all")).text()];
   assert.ok(!both[0].includes("Beta line") && !both[1].includes("quoted") && both[1].includes("Beta line"));
 });
 

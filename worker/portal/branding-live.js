@@ -14,6 +14,7 @@ import { typefaceOf, filesOf, specimenSlots, faceOf, WEIGHT_NAME } from "./brand
 import { requirementsFor, completionOf, applyOverrides, REQUIREMENT_LABEL } from "./brand-requirements.js";
 import { LEVEL_LABEL } from "../../admin/assets/brand-requirement-items.js";
 import { offerBox, offerList, requestKeyOf, priceLabel, pricingService, ESTIMATE_NOTE } from "./branding-pricing.js";
+import { hubLanding, viewHeader, logoLibrary, LOGO_ERRORS } from "./branding-hub.js";
 import { exampleTypeCard, exampleColours, exampleTagline, exampleImagery, exampleLayout, exampleTextures, exampleIcons, exampleStyle, EXAMPLE_LABEL } from "./brand-examples.js";
 
 const href = (vm, p) => `${vm.base}${p}`;
@@ -419,6 +420,30 @@ export function brandingOverview(vm, brand, o = {}) {
     sent: { cls: "", eyebrow: `<span class="eyebrow">Brand Discovery</span>`, title: "Brand Discovery sent", text: "Thank you. Framework has your answers and will use them to shape your brand.", btn: "View Brand Discovery", btnCls: "btn" },
   }[dState];
   const discoveryCard = cardOf ? `<section class="bk-discovery${cardOf.cls}" aria-labelledby="h-discovery"><div class="bk-discovery__text">${cardOf.eyebrow}<h2 class="h3" id="h-discovery">${cardOf.title}</h2><p>${cardOf.text}</p></div><a class="${cardOf.btnCls}" href="${e(dHref)}">${cardOf.btn}</a></section>` : "";
+  // The four-option Branding hub: "all" is the earlier single-page layout, kept at /branding/all so every older link and bookmark still lands on the same content.
+  const view = o.view || "all";
+  if (view === "hub") {
+    const kitFiles = assets.filter((a) => a.kind !== "logo" && a.kind !== "font").length;
+    return hubLanding(vm, { counts: { logos: (o.uploads || []).filter((u) => u.category === "logo").length + new Set(assets.filter((a) => a.kind === "logo").map((a) => a.variantKey || a.id)).size, typography: typeList.length || fonts.length, colours: colours.length, kit: kitFiles + (live && brand.tagline ? 1 : 0) }, discoveryHref: dState === "new" || dState === "progress" ? dHref : "", discoveryLabel: dState === "new" ? "Start Brand Discovery" : "Continue Brand Discovery", bookHref: o.bookHref || "", lead: live ? `${approved}: logos, typography, colours and more.` : "Your logos, fonts, colours and brand guide, in one place." });
+  }
+  const wrap = (title, lead, inner, cls = "") => `<div class="bhv">${viewHeader(vm, { title, lead })}${banner}${inner.includes("bk-offer") ? pricingNote : ""}<div class="bk bk--view${cls}">${inner}</div></div>`;
+  if (view === "logos") {
+    // "Need a logo variation?": Framework's paid design options for the variations that have no published file yet, through the existing request workflow (the free upload is on this page, so no upload link here).
+    const offerHtml = anyLogoSetting ? "" : offerList({ rows: missingLogos, extra: legacyOpen("brand-logos"), uploadHref: "", upload: pricingService("logo-primary").upload });
+    return `<div class="bhv bhv--logos">${logoLibrary(vm, { uploads: o.uploads || [], assets, labels: { role: ROLE_LABEL, orientation: ORIENTATION_LABEL, tone: TONE_LABEL }, canUpload, canDelete: o.canDelete, csrf, limits: o.limits, usage: o.usage, results: o.results, errors: { ...UPLOAD_ERRORS, ...LOGO_ERRORS }, banner, notice: o.noticeText || "", bannerError: o.bannerError || "", offerHtml })}</div>`;
+  }
+  if (view === "typography") return wrap("Typography", "Approved fonts, how to use them, and where to get them.", parts[1], " bk--single");
+  if (view === "colours") return wrap("Brand Colours", "Approved colours. Tap a code to copy it.", parts[2], " bk--single");
+  if (view === "kit") {
+    // Only what exists is shown as content. A part that has nothing yet is not drawn as a sample: Framework's design options for those parts wait together in one closed disclosure.
+    const KEYS = ["tagline", "imagery", "layout", "textures", "iconography", "style"];
+    const has = { tagline: Boolean(live && brand.tagline), ...Object.fromEntries(KEYS.slice(1).map((k) => [k, assets.some((a) => sectionOf(a) === k)])) };
+    const shown = KEYS.map((k, i) => (has[k] ? parts[3 + i] : "")).join("");
+    const missingOffers = KEYS.filter((k) => !has[k]).map((k) => offer(k)).join("");
+    const anything = shown || guideDocs.length || extraDocs.length;
+    const body = `${anything ? "" : emptyState("Your brand guide, visual style references and packaged downloads appear here once Framework publishes them.")}${shown}${more}${missingOffers ? `<details class="lg-more" id="kit-more"><summary class="lg-more__sum">Need something added to your Brand Kit?</summary><div class="lg-more__body">${missingOffers}</div></details>` : ""}${meta}${share}${kit}`;
+    return wrap("Brand Kit", "The brand guide, visual style references and packaged downloads.", body);
+  }
   return head.replace(/<\/header>$/, `${pricingNote}</header>`) + banner + discoveryCard + nav + `<div class="bk">${parts.join("")}</div>` + more + meta + share + kit;
 }
 
