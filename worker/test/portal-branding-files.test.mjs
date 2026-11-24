@@ -361,7 +361,7 @@ test("a client's own files are listed without keys or hashes, are never inline, 
   const w = await world();
   const up = await B.clientUploadFile(w.deps, { ...asMember(w), category: "guidelines", file: file("Guidelines.pdf", S.pdf()) });
   const list = await repo.listClientUploads(w.db, w.a.id);
-  assert.deepEqual(Object.keys(list[0]).sort(), ["category", "createdAt", "format", "held", "id", "name", "size"]);
+  assert.deepEqual(Object.keys(list[0]).sort(), ["category", "createdAt", "format", "held", "id", "logoBackground", "logoColour", "logoType", "name", "size"]);
   const res = await B.clientDownloadUpload(w.deps, { ...asOwner(w), uploadId: up.id });
   assert.match(res.response.headers.get("Content-Disposition"), /^attachment; filename="Guidelines\.pdf"/);
   assert.equal(res.response.headers.get("Content-Type"), "application/octet-stream");

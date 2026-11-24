@@ -44,7 +44,7 @@ import { checkCsrf, csrfFor } from "./sessions.js";
 import { can } from "./policy.js";
 import { buildRequestRoutes } from "./requests/routes.js";
 import * as requestsRepo from "./requests/repo.js";
-import { getClientBrand, listClientUploads, uploadUsage, getBrandKit, listServiceRequests, createServiceRequest } from "./repo/brand.js";
+import { getClientBrand, listClientUploads, uploadUsage, getBrandKit, listServiceRequests, createServiceRequest, cleanLogoDetails } from "./repo/brand.js";
 import { loadPricing, listPrices } from "./repo/prices.js";
 import { listClientInvoices, clientInvoiceSummary } from "./repo/invoices.js";
 import { clientDownloadInvoice } from "./invoice-files.js";
@@ -62,6 +62,8 @@ import { clientCreateRequest, clientReply, clientDownloadAttachment } from "./su
 import { dispatchNotifications } from "./service-notifications.js";
 import { fontCss } from "./brand-type.js";
 import { paletteCss } from "./branding-book.js";
+import { UPLOAD_ERRORS } from "./branding-live.js";
+import { MAX_LOGO_FILES, LOGO_ERRORS } from "./branding-hub.js";
 import { clientUploadFile, clientDeleteUpload, clientDownloadUpload, clientDownloadAsset, clientRequestService, limitsFor } from "./brand-files.js";
 
 /**
@@ -382,7 +384,7 @@ async function removeBrandUpload(ctx, a, id) {
   const res = await clientDeleteUpload(brandDeps(ctx), { ...who(a), uploadId: id });
   if (!res.ok) return res.error === "not_found" ? notFoundPage(ctx) : fileProblem(ctx, res.error);
   logEvent({ evt: "brand.upload.remove", outcome: "removed", status: 303, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
-  return redirect(`/portal/o/${a.membership.slug}/branding/uploads?removed=1`);
+  return redirect(read.fields.get("return") === "logos" ? `/portal/o/${a.membership.slug}/branding/logos?removed=1` : `/portal/o/${a.membership.slug}/branding/uploads?removed=1`);
 }
 
 /** A client owner asks for additions or changes to one Branding section, or for the full brand kit. One open request per section (the database enforces it): a second press is a friendly "already open". */
@@ -392,7 +394,9 @@ async function requestBrandSection(ctx, a) {
   if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) return errorPage(403, { ref: ctx.ref });
   const note = (read.fields.get("note") || "").trim();
   const res = await clientRequestService(brandDeps(ctx), { ...who(a), serviceKey: read.fields.get("section") || "", note: note || null });
-  const base = `/portal/o/${a.membership.slug}/branding`;
+  const key = read.fields.get("section") || "";
+  const view = /logo/.test(key) ? "logos" : /typography|font/.test(key) ? "typography" : /colour/.test(key) ? "colours" : "brand-kit"; // back to the view the request was made from
+  const base = `/portal/o/${a.membership.slug}/branding/${view}`;
   if (!res.ok) {
     if (res.error === "already_requested") return redirect(`${base}?requested=0`);
     if (res.error === "forbidden" || res.error === "not_allowed") return errorPage(403, { ref: ctx.ref });
@@ -407,13 +411,69 @@ async function downloadBrandFile(ctx, a, id, kind) {
   if (!ctx.env.PORTAL_FILES) return errorPage(503, { ref: ctx.ref });
   const deps = brandDeps(ctx);
   const res = kind === "upload"
-    ? await clientDownloadUpload(deps, { ...who(a), uploadId: id })
+    ? await clientDownloadUpload(deps, { ...who(a), uploadId: id, inline: viewFilters(ctx.url).preview })
     : await clientDownloadAsset(deps, { ...who(a), assetId: id, inline: viewFilters(ctx.url).preview, font: viewFilters(ctx.url).font });
   return res.ok ? withPortalHeaders(res.response) : fileProblem(ctx, res.error);
 }
 
 /** The Brand Book prototype: only where the Staging-only demo switch (PORTAL_DEMO) is on, so it is a 404 on Production even if this code is released there. */
 const bookOn = (ctx) => brandingOn(ctx) && demoEnabled(ctx.env, ctx.cfg);
+
+/** The logo library, optionally with the per-file results of an upload that was just made (never a redirect after a partial failure, so the results stay on screen). */
+async function brandingLogosView(ctx, a, o = {}) {
+  const [brand, data] = await brandingViewData(ctx, a);
+  const f = viewFilters(ctx.url);
+  const noticeText = f.removed ? "File removed." : f.uploaded ? "Uploaded." : "";
+  return pages.brandingPage(ctx, a, brand, { ...data, view: "logos", noticeText, ...o });
+}
+
+/** Body limit for one logo upload: up to MAX_LOGO_FILES files of the per-file size limit, never more than 60 MB in all. */
+const logoUploadMax = (ctx) => Math.min(MAX_LOGO_FILES * limitsFor(brandDeps(ctx)).maxFileBytes, 60 * 1024 * 1024) + UPLOAD_FORM_OVERHEAD;
+
+/**
+ * Uploads one or more logo files. Each file is checked and stored on its own (the same checks, storage, limits and audit as every other Branding upload), so one refused file never
+ * blocks the others, nothing is ever replaced, and the same bytes sent again are reported as already uploaded instead of being stored twice. The optional details of file i are
+ * type_i, colour_i and background_i. Owners and members may upload (the existing branding.upload rule); the role is checked again inside clientUploadFile.
+ */
+async function uploadLogos(ctx, a) {
+  const base = `/portal/o/${a.membership.slug}/branding/logos`;
+  const read = await readUploads(ctx.request, logoUploadMax(ctx), MAX_LOGO_FILES);
+  if (read.error) return brandingLogosView(ctx, a, { bannerError: read.error === 413 ? UPLOAD_ERRORS.file_too_large : UPLOAD_ERRORS.invalid, status: read.error });
+  if (!(await checkCsrf(ctx.cfg, a.session, read.fields.get("csrf") || ""))) {
+    logEvent({ evt: "brand.upload", outcome: "rejected", reason: "csrf", status: 403, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId });
+    return errorPage(403, { ref: ctx.ref });
+  }
+  if (!can(a.membership.role, "branding.upload")) return errorPage(403, { ref: ctx.ref });
+  if (!ctx.env.PORTAL_FILES) return brandingLogosView(ctx, a, { bannerError: UPLOAD_ERRORS.storage_unavailable, status: 503 });
+  if (!read.files.length) return brandingLogosView(ctx, a, { bannerError: LOGO_ERRORS.no_file, status: 422 });
+  const results = [];
+  for (let i = 0; i < read.files.length; i++) {
+    const file = read.files[i];
+    const logo = cleanLogoDetails({ type: read.fields.get(`type_${i}`), colour: read.fields.get(`colour_${i}`), background: read.fields.get(`background_${i}`) });
+    if (!logo) { results.push({ name: file.name, ok: false, error: "invalid_logo_detail" }); continue; }
+    const res = await clientUploadFile(brandDeps(ctx), { ...who(a), category: "logo", fontRightsAck: false, file, logo });
+    results.push(res.ok ? { name: file.name, ok: true, duplicate: Boolean(res.duplicate) } : { name: file.name, ok: false, error: res.error });
+    logEvent({ evt: "brand.upload", outcome: res.ok ? "saved" : "refused", reason: res.ok ? undefined : res.error, status: res.ok ? 303 : res.error === "forbidden" ? 403 : 422, route: routeName(ctx.url.pathname), ref: ctx.ref, org: a.membership.organizationId, user: a.session.userId });
+  }
+  const failed = results.filter((r) => !r.ok);
+  if (!failed.length) return redirect(`${base}?uploaded=1`);
+  const anyOk = results.some((r) => r.ok);
+  return brandingLogosView(ctx, a, { results, status: anyOk ? 200 : failed.some((r) => r.error === "forbidden") ? 403 : failed.some((r) => /^storage_/.test(r.error)) ? 503 : 422 });
+}
+
+/** Everything the Branding views draw from: the published brand, the organization's own uploads, requests, Brand Discovery, pricing and the signed-in role's abilities. */
+async function brandingViewData(ctx, a) {
+      const org = a.membership.organizationId;
+      const brand = await getClientBrand(ctx.db, org);
+      const kit = brand.published ? await getBrandKit(ctx.db, org) : null;
+      const uploads = await listClientUploads(ctx.db, org);
+      const uploadCount = uploads.length;
+      const newest = {}; // the newest request per section (listServiceRequests is newest first)
+      for (const r of await listServiceRequests(ctx.db, org)) if (!newest[r.serviceKey]) newest[r.serviceKey] = r;
+      const f = viewFilters(ctx.url);
+      const discovery = discoveryOn(ctx) ? await listClientDiscoveries(ctx.db, org) : [];
+      return [brand, { uploads, canDelete: can(a.membership.role, "branding.delete_upload"), limits: limitsFor(brandDeps(ctx)), usage: { files: uploads.length, bytes: uploads.reduce((n, u) => n + (u.size || 0), 0) }, bookHref: bookOn(ctx) && a.staff ? `/portal/o/${a.membership.slug}/branding/book` : "", discovery, canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, requirementSettings: (await listRequirementSettings(ctx.db, org)).items, pricing: await loadPricing(ctx.db), notice: f.requested ? "sent" : f.requestDup ? "dup" : "" }];
+}
 
 const BRANDING_ROUTES = [
   // The Brand Book PROTOTYPE (Staging only; read-only, no new data, no posting): the same published brand as the Branding page, as a deck of stacked cards. See branding-book.js.
@@ -431,20 +491,10 @@ const BRANDING_ROUTES = [
       return withPortalHeaders(new Response(brand.published ? paletteCss(brand.colours) : "", { status: 200, headers: securityHeaders({ "Content-Type": "text/css; charset=utf-8" }) }));
     },
   },
-  {
-    when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding$/, action: "branding.view",
-    run: async (ctx, a) => {
-      const org = a.membership.organizationId;
-      const brand = await getClientBrand(ctx.db, org);
-      const kit = brand.published ? await getBrandKit(ctx.db, org) : null;
-      const uploadCount = (await listClientUploads(ctx.db, org)).length;
-      const newest = {}; // the newest request per section (listServiceRequests is newest first)
-      for (const r of await listServiceRequests(ctx.db, org)) if (!newest[r.serviceKey]) newest[r.serviceKey] = r;
-      const f = viewFilters(ctx.url);
-      const discovery = discoveryOn(ctx) ? await listClientDiscoveries(ctx.db, org) : [];
-      return pages.brandingPage(ctx, a, brand, { bookHref: bookOn(ctx) && a.staff ? `/portal/o/${a.membership.slug}/branding/book` : "", discovery, canUpload: can(a.membership.role, "branding.upload"), uploadCount, brandName: kit && kit.brandName ? kit.brandName : "", canRequest: can(a.membership.role, "branding.request"), requests: newest, requirementSettings: (await listRequirementSettings(ctx.db, org)).items, pricing: await loadPricing(ctx.db), notice: f.requested ? "sent" : f.requestDup ? "dup" : "" });
-    },
-  },
+  { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding$/, action: "branding.view", run: async (ctx, a) => { const [brand, o] = await brandingViewData(ctx, a); return pages.brandingPage(ctx, a, brand, { ...o, view: "hub" }); } },
+  // The four views of the Branding hub, and the earlier single page (kept at /branding/all so older links and bookmarks still reach the same content).
+  { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/(typography|colours|brand-kit|all)$/, action: "branding.view", run: async (ctx, a, which) => { const [brand, o] = await brandingViewData(ctx, a); return pages.brandingPage(ctx, a, brand, { ...o, view: which === "brand-kit" ? "kit" : which }); } },
+  { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/logos$/, action: "branding.view", postAction: "branding.upload", bucket: "branding", maxBody: (ctx) => logoUploadMax(ctx), run: (ctx, a) => brandingLogosView(ctx, a), post: (ctx, a) => uploadLogos(ctx, a) },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/request$/, action: "branding.view", postAction: "branding.request", bucket: "branding", run: async (ctx, a) => redirect(`/portal/o/${a.membership.slug}/branding`), post: (ctx, a) => requestBrandSection(ctx, a) },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads$/, action: "branding.view", postAction: "branding.upload", bucket: "branding", maxBody: (ctx) => limitsFor(brandDeps(ctx)).maxFileBytes + UPLOAD_FORM_OVERHEAD, run: (ctx, a) => brandingUploadsView(ctx, a), post: (ctx, a) => uploadBrandFile(ctx, a) },
   { when: brandingOn, re: /^\/portal\/o\/([^/]+)\/branding\/uploads\/([^/]+)\/download$/, action: "branding.view", run: (ctx, a, id) => downloadBrandFile(ctx, a, id, "upload") },

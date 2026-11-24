@@ -149,3 +149,6 @@ The Review tab's expanded panels (Website updates, Needed from the client; root 
 - On Staging both portals show a small amber "Staging" pill (Admin: top of the sidebar footer and the mobile bar; client portal: beside the logo in the one-row header). Production shows no label.
 - Framework staff get "Switch to Production" (on Staging) or "Switch to Staging" (on Production): Admin sidebar footer under Sign out; client portal account bar on desktop and the Menu dropdown on mobile, above Sign out. Client accounts never get it (server-side staff check, `worker/portal/env-switch.js`).
 - Links are fixed entry points (`/admin`, `/portal`) on the verified hosts `frameworkco.ca` and `staging.frameworkco.ca`; no session, token, query or client path is carried, and the destination enforces its own sign-in and permissions. Other hosts (workers.dev, localhost) show nothing.
+
+## Client Portal Branding hub
+Four link cards (2 x 2 from 641px, four compact rows on a phone; `bh-card`), then a small Brand Discovery link while one is waiting or in progress. Each view uses `viewHeader` (breadcrumb, Back to Branding, title, the action beside the title on desktop and full width below it on a phone). The logo library uses `lg-card` tiles and a bottom sheet (`lg-sheet`) on phones and a centred card elsewhere. Styles: `assets/css/portal-branding-hub.css`.

@@ -449,15 +449,15 @@ test("signed in: the assessment is under Branding for the organization's own mem
 
 test("Branding shows a Brand Discovery card only when Framework has assigned one and the feature is on; approved branding is untouched by answering", async () => {
   const { w, ann, make, q, orgA, orgB, bob } = await portal();
-  const none = await text(await ann.get("/portal/o/alpha/branding"));
+  const none = await text(await ann.get("/portal/o/alpha/branding/all"));
   assert.ok(!/Brand Discovery/.test(none), "no card until an assessment is assigned");
   const { id } = await make(orgA);
-  const card = await text(await ann.get("/portal/o/alpha/branding"));
+  const card = await text(await ann.get("/portal/o/alpha/branding/all"));
   assert.match(card, /Brand Discovery/); assert.match(card, new RegExp(`/portal/o/alpha/branding/discovery/${id}"[^>]*>Start`));
-  assert.ok(!/Brand Discovery/.test(await text(await bob.get("/portal/o/beta/branding"))), "another organization sees nothing");
+  assert.ok(!/Brand Discovery/.test(await text(await bob.get("/portal/o/beta/branding/all"))), "another organization sees nothing");
   const off = await portal({ discovery: false });
   await off.make(off.orgA);
-  assert.ok(!/Brand Discovery/.test(await text(await off.ann.get("/portal/o/alpha/branding"))), "feature off: no card");
+  assert.ok(!/Brand Discovery/.test(await text(await off.ann.get("/portal/o/alpha/branding/all"))), "feature off: no card");
 
   const snap = () => JSON.stringify(["brand_kits", "brand_assets", "brand_requirements", "brand_uploads", "service_requests"].map((t) => q(`SELECT * FROM ${t}`)));
   const before = snap();
@@ -465,7 +465,7 @@ test("Branding shows a Brand Discovery card only when Framework has assigned one
   const csrf = csrfOf(html1);
   await ann.send(`/portal/o/alpha/branding/discovery/${id}/1`, { method: "POST", body: new URLSearchParams({ csrf, "l:style.personality:modern": "1", go: "save" }).toString(), headers: { "Content-Type": "application/x-www-form-urlencoded", ...SAME } });
   assert.equal(snap(), before, "answering never writes to brand kits, assets, requirements, uploads or requests");
-  assert.match(await text(await ann.get("/portal/o/alpha/branding")), />Continue Brand Discovery</);
+  assert.match(await text(await ann.get("/portal/o/alpha/branding")), /<p class="bh-discovery"><a class="text-link" href="[^"]*\/branding\/discovery\/[^"]+">Continue Brand Discovery<\/a><\/p>/, "the hub's small link, below the four options");
 });
 
 /* ====================================================================== Admin API */
@@ -927,7 +927,7 @@ test("portal home: the Branding card carries a red dot and 'New Brand Discovery 
 
 test("Branding page: a black 'ready' card with a contrasting Start/Continue button while waiting, a quiet one once sent, and an introduction that matches the branding stage", async () => {
   const { w, ann, make, orgA, q } = await portal();
-  const page = async () => text(await ann.get("/portal/o/alpha/branding"));
+  const page = async () => text(await ann.get("/portal/o/alpha/branding/all"));
   const lead = (html) => /<p class="lead">([\s\S]*?)<\/p>/.exec(html)[1];
   assert.match(lead(await page()), /Your brand kit in nine parts/, "no assessment, no brand: the plain introduction");
   const { id } = await make(orgA);
