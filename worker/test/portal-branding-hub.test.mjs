@@ -50,7 +50,7 @@ test("Branding is exactly four options, in order, each a link to its own view, w
   const html = await text(ann, base("alpha"));
   const cards = [...html.matchAll(/<a class="bh-card" href="([^"]+)"><span class="bh-card__icon">[\s\S]*?<span class="bh-card__title">([^<]+)<\/span>/g)].map((m) => [m[1], m[2]]);
   assert.deepEqual(cards, [[`${base("alpha")}/logos`, "Logos"], [`${base("alpha")}/typography`, "Typography"], [`${base("alpha")}/colours`, "Brand Colours"], [`${base("alpha")}/brand-kit`, "Brand Kit"]]);
-  assert.match(html, /<h1 class="h1 h1--section">Branding<\/h1>/);
+  assert.match(html, /<h1 class="h1 h1--section">Branding<\/h1><\/header><ul class="bh-grid">/, "the four cards start right below the heading: no introductory paragraph");
   assert.ok(!/class="bk-nav"|class="bk-sec"|bk-discovery|Need a complete brand identity/.test(html), "the nine-module page is not the landing any more");
   assert.match(html, /href="\/assets\/css\/portal-branding-hub\.css"/);
   assert.ok(!/<script[\s>]|\sstyle=/i.test(html), "no inline script or style");
@@ -70,7 +70,8 @@ test("each view has a clear way back to Branding; the earlier single page and ev
     assert.equal(r.status, 200, path);
     const html = await r.text();
     assert.match(html, new RegExp(`<h1 class="h1 h1--section">${title}</h1>`), path);
-    assert.match(html, new RegExp(`<a class="text-link" href="${base("alpha")}"><span aria-hidden="true">←</span> Back to Branding</a>`), path + " has a way back");
+    assert.match(html, new RegExp(`<p class="bhv-back"><a class="text-link" href="${base("alpha")}"><span aria-hidden="true">←</span> Branding</a></p><div class="bhv-bar"><h1`), path + ": one compact ← Branding link above the heading");
+    assert.ok(!/class="crumb"|Back to Branding/.test(html), path + ": no separate breadcrumb or second back link");
     assert.match(html, /<title>[^<]*\| Framework<\/title>/);
     assert.ok(!/<script[^>]*>\s*[^<\s]|\sstyle=/i.test(html.replace(/<script src="[^"]+"><\/script>/g, "")), path + ": no inline script or style");
   }
@@ -245,7 +246,7 @@ test("the upload form is plain HTML first: a multipart form with CSRF, a multipl
     assert.deepEqual([...sel.matchAll(/<option value="[^"]*">([^<]+)<\/option>/g)].map((m) => m[1]).slice(1), options, name);
     assert.match(sel, /<option value="">Skip<\/option>/, name + " is optional");
   }
-  assert.match(html, /<template id="lg-row-template">/); assert.match(html, /role="dialog" aria-modal="true" aria-labelledby="lg-sheet-h" hidden/);
+  assert.match(html, /<template id="lg-row-template">/); assert.match(html, /role="dialog" aria-modal="true" aria-labelledby="lg-sheet-h" aria-describedby="lg-sheet-help" hidden/);
   assert.match(html, /src="\/assets\/js\/portal-logo-upload\.js"/);
   const js = readFileSync(new URL("../../assets/js/portal-logo-upload.js", import.meta.url), "utf8");
   assert.match(js, /readAsDataURL/, "previews are data: images (the portal policy has no blob:)"); assert.ok(!/createObjectURL|fetch\(|XMLHttpRequest|innerHTML|eval\(/.test(js), "no network call, no HTML insertion");
@@ -314,4 +315,31 @@ test("without migration 0032 the library and the uploads still work (details are
   assert.equal(res.status, 303);
   assert.match(await text(ann, `${base("alpha")}/logos`), /plain\.png/);
   assert.equal(sql(w.db, "SELECT count(*) n FROM brand_uploads")[0].n, 1);
+});
+
+test("polish: the Logos page has no lead or breadcrumb, the upload help lives in the review sheet (and with the plain fallback), and the library starts right below the button", async () => {
+  const { ann, alpha, publishKit } = await setup();
+  await publishKit(alpha);
+  const html = await text(ann, `${base("alpha")}/logos`);
+  assert.ok(!/Your logo library|Download any version/.test(html), "the lead is gone");
+  assert.ok(!/<p class="muted small lg-help"[^>]*>[^<]*<\/p>\s*<div class="lg-nojs">/.test(html), "no help paragraph sits between the button and the library");
+  const sheet = /<div class="lg-sheet"[\s\S]*?<\/div><ul class="lg-list"/.exec(html)[0];
+  assert.match(sheet, /PNG, JPG, WebP, SVG, PDF, AI, EPS or ZIP\. Up to 25 MB each, 10 files at a time\. The details below are optional: you can upload without them\./, "formats, the real file and batch limits and the optional-details note are in the sheet");
+  assert.match(html, /<div class="lg-nojs"><p class="muted small lg-help" id="lg-help">PNG, JPG/, "the plain fallback keeps its help");
+  assert.match(html, /aria-describedby="lg-help"/);
+  const bar = html.indexOf('class="bhv-bar"'), btn = html.indexOf("lg-upload"), grid = html.search(/class="empty"|class="lg-grid"/);
+  assert.ok(bar < btn && btn < grid, "heading, then the button, then the empty state or the first card");
+  const js = readFileSync(new URL("../../assets/js/portal-logo-upload.js", import.meta.url), "utf8");
+  assert.match(js, /aria-describedby", "lg-sheet-help"/); assert.match(js, /Only the first " \+ maxFiles \+ " files were kept/, "too many files is said out loud");
+});
+
+test("polish: Continue Brand Discovery and the staff-only Preview Brand Book each get their own row, with the preview note below its button", async () => {
+  const { hubLanding } = await import("../portal/branding-hub.js");
+  const vm = { base: "/portal/o/alpha" };
+  const html = hubLanding(vm, { counts: {}, discoveryHref: "/portal/o/alpha/branding/discovery/x", discoveryLabel: "Continue Brand Discovery", bookHref: "/portal/o/alpha/branding/book" });
+  assert.match(html, /<p class="bh-row bh-discovery"><a class="text-link" href="[^"]+">Continue Brand Discovery<\/a><\/p><div class="bh-row bk-preview"><a class="btn btn--small" href="\/portal\/o\/alpha\/branding\/book">Preview Brand Book<\/a><p class="muted small bh-note">Prototype for review · visible to Framework master access only<\/p><\/div>$/);
+  const none = hubLanding(vm, { counts: {} });
+  assert.ok(!/bh-discovery|bk-preview|Prototype for review/.test(none), "visibility rules unchanged: nothing without a link or a staff preview");
+  const router = readFileSync(new URL("../portal/router.js", import.meta.url), "utf8");
+  assert.match(router, /bookHref: bookOn\(ctx\) && a\.staff/, "the preview is still staff-only and Staging-only");
 });

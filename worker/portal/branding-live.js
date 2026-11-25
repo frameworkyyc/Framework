@@ -424,7 +424,7 @@ export function brandingOverview(vm, brand, o = {}) {
   const view = o.view || "all";
   if (view === "hub") {
     const kitFiles = assets.filter((a) => a.kind !== "logo" && a.kind !== "font").length;
-    return hubLanding(vm, { counts: { logos: (o.uploads || []).filter((u) => u.category === "logo").length + new Set(assets.filter((a) => a.kind === "logo").map((a) => a.variantKey || a.id)).size, typography: typeList.length || fonts.length, colours: colours.length, kit: kitFiles + (live && brand.tagline ? 1 : 0) }, discoveryHref: dState === "new" || dState === "progress" ? dHref : "", discoveryLabel: dState === "new" ? "Start Brand Discovery" : "Continue Brand Discovery", bookHref: o.bookHref || "", lead: live ? `${approved}: logos, typography, colours and more.` : "Your logos, fonts, colours and brand guide, in one place." });
+    return hubLanding(vm, { counts: { logos: (o.uploads || []).filter((u) => u.category === "logo").length + new Set(assets.filter((a) => a.kind === "logo").map((a) => a.variantKey || a.id)).size, typography: typeList.length || fonts.length, colours: colours.length, kit: kitFiles + (live && brand.tagline ? 1 : 0) }, discoveryHref: dState === "new" || dState === "progress" ? dHref : "", discoveryLabel: dState === "new" ? "Start Brand Discovery" : "Continue Brand Discovery", bookHref: o.bookHref || "" });
   }
   const wrap = (title, lead, inner, cls = "") => `<div class="bhv">${viewHeader(vm, { title, lead })}${banner}${inner.includes("bk-offer") ? pricingNote : ""}<div class="bk bk--view${cls}">${inner}</div></div>`;
   if (view === "logos") {
