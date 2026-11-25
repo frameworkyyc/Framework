@@ -19,6 +19,7 @@
   /* The plain fallback (one file with its three details) is removed, not hidden: its fields share names and ids with the sheet's rows and must not be sent twice. */
   var plain = form.querySelector(".lg-nojs");
   if (plain && plain.parentNode) plain.parentNode.removeChild(plain);
+  input.setAttribute("aria-describedby", "lg-sheet-help"); /* the formats and limits now live in the review sheet */
   var maxBytes = parseInt(form.getAttribute("data-max-bytes") || "0", 10) || 0;
   var maxFiles = parseInt(form.getAttribute("data-max-files") || "10", 10) || 10;
   var PICTURES = /\.(png|jpe?g|webp|svg)$/i;
@@ -65,8 +66,10 @@
   }
   function open() {
     if (!files.length) return;
-    if (files.length > maxFiles) files = files.slice(0, maxFiles);
+    var extra = files.length > maxFiles ? files.length - maxFiles : 0;
+    if (extra) files = files.slice(0, maxFiles);
     sync(); render();
+    if (extra) status.textContent = "Only the first " + maxFiles + " files were kept (" + extra + " more can’t be added at once). " + status.textContent;
     opener = document.activeElement;
     sheet.hidden = false; document.body.classList.add("lg-open");
     var first = sheet.querySelector("select, button"); if (first) first.focus();

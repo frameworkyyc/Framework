@@ -44,24 +44,24 @@ export const HUB_OPTIONS = Object.freeze([
 ]);
 
 /**
- * @param o { counts: { logos, typography, colours, kit } (numbers), discoveryHref: string ("" when Brand Discovery is not in progress), bookHref, lead }
+ * @param o { counts: { logos, typography, colours, kit } (numbers), discoveryHref: string ("" when Brand Discovery is not in progress), discoveryLabel, bookHref }
  */
 export function hubLanding(vm, o = {}) {
-  const { counts = {}, discoveryHref = "", discoveryLabel = "Continue Brand Discovery", bookHref = "", lead = "Your logos, fonts, colours and brand guide, in one place." } = o;
+  const { counts = {}, discoveryHref = "", discoveryLabel = "Continue Brand Discovery", bookHref = "" } = o;
   const meta = (k) => {
     const n = counts[k] || 0;
     const word = { logos: ["logo file", "logo files"], typography: ["typeface", "typefaces"], colours: ["colour", "colours"], kit: ["file", "files"] }[k];
     return n ? `${n} ${n === 1 ? word[0] : word[1]}` : "Nothing added yet";
   };
   const cards = HUB_OPTIONS.map((x) => `<li class="bh-item"><a class="bh-card" href="${e(href(vm, x.path))}"><span class="bh-card__icon">${ICON[x.key]}</span><span class="bh-card__text"><span class="bh-card__title">${e(x.title)}</span><span class="bh-card__desc">${e(x.desc)}</span><span class="bh-card__meta">${e(meta(x.key))}</span></span>${GO}</a></li>`).join("");
-  const disc = discoveryHref ? `<p class="bh-discovery"><a class="text-link" href="${e(discoveryHref)}">${e(discoveryLabel)}</a></p>` : "";
-  const book = bookHref ? `<p class="bk-preview"><a class="btn btn--small" href="${e(bookHref)}">Preview Brand Book</a> <span class="muted small">Prototype for review · visible to Framework master access only</span></p>` : "";
-  return `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1><p class="lead">${e(lead)}</p></header><ul class="bh-grid">${cards}</ul>${disc}${book}`;
+  const disc = discoveryHref ? `<p class="bh-row bh-discovery"><a class="text-link" href="${e(discoveryHref)}">${e(discoveryLabel)}</a></p>` : "";
+  const book = bookHref ? `<div class="bh-row bk-preview"><a class="btn btn--small" href="${e(bookHref)}">Preview Brand Book</a><p class="muted small bh-note">Prototype for review · visible to Framework master access only</p></div>` : "";
+  return `<header class="page-head page-head--compact">${crumb(vm, [["Branding"]])}<h1 class="h1 h1--section">Branding</h1></header><ul class="bh-grid">${cards}</ul>${disc}${book}`;
 }
 
-/** The header every Branding view shares: breadcrumb, a clear way back to Branding, the title and a short lead. `actions` sits beside the title on desktop and under it on phones. */
+/** The header every Branding view shares: one compact "← Branding" link above the title, the title, an optional short lead. `actions` sits beside the title on desktop and under it on phones. */
 export function viewHeader(vm, { title, lead = "", actions = "" }) {
-  return `<header class="page-head page-head--compact bhv-head">${crumb(vm, [["Branding", "/branding"], [title]])}<p class="bhv-back"><a class="text-link" href="${e(href(vm, "/branding"))}"><span aria-hidden="true">←</span> Back to Branding</a></p><div class="bhv-bar"><h1 class="h1 h1--section">${e(title)}</h1>${actions}</div>${lead ? `<p class="lead">${e(lead)}</p>` : ""}</header>`;
+  return `<header class="page-head page-head--compact bhv-head"><p class="bhv-back"><a class="text-link" href="${e(href(vm, "/branding"))}"><span aria-hidden="true">←</span> Branding</a></p><div class="bhv-bar"><h1 class="h1 h1--section">${e(title)}</h1>${actions}</div>${lead ? `<p class="lead">${e(lead)}</p>` : ""}</header>`;
 }
 
 /* ------------------------------------------------------------------ the logo library */
@@ -115,12 +115,12 @@ const detailFields = (i) => `<div class="lg-fields">${select(`type_${i}`, "Logo 
  */
 function uploadForm(vm, { csrf, limits }) {
   const maxMb = limits ? Math.floor(limits.maxFileBytes / MB) : 25;
+  const help = `PNG, JPG, WebP, SVG, PDF, AI, EPS or ZIP. Up to ${maxMb} MB each, ${MAX_LOGO_FILES} files at a time. The details below are optional: you can upload without them.`;
   return `<form class="lg-form" id="lg-form" method="post" action="${e(href(vm, "/branding/logos"))}" enctype="multipart/form-data" novalidate data-max-bytes="${limits ? e(String(limits.maxFileBytes)) : ""}" data-max-files="${MAX_LOGO_FILES}">
 <input type="hidden" name="csrf" value="${e(csrf)}">
 <input class="lg-input" id="lg-files" name="file" type="file" multiple accept="${e(LOGO_ACCEPT)}" aria-describedby="lg-help">
-<p class="muted small lg-help" id="lg-help">PNG, JPG, WebP, SVG, PDF, AI, EPS or ZIP. Up to ${maxMb} MB each, ${MAX_LOGO_FILES} files at a time. You don’t have to fill in the details.</p>
-<div class="lg-nojs"><div class="lg-row lg-row--plain">${detailFields(0)}</div><p class="step-nav"><button class="btn btn--primary" type="submit">Upload logo</button></p></div>
-<div class="lg-sheet" id="lg-sheet" role="dialog" aria-modal="true" aria-labelledby="lg-sheet-h" hidden><div class="lg-sheet__panel"><div class="lg-sheet__head"><h2 class="h3" id="lg-sheet-h">Review your files</h2><p class="muted small">Add details if you like. You can upload without them.</p></div><ul class="lg-list" id="lg-list"></ul><p class="lg-sheet__status muted small" id="lg-status" role="status"></p><div class="lg-sheet__actions"><button class="btn" type="button" id="lg-cancel">Cancel</button><button class="btn btn--primary" type="submit" id="lg-submit">Upload</button></div></div></div>
+<div class="lg-nojs"><p class="muted small lg-help" id="lg-help">${e(help)}</p><div class="lg-row lg-row--plain">${detailFields(0)}</div><p class="step-nav"><button class="btn btn--primary" type="submit">Upload logo</button></p></div>
+<div class="lg-sheet" id="lg-sheet" role="dialog" aria-modal="true" aria-labelledby="lg-sheet-h" aria-describedby="lg-sheet-help" hidden><div class="lg-sheet__panel"><div class="lg-sheet__head"><h2 class="h3" id="lg-sheet-h">Review your files</h2><p class="muted small" id="lg-sheet-help">${e(help)}</p></div><ul class="lg-list" id="lg-list"></ul><p class="lg-sheet__status muted small" id="lg-status" role="status"></p><div class="lg-sheet__actions"><button class="btn" type="button" id="lg-cancel">Cancel</button><button class="btn btn--primary" type="submit" id="lg-submit">Upload</button></div></div></div>
 <template id="lg-row-template"><li class="lg-row"><div class="lg-row__thumb"></div><div class="lg-row__main"><p class="lg-row__name"></p><p class="muted small lg-row__note"></p>${detailFields("{i}")}</div><button class="btn btn--small btn--quiet lg-row__remove" type="button">Remove</button></li></template>
 </form>`;
 }
@@ -149,6 +149,6 @@ export function logoLibrary(vm, o = {}) {
   const banner = bannerError ? `<p class="form-banner form-banner--error" role="alert" tabindex="-1" data-error-summary>${e(bannerError)}</p>` : notice ? `<p class="form-banner" role="status">${e(notice)}</p>` : "";
   const count = mine.length + groups.size;
   const usage = limits && o.usage ? `<p class="muted small">${o.usage.files} of ${limits.maxFiles} files used · ${e(fileSize(o.usage.bytes))} of ${e(fileSize(limits.quotaBytes))}. Files are private to your organization and Framework.</p>` : "";
-  const head = viewHeader(vm, { title: "Logos", lead: "Your logo library. Download any version, any time.", actions: button });
+  const head = viewHeader(vm, { title: "Logos", actions: button });
   return `${head}${banner}${extraBanner}${resultList(results, errors)}${canUpload ? uploadForm(vm, { csrf, limits }) : `<p class="muted small">Your role can view and download logos but not upload them.</p>`}<section aria-labelledby="h-lib"><h2 class="h2 visually-hidden" id="h-lib">Logo files</h2>${count ? `<ul class="lg-grid">${cards}</ul>` : empty}</section>${usage}${offerHtml ? `<details class="lg-more" id="logo-variations"><summary class="lg-more__sum">Need a logo variation?</summary><div class="lg-more__body">${offerHtml}</div></details>` : ""}`;
 }

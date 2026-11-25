@@ -465,7 +465,7 @@ test("Branding shows a Brand Discovery card only when Framework has assigned one
   const csrf = csrfOf(html1);
   await ann.send(`/portal/o/alpha/branding/discovery/${id}/1`, { method: "POST", body: new URLSearchParams({ csrf, "l:style.personality:modern": "1", go: "save" }).toString(), headers: { "Content-Type": "application/x-www-form-urlencoded", ...SAME } });
   assert.equal(snap(), before, "answering never writes to brand kits, assets, requirements, uploads or requests");
-  assert.match(await text(await ann.get("/portal/o/alpha/branding")), /<p class="bh-discovery"><a class="text-link" href="[^"]*\/branding\/discovery\/[^"]+">Continue Brand Discovery<\/a><\/p>/, "the hub's small link, below the four options");
+  assert.match(await text(await ann.get("/portal/o/alpha/branding")), /<p class="bh-row bh-discovery"><a class="text-link" href="[^"]*\/branding\/discovery\/[^"]+">Continue Brand Discovery<\/a><\/p>/, "the hub's small link, below the four options");
 });
 
 /* ====================================================================== Admin API */
