@@ -230,6 +230,12 @@ body:not(.auth):not(.si-body) .wd-item .wd-btn { border-radius: var(--ds-pill); 
 .pv__link { display: flex; align-items: center; min-height: 44px; padding: 0 8px; border-radius: var(--ds-r); color: var(--ds-ink); font-size: 15px; font-weight: 600; text-decoration: none; }
 .pv__link:hover { background: var(--ds-soft); }
 body:has(.pv) .foot { padding-bottom: 88px; }
+/* phones: a little more room from the edge and the home indicator; the open panel stays aligned above the button and inside the screen */
+@media (max-width: 640px), (pointer: coarse) and (max-height: 500px) {
+  .pv { right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); }
+  .pv__panel[popover] { right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px) + 60px); width: min(300px, calc(100vw - 40px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); max-height: calc(100dvh - 120px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto; }
+  body:has(.pv) .foot { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+}
 @media (prefers-reduced-transparency: reduce) { .pv__btn, .pv__panel[popover] { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; } }
 @media (prefers-reduced-motion: reduce) { .pv__btn { transition: none; } }
 /* a browser without the popover element: no button, the panel is simply shown as a small card at the same place */

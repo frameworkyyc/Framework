@@ -264,3 +264,14 @@ test("the preview bubble: a labelled floating button and a compact panel (native
   assert.equal((await hello.get("/portal/o/alpha")).headers.get("content-security-policy"), (await ann.get("/portal/o/alpha")).headers.get("content-security-policy"));
   void w;
 });
+
+test("the preview bubble on phones: 24px from the right and 20px from the bottom plus the safe-area insets, the panel aligned above it; desktop placement and the button size are unchanged", async () => {
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../../assets/css/portal-ds.css", import.meta.url), "utf8");
+  assert.match(css, /\.pv \{ position: fixed; z-index: 50; right: max\(16px, env\(safe-area-inset-right\)\); bottom: max\(16px, env\(safe-area-inset-bottom\)\); \}/, "desktop placement unchanged");
+  assert.match(css, /\.pv__btn \{ display: grid; place-items: center; width: 48px; height: 48px;/, "button size unchanged");
+  const phone = /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{\s*\.pv \{([^}]*)\}\s*\.pv__panel\[popover\] \{([^}]*)\}/.exec(css);
+  assert.ok(phone, "a phone-only block");
+  assert.match(phone[1], /right: calc\(24px \+ env\(safe-area-inset-right, 0px\)\); bottom: calc\(20px \+ env\(safe-area-inset-bottom, 0px\)\)/);
+  assert.match(phone[2], /right: calc\(24px \+ env\(safe-area-inset-right, 0px\)\); bottom: calc\(20px \+ env\(safe-area-inset-bottom, 0px\) \+ 60px\)/, "the panel keeps the same 12px gap above the 48px button");
+});
