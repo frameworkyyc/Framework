@@ -343,3 +343,30 @@ test("polish: Continue Brand Discovery and the staff-only Preview Brand Book eac
   const router = readFileSync(new URL("../portal/router.js", import.meta.url), "utf8");
   assert.match(router, /bookHref: bookOn\(ctx\) && a\.staff/, "the preview is still staff-only and Staging-only");
 });
+
+test("Need a logo variation? appears only when there is an actionable design option: never blank when every logo slot is filled, and always with the existing pricing and request action when something is missing", async () => {
+  const { ann, mia, alpha, deliver, publishKit } = await setup();
+  await publishKit(alpha);
+  const has = (html) => /<details class="lg-more" id="logo-variations">/.test(html);
+  const open = (html) => html.slice(html.indexOf('id="logo-variations"'));
+  // nothing published: four variations can still be designed
+  let html = await text(ann, `${base("alpha")}/logos`);
+  assert.ok(has(html)); assert.match(open(html), /Request Design/); assert.match(open(html), /action="\/portal\/o\/alpha\/branding\/request"/);
+  assert.match(await text(mia, `${base("alpha")}/logos`), /Ask an owner of your organization to send a request/);
+  // one variation filled: the others are still offered, the filled one is not
+  await deliver(alpha, { kind: "logo", logo_role: "primary", orientation: "horizontal", tone: "light", transparent: true }, "p.png", S.png());
+  html = await text(ann, `${base("alpha")}/logos`);
+  assert.ok(has(html)); assert.ok(!/Primary Logo Design/.test(open(html)), "the filled variation is not offered"); assert.match(open(html), /Secondary Logo Design/);
+  // all four filled: no design option is left, so no empty disclosure
+  await deliver(alpha, { kind: "logo", logo_role: "secondary", orientation: "horizontal", tone: "light", transparent: true }, "s.png", S.png(3));
+  await deliver(alpha, { kind: "logo", logo_role: "simplified", orientation: "horizontal", tone: "light", transparent: true }, "m.png", S.png(4));
+  await deliver(alpha, { kind: "logo", logo_role: "icon", orientation: "square", tone: "light", transparent: true }, "i.png", S.png(5));
+  html = await text(ann, `${base("alpha")}/logos`);
+  assert.ok(!has(html), "all slots filled: the disclosure is not rendered");
+  assert.ok(!/Need a logo variation\?/.test(html));
+  assert.ok(!/<details class="lg-more"[^>]*>\s*<summary[^>]*>[^<]*<\/summary>\s*<div class="lg-more__body">\s*<\/div>/.test(html), "and never an empty one");
+  // an open whole-logo request keeps its status visible even with every slot filled
+  assert.equal((await ann.post(`${base("alpha")}/request`, { csrf: csrfOf(await text(ann, `${base("alpha")}/logos`)), section: "brand-logos", note: "" })).status, 303);
+  html = await text(ann, `${base("alpha")}/logos`);
+  assert.ok(has(html) && /class="tag">Requested</.test(open(html)), "an open request is shown, not hidden");
+});

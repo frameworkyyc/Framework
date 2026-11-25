@@ -22,23 +22,24 @@ test("links go to the other environment's fixed entry point, with nothing carrie
   assert.ok(!/[?#]/.test(switchLink("staging.frameworkco.ca", "portal").href), "no query or fragment");
 });
 
-test("client portal on Staging: everyone sees the Staging label; the switch link is for Framework staff only, in the bar and in the mobile menu, above Sign out", async () => {
+test("client portal on Staging: everyone sees the Staging label; the switch link lives only in the staff preview bubble, never in the bar or the Menu, and a client never gets the bubble", async () => {
   const w = await makeWorld();
   Object.assign(w.env, { PORTAL_FILES: fakeR2(), PORTAL_SERVICES: "1", PORTAL_REQUESTS: "1" });
   const A = await w.org("alpha", "Alpha Co");
-  await w.invite(A, "ann@alpha.test", "owner");
-  const ann = w.browser(), hello = w.browser();
-  await ann.signIn(w.user(1, "ann@alpha.test")); await hello.signIn(w.user(9, "hello@frameworkco.ca"));
-  const client = await (await ann.get("/portal/o/alpha")).text();
-  assert.match(client, /<span class="envtag">Staging<\/span>/);
-  assert.ok(!/envlink|Switch to/.test(client), "a client never sees the switch");
+  await w.invite(A, "ann@alpha.test", "owner"); await w.invite(A, "mia@alpha.test", "member");
+  const ann = w.browser(), mia = w.browser(), hello = w.browser();
+  await ann.signIn(w.user(1, "ann@alpha.test")); await mia.signIn(w.user(3, "mia@alpha.test")); await hello.signIn(w.user(9, "hello@frameworkco.ca"));
+  for (const b of [ann, mia]) {
+    const client = await (await b.get("/portal/o/alpha")).text();
+    assert.match(client, /<span class="envtag">Staging<\/span>/);
+    assert.ok(!/envlink|Switch to|data-staff-preview|Preview controls|class="pv/.test(client), "a client never sees the switch or the preview controls");
+  }
   const staff = await (await hello.get("/portal/o/alpha")).text();
-  assert.match(staff, /<span class="envtag">Staging<\/span>/);
-  const links = [...staff.matchAll(/<a class="envlink" href="([^"]*)" rel="noopener noreferrer">([^<]*)<\/a>/g)];
-  assert.equal(links.length, 2, "once in the account bar and once in the menu");
-  for (const [, href, label] of links) { assert.equal(href, "https://frameworkco.ca/portal"); assert.equal(label, "Switch to Production"); }
-  assert.ok(staff.indexOf('<li class="primary__env">') < staff.indexOf('<li class="primary__out">'), "Sign out stays last in the menu");
-  assert.ok(!/(session|token|csrf)[^"]*frameworkco\.ca\/portal/i.test(staff.match(/<a class="envlink"[^>]*>/)[0]));
+  assert.match(staff, /<span class="envtag">Staging<\/span>/, "the Staging badge stays");
+  assert.ok(!/class="envlink"|primary__env/.test(staff), "no environment link in the bar or the regular menu for staff");
+  const links = [...staff.matchAll(/<a class="pv__link" href="([^"]*)"(?: rel="noopener noreferrer")?>([^<]*)<\/a>/g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(links, [["/portal", "Switch client"], ["https://frameworkco.ca/portal", "Switch to Production"]], "one environment link, in the bubble, the fixed entry point");
+  assert.ok(!/frameworkco\.ca\/portal[^"]*[?#;]|(session|token|csrf|alpha)[^"]*frameworkco\.ca\/portal/i.test(staff.match(/<a class="pv__link" href="https:[^>]*>/)[0]), "nothing from this visit is carried across");
 });
 
 test("Admin: the sidebar footer shows the link under Sign out, and Staging shows its label", () => {
