@@ -152,3 +152,6 @@ The Review tab's expanded panels (Website updates, Needed from the client; root 
 
 ## Client Portal Branding hub
 Four link cards (2 x 2 from 641px, four compact rows on a phone; `bh-card`), then a small Brand Discovery link while one is waiting or in progress. Each view uses `viewHeader` (breadcrumb, Back to Branding, title, the action beside the title on desktop and full width below it on a phone). The logo library uses `lg-card` tiles and a bottom sheet (`lg-sheet`) on phones and a centred card elsewhere. Styles: `assets/css/portal-branding-hub.css`.
+
+## Master-access preview controls (client portal)
+Framework staff in master access get one small floating frosted-glass button (bottom right, labelled "Preview controls") instead of the black bar. It opens a compact panel above it (native popover: no script; Escape and an outside click close it and focus returns to the button) with the client being viewed, the Owner / Member preview selector (active role filled and ticked), Switch client and the environment link (fixed `/portal` entry of the other environment; nothing carried across). Only rendered when the guard verified staff access; it stays for either preview role, and the regular bar and Menu no longer carry the environment link for staff. Safe-area aware; the page keeps room below its footer.

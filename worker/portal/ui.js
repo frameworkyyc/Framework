@@ -122,8 +122,9 @@ const envLinkHtml = (l) => `<a class="envlink" href="${e(l.href)}" rel="noopener
  * @param who     {org, user}  shown in the bar
  * @param actions HTML for the right side of the bar (sign-out form, or the demo exit link) - already escaped by the caller
  * @param banner  HTML shown above the bar (the demo banner) - already escaped by the caller
+ * @param floating HTML placed last in the body (the master-access preview controls) - already escaped by the caller
  */
-export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions = "", banner = "", headers = {}, cookies = [], script = null, styles = [], feedbackHref = null, frameSrc = [], bleed = false, fx = false, envTag = "", envLink = null }) {
+export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions = "", banner = "", headers = {}, cookies = [], script = null, styles = [], feedbackHref = null, frameSrc = [], bleed = false, fx = false, envTag = "", envLink = null, floating = "" }) {
   const items = nav.list || [...NAV, ...(nav.items || [])];
   const links = items.map((n) => `<li><a href="${e(nav.base + n.path)}"${n.key === nav.active ? ' aria-current="page"' : ""}>${e(n.label)}</a></li>`).join("");
   const html = `<!DOCTYPE html>
@@ -132,7 +133,7 @@ export function appPage({ status: code = 200, title, bodyHtml, nav, who, actions
 <header class="bar${nav.menu ? " bar--wide" : ""}"><div class="wrap bar__in"><a class="brand" href="${e(nav.base)}" aria-label="Framework client portal home">${MARK}<span class="brand__word">Framework</span></a>${envTag ? `<span class="envtag">${e(envTag)}</span>` : ""}
 ${nav.menu ? `<nav class="primary primary--wide" aria-label="Portal"><ul class="primary__list">${links}</ul><details class="primary__menu"><summary>Menu</summary><ul>${links}${envLink ? `<li class="primary__env">${envLinkHtml(envLink)}</li>` : ""}${actions ? `<li class="primary__out">${actions}</li>` : ""}</ul></details></nav>` : `<nav class="primary" aria-label="Portal"><ul>${links}</ul></nav>`}
 <div class="who"><span class="who__org">${e(who.org)}</span><span class="who__user">${e(who.user)}</span><div class="who__act">${envLink ? envLinkHtml(envLink) : ""}${actions}</div></div></div></header>
-<main id="main" class="${bleed ? "page page--bleed" : "wrap page"}" tabindex="-1">${bodyHtml}</main>${feedbackHref ? footerWithFeedback(feedbackHref) : footer}</body></html>`;
+<main id="main" class="${bleed ? "page page--bleed" : "wrap page"}" tabindex="-1">${bodyHtml}</main>${feedbackHref ? footerWithFeedback(feedbackHref) : footer}${floating}</body></html>`;
   return new Response(html, { status: code, headers: securityHeaders({ ...headers, "Content-Type": "text/html; charset=utf-8", "Set-Cookie": cookies }, { scripts: !!script || !!fx, frameSrc }) });
 }
 

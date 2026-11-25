@@ -204,3 +204,33 @@ body:not(.auth):not(.si-body) .wd-item .wd-btn { border-radius: var(--ds-pill); 
   .bar--wide .brand__word { letter-spacing: .08em; }
   body:not(.auth):not(.si-body) .primary__menu summary { padding: 0 14px; }
 }
+
+
+/* ---------- master-access preview controls: a small floating frosted-glass button (bottom right) that opens a compact panel above it ----------
+   Staff only (the markup is never rendered for a client). A native popover: a tap toggles it, Escape or a click outside closes it, focus returns to the button.
+   Clear of the iPhone home indicator through the safe-area inset, and the page keeps room below its last line so the button never covers footer links. */
+.pv { position: fixed; z-index: 50; right: max(16px, env(safe-area-inset-right)); bottom: max(16px, env(safe-area-inset-bottom)); }
+.pv__btn { display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 1px solid rgba(10, 10, 10, .12); border-radius: 50%; background: rgba(255, 255, 255, .62); -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4); color: var(--ds-ink); box-shadow: var(--ds-shadow-2); cursor: pointer; transition: background var(--ds-dur) var(--ds-ease), transform var(--ds-dur) var(--ds-ease); }
+.pv__btn:hover { background: rgba(255, 255, 255, .88); }
+.pv__btn:active { transform: scale(.96); }
+.pv__btn:focus-visible { outline: 2px solid var(--ds-ink); outline-offset: 3px; }
+.pv__panel[popover] { position: fixed; inset: auto; right: max(16px, env(safe-area-inset-right)); bottom: calc(max(16px, env(safe-area-inset-bottom)) + 60px); margin: 0; width: min(300px, calc(100vw - 32px)); padding: 16px; border: 1px solid rgba(10, 10, 10, .1); border-radius: var(--ds-r-lg); background: rgba(255, 255, 255, .86); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); color: var(--ds-ink); box-shadow: var(--ds-shadow-2); overflow: visible; }
+.pv__eyebrow { margin: 0 0 2px; font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ds-muted); }
+.pv__who { margin: 0 0 14px; font-size: 16px; line-height: 1.35; overflow-wrap: anywhere; }
+.pv__group { margin: 0 0 12px; }
+.pv__label { display: block; margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--ds-muted); }
+.pv__seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: var(--ds-soft); }
+.pv__form { margin: 0; }
+.pv__role { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--ds-ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.pv__role:hover { background: rgba(10, 10, 10, .06); }
+.pv__role[aria-pressed="true"] { background: var(--ds-ink); color: #fff; }
+.pv__role:focus-visible, .pv__link:focus-visible { outline: 2px solid var(--ds-ink); outline-offset: 2px; }
+.pv__tick { display: inline-block; min-width: 1ch; font-size: 13px; }
+.pv__links { display: grid; gap: 2px; padding-top: 8px; border-top: 1px solid var(--ds-line); }
+.pv__link { display: flex; align-items: center; min-height: 44px; padding: 0 8px; border-radius: var(--ds-r); color: var(--ds-ink); font-size: 15px; font-weight: 600; text-decoration: none; }
+.pv__link:hover { background: var(--ds-soft); }
+body:has(.pv) .foot { padding-bottom: 88px; }
+@media (prefers-reduced-transparency: reduce) { .pv__btn, .pv__panel[popover] { background: #fff; -webkit-backdrop-filter: none; backdrop-filter: none; } }
+@media (prefers-reduced-motion: reduce) { .pv__btn { transition: none; } }
+/* a browser without the popover element: no button, the panel is simply shown as a small card at the same place */
+@supports not selector(:popover-open) { .pv__btn { display: none; } .pv__panel[popover] { display: block; bottom: max(16px, env(safe-area-inset-bottom)); } }

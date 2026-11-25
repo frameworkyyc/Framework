@@ -429,7 +429,10 @@ export function brandingOverview(vm, brand, o = {}) {
   const wrap = (title, lead, inner, cls = "") => `<div class="bhv">${viewHeader(vm, { title, lead })}${banner}${inner.includes("bk-offer") ? pricingNote : ""}<div class="bk bk--view${cls}">${inner}</div></div>`;
   if (view === "logos") {
     // "Need a logo variation?": Framework's paid design options for the variations that have no published file yet, through the existing request workflow (the free upload is on this page, so no upload link here).
-    const offerHtml = anyLogoSetting ? "" : offerList({ rows: missingLogos, extra: legacyOpen("brand-logos"), uploadHref: "", upload: pricingService("logo-primary").upload });
+    // Only when there is something to act on: a variation without a published file (a design to request), or an open whole-logo request whose status should stay visible. With every slot filled
+    // (or Admin's own settings in charge) there is nothing to offer, so the disclosure is not drawn at all.
+    const openLogoRequest = legacyOpen("brand-logos");
+    const offerHtml = !anyLogoSetting && (missingLogos.length || openLogoRequest) ? offerList({ rows: missingLogos, extra: openLogoRequest, uploadHref: "", upload: pricingService("logo-primary").upload }) : "";
     return `<div class="bhv bhv--logos">${logoLibrary(vm, { uploads: o.uploads || [], assets, labels: { role: ROLE_LABEL, orientation: ORIENTATION_LABEL, tone: TONE_LABEL }, canUpload, canDelete: o.canDelete, csrf, limits: o.limits, usage: o.usage, results: o.results, errors: { ...UPLOAD_ERRORS, ...LOGO_ERRORS }, banner, notice: o.noticeText || "", bannerError: o.bannerError || "", offerHtml })}</div>`;
   }
   if (view === "typography") return wrap("Typography", "Approved fonts, how to use them, and where to get them.", parts[1], " bk--single");
