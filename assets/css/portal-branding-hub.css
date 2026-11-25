@@ -2,7 +2,7 @@
    Uses the portal's shared tokens (defined in portal-ds.css, which loads after this file): soft grey ground, white cards, gentle corners, pill buttons. */
 
 /* ---------- the four options: 2 x 2 on desktop and tablet, four compact rows on a phone ---------- */
-.bh-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 24px 0 0; padding: 0; list-style: none; }
+.bh-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0 0; padding: 0; list-style: none; }
 .bh-card { position: relative; display: grid; grid-template-columns: 48px minmax(0, 1fr) 16px; align-items: center; gap: 16px; min-height: 120px; padding: 24px; border: 1px solid var(--ds-line, #E3E3E0); border-radius: var(--ds-r-lg, 18px); background: var(--ds-card, #fff); color: var(--ds-ink, #0A0A0A); text-decoration: none; box-shadow: var(--ds-shadow-1, 0 1px 2px rgba(10, 10, 10, .04)); transition: box-shadow .18s, transform .18s, background .18s; }
 .bh-card:hover { box-shadow: var(--ds-shadow-2, 0 8px 24px rgba(10, 10, 10, .12)); transform: translateY(-1px); }
 .bh-card:focus-visible { outline: 2px solid var(--ds-ink, #0A0A0A); outline-offset: 3px; }
@@ -13,7 +13,9 @@
 .bh-card__meta { margin-top: 4px; font-size: 13px; font-weight: 600; color: var(--ds-ink, #0A0A0A); }
 .bh-card__go { color: var(--ds-muted, #66665F); transition: transform .18s; }
 .bh-card:hover .bh-card__go { transform: translateX(3px); color: var(--ds-ink, #0A0A0A); }
-.bh-discovery { margin: 20px 4px 0; font-size: 15px; }
+.bh-row { margin: 16px 0 0; }
+.bh-discovery { margin: 16px 4px 0; font-size: 15px; }
+.bh-note { margin: 8px 0 0; max-width: 34em; }
 @media (max-width: 640px) {
   .bh-grid { grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 18px; }
   .bh-card { grid-template-columns: 40px minmax(0, 1fr) 16px; min-height: 0; gap: 14px; padding: 14px 16px; border-radius: var(--ds-r, 12px); }
@@ -24,7 +26,7 @@
 }
 
 /* ---------- a view: back link, title, and the action beside it ---------- */
-.bhv-back { margin: 0 0 8px; font-size: 14px; }
+.bhv-back { margin: 0 0 6px; font-size: 14px; }
 .bhv-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
 .bhv-bar .h1 { margin: 0; }
 .bhv .bk--view .bk-sec__no, .bhv .bk--view .bk-nav { display: none; }
@@ -41,11 +43,12 @@
 .lg-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); }
 .lg-input:focus-visible ~ .lg-help { outline: 2px solid var(--ds-ink, #0A0A0A); outline-offset: 2px; border-radius: 6px; }
 body:has(.lg-input:focus-visible) .lg-upload { outline: 2px solid var(--ds-ink, #0A0A0A); outline-offset: 3px; }
-.lg-form { margin: 16px 0 0; }
+.lg-form { margin: 0; }
+.lg-form:has(.lg-nojs) { margin-top: 16px; }
 .lg-help { margin: 0 0 12px; }
 .lg-nojs { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--ds-line, #E3E3E0); border-radius: var(--ds-r, 12px); background: var(--ds-card, #fff); }
 .lg-form--js .lg-nojs { display: none; }
-.lg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 20px 0 0; padding: 0; list-style: none; }
+.lg-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 16px 0 0; padding: 0; list-style: none; }
 .lg-card { display: grid; grid-template-rows: auto 1fr; overflow: hidden; border: 1px solid var(--ds-line, #E3E3E0); border-radius: var(--ds-r-lg, 18px); background: var(--ds-card, #fff); box-shadow: var(--ds-shadow-1, 0 1px 2px rgba(10, 10, 10, .04)); }
 .lg-card__stage { padding: 12px 12px 0; }
 .lg-stage { display: grid; place-items: center; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--ds-r, 12px); background: var(--ds-soft, #F5F5F3); }
@@ -145,3 +148,9 @@ body.lg-open { overflow: hidden; }
 .bhv .bk--view .bk-more, .bhv .bk--view .brand-aside, .bhv .bk--view .brand-kit { margin-top: 28px; }
 .bhv .bk--view > .lg-more { margin-top: 24px; }
 .bhv .bk--view .swatches { gap: 16px; }
+
+/* the library starts right under the upload button; the empty state takes the same spot */
+.bhv--logos .bhv-head { margin-bottom: 0; }
+.bhv--logos section[aria-labelledby="h-lib"] .empty { margin-top: 16px; }
+.bhv--logos .lg-results, .bhv--logos .form-banner { margin-top: 16px; }
+@media (max-width: 640px) { .bhv--logos .lg-grid { margin-top: 12px; } }
