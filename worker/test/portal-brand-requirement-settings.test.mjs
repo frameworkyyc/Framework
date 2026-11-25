@@ -41,7 +41,7 @@ async function setup({ migrated = true } = {}) {
   let seq = 0;
   const section = async (key, published = true) => assert.equal((await upload({ kind: "other", title: key + seq, section: key, published }, `${key}${seq}.png`, S.png(10 + ++seq, 10))).status, 201);
   const publish = async (kit = {}) => { assert.ok((await brand.saveBrandKit(w.db, A.id, kit, ADMIN)).ok); assert.ok((await brand.setBrandKitStatus(w.db, A.id, "published", ADMIN)).ok); };
-  const page = async () => (await ann.get(base)).text();
+  const page = async () => (await ann.get(base + "/all")).text();
   return { w, A, ann, call, upload, logo, section, publish, page };
 }
 
@@ -141,12 +141,12 @@ test("settings belong to one client: another organization, its members and its p
   const B = await t.w.org("beta", "Beta Co"); await t.w.invite(B, "bob@beta.test", "owner");
   const bob = t.w.browser(); await bob.signIn(t.w.user(2, "bob@beta.test"));
   assert.ok((await brand.saveBrandKit(t.w.db, B.id, {}, ADMIN)).ok); assert.ok((await brand.setBrandKitStatus(t.w.db, B.id, "published", ADMIN)).ok);
-  const betaBefore = norm(await (await bob.get("/portal/o/beta/branding")).text());
+  const betaBefore = norm(await (await bob.get("/portal/o/beta/branding/all")).text());
   await t.publish();
   assert.equal((await setReq(t, "logo", "required", "<script>alert(1)</script> & more")).status, 200);
   const html = await t.page();
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; more/); assert.ok(!html.includes("<script>alert"));
-  assert.equal(norm(await (await bob.get("/portal/o/beta/branding")).text()), betaBefore, "Beta's page is byte-identical");
+  assert.equal(norm(await (await bob.get("/portal/o/beta/branding/all")).text()), betaBefore, "Beta's page is byte-identical");
   assert.equal(sql(t.w, "SELECT COUNT(*) n FROM brand_requirements WHERE organization_id = ?", B.id)[0].n, 0);
 });
 

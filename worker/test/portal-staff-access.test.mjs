@@ -99,7 +99,7 @@ test("opening a client: its own pages and content, a persistent banner, and no t
     const res = await hello.get(`/portal/o/alpha${p}`);
     assert.equal(res.status, 200, p);
     const html = await res.text();
-    assert.match(html, /Viewing: Alpha Co/, p);
+    assert.match(html, /Viewing: <strong>Alpha Co<\/strong>/, p);
     assert.match(html, /Framework master access/, p);
     assert.match(html, /href="\/portal">Switch client/, p);
   }
@@ -130,7 +130,7 @@ test("role preview: Owner (default) shows Team; Member hides it exactly as a mem
   const member = await text(hello, "/portal/o/alpha");
   assert.doesNotMatch(member, /href="\/portal\/o\/alpha\/members"/);
   assert.equal((await hello.get("/portal/o/alpha/members")).status, 403, "refused exactly as it is for a real member");
-  assert.match(member, /aria-pressed="true">Member/);
+  assert.match(member, /aria-pressed="true"><span class="pv__tick" aria-hidden="true">✓<\/span>Member/);
   await post(hello, "/portal/staff/view-as", { csrf: csrfOf(member), role: "owner", next: "/portal/o/alpha" });
   assert.equal((await hello.get("/portal/o/alpha/members")).status, 200);
   hello.jar.set(VIEW_ROLE_COOKIE, "superuser"); // a tampered cookie falls back to the default and cannot raise anything
@@ -140,8 +140,8 @@ test("role preview: Owner (default) shows Team; Member hides it exactly as a mem
 test("switching between several clients works, and each shows only its own content", async () => {
   const { hello } = await setup();
   const a = await text(hello, "/portal/o/alpha"), b = await text(hello, "/portal/o/beta");
-  assert.match(a, /Viewing: Alpha Co/); assert.doesNotMatch(a, /Beta Co/);
-  assert.match(b, /Viewing: Beta Co/); assert.doesNotMatch(b, /Alpha Co/);
+  assert.match(a, /Viewing: <strong>Alpha Co<\/strong>/); assert.doesNotMatch(a, /Beta Co/);
+  assert.match(b, /Viewing: <strong>Beta Co<\/strong>/); assert.doesNotMatch(b, /Alpha Co/);
 });
 
 test("a Framework request is attributed to Framework: the client sees \"Framework\", Admin sees the staff name flagged, and every write and visit is audited internally", async () => {
@@ -237,4 +237,41 @@ test("audit: a direct link to an inner page records the visit, once per 30-minut
   await post(hello, "/portal/o/alpha/account", { csrf, name: "A" });
   await post(hello, "/portal/o/alpha/account", { csrf, name: "B" });
   assert.equal(sql(w, "SELECT COUNT(*) n FROM activity_log WHERE action = 'staff.portal.write' AND organization_id = ?", A.id)[0].n, 2);
+});
+
+test("the preview bubble: a labelled floating button and a compact panel (native popover, no script) with the client, the Owner / Member selector with the active role marked, Switch client and the environment link; present for either preview role, absent for clients and on the directory", async () => {
+  const { w, ann, hello } = await setup();
+  const html = await text(hello, "/portal/o/alpha");
+  assert.match(html, /<button class="pv__btn" type="button" popovertarget="pv-panel" aria-label="Preview controls">/);
+  assert.match(html, /<div class="pv__panel" id="pv-panel" popover role="dialog" aria-label="Preview controls">/);
+  assert.ok(!/class="staff-banner"/.test(html), "the black bar is gone");
+  assert.match(html, /<p class="pv__who">Viewing: <strong>Alpha Co<\/strong><\/p>/);
+  assert.match(html, /<button class="pv__role" type="submit" aria-pressed="true"><span class="pv__tick" aria-hidden="true">✓<\/span>Owner<\/button>/, "Owner is the default and is marked");
+  assert.match(html, /<button class="pv__role" type="submit" aria-pressed="false"><span class="pv__tick" aria-hidden="true"><\/span>Member<\/button>/);
+  assert.match(html, /<a class="pv__link" href="\/portal">Switch client<\/a>/);
+  assert.match(html, /href="https:\/\/frameworkco\.ca\/portal" rel="noopener noreferrer">Switch to Production<\/a>/);
+  assert.equal([...html.matchAll(/Switch to Production/g)].length, 1, "exactly one environment link: no duplicate in the regular menu");
+  assert.ok(html.indexOf('class="pv"') > html.indexOf("</main>"), "the bubble is last in the page, out of the way of the content");
+  // the same preview action as before, then the bubble is still there with Member marked, and Team is hidden as for a real member
+  const csrf = csrfOf(html);
+  assert.equal((await post(hello, "/portal/staff/view-as", { csrf, role: "member", next: "/portal/o/alpha" })).status, 303);
+  const member = await text(hello, "/portal/o/alpha");
+  assert.match(member, /aria-pressed="true"><span class="pv__tick" aria-hidden="true">✓<\/span>Member/); assert.match(member, /data-staff-preview/);
+  assert.match(member, /name="next" value="\/portal\/o\/alpha"/, "the preview form returns to the same page");
+  // ordinary client accounts: no bubble, no preview forms
+  for (const p of ["/portal/o/alpha", "/portal/o/alpha/account"]) assert.ok(!/data-staff-preview|pv__|Preview controls|staff\/view-as/.test(await text(ann, p)), p);
+  // no script was added for it: staff and clients get the same strict policy on this page
+  assert.equal((await hello.get("/portal/o/alpha")).headers.get("content-security-policy"), (await ann.get("/portal/o/alpha")).headers.get("content-security-policy"));
+  void w;
+});
+
+test("the preview bubble on phones: 24px from the right and 20px from the bottom plus the safe-area insets, the panel aligned above it; desktop placement and the button size are unchanged", async () => {
+  const { readFileSync } = await import("node:fs");
+  const css = readFileSync(new URL("../../assets/css/portal-ds.css", import.meta.url), "utf8");
+  assert.match(css, /\.pv \{ position: fixed; z-index: 50; right: max\(16px, env\(safe-area-inset-right\)\); bottom: max\(16px, env\(safe-area-inset-bottom\)\); \}/, "desktop placement unchanged");
+  assert.match(css, /\.pv__btn \{ display: grid; place-items: center; width: 48px; height: 48px;/, "button size unchanged");
+  const phone = /@media \(max-width: 640px\), \(pointer: coarse\) and \(max-height: 500px\) \{\s*\.pv \{([^}]*)\}\s*\.pv__panel\[popover\] \{([^}]*)\}/.exec(css);
+  assert.ok(phone, "a phone-only block");
+  assert.match(phone[1], /right: calc\(24px \+ env\(safe-area-inset-right, 0px\)\); bottom: calc\(20px \+ env\(safe-area-inset-bottom, 0px\)\)/);
+  assert.match(phone[2], /right: calc\(24px \+ env\(safe-area-inset-right, 0px\)\); bottom: calc\(20px \+ env\(safe-area-inset-bottom, 0px\) \+ 60px\)/, "the panel keeps the same 12px gap above the 48px button");
 });

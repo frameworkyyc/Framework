@@ -33,7 +33,7 @@ async function setup() {
   await w.invite(alpha, "ann@alpha.test", "owner"); await w.invite(alpha, "mia@alpha.test", "member"); await w.invite(beta, "bob@beta.test", "owner");
   const ann = w.browser(), mia = w.browser(), bob = w.browser();
   await ann.signIn(w.user(1, "ann@alpha.test")); await mia.signIn(w.user(2, "mia@alpha.test")); await bob.signIn(w.user(3, "bob@beta.test"));
-  const csrf = async (b, slug) => csrfOf(await (await b.get(base(slug))).text());
+  const csrf = async (b, slug) => csrfOf(await (await b.get(base(slug) + "/all")).text());
   const send = async (b, slug, fields = {}, token) => b.post(`${base(slug)}/request`, { csrf: token === undefined ? await csrf(b, slug) : token, ...fields });
   const admin = async (path, { method = "GET", json } = {}) => {
     const h = { Origin: ADMIN_ORIGIN, "Cf-Access-Jwt-Assertion": sign({ iss: `https://${TEAM}`, aud: [AUD], email: ADMIN, exp: nowS() + 600, iat: nowS() }), ...(method !== "GET" ? { "X-Framework-Admin": "1", "Content-Type": "application/json" } : {}) };
@@ -54,13 +54,13 @@ test("the catalogue: six section request keys plus one per priced design service
 test("an owner requests an empty section: the request is stored for the right organization and person, the page shows its status instead of a button, and it is audited", async () => {
   const { w, alpha, ann, send } = await setup();
   const res = await send(ann, "alpha", { section: "brand-logos", note: "We need a primary and an icon version." });
-  assert.equal(res.status, 303); assert.equal(res.headers.get("Location"), `${base("alpha")}?requested=1`);
+  assert.equal(res.status, 303); assert.equal(res.headers.get("Location"), `${base("alpha")}/logos?requested=1`);
   const r = rowsOf(w, "SELECT organization_id, service_key, status, note, requested_by FROM service_requests");
   assert.equal(r.length, 1);
   assert.deepEqual([r[0].organization_id, r[0].service_key, r[0].status, r[0].note], [alpha.id, "brand-logos", "new", "We need a primary and an icon version."]);
   assert.equal(r[0].requested_by, rowsOf(w, "SELECT id FROM portal_users WHERE email = 'ann@alpha.test'")[0].id);
   assert.equal(rowsOf(w, "SELECT count(*) n FROM activity_log WHERE action = 'service.requested' AND organization_id = ?", alpha.id)[0].n, 1);
-  const html = await (await ann.get(res.headers.get("Location"))).text();
+  const html = await (await ann.get(res.headers.get("Location").replace(/\/(logos|colours|brand-kit)\?/, "/all?"))).text();
   assert.match(html, /Request sent\. Framework will follow up\./);
   const logos = html.slice(html.indexOf('id="logo"'), html.indexOf('id="typography"'));
   assert.match(logos, /class="tag">Requested</); assert.ok(!/<summary class="btn/.test(logos), "no button while the request is open");
@@ -70,11 +70,11 @@ test("an owner requests an empty section: the request is stored for the right or
 test("no accidental duplicates: pressing it again, or twice at once, leaves exactly one open request and says so", async () => {
   const { w, ann, send } = await setup();
   const again = await send(ann, "alpha", { section: "brand-colours" });
-  assert.equal(again.headers.get("Location"), `${base("alpha")}?requested=1`);
+  assert.equal(again.headers.get("Location"), `${base("alpha")}/colours?requested=1`);
   const dup = await send(ann, "alpha", { section: "brand-colours" });
-  assert.equal(dup.status, 303); assert.equal(dup.headers.get("Location"), `${base("alpha")}?requested=0`);
-  assert.match(await (await ann.get(dup.headers.get("Location"))).text(), /already open, so we didn’t send it twice/);
-  const token = await (async () => csrfOf(await (await ann.get(base("alpha"))).text()))();
+  assert.equal(dup.status, 303); assert.equal(dup.headers.get("Location"), `${base("alpha")}/colours?requested=0`);
+  assert.match(await (await ann.get(dup.headers.get("Location").replace(/\/(logos|colours|brand-kit)\?/, "/all?"))).text(), /already open, so we didn’t send it twice/);
+  const token = await (async () => csrfOf(await (await ann.get(base("alpha") + "/all")).text()))();
   const both = await Promise.all([send(ann, "alpha", { section: "brand-typography" }, token), send(ann, "alpha", { section: "brand-typography" }, token)]);
   assert.deepEqual(both.map((r) => r.status), [303, 303]);
   assert.equal(rowsOf(w, "SELECT count(*) n FROM service_requests WHERE service_key IN ('brand-colours', 'brand-typography')")[0].n, 2, "one per section");
@@ -87,13 +87,13 @@ test("sections that already have files also offer 'Request additions or changes'
   assert.ok(up.ok);
   await brand.saveBrandKit(w.db, alpha.id, { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }] }, ADMIN);
   await brand.setBrandKitStatus(w.db, alpha.id, "published", ADMIN);
-  const html = await (await ann.get(base("alpha"))).text();
+  const html = await (await ann.get(base("alpha") + "/all")).text();
   const sec = (id, next) => html.slice(html.indexOf(`id="${id}"`), html.indexOf(`id="${next}"`));
   assert.match(sec("logo", "typography"), /Download PNG/); assert.match(sec("logo", "typography"), /Request additions or changes/);
   assert.match(sec("colours", "tagline"), /data-copy="#0A0A0A"/); assert.match(sec("colours", "tagline"), /Request additions or changes/);
   assert.match(sec("typography", "colours"), /Not added yet/);
   assert.equal((await ann.post(`${base("alpha")}/request`, { csrf: csrfOf(html), section: "brand-logos" })).status, 303);
-  assert.match(await (await ann.get(base("alpha"))).text(), /class="tag">Requested</);
+  assert.match(await (await ann.get(base("alpha") + "/all")).text(), /class="tag">Requested</);
 });
 
 test("after Admin closes or declines a request the button returns and a new one can be sent; an in-progress one still shows its status", async () => {
@@ -101,25 +101,25 @@ test("after Admin closes or declines a request the button returns and a new one 
   await send(ann, "alpha", { section: "brand-guidelines" });
   const id = rowsOf(w, "SELECT id FROM service_requests")[0].id;
   assert.equal((await admin(`/clients/${alpha.id}/branding/requests/${id}/update`, { method: "POST", json: { status: "contacted", admin_note: "We emailed you." } })).status, 200);
-  let html = await (await ann.get(base("alpha"))).text();
+  let html = await (await ann.get(base("alpha") + "/all")).text();
   assert.match(html, /class="tag">In progress</); assert.match(html, /Framework has been in touch/);
-  assert.equal((await send(ann, "alpha", { section: "brand-guidelines" })).headers.get("Location"), `${base("alpha")}?requested=0`, "still open: no second request");
+  assert.equal((await send(ann, "alpha", { section: "brand-guidelines" })).headers.get("Location"), `${base("alpha")}/brand-kit?requested=0`, "still open: no second request");
   await admin(`/clients/${alpha.id}/branding/requests/${id}/update`, { method: "POST", json: { status: "closed", admin_note: null } });
-  html = await (await ann.get(base("alpha"))).text();
+  html = await (await ann.get(base("alpha") + "/all")).text();
   assert.match(html, /class="tag">Closed</); assert.match(html.slice(html.indexOf('id="guidelines"'), html.indexOf('id="additional"')), /<summary class="btn btn--small">Request<span/);
-  assert.equal((await send(ann, "alpha", { section: "brand-guidelines" })).headers.get("Location"), `${base("alpha")}?requested=1`);
+  assert.equal((await send(ann, "alpha", { section: "brand-guidelines" })).headers.get("Location"), `${base("alpha")}/brand-kit?requested=1`);
   assert.equal(rowsOf(w, "SELECT count(*) n FROM service_requests WHERE service_key = 'brand-guidelines'")[0].n, 2);
 });
 
 test("Full Brand Kit: a prominent request at the bottom of the page, sent like any other", async () => {
   const { w, ann, send } = await setup();
-  let html = await (await ann.get(base("alpha"))).text();
+  let html = await (await ann.get(base("alpha") + "/all")).text();
   assert.ok(html.indexOf('id="h-kit"') > html.indexOf('id="additional"'), "it comes last");
   assert.match(html, /<summary class="btn btn--primary">Request full brand kit/);
   const res = await send(ann, "alpha", { section: "brand-full-kit", note: "" });
-  assert.equal(res.headers.get("Location"), `${base("alpha")}?requested=1`);
+  assert.equal(res.headers.get("Location"), `${base("alpha")}/brand-kit?requested=1`);
   assert.equal(rowsOf(w, "SELECT note FROM service_requests WHERE service_key = 'brand-full-kit'")[0].note, null, "an empty note is stored as nothing");
-  html = await (await ann.get(base("alpha"))).text();
+  html = await (await ann.get(base("alpha") + "/all")).text();
   assert.match(html.slice(html.indexOf('id="h-kit"')), /class="tag">Requested</);
 });
 
@@ -137,7 +137,7 @@ test("Admin sees every request with its section, status and note, linked to the 
 test("permissions and isolation: a member cannot send (403, nothing stored); a bad, missing or foreign CSRF token, an unknown section or an over-long note change nothing; the organization always comes from the session", async () => {
   const { w, alpha, beta, ann, mia, bob, send, csrf } = await setup();
   assert.equal((await send(mia, "alpha", { section: "brand-logos" })).status, 403);
-  assert.match(await (await mia.get(base("alpha"))).text(), /Ask an owner of your organization/);
+  assert.match(await (await mia.get(base("alpha") + "/all")).text(), /Ask an owner of your organization/);
   for (const token of [null, "", "garbage", await csrf(bob, "beta")]) assert.equal((await send(ann, "alpha", { section: "brand-logos" }, token)).status, 403, String(token).slice(0, 6));
   assert.equal((await send(ann, "alpha", { section: "brand-everything" })).status, 400);
   assert.equal((await send(ann, "alpha", { section: "" })).status, 400);
@@ -148,7 +148,7 @@ test("permissions and isolation: a member cannot send (403, nothing stored); a b
   const sent = await send(bob, "beta", { section: "brand-logos", organization_id: alpha.id, organization: "alpha", slug: "alpha" });
   assert.equal(sent.status, 303);
   assert.deepEqual(rowsOf(w, "SELECT organization_id, service_key FROM service_requests"), [{ organization_id: beta.id, service_key: "brand-logos" }]);
-  assert.ok(!/class="tag">Requested</.test(await (await ann.get(base("alpha"))).text()), "alpha does not see beta's request");
+  assert.ok(!/class="tag">Requested</.test(await (await ann.get(base("alpha") + "/all")).text()), "alpha does not see beta's request");
   assert.equal(rowsOf(w, "SELECT count(*) n FROM service_requests WHERE organization_id = ?", alpha.id)[0].n, 0);
 });
 
@@ -156,7 +156,7 @@ test("a request needs an active member: a removed owner can no longer send, and 
   const { w, alpha, ann } = await setup();
   assert.equal((await ann.get(`${base("alpha")}/request`)).status, 303, "a GET only redirects");
   assert.equal(rowsOf(w, "SELECT count(*) n FROM service_requests")[0].n, 0);
-  const token = csrfOf(await (await ann.get(base("alpha"))).text());
+  const token = csrfOf(await (await ann.get(base("alpha") + "/all")).text());
   w.db.raw.prepare("UPDATE memberships SET status = 'revoked', revoked_at = '2026-10-28T00:00:00.000Z', revoked_by = 'admin@framework.test' WHERE organization_id = ? AND user_id = (SELECT id FROM portal_users WHERE email = 'ann@alpha.test')").run(alpha.id);
   const res = await ann.post(`${base("alpha")}/request`, { csrf: token, section: "brand-logos" });
   assert.notEqual(res.status, 303);
@@ -166,7 +166,7 @@ test("a request needs an active member: a removed owner can no longer send, and 
 test("the request area is plain, scriptless HTML: no inline script or style, a labelled note field, native details; the note is never echoed back", async () => {
   const { ann, send } = await setup();
   await send(ann, "alpha", { section: "brand-logos", note: "<script>alert(1)</script>" });
-  const res = await ann.get(base("alpha"));
+  const res = await ann.get(base("alpha") + "/all");
   const html = await res.text();
   assert.ok(!html.includes("<script>alert(1)"), "the note is not rendered anywhere");
   assert.ok(!/\sstyle=|<script|\son[a-z]+=/.test(html.replace(/<link[^>]*>/g, "")), "no inline style, script or handler");

@@ -33,12 +33,19 @@ async function signOutForm(ctx, session) {
   return `<form method="post" action="/portal/logout" class="signout"><input type="hidden" name="csrf" value="${e(token)}"><button class="btn" type="submit">Sign out</button></form>`;
 }
 
-/** The subtle, persistent master-access strip: who is being viewed, the role being previewed, and the way back to the directory. Only ever rendered when the guard verified staff access. */
-async function staffBanner(ctx, a) {
+/**
+ * The master-access preview controls: one small floating, frosted-glass button (bottom right) that opens a compact panel with the client being viewed, the Owner / Member preview selector, Switch client
+ * and the environment switch. Only ever rendered when the guard verified staff access (a.staff), so it never exists for a client account. It is a native popover (no script, so the portal's policy is
+ * unchanged): a tap toggles it, Escape and a click outside close it, and focus goes back to the button. The preview choice is the existing POST /portal/staff/view-as (same CSRF token, role and
+ * same-path return); the environment link is the fixed /portal entry point of the other environment (env-switch.js): no session, token, client path or preview state is carried.
+ */
+async function staffBubble(ctx, a) {
   const token = await csrfFor(ctx.cfg, a.session);
   const next = e(ctx.url.pathname);
-  const form = (role, label) => `<form method="post" action="/portal/staff/view-as" class="staff-banner__form"><input type="hidden" name="csrf" value="${e(token)}"><input type="hidden" name="role" value="${role}"><input type="hidden" name="next" value="${next}"><button class="staff-banner__btn" type="submit"${a.staff.previewRole === role ? ' aria-pressed="true"' : ' aria-pressed="false"'}>${label}</button></form>`;
-  return `<div class="staff-banner" role="region" aria-label="Framework master access"><div class="wrap"><span class="staff-banner__who"><strong>Viewing: ${e(a.membership.name)}</strong> <span>Framework master access</span></span><span class="staff-banner__tools"><span class="staff-banner__label">Preview as</span>${form("owner", "Owner")}${form("member", "Member")}<a href="/portal">Switch client</a></span></div></div>`;
+  const role = (value, label) => `<form method="post" action="/portal/staff/view-as" class="pv__form"><input type="hidden" name="csrf" value="${e(token)}"><input type="hidden" name="role" value="${value}"><input type="hidden" name="next" value="${next}"><button class="pv__role" type="submit" aria-pressed="${a.staff.previewRole === value ? "true" : "false"}"><span class="pv__tick" aria-hidden="true">${a.staff.previewRole === value ? "✓" : ""}</span>${label}</button></form>`;
+  const env = switchLink(ctx.url.hostname, "portal");
+  const ICON = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="8" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>`;
+  return `<div class="pv" data-staff-preview><button class="pv__btn" type="button" popovertarget="pv-panel" aria-label="Preview controls">${ICON}</button><div class="pv__panel" id="pv-panel" popover role="dialog" aria-label="Preview controls"><p class="pv__eyebrow">Framework master access</p><p class="pv__who">Viewing: <strong>${e(a.membership.name)}</strong></p><div class="pv__group" role="group" aria-label="Preview as"><span class="pv__label">Preview as</span><div class="pv__seg">${role("owner", "Owner")}${role("member", "Member")}</div></div><div class="pv__links"><a class="pv__link" href="/portal">Switch client</a>${env ? `<a class="pv__link" href="${e(env.href)}" rel="noopener noreferrer">${e(env.label)}</a>` : ""}</div></div></div>`;
 }
 
 export async function staffDirectoryPage(ctx, session, orgs, q = "") {
@@ -82,7 +89,7 @@ async function shell(ctx, a, { title, active, body, status = 200, vm, script = n
   const wide = requestsEnabled(ctx.env);
   const list = wide ? requestsNav(ctx.env, m.role) : [{ key: "home", label: "Home", path: "" }, { key: "account", label: "Account", path: "/account" }, ...(permissionsFor(m.role).includes("members.view") ? [{ key: "team", label: "Team", path: "/members" }] : [])];
   const current = wide ? activeKey(String(ctx.url.pathname).slice(vm.base.length)) : active === "account" || active === "team" ? active : "home";
-  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), envTag: envTag(ctx.url.hostname), envLink: a.staff ? switchLink(ctx.url.hostname, "portal") : null, banner: a.staff ? await staffBanner(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}`, bleed, fx });
+  return appPage({ status, title, bodyHtml: body, nav: { base: vm.base, active: current, list, menu: wide }, who: { org: m.name, user: session.email }, actions: await signOutForm(ctx, session), envTag: envTag(ctx.url.hostname), floating: a.staff ? await staffBubble(ctx, a) : "", script, styles: wide ? [...styles, "/assets/css/portal-requests.css"] : styles, frameSrc, feedbackHref: `${vm.base}/feedback${ref ? `?from=${ref}` : ""}`, bleed, fx });
 }
 
 export function loginPage({ continueHref, ended = false, demoHref = null, fx = false, share = null }) {
@@ -184,11 +191,18 @@ export async function feedbackPage(ctx, a, o = {}) {
 }
 
 const BRANDING_SCRIPT = "/assets/js/portal-branding.js";
+const LOGO_UPLOAD_SCRIPT = "/assets/js/portal-logo-upload.js";
+const BRANDING_HUB_CSS = "/assets/css/portal-branding-hub.css";
+const BRANDING_VIEW_TITLE = { hub: "Branding", logos: "Logos", typography: "Typography", colours: "Brand Colours", kit: "Brand Kit", all: "Branding" };
 /** The Branding page: the five sections (always), the request controls and the Full Brand Kit request. `o`: see branding-live.js brandingOverview. */
 export async function brandingPage(ctx, a, brand, o = {}) {
   const vm = liveModel(ctx, a, {});
   const csrf = await csrfFor(ctx.cfg, a.session);
-  return shell(ctx, a, { title: "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, { ...o, csrf }), vm, script: brand.published ? BRANDING_SCRIPT : null, styles: Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [], ref: "branding" });
+  const view = o.view || "all";
+  const hubViews = view !== "all";
+  const fonts = Object.keys(specimenSlots(brand.typography, (brand.assets || []).filter((x) => x.kind === "font"))).length ? [`${vm.base}/branding/fonts.css`] : [];
+  const script = view === "logos" ? LOGO_UPLOAD_SCRIPT : brand.published || view === "colours" ? BRANDING_SCRIPT : null;
+  return shell(ctx, a, { title: BRANDING_VIEW_TITLE[view] || "Branding", active: "home", body: brandingLive.brandingOverview(vm, brand, { ...o, csrf }), vm, status: o.status || 200, script, styles: [...(hubViews ? [BRANDING_HUB_CSS] : []), ...fonts], ref: "branding" });
 }
 /** The Brand Book PROTOTYPE (Staging only): the same published brand as the Branding page, as a deck of stacked cards. Read-only; see branding-book.js. */
 export async function brandingBookPage(ctx, a, brand, o = {}) {

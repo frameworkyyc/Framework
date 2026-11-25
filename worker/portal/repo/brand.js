@@ -422,11 +422,45 @@ export async function createClientUpload(db, organizationId, userId, { category,
   return fail("not_allowed");
 }
 
+export const LOGO_TYPES = Object.freeze(["primary", "secondary", "simplified", "submark", "other"]);
+export const LOGO_COLOURS = Object.freeze(["full", "light", "dark"]);
+export const LOGO_BACKGROUNDS = Object.freeze(["transparent", "solid"]);
+const noLogoColumns = (err) => /no such column/i.test(String(err && err.message));
+
+/** The optional logo details of an upload (all three may be empty). An unknown value is refused ("invalid_logo_detail"), an empty one means "not chosen". */
+export function cleanLogoDetails({ type = "", colour = "", background = "" } = {}) {
+  const pick = (v, list) => { const x = String(v || "").trim(); return x === "" ? null : list.includes(x) ? x : undefined; };
+  const out = { type: pick(type, LOGO_TYPES), colour: pick(colour, LOGO_COLOURS), background: pick(background, LOGO_BACKGROUNDS) };
+  return Object.values(out).includes(undefined) ? null : out;
+}
+
+/**
+ * Saves the optional logo details on an upload that was just recorded. They only describe a file (never replace one), so this is a plain update of three nullable columns, and it is
+ * skipped quietly where migration 0032 is not applied yet: the upload itself is already saved either way.
+ */
+export async function setUploadLogoDetails(db, organizationId, uploadId, details) {
+  requireOrgId(organizationId); requireId(uploadId, "upload_id");
+  if (!details || (details.type === null && details.colour === null && details.background === null)) return false;
+  try {
+    await db.prepare("UPDATE brand_uploads SET logo_type = ?, logo_colour = ?, logo_background = ? WHERE id = ? AND organization_id = ? AND deleted_at IS NULL").bind(details.type, details.colour, details.background, uploadId, organizationId).run();
+    return true;
+  } catch (err) { if (noLogoColumns(err)) return false; throw err; }
+}
+
+/** The same bytes, already uploaded by this organization (and not deleted): makes a retry after a lost response safe, because nothing is stored twice. */
+export async function findUploadBySha(db, organizationId, sha256) {
+  requireOrgId(organizationId);
+  const r = await db.prepare("SELECT id, original_name, size_bytes FROM brand_uploads WHERE organization_id = ? AND sha256 = ? AND deleted_at IS NULL ORDER BY created_at LIMIT 1").bind(organizationId, sha256).first();
+  return r ? { id: r.id, name: r.original_name, size: r.size_bytes } : null;
+}
+
 /** What a client sees of their own organization's uploads: no keys, no hashes. */
 export async function listClientUploads(db, organizationId) {
   requireOrgId(organizationId);
-  return (await db.prepare("SELECT id, category, original_name, format, size_bytes, status, created_at FROM brand_uploads WHERE organization_id = ? AND deleted_at IS NULL ORDER BY created_at DESC, id").bind(organizationId).all()).results
-    .map((r) => ({ id: r.id, category: r.category, name: r.original_name, format: r.format, size: r.size_bytes, held: r.status === "held", createdAt: r.created_at }));
+  const map = (r) => ({ id: r.id, category: r.category, name: r.original_name, format: r.format, size: r.size_bytes, held: r.status === "held", createdAt: r.created_at, logoType: r.logo_type || null, logoColour: r.logo_colour || null, logoBackground: r.logo_background || null });
+  const rows = (cols) => db.prepare(`SELECT id, category, original_name, format, size_bytes, status, created_at${cols} FROM brand_uploads WHERE organization_id = ? AND deleted_at IS NULL ORDER BY created_at DESC, id`).bind(organizationId).all();
+  try { return (await rows(", logo_type, logo_colour, logo_background")).results.map(map); } catch (err) { if (!noLogoColumns(err)) throw err; }
+  return (await rows("")).results.map(map);
 }
 
 /** A client-submitted file that may be downloaded: not deleted and not held. */

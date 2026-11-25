@@ -54,7 +54,7 @@ test("with PORTAL_BRANDING off, Branding stays a 'Coming soon' page and none of 
   const { ann } = await setup({ flag: false });
   const page = await (await ann.get(base("alpha"))).text();
   assert.match(page, /Coming soon/);
-  for (const p of ["/uploads", "/uploads/00000000-0000-4000-8000-000000000000/download", "/files/00000000-0000-4000-8000-000000000000"]) assert.equal((await ann.get(base("alpha") + p)).status, 404, p);
+  for (const p of ["/logos", "/typography", "/colours", "/brand-kit", "/all", "/uploads", "/uploads/00000000-0000-4000-8000-000000000000/download", "/files/00000000-0000-4000-8000-000000000000"]) assert.equal((await ann.get(base("alpha") + p)).status, 404, p);
   const home = await (await ann.get("/portal/o/alpha")).text();
   assert.ok(!/href="\/portal\/o\/alpha\/branding"/.test(home), "Home does not link a section that is not live");
 });
@@ -68,7 +68,7 @@ test("with the flag on, Home links Branding", async () => {
 
 test("no brand kit: all nine numbered sections show in order, each with a clean empty state (Logo shows its four examples), plus the other-files groups, the upload path and the Full Brand Kit request", async () => {
   const { ann, mia } = await setup();
-  const res = await ann.get(base("alpha"));
+  const res = await ann.get(base("alpha") + "/all");
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("content-security-policy"), PORTAL_CSP, "no script on the empty page");
   const html = await res.text();
@@ -83,7 +83,7 @@ test("no brand kit: all nine numbered sections show in order, each with a clean 
   assert.match(html, /Need a complete brand identity\?/); assert.match(html, /Request full brand kit/);
   assert.ok(!/logo-grid|data-copy|Download (SVG|PNG|PDF|WEBP|JPG)|lv-card--has/.test(html), "no library chrome, no copy buttons and no download buttons");
   assert.equal([...html.matchAll(/lv-card--example/g)].length, 4, "the four variation cards are shown as examples"); assert.equal([...html.matchAll(/<span class="tag">Not added yet<\/span>/g)].length, 14, "4 logo cards + 3 typeface cards + 7 example panels");
-  const m = await (await mia.get(base("alpha"))).text();
+  const m = await (await mia.get(base("alpha") + "/all")).text();
   assert.ok(!/<summary class="btn/.test(m), "a member has no request buttons");
   assert.match(m, /Ask an owner of your organization to send a request for this section/);
 });
@@ -92,7 +92,7 @@ test("a DRAFT kit (even with published assets) shows the empty sections and noth
   const { w, ann, alpha, deliver } = await setup();
   const id = await deliver(alpha, logo, "x.png", S.png(), true);
   await brand.saveBrandKit(w.db, alpha.id, { colours: [{ name: "Ink", role: "primary", hex: "#0A0A0A", note: "" }] }, ADMIN);
-  const html = await (await ann.get(base("alpha"))).text();
+  const html = await (await ann.get(base("alpha") + "/all")).text();
   assert.match(html, /Not added yet/); assert.ok(!/data-copy/.test(html) && /swatch--example/.test(html), "the client kit is a draft: only the Framework example is shown, with no copy button");
   assert.equal((await ann.get(`${base("alpha")}/files/${id}`)).status, 404);
 });
@@ -108,7 +108,7 @@ test("a published kit shows logos grouped by variation, colours with codes, typo
   const licensed = await deliver(alpha, { kind: "font", title: "Switzer Regular", downloadable: true, license_note: "OFL" }, "f.ttf", S.ttf());
   const locked = await deliver(alpha, { kind: "font", title: "Secret Serif", downloadable: false, license_note: "Licensed to Framework" }, "g.ttf", S.ttf());
   await publishKit(alpha);
-  const res = await ann.get(base("alpha"));
+  const res = await ann.get(base("alpha") + "/all");
   assert.equal(res.headers.get("content-security-policy"), PORTAL_CSP_WITH_SCRIPT, "script only for the copy button, never inline");
   const html = await res.text();
   assert.equal((html.match(/lv-card--has/g) || []).length, 1, "PNG and SVG of one variation share a card");
@@ -129,15 +129,15 @@ test("a published kit shows logos grouped by variation, colours with codes, typo
 test("an unpublished kit's colours never reach the page after a kit is un-published", async () => {
   const { w, ann, alpha, publishKit } = await setup();
   await publishKit(alpha);
-  assert.match(await (await ann.get(base("alpha"))).text(), /data-copy="#0A0A0A"/);
+  assert.match(await (await ann.get(base("alpha") + "/all")).text(), /data-copy="#0A0A0A"/);
   await brand.setBrandKitStatus(w.db, alpha.id, "draft", ADMIN);
-  assert.ok(!/data-copy/.test(await (await ann.get(base("alpha"))).text()));
+  assert.ok(!/data-copy/.test(await (await ann.get(base("alpha") + "/all")).text()));
 });
 
 test("the brand name appears in the introduction when one is set", async () => {
   const { ann, alpha, publishKit } = await setup();
   await publishKit(alpha, { brandName: "Alpha Atelier" });
-  assert.match(await (await ann.get(base("alpha"))).text(), /Alpha Atelier/);
+  assert.match(await (await ann.get(base("alpha") + "/all")).text(), /Alpha Atelier/);
 });
 
 /* ------------------------------------------------------------------ downloads */
@@ -406,7 +406,7 @@ test("Branding is nine always-visible numbered sections (no accordion); Logo alw
   const d = await deliver(alpha, { kind: "document", title: "Card template" }, "d.pdf", S.pdf());
   const f = await deliver(alpha, { kind: "font", title: "Switzer Regular", downloadable: true, license_note: "OFL" }, "f.ttf", S.ttf());
   await publishKit(alpha);
-  const html = await (await ann.get(base("alpha"))).text();
+  const html = await (await ann.get(base("alpha") + "/all")).text();
   assert.equal([...html.matchAll(/<section class="bk-sec" id="/g)].length, 9);
   assert.ok(!/<details class="acc"|acc__head/.test(html), "sections are not collapsed");
   const sec = (id, next) => html.slice(html.indexOf(`id="${id}"`), html.indexOf(`id="${next}"`));

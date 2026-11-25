@@ -51,6 +51,7 @@ export const STAGES = Object.freeze([
   { file: "0028_website_analytics.sql", tables: ["website_analytics", "website_analytics_cache"], indexes: ["idx_website_analytics_cache_org"] }, // two tables for Website Analytics (which Cloudflare site and Search Console property to read; cached aggregates); needs 0011. Applied to Staging; Production only through this workflow, after approval
   { file: "0030_website_workspace.sql", tables: ["website_tasks", "website_updates"], indexes: ["idx_website_tasks_site", "idx_website_updates_site"] }, // one nullable column on websites (staging_url) and two tables for the Website review workspace; needs 0011. Applied to Staging; Production only through this workflow, after approval
   { file: "0031_website_staging_screenshot.sql", tables: [], indexes: [] }, // six nullable staging_screenshot_* columns on websites (no table or index); needs 0011. Approved for Staging (applied through the Staging workflow); Production only through this workflow, after its own approval
+  { file: "0032_brand_upload_logo_details.sql", tables: [], indexes: [] }, // three nullable logo_* columns on brand_uploads (no table or index); needs 0005. Additive; approved for Staging by the standing rule, applied with scripts/ops/staging-migrate.mjs.
 ]);
 export const EXPECTED = Object.freeze({
   name: "framework-portal",
